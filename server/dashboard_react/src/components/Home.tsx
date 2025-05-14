@@ -365,7 +365,7 @@ export default function Home({
           )}
 
           {selectedOrg && !isCreatingOrg && !isCreatingApp && (
-            <div className="h-full p-8">
+            <div className="h-full p-8 overflow-y-auto">
               <ApplicationDetails
                 application={selectedApp}
                 organization={selectedOrg}
