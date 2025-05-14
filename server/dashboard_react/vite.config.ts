@@ -55,6 +55,10 @@ export default defineConfig(({ command }) => {
             target: 'http://backend:9000',
             changeOrigin: false,
           },
+          '/analytics': {
+            target: 'http://backend:9000',
+            changeOrigin: true,
+          }
         },
       }
     })

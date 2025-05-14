@@ -1,9 +1,9 @@
 import { Application, Organisation } from "../../types";
 import { useState, useEffect } from "react";
-// import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ReleaseWorkflow from "../release/ReleaseWorkflow";
 import UserManagement from "./UserManagement";
-import { AppWindow, Plus, ArrowLeft, Activity, Clock, Globe, Package, ChevronDown, ChevronUp, Rocket, FileJson, ListRestart } from "lucide-react";
+import { AppWindow, Plus, ArrowLeft, Activity, Clock, Globe, Package, ChevronDown, ChevronUp, Rocket, FileJson, ListRestart, Eye } from "lucide-react";
 import axios from "../../api/axios";
 import CreateDimension from '../dimension/CreateDimension';
 import DimensionPriority from '../dimension/DimensionPriority';
@@ -65,6 +65,7 @@ export default function ApplicationDetails({
   const [loadingRelease, setLoadingRelease] = useState(false);
   const [showConfigDetails, setShowConfigDetails] = useState(false);
   const [isDimensionPriorityOpen, setIsDimensionPriorityOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setIsReleaseModalOpen(false);
@@ -338,6 +339,29 @@ export default function ApplicationDetails({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-4">
+        <button
+          onClick={() =>
+            navigate(
+              `/dashboard/release/${organization.name}/${application.application}`
+            )
+          }
+          className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all duration-300 border border-white/20 flex items-center"
+        >
+          <Eye size={18} className="mr-2" />
+          View Release Details
+        </button>
+        {/* <button
+          onClick={() => {
+            // Navigate to analytics, let the Analytics component handle release selection
+            navigate(
+              `/dashboard/analytics/${organization.name}/${application.application}`
+            );
+          }}
+          className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-green-500/20 flex items-center"
+        >
+          <BarChart3 size={18} className="mr-2" />
+          View Analytics
+        </button> */}
         <button
           onClick={handleRelease}
           className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
