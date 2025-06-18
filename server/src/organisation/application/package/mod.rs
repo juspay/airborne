@@ -46,7 +46,6 @@ use diesel::QueryDsl;
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(list)
-        .service(create_json)
         .service(create_package_json_v1)
         .service(create_json_v1_multipart)
 }
@@ -56,298 +55,6 @@ struct Response {
     version: i32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageConfig {
-    timeout: Option<i32>,
-    properties: Vec<serde_json::Value>,
-    version: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageManifestHash {
-    #[serde(flatten)]
-    entries: std::collections::HashMap<String, ManifestHashEntry>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ManifestHashEntry {
-    file_name: String,
-    hash: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageManifest {
-    #[serde(flatten)]
-    entries: std::collections::HashMap<String, String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PackageResourceEntry {
-    url: String,
-    file_path: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageResourceGroup {
-    #[serde(flatten)]
-    entries: std::collections::HashMap<String, PackageResourceEntry>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageBootResources {
-    mandatory: Option<PackageResourceGroup>,
-    best_effort: Option<PackageResourceGroup>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageInfo {
-    name: String,
-    version: String,
-    index: String,
-    properties: PackageProperties,
-    preboot: Option<PackageBootResources>,
-    postboot: Option<PackageBootResources>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-
-struct PackageProperties {
-    manifest_hash: Option<PackageManifestHash>,
-    manifest: Option<PackageManifest>,
-    #[serde(flatten)]
-    additional: std::collections::HashMap<String, serde_json::Value>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct PackageJsonRequest {
-    config: PackageConfig,
-    package: PackageInfo,
-}
-
-#[post("/create_json")]
-async fn create_json(
-    req: Json<PackageJsonRequest>,
-    auth_response: ReqData<AuthResponse>,
-    state: web::Data<AppState>,
-) -> Result<Json<Response>, actix_web::Error> {
-    let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
-
-    println!("organisation: {:?}", organisation);
-    println!("application: {:?}", application);
-
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(error::ErrorInternalServerError)?;
-
-    let latest_version = packages
-        .filter(org_id.eq(&organisation).and(app_id.eq(&application)))
-        .select(max(version))
-        .first::<Option<i32>>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
-
-    let ver = latest_version.unwrap_or(0) + 1;
-
-    let index_url = &req.package.index;
-    let index_name = index_url
-        .split('/')
-        .last()
-        .unwrap_or("index.jsa")
-        .to_string();
-
-    let mut file_list: Vec<String> = Vec::new();
-    if let Some(manifest) = &req.package.properties.manifest {
-        for file_path in manifest.entries.values() {
-            if let Some(filename) = file_path.split('/').last() {
-                file_list.push(filename.to_string());
-            }
-        }
-    }
-
-    if let Some(preboot) = &req.package.preboot {
-        if let Some(mandatory) = &preboot.mandatory {
-            for entry in mandatory.entries.values() {
-                file_list.push(entry.file_path.clone());
-            }
-        }
-        if let Some(best_effort) = &preboot.best_effort {
-            for entry in best_effort.entries.values() {
-                file_list.push(entry.file_path.clone());
-            }
-        }
-    }
-
-    if let Some(postboot) = &req.package.postboot {
-        if let Some(mandatory) = &postboot.mandatory {
-            for entry in mandatory.entries.values() {
-                file_list.push(entry.file_path.clone());
-            }
-        }
-        if let Some(best_effort) = &postboot.best_effort {
-            for entry in best_effort.entries.values() {
-                file_list.push(entry.file_path.clone());
-            }
-        }
-    }
-
-    file_list.sort();
-    file_list.dedup();
-
-    println!("ver : {:?}", ver);
-    println!("file_list : {:?}", file_list);
-    println!("index_name : {:?}", index_name);
-    println!("application : {:?}", application);
-    println!("organisation : {:?}", organisation);
-
-    // Create a control variant with the package configuration
-    let mut control_overrides = std::collections::HashMap::new();
-    control_overrides.insert("package.version".to_string(), Document::from(ver));
-    control_overrides.insert("package.name".to_string(), Document::from(application.clone()));
-    control_overrides.insert("config.package_timeout".to_string(), Document::from(30));
-    control_overrides.insert("config.release_config_timeout".to_string(), Document::from(10));
-    control_overrides.insert("config.version".to_string(), Document::from("1"));
-
-    // Create experimental variant with same overrides (required by check_variants_override_coverage)
-    let experimental_overrides = control_overrides.clone();
-
-    // Use superposition_org_id from environment
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-    println!(
-        "Using Superposition Org ID from environment for create_json: {}",
-        superposition_org_id_from_env
-    );
-
-    // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
-    println!("Using workspace name for create_json: {}", workspace_name);
-
-    println!(
-        "superposition_org_id_from_env : {:?}",
-        superposition_org_id_from_env
-    );
-
-    let control = VariantBuilder::default()
-        .id("control".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Control)
-        .overrides(Document::Object(control_overrides))
-        .build().map_err(error::ErrorInternalServerError)?;
-
-    let release = VariantBuilder::default()
-        .id("experimental".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
-        .overrides(Document::Object(experimental_overrides))
-        .build().map_err(error::ErrorInternalServerError)?;
-
-    let experiment = state.superposition_client
-        .create_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .name(format!(
-            "{}-{}-{}",
-            application, organisation, ver
-        ))
-        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
-        .description(format!(
-            "Experiment for application {} in organisation {} with version {}",
-            application, organisation, ver
-        ))
-        .change_reason(format!(
-            "Experiment for application {} in organisation {} with version {}",
-            application, organisation, ver
-        ))
-        .variants(control)
-        .variants(release)
-        .context("and", Document::Array(vec![]))
-        .send()
-        .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to create experiment: {}", e)))?;
-
-    println!("experiment : {:?}", experiment);
-
-    // Store package data with file information from preboot/postboot resources
-    let mut important_files: Vec<crate::utils::db::models::File> = Vec::new();
-    let mut lazy_files: Vec<crate::utils::db::models::File> = Vec::new();
-
-    // Extract files from manifest and categorize them
-    if let Some(manifest) = &req.package.properties.manifest {
-        for file_path in manifest.entries.values() {
-            if let Some(filename) = file_path.split('/').last() {
-                // For now, treat manifest files as important
-                important_files.push(crate::utils::db::models::File {
-                    url: format!("{}/{}", state.env.public_url, file_path),
-                    file_path: filename.to_string(),
-                });
-            }
-        }
-    }
-
-    // Extract files from preboot/postboot resources
-    if let Some(preboot) = &req.package.preboot {
-        if let Some(mandatory) = &preboot.mandatory {
-            for entry in mandatory.entries.values() {
-                important_files.push(crate::utils::db::models::File {
-                    url: entry.url.clone(),
-                    file_path: entry.file_path.clone(),
-                });
-            }
-        }
-        if let Some(best_effort) = &preboot.best_effort {
-            for entry in best_effort.entries.values() {
-                lazy_files.push(crate::utils::db::models::File {
-                    url: entry.url.clone(),
-                    file_path: entry.file_path.clone(),
-                });
-            }
-        }
-    }
-
-    if let Some(postboot) = &req.package.postboot {
-        if let Some(mandatory) = &postboot.mandatory {
-            for entry in mandatory.entries.values() {
-                important_files.push(crate::utils::db::models::File {
-                    url: entry.url.clone(),
-                    file_path: entry.file_path.clone(),
-                });
-            }
-        }
-        if let Some(best_effort) = &postboot.best_effort {
-            for entry in best_effort.entries.values() {
-                lazy_files.push(crate::utils::db::models::File {
-                    url: entry.url.clone(),
-                    file_path: entry.file_path.clone(),
-                });
-            }
-        }
-    }
-
-    diesel::insert_into(packages)
-        .values(PackageEntry {
-            version: ver,
-            app_id: application,
-            org_id: organisation,
-            index: index_name,
-            version_splits: true,
-            use_urls: true,
-            properties: serde_json::to_value(&req.package.properties)
-                .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
-            important: serde_json::to_value(&important_files)
-                .map_err(error::ErrorInternalServerError)?,
-            lazy: serde_json::to_value(&lazy_files).map_err(error::ErrorInternalServerError)?,
-            resources: serde_json::Value::Array(vec![]), // Default to empty array for create_json
-        })
-        .execute(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
-
-    Ok(Json(Response { version: ver }))
-}
 
 #[derive(Serialize)]
 struct PackageList {
@@ -356,7 +63,7 @@ struct PackageList {
 
 #[derive(Serialize)]
 struct Package {
-    index: String,
+    index: crate::utils::db::models::File,
     important: Vec<crate::utils::db::models::File>,
     lazy: Vec<crate::utils::db::models::File>,
     version: i32,
@@ -393,7 +100,11 @@ async fn list(
                 serde_json::from_value(a.lazy.clone()).unwrap_or_default();
 
             Package {
-                index: a.index.to_owned(),
+                index: serde_json::from_value(a.index.clone())
+                    .unwrap_or(crate::utils::db::models::File {
+                        url: String::new(),
+                        file_path: String::new(),
+                    }),
                 important,
                 lazy,
                 version: a.version,
@@ -544,7 +255,7 @@ async fn create_package_json_v1(
             version: ver,
             app_id: application.clone(),
             org_id: organisation.clone(),
-            index: req.package.index.url.clone(),
+            index: serde_json::to_value(&req.package.index).map_err(error::ErrorInternalServerError)?,
             version_splits: true,
             use_urls: true,
             important: serde_json::to_value(&req.package.important)
@@ -614,12 +325,12 @@ async fn create_json_v1_multipart(
         .await
         {
             Ok(_) => {
-                req.package.index = File {
+                req.package.index = crate::utils::db::models::File {
                     url: format!(
                         "{}/{}/{}",
                         state.env.public_url, state.env.bucket_name, s3_path
                     ),
-                    file_path: "index.android.bundle".to_string(),
+                    file_path: index_name.clone(),
                 };
             }
             Err(e) => {
@@ -721,7 +432,7 @@ async fn create_json_v1_multipart(
             version: ver,
             app_id: application.clone(),
             org_id: organisation.clone(),
-            index: req.package.index.url.clone(),
+            index: serde_json::to_value(&req.package.index).map_err(error::ErrorInternalServerError)?,
             version_splits: true,
             use_urls: true,
             important: serde_json::to_value(&req.package.important)
