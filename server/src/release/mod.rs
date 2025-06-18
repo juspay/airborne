@@ -93,7 +93,7 @@ struct InnerPackage {
     version: i32,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 struct File {
     url: String,
     #[serde(rename = "filePath")]
@@ -296,6 +296,8 @@ async fn serve_release(
         serde_json::from_value(package_data.important.clone()).unwrap_or_default();
     let lazy_files: Vec<File> =
         serde_json::from_value(package_data.lazy.clone()).unwrap_or_default();
+    let index_file: File = 
+        serde_json::from_value(package_data.index.clone()).unwrap_or_default();
 
     Ok(Json(ReleaseConfig {
         version: config_data.version.to_string(),
@@ -310,11 +312,8 @@ async fn serve_release(
         package: Package {
             name: package_data.app_id,
             version: config_data.version.to_string(),
-            properties: json!({"hello" : "world"}), // TODO: Add properties based on package settings.
-            index: File {
-                url: package_data.index,
-                file_path: "index.android.bundle".to_string(),
-            },
+            properties: config_data.properties.clone(),
+            index: index_file,
             important: important_files,
             lazy: lazy_files,
         },

@@ -335,7 +335,6 @@ fn parse_groups(user_id: String, groups: Vec<String>) -> User {
                     application: app_name,
                     organisation: organisation_name.clone(),
                     access: vec![access],
-                    release_config: None, // Get release config from CAC
                 });
             }
         } else {
