@@ -61,6 +61,7 @@ class ApplicationManager(
     private var indexFolderPath = ""
     private var sessionId: String? = null
     private var rcCallback: ReleaseConfigCallback? = null
+    private val packageBackupDir = "$BACKUPS_DIR/${PACKAGE_DIR_NAME}_backup"
 
     fun loadApplication(
         unSanitizedClientId: String,
@@ -505,6 +506,75 @@ class ApplicationManager(
         }
         return ""
     }
+
+    internal fun backupPackage(
+        restorePoint: String
+    ): Boolean {
+        otaServices.fileProviderService.updateFile("$packageBackupDir/$restorePoint/.keep", ByteArray(0))
+
+        otaServices.fileProviderService.listFilesRecursive(APP_DIR)?.forEach { name ->
+            val data = otaServices.fileProviderService.readFromFile("$APP_DIR/$name")
+            otaServices.fileProviderService.updateFile("$packageBackupDir/$restorePoint/$name", data.toByteArray())
+        }
+        Log.d(UpdateTask.TAG, "Created restore point at $restorePoint.")
+        return true
+    }
+
+    /**
+     * Creates a restore point with the given name.
+     * If the restore point name is `default`, it throws an `IllegalArgumentException`.
+     *
+     * @param restorePoint The name of the restore point to create.
+     * @throws IllegalArgumentException if the restore point name is `default`.
+     */
+    @Throws(IllegalArgumentException::class)
+    fun createRestorePoint(restorePoint: String) {
+        if (restorePoint == "default") {
+            throw IllegalArgumentException(
+                "Can't create restore point named `default` as it is a reserved restore point."
+            )
+        }
+        backupPackage(restorePoint)
+    }
+
+    /**
+     * Rolls back the package update to the specified restore point.
+     * If the restore point does not exist, it returns false.
+     *
+     * @param restorePoint The name of the restore point to roll back to.
+     * @return true if rollback was successful, false otherwise.
+     */
+    fun rollbackPackage(
+        restorePoint: String = "default"
+    ): Boolean {
+        Log.d(UpdateTask.TAG, "Rolling back package update to $restorePoint.")
+        cancelAllUpdateTasks()
+        trackInfo("rollback_initiated", JSONObject().put("restore_point", restorePoint))
+        val keepFile = otaServices.fileProviderService.getFileFromInternalStorage("$packageBackupDir/$restorePoint/.keep")
+        if (keepFile.exists()) {
+            otaServices.fileProviderService.listFiles("$packageBackupDir/$restorePoint")?.forEach { name ->
+                val data = otaServices.fileProviderService.readFromFile("$packageBackupDir/$restorePoint/$name")
+                otaServices.fileProviderService.updateFile("$APP_DIR/$name", data.toByteArray())
+            }
+            otaServices.fileProviderService.deleteFileFromInternalStorage("$packageBackupDir/$restorePoint/.keep")
+            Log.d(UpdateTask.TAG, "Rollback successful at $restorePoint.")
+            trackInfo("rollback_success", JSONObject().put("restore_point", restorePoint))
+            return true
+        } else {
+            Log.e(UpdateTask.TAG, "No backup found for rollback at restore point = $restorePoint.")
+            trackInfo("rollback_failed", JSONObject().put("restore_point", restorePoint))
+            return false
+        }
+    }
+
+    fun cancelAllUpdateTasks() {
+        val snapshot = RUNNING_UPDATE_TASKS.entries.toList()
+        snapshot.forEach { (clientId, task) ->
+            task.cancel()
+            RUNNING_UPDATE_TASKS.remove(clientId)
+        }
+    }
+
 
     companion object {
         const val TAG = "ApplicationManager"
