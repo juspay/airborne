@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use crate::utils::db::models::File;
 use crate::utils::workspace::get_workspace_name_for_application;
 use crate::{
@@ -248,9 +250,22 @@ async fn create_json(
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
+        .name(format!(
+            "{}-{}-{}",
+            application, organisation, ver
+        ))
+        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
+        .description(format!(
+            "Experiment for application {} in organisation {} with version {}",
+            application, organisation, ver
+        ))
+        .change_reason(format!(
+            "Experiment for application {} in organisation {} with version {}",
+            application, organisation, ver
+        ))
         .variants(control)
         .variants(release)
-        .context("TODO", Document::String("TODO".to_string()))
+        .context("and", Document::Array(vec![]))
         .send()
         .await
         .map_err(|e| error::ErrorInternalServerError(format!("Failed to create experiment: {}", e)))?;
@@ -503,9 +518,22 @@ async fn create_package_json_v1(
     .create_experiment()
     .org_id(superposition_org_id_from_env.clone())
     .workspace_id(workspace_name.clone())
+    .name(format!(
+        "{}-{}-{}",
+        application, organisation, ver
+    ))
+    .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
+    .description(format!(
+        "Experiment for application {} in organisation {} with version {}",
+        application, organisation, ver
+    ))
+    .change_reason(format!(
+        "Experiment for application {} in organisation {} with version {}",
+        application, organisation, ver
+    ))
     .variants(control_variant)
     .variants(experimental_variant)
-    .context("TODO", Document::String("TODO".to_string()))
+    .context("and", Document::Array(vec![])) // Empty context for now
     .send()
     .await
     .map_err(|e| error::ErrorInternalServerError(format!("Failed to create experiment: {}", e)))?;
@@ -667,9 +695,22 @@ async fn create_json_v1_multipart(
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
+        .name(format!(
+            "{}-{}-{}",
+            application, organisation, ver
+        ))
+        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
+        .description(format!(
+            "Experiment for application {} in organisation {} with version {}",
+            application, organisation, ver
+        ))
+        .change_reason(format!(
+            "Experiment for application {} in organisation {} with version {}",
+            application, organisation, ver
+        ))
         .variants(control_variant)
         .variants(experimental_variant)
-        .context("TODO", Document::String("TODO".to_string()))
+        .context("and", Document::Array(vec![]))
         .send()
         .await
         .map_err(|e| error::ErrorInternalServerError(format!("Failed to create experiment: {}", e)))?;

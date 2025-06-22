@@ -31,8 +31,7 @@ use crate::{
         db::{
             models::{PackageEntryRead, ReleaseEntry},
             schema::hyperotaserver::releases::dsl::*,
-        },
-        workspace::get_workspace_name_for_application,
+        }, document::value_to_document, workspace::get_workspace_name_for_application
     },
 };
 
@@ -44,7 +43,12 @@ pub fn add_routes() -> Scope {
 struct CreateRequest {
     version_id: Option<String>,
     metadata: Option<serde_json::Value>,
-    context: Option<serde_json::Value>, // Changed to accept JsonLogic format directly
+    context: Option<Context>, // Changed to accept JsonLogic format directly
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct Context {
+    and: serde_json::Value
 }
 
 #[derive(Serialize)]
@@ -168,14 +172,6 @@ async fn create(
         workspace_name
     );
 
-    // Create context and variants for the experiment
-    let mut context_map: std::collections::HashMap<String, serde_json::Value> =
-        std::collections::HashMap::new();
-    if let Some(context) = &req.context {
-        context_map =
-            serde_json::from_value(context.clone()).map_err(error::ErrorInternalServerError)?;
-    }
-
     // Create control variant with release configuration
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert(
@@ -204,13 +200,34 @@ async fn create(
         .build()
         .map_err(error::ErrorInternalServerError)?;
 
+    let context = if let Some(ctx) = &req.context {
+        // Convert JsonLogic context to Document
+        let and_condition = value_to_document(&ctx.and);
+        and_condition
+    } else {
+        Document::Array(vec![]) // Default to empty array if no context provided
+    };
+
     let created_experiment_response = state.superposition_client
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
+        .name(format!(
+            "{}-{}-exp",
+            application, organisation
+        ))
+        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
+        .description(format!(
+            "Experiment for application {} in organisation {}",
+            application, organisation
+        ))
+        .change_reason(format!(
+            "Experiment for application {} in organisation {}",
+            application, organisation
+        ))
         .variants(control_variant)
         .variants(experimental_variant)
-        .context("TODO", Document::String("TODO".to_string()))
+        .context("and", context)
         .send()
         .await
         .map_err(|e| {

@@ -15,22 +15,24 @@
 
 set -e
 
+AWS_URL="${AWS_URL:-http://localhost:4566}"
+
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Init script starting with PID $$"
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Current LocalStack container ID: $(hostname)"
 
 # Check if LocalStack is the same container as when we started
-CONTAINER_ID=$(curl -s http://localstack:4566/_localstack/health | grep -o '"container_id":"[^"]*' | cut -d'"' -f4)
+CONTAINER_ID=$(curl -s ${AWS_URL}/_localstack/health | grep -o '"container_id":"[^"]*' | cut -d'"' -f4)
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] LocalStack container reports ID: $CONTAINER_ID"
 
 # List any existing keys before we do anything
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Checking for existing keys..."
-aws --endpoint-url=http://localstack:4566 kms list-keys
+aws --endpoint-url=${AWS_URL} kms list-keys
 
 echo "Initializing AWS resources in LocalStack..."
 
 # Set up AWS environment variables
 export AWS_DEFAULT_REGION=us-east-1
-export AWS_ENDPOINT_URL="http://localstack:4566"
+export AWS_ENDPOINT_URL="${AWS_URL}"
 export AWS_SESSION_TOKEN=test
 export AWS_SECRET_ACCESS_KEY=test
 export AWS_ACCESS_KEY_ID=test
@@ -44,7 +46,7 @@ sleep 2
 
 # Test connectivity to localstack
 echo "Testing LocalStack connectivity..."
-curl -v http://localstack:4566
+curl -v ${AWS_URL}
 
 # Create the KMS key and get the ID
 echo "Creating KMS key..."
@@ -77,4 +79,4 @@ echo "AWS resources initialized successfully!"
 
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Created KMS key with ID: $KEYID"
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Checking all current keys:"
-aws --endpoint-url=http://localstack:4566 kms list-keys
+aws --endpoint-url=${AWS_URL} kms list-keys
