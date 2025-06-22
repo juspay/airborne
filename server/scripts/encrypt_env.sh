@@ -15,6 +15,7 @@
 
 set -e
 
+AWS_URL="${AWS_URL:-http://localhost:4566}"
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Starting encrypt_env.sh with PID $$"
 
 # Use the KMS key alias
@@ -23,7 +24,7 @@ echo "[$(date +"%Y-%m-%d %H:%M:%S")] Using KMS Key ID: $KMS_KEY_ID"
 
 # Before encryption, check what keys exist
 echo "[$(date +"%Y-%m-%d %H:%M:%S")] Available KMS keys during encryption:"
-aws --endpoint-url=http://localstack:4566 kms list-keys
+aws --endpoint-url=${AWS_URL} kms list-keys
 
 
 # Try multiple locations for the input file
@@ -86,7 +87,7 @@ while IFS= read -r line; do
     printf "%s" "$VALUE" > "$TMP_FILE"
     
     # Specify the endpoint URL explicitly
-    ENCRYPTED_VALUE=$(aws --endpoint-url=http://localstack:4566 kms encrypt \
+    ENCRYPTED_VALUE=$(aws --endpoint-url=${AWS_URL} kms encrypt \
       --key-id "$KMS_KEY_ID" \
       --plaintext fileb://"$TMP_FILE" \
       --query CiphertextBlob \

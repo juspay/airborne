@@ -213,13 +213,15 @@ services:
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_DEFAULT_REGION=us-east-1
+      - AWS_URL=http://localstack:4566
     volumes:
       - ./scripts:/scripts
       - .:/workspace
     working_dir: /workspace
     entrypoint: ["/bin/bash", "-c"]
     command: [
-        "/scripts/localstack-init/init-aws.sh &&
+        "export AWS_URL=http://localstack:4566 &&
+        /scripts/localstack-init/init-aws.sh &&
         echo 'Running encrypt_env.sh...' &&
         cd /scripts &&
         chmod +x encrypt_env.sh &&
