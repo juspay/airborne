@@ -248,7 +248,7 @@ pub async fn process_cleanup_outbox(
     // 2. Either never attempted (last_attempt is null) or last attempted more than MIN_RETRY_INTERVAL_SECS ago
     // 3. Limit to MAX_JOBS_PER_RUN to avoid overloading the system
     let pending_jobs: Vec<crate::utils::db::models::CleanupOutboxEntry> = cleanup_outbox
-        .filter(attempts.lt(MAX_ATTEMPTS as i32))
+        .filter(attempts.lt(MAX_ATTEMPTS))
         .filter(last_attempt.is_null().or(last_attempt.lt(min_retry_time)))
         .order_by(created_at.asc())
         .limit(MAX_JOBS_PER_RUN)

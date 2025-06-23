@@ -256,7 +256,7 @@ pub async fn remove_user_with_transaction(
     let org_path = format!("/{}/", org_context.org_id);
     let org_groups: Vec<_> = user_groups
         .iter()
-        .filter(|g| g.path.as_ref().map_or(false, |p| p.contains(&org_path)))
+        .filter(|g| g.path.as_ref().is_some_and(|p| p.contains(&org_path)))
         .collect();
 
     if org_groups.is_empty() {
@@ -374,7 +374,7 @@ pub async fn get_user_current_role(
         if let Some(path) = group.path {
             if path.starts_with(&org_path) && path != org_path {
                 // Extract role name from path
-                if let Some(role) = path.split('/').last() {
+                if let Some(role) = path.split('/').next_back() {
                     if !role.is_empty() {
                         return Ok(role.to_string());
                     }

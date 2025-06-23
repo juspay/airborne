@@ -162,9 +162,11 @@ async fn delete_organisation(
     }
 
     // Check if user has permissions to delete organization
-    if auth_response.organisation.as_ref().map_or(false, |org| {
-        org.name == organisation && org.is_admin_or_higher()
-    }) {
+    if auth_response
+        .organisation
+        .as_ref()
+        .is_some_and(|org| org.name == organisation && org.is_admin_or_higher())
+    {
         // Delete the organization using the transaction manager
         transaction::delete_organisation_with_transaction(&organisation, &admin, &realm, &state)
             .await?;
@@ -261,7 +263,7 @@ fn parse_user_organizations(groups: Vec<String>) -> Vec<Organisation> {
                 organisation.applications.push(Application {
                     application: app_name,
                     organisation: organisation_name.clone(),
-                    access: vec![access]
+                    access: vec![access],
                 });
             }
         } else {

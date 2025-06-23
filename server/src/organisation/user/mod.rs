@@ -145,10 +145,10 @@ async fn get_org_context(
 
     validate_required_access(&auth, required_level.access, operation)
         .await
-        .map_err(|e| OrgError::Unauthorized(e))?;
+        .map_err(OrgError::Unauthorized)?;
 
-    let org_name = validate_user(auth.organisation.clone(), required_level)
-        .map_err(|e| OrgError::Unauthorized(e))?;
+    let org_name =
+        validate_user(auth.organisation.clone(), required_level).map_err(OrgError::Unauthorized)?;
 
     Ok((org_name, auth))
 }
@@ -159,7 +159,7 @@ async fn find_target_user(
     realm: &str,
     username: &str,
 ) -> Result<UserContext, OrgError> {
-    let target_user = find_user_by_username(&admin, realm, username)
+    let target_user = find_user_by_username(admin, realm, username)
         .await
         .map_err(|e| OrgError::Internal(format!("Keycloak error: {}", e)))?
         .ok_or_else(|| OrgError::UserNotFound(username.to_string()))?;
@@ -188,7 +188,7 @@ async fn find_organization(
     realm: &str,
     org_name: &str,
 ) -> Result<OrgContext, OrgError> {
-    let org_group = find_org_group(&admin, realm, org_name)
+    let org_group = find_org_group(admin, realm, org_name)
         .await
         .map_err(|e| OrgError::Internal(format!("Keycloak error: {}", e)))?
         .ok_or_else(|| OrgError::OrgNotFound(org_name.to_string()))?;
@@ -215,7 +215,7 @@ async fn check_user_modifiable(
 ) -> Result<(), OrgError> {
     // Only check if we're changing from owner role
     if new_role != "owner" {
-        let is_last = is_last_owner(&admin, realm, org_group_id, target_user_id)
+        let is_last = is_last_owner(admin, realm, org_group_id, target_user_id)
             .await
             .map_err(|e| OrgError::Internal(e.to_string()))?;
 
@@ -505,7 +505,7 @@ async fn organisation_list_users(
                 group
                     .path
                     .as_ref()
-                    .map_or(false, |path| path.contains(&org_path))
+                    .is_some_and(|path| path.contains(&org_path))
             });
 
             if is_member {
@@ -520,7 +520,7 @@ async fn organisation_list_users(
                     .filter_map(|group| {
                         if let Some(path) = &group.path {
                             if path.starts_with(&format!("/{}/", org_name)) {
-                                return path.split('/').last().map(String::from);
+                                return path.split('/').next_back().map(String::from);
                             }
                         }
                         None

@@ -31,7 +31,9 @@ use crate::{
         db::{
             models::{PackageEntryRead, ReleaseEntry},
             schema::hyperotaserver::releases::dsl::*,
-        }, document::value_to_document, workspace::get_workspace_name_for_application
+        },
+        document::value_to_document,
+        workspace::get_workspace_name_for_application,
     },
 };
 
@@ -48,7 +50,7 @@ struct CreateRequest {
 
 #[derive(Debug, Deserialize, Clone)]
 struct Context {
-    and: serde_json::Value
+    and: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -174,10 +176,7 @@ async fn create(
 
     // Create control variant with release configuration
     let mut control_overrides = std::collections::HashMap::new();
-    control_overrides.insert(
-        "package.version".to_string(),
-        Document::from(pkg_version),
-    );
+    control_overrides.insert("package.version".to_string(), Document::from(pkg_version));
     // control_overrides.insert("package.name".to_string(), serde_json::json!(application.clone()));
     // control_overrides.insert("release.id".to_string(), serde_json::json!(release_id.to_string()));
     // control_overrides.insert("release.config_version".to_string(), serde_json::json!(config.config_version.clone()));
@@ -192,7 +191,6 @@ async fn create(
         .build()
         .map_err(error::ErrorInternalServerError)?;
 
-
     let experimental_variant = VariantBuilder::default()
         .id("experimental_{}".to_string())
         .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
@@ -202,20 +200,18 @@ async fn create(
 
     let context = if let Some(ctx) = &req.context {
         // Convert JsonLogic context to Document
-        let and_condition = value_to_document(&ctx.and);
-        and_condition
+
+        value_to_document(&ctx.and)
     } else {
         Document::Array(vec![]) // Default to empty array if no context provided
     };
 
-    let created_experiment_response = state.superposition_client
+    let created_experiment_response = state
+        .superposition_client
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
-        .name(format!(
-            "{}-{}-exp",
-            application, organisation
-        ))
+        .name(format!("{}-{}-exp", application, organisation))
         .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
         .description(format!(
             "Experiment for application {} in organisation {}",
@@ -232,9 +228,11 @@ async fn create(
         .await
         .map_err(|e| {
             eprintln!("Failed to create experiment: {:?}", e); // Log the detailed error
-            error::ErrorInternalServerError(format!("Failed to create experiment in Superposition"))
+            error::ErrorInternalServerError(
+                "Failed to create experiment in Superposition".to_string(),
+            )
         })?;
-        
+
     // Assuming 'id' is the field in CreateExperimentResponseContent and it has to_string()
     // The actual type of created_experiment_response.id is models::ExperimentId (likely i64 or similar)
     let experiment_id_for_ramping = created_experiment_response.id.to_string();

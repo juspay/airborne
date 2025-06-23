@@ -29,7 +29,6 @@ mod utils;
 use aws_sdk_s3::config::Builder;
 use dotenvy::dotenv;
 use middleware::auth::Auth;
-use reqwest::Client;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 

@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE},
     types::AppState,
-    utils::{document::{document_to_json_value, value_to_document}, workspace::get_workspace_name_for_application},
+    utils::{
+        document::{document_to_json_value, value_to_document},
+        workspace::get_workspace_name_for_application,
+    },
 };
 use serde_json::Value;
 
@@ -72,25 +75,25 @@ async fn create_dimension_api(
     let workspace_name =
         get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
 
-
-    let current_dimensions = state.superposition_client
+    let current_dimensions = state
+        .superposition_client
         .list_dimensions()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
         .send()
         .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to list dimensions: {}", e)))?;
-    
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to list dimensions: {}", e))
+        })?;
+
     // Find the highest position using nested match statements
     let highest_position = match &current_dimensions.data {
-        Some(dimensions) => match dimensions.iter().map(|d| d.position).max() {
-            Some(pos) => pos,
-            None => 0,
-        },
+        Some(dimensions) => dimensions.iter().map(|d| d.position).max().unwrap_or(0),
         None => 0,
     };
 
-    let dimension = state.superposition_client
+    let dimension = state
+        .superposition_client
         .create_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
@@ -101,9 +104,10 @@ async fn create_dimension_api(
         .change_reason("Creating new dimension".to_string())
         .send()
         .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to create dimension: {}", e)))?;
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to create dimension: {}", e))
+        })?;
 
-    
     Ok(Json(CreateDimensionResponse {
         dimension: dimension.dimension,
         position: dimension.position,
@@ -152,12 +156,13 @@ async fn list_dimensions_api(
     let workspace_name =
         get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
 
-    let dimensionsreq = state.superposition_client
+    let dimensionsreq = state
+        .superposition_client
         .list_dimensions()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone());
     let dimensionsreq = if let Some(page) = query.page {
-        dimensionsreq.page(page as i32)
+        dimensionsreq.page(page)
     } else {
         dimensionsreq
     };
@@ -166,11 +171,10 @@ async fn list_dimensions_api(
     } else {
         dimensionsreq // Default count if not provided
     };
-    let dimensions = dimensionsreq
-        .send()
-        .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to list dimensions: {}", e)))?;
-    
+    let dimensions = dimensionsreq.send().await.map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to list dimensions: {}", e))
+    })?;
+
     Ok(Json(ListDimensionsResponse {
         total_pages: dimensions.total_pages,
         total_items: dimensions.total_items,
@@ -213,14 +217,14 @@ async fn update_dimension_api(
     let workspace_name =
         get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
 
-    let update_dimension = state.superposition_client
+    let update_dimension = state
+        .superposition_client
         .update_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
         .dimension(path.into_inner());
     let update_dimension = if let Some(position) = req.position {
-        update_dimension
-            .position(position)
+        update_dimension.position(position)
     } else {
         update_dimension
     };
@@ -228,7 +232,9 @@ async fn update_dimension_api(
         .change_reason(req.change_reason.clone())
         .send()
         .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to update dimension: {}", e)))?;
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to update dimension: {}", e))
+        })?;
 
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
@@ -262,14 +268,17 @@ async fn delete_dimension_api(
     let workspace_name =
         get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
 
-    state.superposition_client
+    state
+        .superposition_client
         .delete_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
         .dimension(path.into_inner())
         .send()
         .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to delete dimension: {}", e)))?;
-    
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to delete dimension: {}", e))
+        })?;
+
     Ok(Json(()))
 }
