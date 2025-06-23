@@ -14,7 +14,6 @@
 
 use std::collections::HashMap;
 
-use actix_web::error::HttpError;
 use actix_web::web::{Json, ReqData};
 use actix_web::{error, Scope};
 
@@ -58,7 +57,7 @@ pub fn add_routes() -> Scope {
 pub struct Application {
     pub application: String,
     pub organisation: String,
-    pub access: Vec<String>
+    pub access: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -70,11 +69,7 @@ fn default_config<T: Clone>(
     superposition_client: Client,
     workspace_name: String,
     superposition_org: String,
-) -> impl AsyncFn(
-    String,
-    T,
-    String,
-) -> actix_web::Result<CreateDefaultConfigOutput>
+) -> impl AsyncFn(String, T, String) -> actix_web::Result<CreateDefaultConfigOutput>
 where
     Document: From<T>,
 {
@@ -89,7 +84,8 @@ where
             .change_reason("Initial value".to_string())
             .schema(get_scheme(value.clone()))
             .send()
-            .await.map_err(error::ErrorInternalServerError)
+            .await
+            .map_err(error::ErrorInternalServerError)
     }
 }
 
@@ -106,20 +102,23 @@ where
             map.insert("pattern".to_string(), Document::String(String::from(".*")));
             map.insert("type".to_string(), Document::String(String::from("string")));
             map
-        },
+        }
         Document::Number(_) => {
             let mut map = HashMap::new();
-            map.insert("type".to_string(), Document::String(String::from("integer")));
+            map.insert(
+                "type".to_string(),
+                Document::String(String::from("integer")),
+            );
             map
-        },
+        }
         Document::Array(_) => {
             let mut map = HashMap::new();
             map.insert("type".to_string(), Document::String(String::from("array")));
-            let mut submap =  HashMap::new();
+            let mut submap = HashMap::new();
             submap.insert("type".to_string(), Document::String(String::from("string")));
             map.insert("items".to_string(), Document::Object(submap));
             map
-        },  
+        }
         _ => HashMap::new(),
     })
 }
@@ -331,7 +330,9 @@ async fn add_application(
 
         // Step 4: Create workspace in Superposition
 
-        match state.superposition_client.create_workspace()
+        match state
+            .superposition_client
+            .create_workspace()
             .org_id(superposition_org_id_from_env.clone())
             .workspace_name(generated_workspace_name.clone())
             .workspace_status(WorkspaceStatus::Enabled)
@@ -489,7 +490,7 @@ async fn add_application(
         actix_web::Result::Ok(Json(Application {
             application,
             organisation,
-            access: roles.iter().map(|&s| s.to_string()).collect()
+            access: roles.iter().map(|&s| s.to_string()).collect(),
         }))
     }
 }

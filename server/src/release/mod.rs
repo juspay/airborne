@@ -30,8 +30,8 @@ use crate::utils::{
         app_id as config_app_id, configs as configs_table, org_id as config_org_id,
         version as config_version,
     },
-    workspace::get_workspace_name_for_application,
     document::document_to_json_value,
+    workspace::get_workspace_name_for_application,
 };
 use crate::{
     types::AppState,
@@ -47,10 +47,7 @@ use diesel::QueryDsl;
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(serve_release)
-        .service( 
-            Scope::new("/v2")
-                .service(serve_release),
-        )
+        .service(Scope::new("/v2").service(serve_release))
 }
 
 #[derive(Serialize, Debug)]
@@ -114,8 +111,8 @@ fn decode_to_config_v2(value: GetResolvedConfigOutput) -> Result<PackageMeta> {
     if let Some(package_meta) = value.config.map(|doc| {
         document_to_json_value(&doc)
             .as_object()
-            .map(|a| a.clone())
-            .unwrap_or_else(|| Map::new())
+            .cloned()
+            .unwrap_or_else(Map::new)
     }) {
         // Extract direct values for config
         let config = ConfigMeta {
@@ -177,7 +174,6 @@ async fn serve_release(
     );
     println!("Query parameters: {:?}", query);
 
-
     let mut conn = state
         .db_pool
         .get()
@@ -191,12 +187,12 @@ async fn serve_release(
             error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
 
-    let context: HashMap<String, Value> =req
+    let context: HashMap<String, Value> = req
         .headers()
         .get("x-dimension")
         .and_then(|val| val.to_str().ok())
-        .map(|val| parse_kv_string(val))
-        .unwrap_or_else(|| HashMap::new());
+        .map(parse_kv_string)
+        .unwrap_or_default();
 
     println!("context: {:?}", context);
 
@@ -206,26 +202,24 @@ async fn serve_release(
         superposition_org_id_from_env
     );
 
-    let applicable_variants =
-        context.iter().fold(
-            state
-                .superposition_client
-                .applicable_variants()
-                .workspace_id(workspace_name.clone())
-                .org_id(superposition_org_id_from_env.clone())
-                .toss(-1)
-                .context("dummy", Document::from("dummy_value")),
-            |builder, (key, value)| {
-                builder.context(key.clone(), Document::String(value.as_str().unwrap_or("").to_string()))
-            },
-        );
-    let applicable_variants =
-        applicable_variants
-        .send()
-        .await
-        .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to get applicable variants: {}", e))
-        })?;
+    let applicable_variants = context.iter().fold(
+        state
+            .superposition_client
+            .applicable_variants()
+            .workspace_id(workspace_name.clone())
+            .org_id(superposition_org_id_from_env.clone())
+            .toss(-1)
+            .context("dummy", Document::from("dummy_value")),
+        |builder, (key, value)| {
+            builder.context(
+                key.clone(),
+                Document::String(value.as_str().unwrap_or("").to_string()),
+            )
+        },
+    );
+    let applicable_variants = applicable_variants.send().await.map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to get applicable variants: {}", e))
+    })?;
 
     println!("applicable_variants: {:?}", applicable_variants);
 
@@ -243,7 +237,12 @@ async fn serve_release(
             .org_id(superposition_org_id_from_env.clone())
             .context("region", Document::from("tamilnadu"))
             .context("variantIds", Document::from(applicable_variants_ids)),
-        |builder, (key, value)| builder.context(key.clone(), Document::String(value.as_str().unwrap_or("").to_string())),
+        |builder, (key, value)| {
+            builder.context(
+                key.clone(),
+                Document::String(value.as_str().unwrap_or("").to_string()),
+            )
+        },
     );
 
     let config = resolved_config_builder.send().await.map_err(|e| {
@@ -296,8 +295,7 @@ async fn serve_release(
         serde_json::from_value(package_data.important.clone()).unwrap_or_default();
     let lazy_files: Vec<File> =
         serde_json::from_value(package_data.lazy.clone()).unwrap_or_default();
-    let index_file: File = 
-        serde_json::from_value(package_data.index.clone()).unwrap_or_default();
+    let index_file: File = serde_json::from_value(package_data.index.clone()).unwrap_or_default();
 
     Ok(Json(ReleaseConfig {
         version: config_data.version.to_string(),

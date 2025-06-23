@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
-use crate::utils::db::models::File;
 use crate::utils::workspace::get_workspace_name_for_application;
 use crate::{
     middleware::auth::{validate_user, AuthResponse, READ, WRITE},
@@ -54,7 +51,6 @@ pub fn add_routes() -> Scope {
 struct Response {
     version: i32,
 }
-
 
 #[derive(Serialize)]
 struct PackageList {
@@ -100,11 +96,12 @@ async fn list(
                 serde_json::from_value(a.lazy.clone()).unwrap_or_default();
 
             Package {
-                index: serde_json::from_value(a.index.clone())
-                    .unwrap_or(crate::utils::db::models::File {
+                index: serde_json::from_value(a.index.clone()).unwrap_or(
+                    crate::utils::db::models::File {
                         url: String::new(),
                         file_path: String::new(),
-                    }),
+                    },
+                ),
                 important,
                 lazy,
                 version: a.version,
@@ -206,7 +203,10 @@ async fn create_package_json_v1(
     // Create control variant with package configuration
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert("package.version".to_string(), Document::from(ver));
-    control_overrides.insert("package.name".to_string(), Document::from(req.package.name.clone()));
+    control_overrides.insert(
+        "package.name".to_string(),
+        Document::from(req.package.name.clone()),
+    );
 
     // Create experimental variant
     let experimental_overrides = control_overrides.clone();
@@ -225,29 +225,29 @@ async fn create_package_json_v1(
         .build()
         .map_err(error::ErrorInternalServerError)?;
 
-    state.superposition_client
-    .create_experiment()
-    .org_id(superposition_org_id_from_env.clone())
-    .workspace_id(workspace_name.clone())
-    .name(format!(
-        "{}-{}-{}",
-        application, organisation, ver
-    ))
-    .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
-    .description(format!(
-        "Experiment for application {} in organisation {} with version {}",
-        application, organisation, ver
-    ))
-    .change_reason(format!(
-        "Experiment for application {} in organisation {} with version {}",
-        application, organisation, ver
-    ))
-    .variants(control_variant)
-    .variants(experimental_variant)
-    .context("and", Document::Array(vec![])) // Empty context for now
-    .send()
-    .await
-    .map_err(|e| error::ErrorInternalServerError(format!("Failed to create experiment: {}", e)))?;
+    state
+        .superposition_client
+        .create_experiment()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .name(format!("{}-{}-{}", application, organisation, ver))
+        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
+        .description(format!(
+            "Experiment for application {} in organisation {} with version {}",
+            application, organisation, ver
+        ))
+        .change_reason(format!(
+            "Experiment for application {} in organisation {} with version {}",
+            application, organisation, ver
+        ))
+        .variants(control_variant)
+        .variants(experimental_variant)
+        .context("and", Document::Array(vec![])) // Empty context for now
+        .send()
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to create experiment: {}", e))
+        })?;
 
     // Store package data with the new important and lazy structure
     diesel::insert_into(packages)
@@ -255,7 +255,8 @@ async fn create_package_json_v1(
             version: ver,
             app_id: application.clone(),
             org_id: organisation.clone(),
-            index: serde_json::to_value(&req.package.index).map_err(error::ErrorInternalServerError)?,
+            index: serde_json::to_value(&req.package.index)
+                .map_err(error::ErrorInternalServerError)?,
             version_splits: true,
             use_urls: true,
             important: serde_json::to_value(&req.package.important)
@@ -402,14 +403,12 @@ async fn create_json_v1_multipart(
         .build()
         .map_err(error::ErrorInternalServerError)?;
 
-    state.superposition_client
+    state
+        .superposition_client
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
-        .name(format!(
-            "{}-{}-{}",
-            application, organisation, ver
-        ))
+        .name(format!("{}-{}-{}", application, organisation, ver))
         .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
         .description(format!(
             "Experiment for application {} in organisation {} with version {}",
@@ -424,7 +423,9 @@ async fn create_json_v1_multipart(
         .context("and", Document::Array(vec![]))
         .send()
         .await
-        .map_err(|e| error::ErrorInternalServerError(format!("Failed to create experiment: {}", e)))?;
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to create experiment: {}", e))
+        })?;
 
     // Store package data with the new important and lazy structure
     diesel::insert_into(packages)
@@ -432,7 +433,8 @@ async fn create_json_v1_multipart(
             version: ver,
             app_id: application.clone(),
             org_id: organisation.clone(),
-            index: serde_json::to_value(&req.package.index).map_err(error::ErrorInternalServerError)?,
+            index: serde_json::to_value(&req.package.index)
+                .map_err(error::ErrorInternalServerError)?,
             version_splits: true,
             use_urls: true,
             important: serde_json::to_value(&req.package.important)
