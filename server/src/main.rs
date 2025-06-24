@@ -28,6 +28,9 @@ mod utils;
 
 use aws_sdk_s3::config::Builder;
 use dotenvy::dotenv;
+extern crate hyper;
+extern crate rustls;
+use google_sheets4::{yup_oauth2::{self, ServiceAccountAuthenticator}, Sheets, hyper_util, hyper_rustls};
 use middleware::auth::Auth;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
@@ -58,6 +61,23 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "false".to_string())
         .parse::<bool>()
         .unwrap_or(false);
+    let organisation_creation_disabled = std::env::var("ORGANISATION_CREATION_DISABLED")
+        .unwrap_or_else(|_| "false".to_string())
+        .parse::<bool>()
+        .unwrap_or(false);
+    let gcp_service_account_json_path = 
+        if organisation_creation_disabled {
+            std::env::var("GCP_SERVICE_ACCOUNT_PATH").expect("GCP_SERVICE_ACCOUNT_PATH must be set if ORGANISATION_CREATION_DISABLED=true")
+        } else {
+            "".to_string()
+        };
+    let spreadsheet_id =
+        if organisation_creation_disabled {
+            std::env::var("GOOGLE_SPREADSHEET_ID")
+                .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true")
+        } else {
+            "".to_string()
+        };
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -90,7 +110,9 @@ async fn main() -> std::io::Result<()> {
         realm,
         bucket_name,
         superposition_org_id: superposition_org_id_env,
-        enable_google_signin: enable_google_signin
+        enable_google_signin: enable_google_signin,
+        organisation_creation_disabled: organisation_creation_disabled,
+        google_spreadsheet_id: spreadsheet_id.clone(),
     };
 
     // This is required for localStack
@@ -100,6 +122,34 @@ async fn main() -> std::io::Result<()> {
         .build();
 
     let aws_s3_client = aws_sdk_s3::Client::from_conf(s3_config);
+
+    // Configure Google Sheets 
+    let mut hub = None;
+    if organisation_creation_disabled {
+        rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
+        let creds = yup_oauth2::read_service_account_key(gcp_service_account_json_path)
+            .await
+            .expect("Can't read gcp credential, an error occurred");
+
+        let gcp_auth = ServiceAccountAuthenticator::builder(creds)
+            .build()
+            .await
+            .expect("There was an error, trying to build connection with gcp authenticator");
+
+        let client = hyper_util::client::legacy::Client::builder(
+            hyper_util::rt::TokioExecutor::new()
+        )
+        .build(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .unwrap()
+                .https_or_http()
+                .enable_http1()
+                .build()
+        );
+        hub = Some(Sheets::new(client, gcp_auth));
+    }
+    
 
     // Create a shared state for the application
     let superposition_client = superposition_rust_sdk::Client::from_conf(
@@ -115,6 +165,7 @@ async fn main() -> std::io::Result<()> {
         db_pool: pool,
         s3_client: aws_s3_client,
         superposition_client,
+        sheets_hub: hub,
     });
 
     // Start the background cleanup job for transaction reconciliation

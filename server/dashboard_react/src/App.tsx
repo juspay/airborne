@@ -51,7 +51,8 @@ interface Application {
 type HomeResponse =
   | { type: "CREATE_ORGANISATION"; name: string }
   | { type: "CREATE_APPLICATION"; organisation: string; name: string }
-  | { type: "INVITE_USER"; organisation: string; email: string; role: string };
+  | { type: "INVITE_USER"; organisation: string; email: string; role: string }
+  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void };
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -59,6 +60,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [configurations, setConfigurations] = useState<Configuration>({
     enableGoogleSignIn: false,
+    organisationCreationDisabled: false,
   });
   console.log("rendering app");
 
@@ -70,6 +72,7 @@ const App: React.FC = () => {
         console.log("Global Configurations:", data);
         setConfigurations({
           enableGoogleSignIn: data.google_signin_enabled || false,
+          organisationCreationDisabled: data.organisation_creation_disabled || false,
         });
       } catch (error) {
         console.error("Failed to fetch global configurations:", error);
@@ -129,18 +132,36 @@ const App: React.FC = () => {
           access: response.role,
         };
         headers["x-organisation"] = response.organisation;
+      } else if (response.type === "REQUEST_ORGANISATION") {
+        endpoint = "/organisations/request";
+        payload = {
+          organisation_name: response.orgName,
+          name: response.name,
+          email: response.email,
+          phone: response.phoneNumber,
+          app_store_link: response.appStoreLink,
+          play_store_link: response.playStoreLink,
+        };
       }
 
       await axios.post(endpoint, payload, { headers });
 
       // Refresh organizations list using the new organizations endpoint
-      const { data: organisations } = await axios.get<Organisation[]>(
-        "/organisations"
-      );
+      if(response.type !== "REQUEST_ORGANISATION") {
+        const { data: organisations } = await axios.get<Organisation[]>(
+          "/organisations"
+        );
 
-      // Update user state with the new organizations data
-      setUser((prev) => (prev ? { ...prev, organisations } : null));
+        // Update user state with the new organizations data
+        setUser((prev) => (prev ? { ...prev, organisations } : null));
+      } else {
+        response.successCb?.();
+        console.log("Organisation request submitted successfully");
+      }
     } catch (error) {
+      if(response.type == "REQUEST_ORGANISATION") {
+        response.errorCb?.("We could not process your request. Please try again later.");
+      }
       console.error("API request failed:", error);
     }
   };
@@ -185,6 +206,7 @@ const App: React.FC = () => {
                 user={user}
                 onResponse={handleHomeResponse}
                 setIsAuthenticated={setIsAuthenticated}
+                configuration={configurations}
               />
             ) : (
               <Navigate to="/dashboard/login" replace />
