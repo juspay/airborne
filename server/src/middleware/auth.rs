@@ -102,7 +102,7 @@ pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> Resul
     }
 }
 
-fn get_access_level(user_groups: &Vec<String>, path: &str) -> Option<usize> {
+fn get_access_level(user_groups: &[String], path: &str) -> Option<usize> {
     static ACCESS_LIST: [&str; 4] = ["owner", "admin", "write", "read"];
     ACCESS_LIST.iter().enumerate().find_map(|(i, role)| {
         let full_path = format!("/{}/{}", path, role); // match format of a

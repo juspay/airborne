@@ -204,10 +204,11 @@ async fn login_implementation(
             &state.env.client_id,
         )
         .map_err(|_| error::ErrorUnauthorized("Token has expired or is invalid"))?;
-
+        println!("[LOGIN] Token data successful for user: {:?}", token_data);
         let admin_token = get_token(state.env.clone(), client)
             .await
             .map_err(error::ErrorInternalServerError)?;
+        println!("[LOGIN] Token admin successful for user: {:?}", admin_token);
         let mut user_resp = get_user_impl(
             AuthResponse {
                 sub: token_data.claims.sub,

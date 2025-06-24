@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
+
 use actix_web::{
     error, get, post,
     web::{self, Json, ReqData},
@@ -50,7 +52,7 @@ struct CreateRequest {
 
 #[derive(Debug, Deserialize, Clone)]
 struct Context {
-    and: serde_json::Value,
+    and: Vec<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -200,10 +202,9 @@ async fn create(
 
     let context = if let Some(ctx) = &req.context {
         // Convert JsonLogic context to Document
-
-        value_to_document(&ctx.and)
+        ctx.and.iter().map(value_to_document).collect()
     } else {
-        Document::Array(vec![]) // Default to empty array if no context provided
+        vec![] // Default to empty array if no context provided
     };
 
     let created_experiment_response = state
@@ -222,16 +223,16 @@ async fn create(
             application, organisation
         ))
         .variants(control_variant)
-        .variants(experimental_variant)
-        .context("and", context)
-        .send()
-        .await
-        .map_err(|e| {
-            eprintln!("Failed to create experiment: {:?}", e); // Log the detailed error
-            error::ErrorInternalServerError(
-                "Failed to create experiment in Superposition".to_string(),
-            )
-        })?;
+        .variants(experimental_variant);
+    let created_experiment_response = if !context.is_empty() {
+        created_experiment_response.context("and", Document::Array(context))
+    } else {
+        created_experiment_response.set_context(Some(HashMap::new()))
+    };
+    let created_experiment_response = created_experiment_response.send().await.map_err(|e| {
+        eprintln!("Failed to create experiment: {:?}", e); // Log the detailed error
+        error::ErrorInternalServerError("Failed to create experiment in Superposition".to_string())
+    })?;
 
     // Assuming 'id' is the field in CreateExperimentResponseContent and it has to_string()
     // The actual type of created_experiment_response.id is models::ExperimentId (likely i64 or similar)
@@ -242,19 +243,19 @@ async fn create(
         experiment_id_for_ramping
     );
 
-    state.superposition_client
-        .ramp_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .id(experiment_id_for_ramping.clone())
-        .traffic_percentage(50)
-        .change_reason(format!(
-            "Auto-activating and ramping experiment for release {} (pkg_version {}) to 100% traffic.",
-            release_id, pkg_version
-        ))
-        .send()
-        .await
-        .map_err(error::ErrorInternalServerError)?;
+    // state.superposition_client
+    //     .ramp_experiment()
+    //     .org_id(superposition_org_id_from_env.clone())
+    //     .workspace_id(workspace_name.clone())
+    //     .id(experiment_id_for_ramping.clone())
+    //     .traffic_percentage(50)
+    //     .change_reason(format!(
+    //         "Auto-activating and ramping experiment for release {} (pkg_version {}) to 100% traffic.",
+    //         release_id, pkg_version
+    //     ))
+    //     .send()
+    //     .await
+    //     .map_err(error::ErrorInternalServerError)?;
 
     let new_release = ReleaseEntry {
         id: release_id,

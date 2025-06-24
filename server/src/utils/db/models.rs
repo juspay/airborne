@@ -21,8 +21,6 @@ pub struct PackageEntry {
     pub app_id: String,
     pub org_id: String,
     pub index: serde_json::Value,
-    pub version_splits: bool,
-    pub use_urls: bool,
     pub important: serde_json::Value,
     pub lazy: serde_json::Value,
     #[diesel(sql_type = diesel::sql_types::Jsonb)]
@@ -39,8 +37,6 @@ pub struct PackageEntryRead {
     pub app_id: String,
     pub org_id: String,
     pub index: serde_json::Value,
-    pub version_splits: bool,
-    pub use_urls: bool,
     pub important: serde_json::Value,
     pub lazy: serde_json::Value,
     #[diesel(sql_type = diesel::sql_types::Jsonb)]

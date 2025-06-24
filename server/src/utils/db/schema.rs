@@ -35,8 +35,6 @@ pub mod hyperotaserver {
             app_id -> Text,
             org_id -> Text,
             index -> Jsonb,
-            version_splits -> Bool,
-            use_urls -> Bool,
             important -> Jsonb,
             lazy -> Jsonb,
             properties -> Jsonb,
