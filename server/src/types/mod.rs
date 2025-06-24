@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use superposition_rust_sdk::Client;
+use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 
 use crate::utils::db;
 
@@ -22,6 +23,7 @@ pub struct AppState {
     pub db_pool: db::DbPool,
     pub s3_client: aws_sdk_s3::Client,
     pub superposition_client: Client,
+    pub sheets_hub: Option<Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>>
 }
 
 #[derive(Clone, Debug)]
@@ -36,4 +38,6 @@ pub struct Environment {
     pub bucket_name: String,
     pub superposition_org_id: String,
     pub enable_google_signin: bool,
+    pub organisation_creation_disabled: bool,
+    pub google_spreadsheet_id: String,
 }

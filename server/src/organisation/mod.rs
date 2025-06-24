@@ -20,6 +20,9 @@ use actix_web::{
     HttpMessage, HttpRequest, Scope,
 };
 use application::Application;
+use google_sheets4::api::ValueRange;
+use hyper_rustls::HttpsConnector;
+use hyper::Client;
 use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -35,6 +38,7 @@ const MAX_ORG_NAME_LENGTH: usize = 50;
 // Routes
 pub fn add_routes() -> Scope {
     Scope::new("")
+        .service(request_organisation)
         .service(create_organisation)
         .service(delete_organisation)
         .service(list_organisations)
@@ -55,7 +59,110 @@ pub struct OrganisationCreatedRequest {
     pub name: String,
 }
 
-// API Implementations
+#[derive(Serialize, Deserialize)]
+pub struct OrganisationRequest {
+    pub organisation_name: String,
+    pub name: String,
+    pub email: String,
+    pub phone: Option<String>,
+    pub play_store_link: Option<String>,
+    pub app_store_link: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OrganisationRequestResponse {
+    pub organisation_name: String,
+    pub message: String,
+}
+
+#[post("/request")]
+async fn request_organisation(
+    req: HttpRequest,
+    body: Json<OrganisationRequest>,
+    state: web::Data<AppState>,
+) -> actix_web::Result<Json<OrganisationRequestResponse>> {
+    let organisation_name = body.organisation_name.clone();
+    let name = body.name.clone();
+    let email = body.email.clone();
+    let phone = body.phone.clone().unwrap_or("".to_string());
+    let play_store_link = body.play_store_link.clone().unwrap_or("".to_string());
+    let app_store_link = body.app_store_link.clone().unwrap_or("".to_string());
+
+    // Validate organization name
+    validate_organisation_name(&organisation_name)?;
+
+    // Get Keycloak Admin Token
+    let auth_response = req
+        .extensions()
+        .get::<AuthResponse>()
+        .cloned()
+        .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
+    let admin_token = auth_response.admin_token.clone();
+    let sub = &auth_response.sub;
+    let client = reqwest::Client::new();
+    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
+    let realm = state.env.realm.clone();
+
+    // Check if organization already exists
+    let groups = admin
+        .realm_groups_get(
+            &realm,
+            None,
+            Some(true),
+            None,
+            Some(2),
+            Some(false),
+            None,
+            Some(organisation_name.clone()),
+        )
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to check existing groups: {}", e))
+        })?;
+
+    if !groups.is_empty() {
+        return Err(error::ErrorBadRequest(Json(
+            json!({"Error" : "Organisation name is taken"}),
+        )));
+    }
+
+    // Push the organization to Google Sheets
+    let req = ValueRange {
+        major_dimension: None,
+        range: None,
+        values: Some(vec![vec![
+            serde_json::Value::String(name),
+            serde_json::Value::String(email),
+            serde_json::Value::String(phone),
+            serde_json::Value::String(organisation_name.clone()),
+            serde_json::Value::String(app_store_link),
+            serde_json::Value::String(play_store_link),
+        ]]),
+    };
+
+    match state.sheets_hub {
+        Some(ref hub) => {
+            let _result = hub
+                .spreadsheets()
+                .values_append(req, &state.env.google_spreadsheet_id, "A1:G1000")
+                .value_input_option("USER_ENTERED")
+                .doit()
+                .await
+                .map_err(|e| error::ErrorInternalServerError(format!("Failed to append to Google Sheets: {}", e)))?;
+        }
+        None => {
+            return Err(error::ErrorInternalServerError(
+                "Google Sheets hub is not initialized",
+            ));
+        }
+    }
+    
+
+    Ok(Json(OrganisationRequestResponse {
+            organisation_name,
+            message: "Organisation request submitted successfully".to_string(),
+        }))
+}
 
 #[post("/create")]
 async fn create_organisation(
@@ -79,6 +186,26 @@ async fn create_organisation(
     let client = reqwest::Client::new();
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
     let realm = state.env.realm.clone();
+
+    // Get user's groups
+    let group_representations = admin
+        .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to fetch user groups: {}", e))
+        })?;
+
+    // Extract group paths
+    let group_paths: Vec<String> = group_representations.iter().filter_map(|g| g.path.clone()).collect();
+
+    // Parse groups into organizations
+    let organizations = parse_user_organizations(group_paths);
+
+    if organizations.len() == 0 && state.env.organisation_creation_disabled {
+        return Err(error::ErrorForbidden(Json(
+            json!({"Error" : "You do not have permission to create an organisation"}),
+        )));
+    }
 
     // Check if organization already exists
     let groups = admin

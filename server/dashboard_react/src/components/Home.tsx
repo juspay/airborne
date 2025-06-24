@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { Plus, ChevronRight, Trash2, Building2, Users, Zap } from "lucide-react";
 import smallLogoImage from '../assets/airborne-cube-logo.png';
 import axios from "../api/axios"; 
+import RequestAccess from "./organization/RequestAccess";
+import { Configuration } from "../types";
 
 // Types
 interface User {
@@ -39,18 +41,21 @@ interface Application {
 type HomeResponse =
   | { type: "CREATE_ORGANISATION"; name: string }
   | { type: "CREATE_APPLICATION"; organisation: string; name: string }
-  | { type: "INVITE_USER"; organisation: string; email: string; role: string };
+  | { type: "INVITE_USER"; organisation: string; email: string; role: string }
+  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void };
 
 interface HomeProps {
   user: User;
   onResponse: (response: HomeResponse) => void;
   setIsAuthenticated: (isAuthenticated: boolean) => void;
+  configuration: Configuration;
 }
 
 export default function Home({
   user,
   onResponse,
   setIsAuthenticated,
+  configuration,
 }: HomeProps) {
   const navigate = useNavigate();
   const [selectedOrg, setSelectedOrg] = useState<Organisation | null>(null);
@@ -62,6 +67,13 @@ export default function Home({
   const [activeTab, setActiveTab] = useState<"applications" | "users">("applications");
   const [organisations, setOrganisations] = useState<Organisation[]>(user.organisations || []);
   const [isDeletingOrg, setIsDeletingOrg] = useState<string | null>(null);
+
+  const [reqOrgName, setReqOrgName] = useState("");
+  const [reqName, setReqName] = useState("");
+  const [reqEmail, setReqEmail] = useState("");
+  const [reqPhoneNumber, setReqPhoneNumber] = useState("");
+  const [reqAppStoreLink, setReqAppStoreLink] = useState("");
+  const [reqPlayStoreLink, setReqPlayStoreLink] = useState("");
 
   useEffect(() => {
     setOrganisations(user.organisations || []);
@@ -112,6 +124,52 @@ export default function Home({
       setNewOrgName("");
       setIsCreatingOrg(false);
     }
+  };
+
+  const handleReqOrgCreationSubmit = (successCb, errorCb) => {
+    console.log("Requesting organisation creation with data:", successCb, errorCb)
+    if (reqOrgName.trim().length == 0) {
+        console.log("org cannot be empty")
+        errorCb("Organisation name cannot be empty.")
+        return;
+      }
+
+      if (reqEmail.trim().length == 0) {
+        console.log("Email cannot be empty")
+        errorCb("Email cannot be empty.")
+        return;
+      }
+
+      if (reqName.trim().length == 0) {
+        console.log("name cannot be empty")
+        errorCb("Your name cannot be empty.")
+        return;
+      }
+
+
+      console.log("on resp")
+
+      onResponse({
+        type: "REQUEST_ORGANISATION",
+        orgName: reqOrgName.trim(),
+        name: reqName.trim(),
+        email: reqEmail.trim(),
+        phoneNumber: reqPhoneNumber.trim(),
+        appStoreLink: reqAppStoreLink.trim(),
+        playStoreLink: reqPlayStoreLink.trim(),
+        errorCb: (message: string) => {
+          errorCb(message);
+        },
+        successCb: () => {
+          successCb();
+          setReqOrgName("");
+          setReqName("");
+          setReqEmail("");
+          setReqPhoneNumber("");
+          setReqAppStoreLink("");
+          setReqPlayStoreLink("");
+        }
+      });
   };
 
   const handleCreateAppSubmit = () => {
@@ -209,7 +267,6 @@ export default function Home({
         setSelectedOrg(prevOrg => prevOrg ? {...prevOrg, users: []} : null);
     }
   }, [selectedOrg?.name, selectedOrg === null]);
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -311,13 +368,36 @@ export default function Home({
 
         {/* Main Content Area */}
         <main className="flex-1 relative">
-          {isCreatingOrg && (
+          {isCreatingOrg && (organisations.length > 0 || !configuration.organisationCreationDisabled) && (
             <div className="h-full flex items-center justify-center p-8">
               <div className="w-full max-w-2xl">
                 <CreateOrganization
                   newOrgName={newOrgName}
                   onOrgNameChange={setNewOrgName}
                   onCreateOrg={handleCreateOrgSubmit}
+                  onCancel={() => setIsCreatingOrg(false)} 
+                />
+              </div>
+            </div>
+          )}
+
+          {isCreatingOrg && organisations.length == 0 && configuration.organisationCreationDisabled && (
+            <div className="h-full flex items-center justify-center p-8">
+              <div className="w-full max-w-2xl">
+                <RequestAccess
+                  newOrgName={reqOrgName}
+                  name={reqName}
+                  email={reqEmail}
+                  phoneNumber={reqPhoneNumber}
+                  appStoreLink={reqAppStoreLink}
+                  playStoreLink={reqPlayStoreLink}
+                  onOrgNameChange={setReqOrgName}
+                  onNameChange={setReqName}
+                  onEmailChange={setReqEmail}
+                  onPhoneNumberChange={setReqPhoneNumber}
+                  onAppStoreLinkChange={setReqAppStoreLink}
+                  onPlayStoreLinkChange={setReqPlayStoreLink}
+                  onCreateOrg={handleReqOrgCreationSubmit}
                   onCancel={() => setIsCreatingOrg(false)} 
                 />
               </div>
@@ -394,8 +474,8 @@ export default function Home({
                     <div className="flex items-center justify-center space-x-3">
                       <Plus size={24} className="group-hover:rotate-90 transition-transform duration-300" /> 
                       <span>
-                        {organisations.length === 0 
-                          ? "Create Your First Organization" 
+                        {organisations.length === 0 && configuration.organisationCreationDisabled
+                          ? "Request to Create Organization" 
                           : "Create New Organization"
                         }
                       </span>

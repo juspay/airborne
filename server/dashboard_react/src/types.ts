@@ -32,4 +32,5 @@ export type HomeResponse =
 
 export type Configuration = {
   enableGoogleSignIn: boolean;
+  organisationCreationDisabled: boolean;
 }

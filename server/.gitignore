@@ -8,3 +8,5 @@
 localstack-data/
 superposition/
 **/.env*
+
+airborne-gcp.json
