@@ -31,10 +31,8 @@ use actix_web::{
     web::{self, Json, ReqData},
     Result, Scope,
 };
-use aws_smithy_types::Document;
 use diesel::dsl::max;
 use serde::{Deserialize, Serialize};
-use superposition_rust_sdk::types::builders::VariantBuilder;
 
 use diesel::prelude::*;
 use diesel::ExpressionMethods;
@@ -90,6 +88,7 @@ async fn list(
     let entries = entries
         .iter()
         .map(|a| {
+            let _ = a.org_id; //Suppress unused variable warning
             let important: Vec<crate::utils::db::models::File> =
                 serde_json::from_value(a.important.clone()).unwrap_or_default();
             let lazy: Vec<crate::utils::db::models::File> =
@@ -200,55 +199,6 @@ async fn create_package_json_v1(
         workspace_name
     );
 
-    // Create control variant with package configuration
-    let mut control_overrides = std::collections::HashMap::new();
-    control_overrides.insert("package.version".to_string(), Document::from(ver));
-    control_overrides.insert(
-        "package.name".to_string(),
-        Document::from(req.package.name.clone()),
-    );
-
-    // Create experimental variant
-    let experimental_overrides = control_overrides.clone();
-
-    let control_variant = VariantBuilder::default()
-        .id("control".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Control)
-        .overrides(Document::Object(control_overrides))
-        .build()
-        .map_err(error::ErrorInternalServerError)?;
-
-    let experimental_variant = VariantBuilder::default()
-        .id("experimental".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
-        .overrides(Document::Object(experimental_overrides))
-        .build()
-        .map_err(error::ErrorInternalServerError)?;
-
-    state
-        .superposition_client
-        .create_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .name(format!("{}-{}-{}", application, organisation, ver))
-        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
-        .description(format!(
-            "Experiment for application {} in organisation {} with version {}",
-            application, organisation, ver
-        ))
-        .change_reason(format!(
-            "Experiment for application {} in organisation {} with version {}",
-            application, organisation, ver
-        ))
-        .variants(control_variant)
-        .variants(experimental_variant)
-        .context("and", Document::Array(vec![])) // Empty context for now
-        .send()
-        .await
-        .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to create experiment: {}", e))
-        })?;
-
     // Store package data with the new important and lazy structure
     diesel::insert_into(packages)
         .values(PackageEntry {
@@ -257,8 +207,6 @@ async fn create_package_json_v1(
             org_id: organisation.clone(),
             index: serde_json::to_value(&req.package.index)
                 .map_err(error::ErrorInternalServerError)?,
-            version_splits: true,
-            use_urls: true,
             important: serde_json::to_value(&req.package.important)
                 .map_err(error::ErrorInternalServerError)?,
             lazy: serde_json::to_value(&req.package.lazy)
@@ -361,72 +309,6 @@ async fn create_json_v1_multipart(
         workspace_name
     );
 
-    // Create context string from context operators
-    let context_string = if !req.contexts.is_empty() {
-        req.contexts
-            .iter()
-            .map(|ctx| {
-                let operator_str = match ctx.operator {
-                    ContextOperator::Is => "IS",
-                };
-                format!("{}:{}:{}", ctx.key, operator_str, ctx.value)
-            })
-            .collect::<Vec<_>>()
-            .join(",")
-    } else {
-        String::new()
-    };
-
-    // Create control variant with package configuration
-    let mut control_overrides = std::collections::HashMap::new();
-    control_overrides.insert("package.version".to_string(), Document::from(ver));
-    control_overrides.insert("package.name".to_string(), Document::from(req.package.name));
-    if !context_string.is_empty() {
-        control_overrides.insert("context".to_string(), Document::from(context_string));
-    }
-
-    // Create experimental variant
-    let experimental_overrides = control_overrides.clone();
-
-    // Create variants
-    let control_variant = VariantBuilder::default()
-        .id("control".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Control)
-        .overrides(Document::Object(control_overrides))
-        .build()
-        .map_err(error::ErrorInternalServerError)?;
-
-    let experimental_variant = VariantBuilder::default()
-        .id("experimental".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
-        .overrides(Document::Object(experimental_overrides))
-        .build()
-        .map_err(error::ErrorInternalServerError)?;
-
-    state
-        .superposition_client
-        .create_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .name(format!("{}-{}-{}", application, organisation, ver))
-        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
-        .description(format!(
-            "Experiment for application {} in organisation {} with version {}",
-            application, organisation, ver
-        ))
-        .change_reason(format!(
-            "Experiment for application {} in organisation {} with version {}",
-            application, organisation, ver
-        ))
-        .variants(control_variant)
-        .variants(experimental_variant)
-        .context("and", Document::Array(vec![]))
-        .send()
-        .await
-        .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to create experiment: {}", e))
-        })?;
-
     // Store package data with the new important and lazy structure
     diesel::insert_into(packages)
         .values(PackageEntry {
@@ -435,8 +317,6 @@ async fn create_json_v1_multipart(
             org_id: organisation.clone(),
             index: serde_json::to_value(&req.package.index)
                 .map_err(error::ErrorInternalServerError)?,
-            version_splits: true,
-            use_urls: true,
             important: serde_json::to_value(&req.package.important)
                 .map_err(error::ErrorInternalServerError)?,
             lazy: serde_json::to_value(&req.package.lazy)

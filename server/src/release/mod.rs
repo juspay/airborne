@@ -22,7 +22,7 @@ use actix_web::{
 };
 use aws_smithy_types::Document;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value};
 use superposition_rust_sdk::operation::get_resolved_config::GetResolvedConfigOutput;
 
 use crate::utils::{
@@ -71,18 +71,9 @@ struct ConfigProperties {
     tenant_info: serde_json::Value,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug)]
 struct PackageMeta {
-    config: ConfigMeta,
     package: InnerPackage,
-}
-
-#[derive(Deserialize, Debug)]
-struct ConfigMeta {
-    version: String,
-    release_config_timeout: i32,
-    package_timeout: i32,
-    properties: serde_json::Value,
 }
 
 #[derive(Deserialize, Debug)]
@@ -114,24 +105,6 @@ fn decode_to_config_v2(value: GetResolvedConfigOutput) -> Result<PackageMeta> {
             .cloned()
             .unwrap_or_else(Map::new)
     }) {
-        // Extract direct values for config
-        let config = ConfigMeta {
-            version: package_meta
-                .get("config.version")
-                .and_then(|v| v.as_str())
-                .unwrap_or("0.0.0")
-                .to_string(),
-            release_config_timeout: package_meta
-                .get("config.release_config_timeout")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) as i32,
-            package_timeout: package_meta
-                .get("config.package_timeout")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) as i32,
-            properties: package_meta.get("properties").cloned().unwrap_or(json!({})),
-        };
-
         // Extract package version
         let package = InnerPackage {
             version: package_meta
@@ -140,7 +113,7 @@ fn decode_to_config_v2(value: GetResolvedConfigOutput) -> Result<PackageMeta> {
                 .unwrap_or(0) as i32,
         };
 
-        Ok(PackageMeta { config, package })
+        Ok(PackageMeta { package })
     } else {
         println!("Failed to decode package_meta from GetResolvedConfigOutput");
         Err(error::ErrorInternalServerError("Failed to decode JSON"))
@@ -208,8 +181,7 @@ async fn serve_release(
             .applicable_variants()
             .workspace_id(workspace_name.clone())
             .org_id(superposition_org_id_from_env.clone())
-            .toss(-1)
-            .context("dummy", Document::from("dummy_value")),
+            .toss(-1),
         |builder, (key, value)| {
             builder.context(
                 key.clone(),
@@ -217,6 +189,11 @@ async fn serve_release(
             )
         },
     );
+    let applicable_variants = if applicable_variants.get_context().is_none() {
+        applicable_variants.set_context(Some(HashMap::new()))
+    } else {
+        applicable_variants
+    };
     let applicable_variants = applicable_variants.send().await.map_err(|e| {
         error::ErrorInternalServerError(format!("Failed to get applicable variants: {}", e))
     })?;
@@ -310,7 +287,7 @@ async fn serve_release(
         package: Package {
             name: package_data.app_id,
             version: config_data.version.to_string(),
-            properties: config_data.properties.clone(),
+            properties: package_data.properties.clone(),
             index: index_file,
             important: important_files,
             lazy: lazy_files,
