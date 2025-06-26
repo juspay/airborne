@@ -12,28 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use superposition_rust_sdk::Client;
+use actix_web::{get, web::{self, Json}, HttpRequest, Scope};
+use crate::types::AppState;
+use serde::{ Serialize, Deserialize };
 
-use crate::utils::db;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub env: Environment,
-    pub db_pool: db::DbPool,
-    pub s3_client: aws_sdk_s3::Client,
-    pub superposition_client: Client,
+pub fn add_routes() -> Scope {
+    Scope::new("")
+        .service(get_global_configurations)
 }
 
-#[derive(Clone, Debug)]
-pub struct Environment {
-    pub public_url: String,
-    pub keycloak_url: String,
-    pub keycloak_external_url: String,
-    pub keycloak_public_key: String,
-    pub client_id: String,
-    pub secret: String,
-    pub realm: String,
-    pub bucket_name: String,
-    pub superposition_org_id: String,
-    pub enable_google_signin: bool,
+#[derive(Serialize, Deserialize)]
+struct Configuration {
+    google_signin_enabled: bool,
+}
+
+#[get("/")]
+async fn get_global_configurations(
+    _: HttpRequest,
+    state: web::Data<AppState>,
+) -> actix_web::Result<Json<Configuration>> {
+    
+    let config = Configuration {
+        google_signin_enabled: state.env.enable_google_signin,
+    };
+
+    Ok(Json(config))
 }

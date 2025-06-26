@@ -54,6 +54,10 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "9000".to_string())
         .parse()
         .expect("PORT must be a valid number");
+    let enable_google_signin = std::env::var("ENABLE_GOOGLE_SIGNIN")
+        .unwrap_or_else(|_| "false".to_string())
+        .parse::<bool>()
+        .unwrap_or(false);
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -86,6 +90,7 @@ async fn main() -> std::io::Result<()> {
         realm,
         bucket_name,
         superposition_org_id: superposition_org_id_env,
+        enable_google_signin: enable_google_signin
     };
 
     // This is required for localStack

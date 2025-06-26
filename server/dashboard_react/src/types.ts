@@ -29,3 +29,7 @@ export type HomeResponse =
   | { type: "CREATE_ORGANISATION"; name: string }
   | { type: "CREATE_APPLICATION"; organisation: string; name: string }
   | { type: "INVITE_USER"; organisation: string; email: string; role: string };
+
+export type Configuration = {
+  enableGoogleSignIn: boolean;
+}

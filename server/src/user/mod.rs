@@ -422,6 +422,9 @@ async fn get_oauth_url(
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<serde_json::Value>> {
     // Use external URL directly from config
+    if !state.env.enable_google_signin {
+        return Err(error::ErrorBadRequest("Google Sign-in is disabled"));
+    }
     let keycloak_url = &state.env.keycloak_external_url;
     let realm = &state.env.realm;
     let client_id = &state.env.client_id;
@@ -511,6 +514,9 @@ async fn oauth_login(
     json_req: Json<OAuthLoginRequest>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>> {
+    if !state.env.enable_google_signin {
+        return Err(error::ErrorBadRequest("Google Sign-in is disabled"));
+    }
     println!("[OAUTH_LOGIN] Processing OAuth login with code");
 
     let oauth_req = json_req.into_inner();
@@ -574,6 +580,9 @@ async fn oauth_signup(
     json_req: Json<OAuthRequest>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>> {
+    if !state.env.enable_google_signin {
+        return Err(error::ErrorBadRequest("Google Sign-in is disabled"));
+    }
     println!("[OAUTH_SIGNUP] Processing OAuth signup with code");
 
     let oauth_req = json_req.into_inner();

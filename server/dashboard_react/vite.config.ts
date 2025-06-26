@@ -35,6 +35,10 @@ export default defineConfig(({ command }) => {
           usePolling: true,
         },
         proxy: {
+          '/dashboard/configuration': {
+            target: 'http://backend:9000',
+            changeOrigin: false,
+          },
           '/organisations': {
             target: 'http://backend:9000',
             changeOrigin: false,
