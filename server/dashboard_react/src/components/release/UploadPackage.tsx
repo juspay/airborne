@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, Save, FileUp, X, Package, Copy, Check } from "lucide-react";
+import { Save, FileUp, X, Package, Copy, Check } from "lucide-react";
 import { Application, Organisation } from "../../types";
 import axios from "../../api/axios";
 
@@ -107,31 +107,6 @@ export default function UploadPackage({
     }
   };
 
-  const handleJsonFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        setErrorMessage("JSON file size should be less than 5MB");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const content = event.target?.result as string;
-          setJsonInput(content);
-          validateJson(content);
-        } catch (error) {
-          console.error(error);
-          setIsValidJson(false);
-          setErrorMessage("Invalid JSON file");
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
   const handleIndexFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -212,47 +187,7 @@ export default function UploadPackage({
                 {organization.name}
               </span>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white/60 hover:text-white/90 transition-colors duration-200"
-            >
-              <span className="sr-only">Close</span>
-              <X size={24} />
-            </button>
-          </div>
-
-          {/* Main Content */}
-          <div className="px-8 pb-8 space-y-6">
-            {/* File Upload Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* JSON File Upload */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                <label className="block text-sm font-medium text-white/90 mb-3">
-                  Upload Package JSON
-                </label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    id="json-upload"
-                    accept=".json"
-                    onChange={handleJsonFileUpload}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="json-upload"
-                    className="inline-flex items-center w-full px-4 py-3 text-sm bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 cursor-pointer transition-all duration-200 text-white/90"
-                  >
-                    <Upload size={16} className="mr-2 text-cyan-400" />
-                    Upload Package JSON
-                  </label>
-                </div>
-              </div>
-
-              {/* Index File Upload */}
-              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
-                <label className="block text-sm font-medium text-white/90 mb-3">
-                  Upload Index File (Optional)
-                </label>
+            <div className="flex items-center space-x-4">
                 <div className="relative">
                   <input
                     type="file"
@@ -276,21 +211,30 @@ export default function UploadPackage({
                       className="inline-flex items-center w-full px-4 py-3 text-sm bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 cursor-pointer transition-all duration-200 text-white/90"
                     >
                       <FileUp size={16} className="mr-2 text-cyan-400" />
-                      Upload Index File
+                      Upload Index File (Optional)
                     </label>
                   )}
                 </div>
                 {uploadError && (
                   <p className="mt-2 text-sm text-red-400">{uploadError}</p>
                 )}
-              </div>
+              <button
+                onClick={onClose}
+                className="text-white/60 hover:text-white/90 transition-colors duration-200"
+              >
+                <span className="sr-only">Close</span>
+                <X size={24} />
+              </button>
             </div>
+          </div>
 
+          {/* Main Content */}
+          <div className="px-8 pb-8 space-y-6">
             {/* JSON Editor */}
             <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
               <div className="flex items-center justify-between mb-4">
                 <label className="block text-sm font-medium text-white/90">
-                  Package JSON
+                  Release Config JSON
                 </label>
               </div>
               <div className="relative">

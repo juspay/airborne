@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Application, Organisation } from "../../types";
 import UploadPackage from "./UploadPackage";
-import UploadConfig from "./UploadConfig";
 import CreateRelease from "./CreateRelease";
 import { CheckCircle } from "lucide-react";
 
@@ -12,7 +11,7 @@ interface ReleaseWorkflowProps {
   onComplete: (releaseInfo: any) => void;
 }
 
-type WorkflowStep = "package" | "config" | "release";
+type WorkflowStep = "package" | "release";
 
 export default function ReleaseWorkflow({
   application,
@@ -22,22 +21,10 @@ export default function ReleaseWorkflow({
 }: ReleaseWorkflowProps) {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("package");
   const [packageVersion, setPackageVersion] = useState<number | null>(null);
-  const [configVersion, setConfigVersion] = useState<string | null>(null);
 
   // Handle the completion of package upload
   const handlePackageUploaded = (version: number) => {
     setPackageVersion(version);
-    setCurrentStep("config");
-  };
-
-  // Handle the completion of config upload
-  const handleConfigUploaded = (versionInfo: {
-    version: number;
-    config_version: string;
-  }) => {
-    // Update both versions based on API response (in case packageVersion changed on server)
-    setPackageVersion(versionInfo.version);
-    setConfigVersion(versionInfo.config_version);
     setCurrentStep("release");
   };
 
@@ -78,29 +65,6 @@ export default function ReleaseWorkflow({
 
               <div
                 className={`flex items-center ${
-                  currentStep === "config"
-                    ? "text-purple-600 font-medium"
-                    : "text-gray-500"
-                }`}
-              >
-                <span
-                  className={`flex items-center justify-center w-8 h-8 rounded-full mr-2 ${
-                    currentStep === "config"
-                      ? "bg-purple-100 text-purple-600"
-                      : configVersion
-                      ? "bg-green-100 text-green-500"
-                      : "bg-gray-100"
-                  }`}
-                >
-                  {configVersion ? <CheckCircle size={16} /> : "2"}
-                </span>
-                <span>Upload Config</span>
-              </div>
-
-              <div className="mx-4 h-0.5 w-10 bg-gray-200"></div>
-
-              <div
-                className={`flex items-center ${
                   currentStep === "release"
                     ? "text-purple-600 font-medium"
                     : "text-gray-500"
@@ -113,7 +77,7 @@ export default function ReleaseWorkflow({
                       : "bg-gray-100"
                   }`}
                 >
-                  3
+                  2
                 </span>
                 <span>Create Release</span>
               </div>
@@ -133,29 +97,16 @@ export default function ReleaseWorkflow({
           />
         )}
 
-        {currentStep === "config" && packageVersion !== null && (
-          <UploadConfig
-            application={application}
-            organization={organization}
-            packageVersion={packageVersion}
-            onClose={onClose}
-            onBack={() => setCurrentStep("package")}
-            onSuccess={handleConfigUploaded}
-          />
-        )}
-
         {currentStep === "release" &&
-          packageVersion !== null &&
-          configVersion !== null && (
+          packageVersion !== null && (
             <CreateRelease
               application={application}
               organization={organization}
               versionInfo={{
                 packageVersion,
-                configVersion,
               }}
               onClose={onClose}
-              onBack={() => setCurrentStep("config")}
+              onBack={() => setCurrentStep("package")}
               onSuccess={handleReleaseCreated}
             />
           )}
