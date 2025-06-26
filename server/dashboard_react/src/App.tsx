@@ -25,6 +25,7 @@ import { Signup } from "./components/Signup";
 import Release from "./components/Release";
 import axios from "./api/axios";
 import Toast from "./components/Toast";
+import { Configuration } from "./types";
 
 // Types
 interface User {
@@ -56,10 +57,25 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [configurations, setConfigurations] = useState<Configuration>({
+    enableGoogleSignIn: false,
+  });
   console.log("rendering app");
 
   // Consolidate authentication check into a single useEffect
   useEffect(() => {
+    const getGlobalConfigurations = async () => {
+      try {
+        const { data } = await axios.get("/dashboard/configuration/");
+        console.log("Global Configurations:", data);
+        setConfigurations({
+          enableGoogleSignIn: data.google_signin_enabled || false,
+        });
+      } catch (error) {
+        console.error("Failed to fetch global configurations:", error);
+      }
+    }
+    getGlobalConfigurations();
     const checkAuthStatus = async () => {
       const token =
         localStorage.getItem("userToken") ||
@@ -155,11 +171,12 @@ const App: React.FC = () => {
               <Login
                 setIsAuthenticated={setIsAuthenticated}
                 setUser={setUser}
+                configuration={configurations}
               />
             )
           }
         />
-        <Route path="/dashboard/signup" element={<Signup></Signup>} />
+        <Route path="/dashboard/signup" element={<Signup configuration={configurations}></Signup>} />
         <Route
           path="/dashboard"
           element={
