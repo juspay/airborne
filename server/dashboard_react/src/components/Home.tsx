@@ -4,9 +4,10 @@ import CreateOrganization from "./organization/CreateOrganization";
 import CreateApplication from "./organization/CreateApplication";
 import ApplicationDetails from "./organization/ApplicationDetails";
 import { useNavigate } from "react-router-dom";
-import { Plus, ChevronRight, Trash2, Building2, Users, Zap } from "lucide-react";
+import { Plus, Building2, Users, Zap } from "lucide-react";
 import smallLogoImage from '../assets/airborne-cube-logo.png';
-import axios from "../api/axios"; 
+import axios from "../api/axios";
+import Sidebar from "./layouts/Sidebar";
 import RequestAccess from "./organization/RequestAccess";
 import { Configuration } from "../types";
 
@@ -67,6 +68,7 @@ export default function Home({
   const [activeTab, setActiveTab] = useState<"applications" | "users">("applications");
   const [organisations, setOrganisations] = useState<Organisation[]>(user.organisations || []);
   const [isDeletingOrg, setIsDeletingOrg] = useState<string | null>(null);
+  const [_, setIsDeletingApp] = useState<string | null>(null);
 
   const [reqOrgName, setReqOrgName] = useState("");
   const [reqName, setReqName] = useState("");
@@ -235,7 +237,35 @@ export default function Home({
     }
   };
 
-  const isOrgAdmin = () => true;
+  const deleteApplication = async (appName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedOrg || !window.confirm(`Are you sure you want to delete ${appName}? This action cannot be undone.`)) {
+      return;
+    }
+    setIsDeletingApp(appName);
+    try {
+      await axios.delete(`/organisations/${selectedOrg.name}/applications/${appName}`, { headers: { "x-organisation": selectedOrg.name } });
+      alert("Application deleted successfully");
+      const updatedOrgs = organisations.map(org => {
+        if (org.name === selectedOrg.name) {
+          return {
+            ...org,
+            applications: org.applications.filter(app => app.application !== appName),
+          };
+        }
+        return org;
+      });
+      handleOrganizationsUpdated(updatedOrgs);
+      if (selectedApp?.application === appName) {
+        handleAppSelect(null);
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.Error || "Failed to delete application");
+      console.error("Delete application error:", error);
+    } finally {
+      setIsDeletingApp(null);
+    }
+  };
 
    useEffect(() => {
     const fetchUsers = async () => {
@@ -284,87 +314,17 @@ export default function Home({
       />
       
       <div className="flex h-[calc(100vh-4rem)] relative z-10">
-        {/* Left Sidebar - Organizations */}
-        <div className="w-80 bg-white/5 backdrop-blur-xl border-r border-white/10 flex flex-col">
-          {/* Sidebar Header */}
-          <div className="p-6 border-b border-white/10">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
-                <img src={smallLogoImage} alt="Airborne Logo" className="w-6 h-6" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Airborne</h1>
-                <p className="text-xs text-white/60">Organization Management</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white/80 uppercase tracking-wider">Organizations</h2>
-              <span className="text-xs text-white/50 bg-white/10 px-2 py-1 rounded-full">{organisations.length}</span>
-            </div>
-          </div>
-
-          {/* Organizations List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {organisations.map((org) => (
-              <div
-                key={org.name}
-                onClick={() => handleOrgSelect(org)}
-                className={`group relative p-4 rounded-xl cursor-pointer transition-all duration-300 ${
-                  selectedOrg?.name === org.name 
-                    ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30 shadow-lg shadow-blue-500/10" 
-                    : "bg-white/5 hover:bg-white/10 border border-white/10"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      selectedOrg?.name === org.name 
-                        ? "bg-gradient-to-r from-blue-400 to-purple-500" 
-                        : "bg-white/10"
-                    }`}>
-                      <Building2 size={18} className="text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white truncate">{org.name}</h3>
-                      <p className="text-xs text-white/60">{org.applications?.length || 0} apps</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    {isOrgAdmin() && (
-                      <button
-                        onClick={(e) => deleteOrganization(org.name, e)}
-                        className={`p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors ${
-                          isDeletingOrg === org.name ? "opacity-50 cursor-not-allowed" : ""
-                        }`}
-                        disabled={isDeletingOrg === org.name}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                    <ChevronRight size={16} className={`transition-transform duration-300 ${
-                      selectedOrg?.name === org.name ? "text-blue-400 rotate-90" : "text-white/40"
-                    }`} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Add Organization Button */}
-          <div className="p-4 border-t border-white/10">
-            <button
-              onClick={() => {setIsCreatingOrg(true); setSelectedOrg(null);}}
-              className="w-full p-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20"
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <Plus size={18} />
-                <span>New Organization</span>
-              </div>
-            </button>
-          </div>
-        </div>
+        <Sidebar
+          organisations={organisations}
+          selectedOrg={selectedOrg}
+          isDeletingOrg={isDeletingOrg}
+          onOrgSelect={handleOrgSelect}
+          onAppSelect={handleAppSelect}
+          onCreateOrg={() => {setIsCreatingOrg(true); setSelectedOrg(null);}}
+          onCreateApp={() => setIsCreatingApp(true)}
+          onDeleteOrg={deleteOrganization}
+          onDeleteApp={deleteApplication}
+        />
 
         {/* Main Content Area */}
         <main className="flex-1 relative">

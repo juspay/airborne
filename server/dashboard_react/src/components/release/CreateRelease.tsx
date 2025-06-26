@@ -19,7 +19,6 @@ interface CreateReleaseProps {
   organization: Organisation;
   versionInfo: {
     packageVersion: number;
-    configVersion: string;
   };
   onClose: () => void;
   onBack: () => void;
@@ -222,14 +221,6 @@ export default function CreateRelease({
                   </span>
                   <p className="text-blue-100 font-bold text-lg">
                     {versionInfo.packageVersion}
-                  </p>
-                </div>
-                <div className="bg-white/10 rounded-lg p-4 border border-white/10">
-                  <span className="text-blue-300/80 text-sm font-medium">
-                    Config Version
-                  </span>
-                  <p className="text-blue-100 font-bold text-lg">
-                    {versionInfo.configVersion}
                   </p>
                 </div>
               </div>
