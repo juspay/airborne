@@ -1,0 +1,37 @@
+{
+    "version": "1",
+    "config": {
+        "version": "1.0.0",
+        "release_config_timeout": 1000,
+        "boot_timeout": 1000,
+        "properties": {
+            "tenantInfo": {
+                "assetsDomain": "https://assets.juspay.in",
+                "defaultClientId": ""
+            }
+        }
+    },
+    "package": {
+        "name": "Hyper OS",
+        "version": "2.12.16",
+        "index": {
+            "url": "https://assets.juspay.in/juspay/hyper-os/in.juspay.hyperos/release/2.0rc1/2.12.15/v1-boot_loader.jsa",
+            "filePath": "v1-boot_loader.js"
+        },
+        "properties": {},
+        "important": [
+            {
+                "url": "https://assets.juspay.in/hyper/configs/bigbasket/in.juspay.hyperpay/1.180.1/v1-icons.jsa",
+                "filePath": "payments-in.juspay.hyperpay-v1-icons.js"
+            },
+            {
+                "url": "https://assets.juspay.in/hyper/configs/bigbasket/in.juspay.hyperpay/1.180.1/v1-strings.jsa",
+                "filePath": "payments-in.juspay.hyperpay-v1-strings.js"
+            }],
+        "lazy": []
+    },
+    "resources": [{
+        "url": "https://payments.juspay.in/hyper/images/kiranakart/ic_slice.png",
+        "filePath": "ic_slice.png"
+    }]
+}
