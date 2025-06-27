@@ -1,3 +1,5 @@
+use std::{str::FromStr, sync::Arc};
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,6 +11,45 @@ use axum::{
     Json,
 };
 
+use crate::{common::config::Config, kafka};
+
+use crate::core::clickhouse;
+use crate::core::victoria;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub clickhouse: Option<Arc<clickhouse::Client>>,
+    pub victoria: Option<Arc<victoria::Client>>,
+    pub kafka: Option<Arc<kafka::Producer>>,
+    pub config: Arc<Config>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LoggingInfra {
+    VictoriaMetrics,
+    KafkaClickhouse,
+}
+
+impl ToString for LoggingInfra {
+    fn to_string(&self) -> String {
+        match self {
+            LoggingInfra::VictoriaMetrics => "victoria-metrics".to_string(),
+            LoggingInfra::KafkaClickhouse => "kafka-clickhouse".to_string(),
+        }
+    }
+}
+
+impl FromStr for LoggingInfra {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "victoria-metrics" => Ok(LoggingInfra::VictoriaMetrics),
+            "kafka-clickhouse" => Ok(LoggingInfra::KafkaClickhouse),
+            _ => Err(format!("Unknown logging infrastructure: {}", s)),
+        }
+    }
+}
 
 /// Core OTA event structure following the enterprise schema
 #[derive(Debug, Clone, Serialize, Deserialize)]

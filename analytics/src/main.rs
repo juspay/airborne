@@ -1,10 +1,6 @@
-mod config;
-mod kafka;
-mod clickhouse;
+mod common;
+mod core;
 mod handlers;
-mod models;
-mod error;
-mod utils;
 
 use anyhow::Result;
 use axum::{
@@ -13,20 +9,19 @@ use axum::{
 use axum::error_handling::HandleErrorLayer;
 use tower::ServiceBuilder;
 use tower_http::timeout::TimeoutLayer;
-use std::{fs, net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, error};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{config::Config, models::ErrorResponse};
+use crate::{common::config::Config, core::bootstrap_clickhouse, common::models::{AppState, ErrorResponse, LoggingInfra}};
 use crate::handlers::{health, events, analytics};
-use crate::utils::strip_sql_comments;
+use crate::core::kafka;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -35,47 +30,66 @@ async fn main() -> Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Load configuration
     let config = Config::load()?;
     info!("Loaded configuration: {:?}", config);
 
-    // Initialize ClickHouse client
-    let clickhouse_client = Arc::new(clickhouse::Client::new(&config.clickhouse).await?);
-    info!("Connected to ClickHouse");
+    let mut consumer_handle: Option<tokio::task::JoinHandle<()>> = None;
+    let mut app_state = AppState {
+        clickhouse: None,
+        victoria: None,
+        kafka: None,
+        config: Arc::new(config.clone()),
+    };
 
-    // Initialize tables and views
-    let sql_text = fs::read_to_string("init-clickhouse.sql")?;
-    let stripped_sql = strip_sql_comments(&sql_text);
-    for raw_stmt in stripped_sql.split(';') {
-        let stmt = raw_stmt.trim();
-        if stmt.is_empty() {
-            continue;
+    if config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+        let clickhouse_client_res = bootstrap_clickhouse(&config).await;
+        match clickhouse_client_res {
+            Ok(clickhouse_client) => {
+                info!("Connected to ClickHouse");
+
+                let kafka_producer = Arc::new(kafka::Producer::new(&config.kafka).await?);
+                info!("Connected to Kafka");
+
+                let kafka_consumer = kafka::Consumer::new(&config.kafka, Arc::clone(&clickhouse_client)).await?;
+                info!("Kafka consumer initialized");
+
+                consumer_handle = Some(tokio::spawn(async move {
+                    info!("Starting Kafka consumer...");
+                    if let Err(e) = kafka_consumer.start_consuming().await {
+                        error!("Kafka consumer error: {:?}", e);
+                    }
+                }));
+
+                app_state.clickhouse = Some(Arc::clone(&clickhouse_client));
+                app_state.kafka = Some(Arc::clone(&kafka_producer));
+            }
+            Err(e) => {
+                error!("Failed to connect to ClickHouse: {:?}", e);
+                return Err(e);
+            }
+            
         }
-        info!("Running ClickHouse migrations");
-        clickhouse_client
-            .query(stmt)
-            .execute()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to run statement `{}`: {}", stmt, e))?;
+        info!("Using Kafka-ClickHouse logging infrastructure");
+    } else if config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+        // Initialize Victoria Metrics client
+        // For now, use a default Victoria Metrics URL (this should be configurable in the future)
+        let victoria_url = std::env::var("VICTORIA_METRICS_URL")
+            .unwrap_or_else(|_| "http://localhost:8428".to_string());
+        match crate::core::victoria::Client::new(victoria_url).await {
+            Ok(victoria_client) => {
+                info!("Connected to Victoria Metrics");
+                app_state.victoria = Some(Arc::new(victoria_client));
+            },
+            Err(e) => {
+                error!("Failed to connect to Victoria Metrics: {:?}", e);
+                return Err(anyhow::anyhow!("Failed to initialize Victoria Metrics client: {}", e));
+            }
+        }
+        info!("Using Victoria Metrics logging infrastructure");
+    } else {
+        return Err(anyhow::anyhow!("Invalid logging infrastructure specified in config"));
     }
 
-    // Initialize Kafka producer
-    let kafka_producer = Arc::new(kafka::Producer::new(&config.kafka).await?);
-    info!("Connected to Kafka");
-
-    // Initialize Kafka consumer
-    let kafka_consumer = kafka::Consumer::new(&config.kafka, Arc::clone(&clickhouse_client)).await?;
-    info!("Kafka consumer initialized");
-
-    // Start Kafka consumer in background
-    let consumer_handle = tokio::spawn(async move {
-        info!("Starting Kafka consumer...");
-        if let Err(e) = kafka_consumer.start_consuming().await {
-            error!("Kafka consumer error: {:?}", e);
-        }
-    });
-
-    // Get server port before moving config
     let server_port = config.server.port;
 
     let safe_layer = ServiceBuilder::new()
@@ -84,7 +98,6 @@ async fn main() -> Result<()> {
         }))
         .layer(TimeoutLayer::new(Duration::from_secs(7)));
 
-    // Build the application router
     let app = Router::new()
         .route("/analytics/health", get(health::health_check))
         .route("/analytics/events", post(events::ingest_event))
@@ -96,42 +109,37 @@ async fn main() -> Result<()> {
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .layer(safe_layer)
-        .with_state(AppState {
-            clickhouse: Arc::clone(&clickhouse_client),
-            kafka: Arc::clone(&kafka_producer),
-            config: Arc::new(config),
-        });
+        .with_state(app_state.clone());
 
     let app = app.into_make_service_with_connect_info::<SocketAddr>();
 
-    // Start the server
     let addr = SocketAddr::from(([0, 0, 0, 0], server_port));
     info!("OTA Analytics Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     
-    // Graceful shutdown handling
-    let shutdown_signal = async {
+    let shutdown_signal = async move {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to install CTRL+C signal handler");
         info!("Shutdown signal received, stopping server...");
+        
+        match consumer_handle {
+            Some(handle) => {
+                handle.abort();
+                if let Err(e) = handle.await {
+                    error!("Error while shutting down Kafka consumer: {:?}", e);
+                }
+            }
+            None => info!("No Kafka consumer to shut down"),
+        };
     };
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal)
         .await?;
 
-    // Wait for consumer to finish (should never finish)
-    consumer_handle.abort();
     info!("OTA Analytics Server stopped");
 
     Ok(())
-}
-
-#[derive(Clone)]
-pub struct AppState {
-    pub clickhouse: Arc<clickhouse::Client>,
-    pub kafka: Arc<kafka::Producer>,
-    pub config: Arc<Config>,
 }

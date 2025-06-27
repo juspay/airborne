@@ -2,12 +2,14 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::env;
 
+use crate::common::models::LoggingInfra;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
     pub kafka: KafkaConfig,
     pub clickhouse: ClickHouseConfig,
-    pub default_tenant_id: String,
+    pub logging_infrastructure: LoggingInfra, // "kafka-clickhouse" or "victoria-metrics" (default: "victoria-metrics")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,7 +67,10 @@ impl Config {
                 username: env::var("CLICKHOUSE_USERNAME").ok(),
                 password: env::var("CLICKHOUSE_PASSWORD").ok(),
             },
-            default_tenant_id: env::var("TENANT_ID").unwrap_or_else(|_| "airborne".to_string()),
+            logging_infrastructure: env::var("LOGGING_INFRASTRUCTURE")
+                .unwrap_or_else(|_| "victoria-metrics".to_string())
+                .parse::<LoggingInfra>()
+                .map_err(anyhow::Error::msg)?,
         };
 
         Ok(config)

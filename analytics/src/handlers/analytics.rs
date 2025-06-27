@@ -6,7 +6,12 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
 use crate::{
-    error::{AppError, AppResult}, models::{ActiveDevicesMetrics, AdoptionMetrics, AnalyticsInterval, FailureMetrics, PerformanceMetrics, VersionDistribution}, AppState
+    common::{error::{
+        AppError, AppResult
+    }, models::{
+        ActiveDevicesMetrics, AdoptionMetrics, AnalyticsInterval, FailureMetrics, LoggingInfra, PerformanceMetrics, VersionDistribution
+    }},
+    AppState
 };
 
 #[derive(Debug, Deserialize)]
@@ -69,24 +74,49 @@ pub async fn get_adoption_metrics(
         }
     }
 
-    let metrics = state
-        .clickhouse
-        .get_adoption_metrics(
-            &params.org_id,
-            &params.app_id,
-            params.release_id.as_deref().unwrap_or("default"),
-            date,
-            params.interval.unwrap_or(AnalyticsInterval::Day),
-            params.start_date.unwrap_or(0),
-            params.end_date.unwrap_or(0),
-        )
-        .await
-        .map_err(|e| {
-            error!("Failed to fetch adoption metrics: {:?}", e);
-            AppError::DatabaseError(e.to_string())
-        })?;
+    let metrics = 
+        if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+            match state.clickhouse {
+                Some(clickhouse) => {
+                    clickhouse.get_adoption_metrics(
+                        &params.org_id,
+                        &params.app_id,
+                        params.release_id.as_deref().unwrap_or("default"),
+                        date,
+                        params.interval.unwrap_or(AnalyticsInterval::Day),
+                        params.start_date.unwrap_or(0),
+                        params.end_date.unwrap_or(0),
+                    ).await
+                },
+                None => Err(AppError::DatabaseError("Clickhouse client not initialized".to_string()).into()),
+            }
+        } else if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+            match state.victoria {
+                Some(victoria) => {
+                    victoria.get_adoption_metrics(
+                        &params.org_id,
+                        &params.app_id,
+                        params.release_id.as_deref().unwrap_or("default"),
+                        date,
+                        params.interval.unwrap_or(AnalyticsInterval::Day),
+                        params.start_date.unwrap_or(0),
+                        params.end_date.unwrap_or(0),
+                    ).await
+                },
+                None => Err(AppError::DatabaseError("Victoria Metrics client not initialized".to_string()).into()),
+            }
+        } else {
+            return Err(AppError::Validation("Unsupported logging infrastructure for analytics".to_string()));
+        };
 
-    Ok(Json(AnalyticsResponse::success(metrics)))
+    match metrics {
+        Ok(metrics) => Ok(Json(AnalyticsResponse::success(metrics))),
+        Err(e) => {
+            error!("Failed to fetch adoption metrics: {:?}", e);
+            Err(AppError::DatabaseError(e.to_string()).into())
+        }
+    }
+
 }
 
 pub async fn get_version_distribution(
@@ -98,20 +128,39 @@ pub async fn get_version_distribution(
 
     let days = params.days.unwrap_or(30);
 
-    let distribution = state
-        .clickhouse
-        .get_version_distribution(
-            &params.org_id,
-            &params.app_id,
-            days,
-        )
-        .await
-        .map_err(|e| {
-            error!("Failed to fetch version distribution: {:?}", e);
-            AppError::DatabaseError(e.to_string())
-        })?;
+    let distribution = 
+        if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+            match state.clickhouse {
+                Some(clickhouse) => clickhouse.get_version_distribution(
+                    &params.org_id,
+                    &params.app_id,
+                    days,
+                ).await,
+                None => Err(AppError::DatabaseError("Clickhouse client not initialized".to_string()).into()),
+            }
+        } else if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+            match state.victoria {
+                Some(victoria) => victoria.get_version_distribution(
+                    &params.org_id,
+                    &params.app_id,
+                    days,
+                ).await,
+                None => Err(AppError::DatabaseError("Victoria Metrics client not initialized".to_string()).into()),
+            }
+        } else {
+            return Err(AppError::Validation("Unsupported logging infrastructure for analytics".to_string()));
+        };
 
-    Ok(Json(AnalyticsResponse::success(vec![distribution])))
+    match distribution {
+        Ok(distribution) => {
+            info!("Successfully fetched version distribution for app_id: {} and org_id: {}", params.app_id, params.org_id);
+            Ok(Json(AnalyticsResponse::success(vec![distribution])))
+        },
+        Err(e) => {
+            error!("Failed to fetch version distribution: {:?}", e);
+            return Err(AppError::DatabaseError(e.to_string()).into());
+        }
+    }
 }
 
 pub async fn get_active_devices(
@@ -123,20 +172,38 @@ pub async fn get_active_devices(
 
     let days = params.days.unwrap_or(30);
 
-    let metrics = state
-        .clickhouse
-        .get_active_devices_metrics(
-            &params.org_id,
-            &params.app_id,
-            days,
-        )
-        .await
-        .map_err(|e| {
-            error!("Failed to fetch active devices: {:?}", e);
-            AppError::DatabaseError(e.to_string())
-        })?;
+    let metrics = 
+        if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+            match state.clickhouse {
+                Some(clickhouse) => clickhouse.get_active_devices_metrics(
+                    &params.org_id,
+                    &params.app_id,
+                    days,
+                ).await,
+                None => Err(AppError::DatabaseError("Clickhouse client not initialized".to_string()).into()),
+            }
+        } else if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+            match state.victoria {
+                Some(victoria) => victoria.get_active_devices_metrics(
+                    &params.org_id,
+                    &params.app_id,
+                    days,
+                ).await,
+                None => Err(AppError::DatabaseError("Victoria Metrics client not initialized".to_string()).into()),
+            }
+        } else {
+            return Err(AppError::Validation("Unsupported logging infrastructure for analytics".to_string()));
+        };
 
-    Ok(Json(AnalyticsResponse::success(metrics)))
+    match metrics {
+        Ok(metrics) => {
+            Ok(Json(AnalyticsResponse::success(metrics)))
+        },
+        Err(e) => {
+            error!("Failed to fetch active devices metrics: {:?}", e);
+            Err(AppError::DatabaseError(e.to_string()).into())
+        }
+    }
 }
 
 pub async fn get_failure_metrics(
@@ -148,30 +215,63 @@ pub async fn get_failure_metrics(
 
     let days = params.days.unwrap_or(30);
 
-    let metrics = state
-        .clickhouse
-        .get_failure_analytics(
-            &params.org_id,
-            &params.app_id,
-            None, // release_id
-            days,
-        )
-        .await
-        .map_err(|e| {
-            error!("Failed to fetch failure analytics: {:?}", e);
-            AppError::DatabaseError(e.to_string())
-        })?;
+    let metrics: Result<FailureMetrics, Box<dyn std::error::Error + Send + Sync>> = 
+        if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+            match state.clickhouse {
+                Some(clickhouse) => {
+                    let failure_analytics = clickhouse.get_failure_analytics(
+                        &params.org_id,
+                        &params.app_id,
+                        params.release_id.as_deref(),
+                        days,
+                    ).await?;
+                    let failure_metrics = FailureMetrics {
+                        org_id: failure_analytics.org_id,
+                        app_id: failure_analytics.app_id,
+                        release_id: failure_analytics.release_id,
+                        total_failures: failure_analytics.total_failures,
+                        failure_rate: if failure_analytics.total_failures > 0 { 100.0 } else { 0.0 },
+                        common_errors: failure_analytics.common_errors,
+                    };
+                    Ok(failure_metrics)
+                },
+                None => Err(AppError::DatabaseError("Clickhouse client not initialized".to_string()).into()),
+            }
+        } else if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+            match state.victoria {
+                Some(victoria) => {
+                    let failure_analytics = victoria.get_failure_analytics(
+                        &params.org_id,
+                        &params.app_id,
+                        params.release_id.as_deref(),
+                        days,
+                    ).await?;
+                    let failure_metrics = FailureMetrics {
+                        org_id: failure_analytics.org_id,
+                        app_id: failure_analytics.app_id,
+                        release_id: failure_analytics.release_id,
+                        total_failures: failure_analytics.total_failures,
+                        failure_rate: if failure_analytics.total_failures > 0 { 100.0 } else { 0.0 },
+                        common_errors: failure_analytics.common_errors,
+                    };
+                    Ok(failure_metrics)
+                },
+                None => Err(AppError::DatabaseError("Victoria Metrics client not initialized".to_string()).into()),
+            }
+        } else {
+            return Err(AppError::Validation("Unsupported logging infrastructure for analytics".to_string()));
+        };
 
-    let failure_metrics = FailureMetrics {
-        org_id: metrics.org_id,
-        app_id: metrics.app_id,
-        release_id: metrics.release_id,
-        total_failures: metrics.total_failures,
-        failure_rate: if metrics.total_failures > 0 { 100.0 } else { 0.0 },
-        common_errors: metrics.common_errors,
-    };
-
-    Ok(Json(AnalyticsResponse::success(failure_metrics)))
+    match metrics {
+        Ok(failure_metrics) => {
+            info!("Successfully fetched failure metrics for org_id: {} and app_id: {}", params.org_id, params.app_id);
+            Ok(Json(AnalyticsResponse::success(failure_metrics)))
+        },
+        Err(e) => {
+            error!("Failed to fetch failure metrics: {:?}", e);
+            return Err(AppError::DatabaseError(e.to_string()).into());
+        }
+    }
 }
 
 pub async fn get_performance_metrics(

@@ -63,6 +63,32 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoria-metrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"
+    command:
+      - --storageDataPath=/storage
+      - --retentionPeriod=12
+    volumes:
+      - victoria_metrics_data:/storage
+
+  backend:
+    image: hyper-ota-analytics:latest
+    container_name: backend
+    depends_on:
+      # - kafka
+      # - clickhouse-server
+
+    ports:
+      - "6400:6400"
+    environment:
+      # KAFKA_BROKER_URL: kafka:29092
+      # CLICKHOUSE_URL: clickhouse-server:8123
+      LOGGING_INFRASTRUCTURE: "victoria-metrics" # kafka-clickhouse or victoria-metrics
+
 volumes:
   zookeeper_data:
     name: zk_data
@@ -72,3 +98,5 @@ volumes:
     name: kafka_data
   clickhouse_data:
     name: ch_data
+  victoria_metrics_data:
+    driver: local

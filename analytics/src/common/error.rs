@@ -4,10 +4,9 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use serde_json::json;
 use thiserror::Error;
 
-use crate::models::ErrorResponse;
+use crate::common::models::ErrorResponse;
 
 #[derive(Error, Debug)]
 pub enum AppError {

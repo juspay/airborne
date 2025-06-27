@@ -46,3 +46,7 @@ time = { version = "0.3.41", features = ["macros"] }
 
 # Environment variables
 dotenv = "0.15"
+
+# Victoria Metrics with Prometheus Connector
+prometheus = { version = "0.9", features = ["process"] }
+prometheus-static-metric = "0.5"
