@@ -1,0 +1,14 @@
+framework module Airborne {
+    umbrella header "Airborne.h"
+
+    header "HPJPApplicationManager.h"
+    header "HPJPApplicationManagerDelegate.h"
+    header "HPJPApplicationManifest.h"
+    header "HPJPApplicationConfig.h"
+    header "HPJPApplicationPackage.h"
+    header "HPJPApplicationResources.h"
+    header "HPJPResource.h"
+
+    export *
+    module * { export * }
+}
