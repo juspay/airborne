@@ -10,8 +10,7 @@ use tracing::{info, error};
 use uuid::Uuid;
 
 use crate::{
-    error::{AppError, AppResult},
-    models::{OtaEvent, OtaEventRequest},
+    common::{error::{AppError, AppResult}, models::{LoggingInfra, OtaEvent, OtaEventRequest}},
     AppState,
 };
 
@@ -27,7 +26,6 @@ pub async fn ingest_event(
         return Err(AppError::Validation("Device ID cannot be empty".to_string()));
     }
 
-    // Extract metadata from headers
     let user_agent = headers
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
@@ -39,7 +37,6 @@ pub async fn ingest_event(
         .map(|s| s.split(',').next().unwrap_or("").trim().to_string())
         .or_else(|| Some(addr.ip().to_string()));
 
-    // Create the OTA event
     let event = OtaEvent {
         org_id: request.org_id,
         app_id: request.app_id,
@@ -67,9 +64,33 @@ pub async fn ingest_event(
         ip_address,
     };
 
-    // ONLY send to Kafka - let consumer handle ClickHouse
-    if let Err(e) = state.kafka.send_ota_event(&event).await {
-        error!("Failed to send event to Kafka: {:?}", e);
+    if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+        match state.kafka {
+            Some(kafka) => {
+                if let Err(e) = kafka.send_ota_event(&event).await {
+                    error!("Failed to send event to Kafka: {:?}", e);
+                    return Err(AppError::Internal("Failed to send event to Kafka".to_string()).into());
+                }
+            },
+            None => {
+                return Err(AppError::Internal("Kafka client not initialized".to_string()).into());
+            }
+        }
+    } else if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+        match state.victoria {
+            Some(victoria) => {
+                if let Err(e) = victoria.insert_ota_event(&event).await {
+                    error!("Failed to send event to Victoria Metrics: {:?}", e);
+                    return Err(AppError::Internal("Failed to send event to Victoria Metrics".to_string()).into());
+                }
+            },
+            None => {
+                return Err(AppError::Internal("Victoria Metrics client not initialized".to_string()).into());
+            }
+        }
+    } else {
+        return Err(AppError::Internal("Unsupported logging infrastructure".to_string()).into());
+        
     }
 
     info!("Successfully queued OTA event: {:?}", event.event_id);

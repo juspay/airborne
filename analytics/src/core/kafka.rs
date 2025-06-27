@@ -7,9 +7,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
 
-use crate::config::KafkaConfig;
-use crate::models::OtaEvent;
-use crate::clickhouse;
+use crate::common::config::KafkaConfig;
+use crate::common::models::{EventType, OtaEvent};
+use crate::core::clickhouse;
 
 #[derive(Clone)]
 pub struct Producer {
@@ -235,21 +235,21 @@ impl Consumer {
         // Process specific event types for real-time alerts and counters
         for event in events {
             match event.event_type {
-                crate::models::EventType::ApplyFailure => {
+                EventType::ApplyFailure => {
                     warn!(
                         "OTA Apply failure detected for {}/{}: {:?}", 
                         event.org_id, event.app_id, event.error_message
                     );
                     // TODO: Trigger alert system
                 }
-                crate::models::EventType::RollbackInitiated => {
+                EventType::RollbackInitiated => {
                     warn!(
                         "OTA Rollback initiated for {}/{}", 
                         event.org_id, event.app_id
                     );
                     // TODO: Trigger alert system
                 }
-                crate::models::EventType::ApplySuccess => {
+                EventType::ApplySuccess => {
                     info!(
                         "OTA Apply success for {}: {} -> {}", 
                         event.app_id,
@@ -257,7 +257,7 @@ impl Consumer {
                         event.target_js_version.as_deref().unwrap_or("unknown")
                     );
                 }
-                crate::models::EventType::UpdateCheck => {
+                EventType::UpdateCheck => {
                     // Most frequent event, only log at debug level
                     tracing::debug!(
                         "Update check for {} - version: {:?}",

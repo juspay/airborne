@@ -1,3 +1,5 @@
+pub mod models;
+
 use std::collections::BTreeMap;
 
 use anyhow::{Ok, Result};
@@ -8,68 +10,16 @@ use tracing::{info};
 use chrono::{Datelike, NaiveDate, TimeZone, Utc};
 use uuid::Uuid;
 
-use crate::config::ClickHouseConfig;
-use crate::models::{
+use crate::common::config::ClickHouseConfig;
+use crate::core::clickhouse::models::OtaEventRow;
+use crate::common::models::{
     ActiveDevicesMetrics, AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval, DailyActiveDevices, DailyFailures, ErrorFrequency, FailureAnalytics, OtaEvent, VersionDistribution, VersionMetrics
 };
 
 #[derive(Clone)]
 pub struct Client {
-    client: ClickHouseClient,
-    database: String,
-}
-
-#[derive(Row, Serialize)]
-struct OtaEventRow {
-    #[serde(rename = "orgId")]
-    org_id: String,
-    #[serde(rename = "appId")]
-    app_id: String,
-    #[serde(rename = "deviceId")]
-    device_id: String,
-    #[serde(rename = "sessionId")]
-    session_id: Option<String>,
-    #[serde(rename = "eventType")]
-    event_type: String,
-    #[serde(rename = "eventId", with = "clickhouse::serde::uuid")]
-    event_id: uuid::Uuid,
-    timestamp: i64,
-    #[serde(rename = "eventDate")]
-    event_date: u16,
-    #[serde(rename = "releaseId")]
-    release_id: Option<String>,
-    #[serde(rename = "currentJsVersion")]
-    current_js_version: Option<String>,
-    #[serde(rename = "targetJsVersion")]
-    target_js_version: Option<String>,
-    #[serde(rename = "rolloutPercentage")]
-    rollout_percentage: Option<u8>,
-    #[serde(rename = "osVersion")]
-    os_version: Option<String>,
-    #[serde(rename = "appVersion")]
-    app_version: Option<String>,
-    #[serde(rename = "deviceType")]
-    device_type: Option<String>,
-    #[serde(rename = "networkType")]
-    network_type: Option<String>,
-    #[serde(rename = "errorCode")]
-    error_code: Option<String>,
-    #[serde(rename = "errorMessage")]
-    error_message: Option<String>,
-    #[serde(rename = "stackTrace")]
-    stack_trace: Option<String>,
-    #[serde(rename = "downloadSizeBytes")]
-    download_size_bytes: Option<u64>,
-    #[serde(rename = "downloadTimeMs")]
-    download_time_ms: Option<u64>,
-    #[serde(rename = "applyTimeMs")]
-    apply_time_ms: Option<u64>,
-    payload: String,  // Changed to Option<String> to match Nullable(String)
-    #[serde(rename = "userAgent")]
-    user_agent: Option<String>,
-    #[serde(rename = "ipAddress")]
-    ip_address: Option<String>,
-    // ingestedAt is removed since it has a DEFAULT value in ClickHouse
+    pub client: ClickHouseClient,
+    pub database: String,
 }
 
 impl Client {
