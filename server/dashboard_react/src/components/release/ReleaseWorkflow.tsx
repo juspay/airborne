@@ -58,7 +58,7 @@ export default function ReleaseWorkflow({
                 >
                   {packageVersion ? <CheckCircle size={16} /> : "1"}
                 </span>
-                <span>Upload Package</span>
+                <span>Upload Release Config</span>
               </div>
 
               <div className="mx-4 h-0.5 w-10 bg-gray-200"></div>
