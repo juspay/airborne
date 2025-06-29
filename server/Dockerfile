@@ -28,6 +28,17 @@ RUN npm run build
 # Make sure the build succeeded
 RUN ls -la dist || echo "dist folder was not created!"
 
+WORKDIR /app
+COPY docs_react/package*.json ./docs_react/
+WORKDIR /app/docs_react
+RUN npm install
+COPY docs_react/ ./
+
+# Run the build
+RUN npm run build
+# Make sure the build succeeded
+RUN ls -la dist || echo "dist folder was not created!"
+
 # Development stage
 FROM rust:latest as dev
 WORKDIR /app
@@ -38,6 +49,7 @@ RUN cargo install diesel_cli --no-default-features --features postgres
 COPY . .
 # Copy the built frontend
 COPY --from=frontend-builder /app/dashboard_react/dist /app/dashboard_react/dist
+COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
 EXPOSE 8081
 CMD ["cargo", "watch", "-x", "run"]
 
@@ -69,4 +81,5 @@ WORKDIR /app
 COPY --from=builder /app/target/release/hyper-ota-server /app/hyper-ota-server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
 COPY --from=frontend-builder /app/dashboard_react/dist /app/dashboard_react/dist
+COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
 CMD ["/app/hyper-ota-server"]

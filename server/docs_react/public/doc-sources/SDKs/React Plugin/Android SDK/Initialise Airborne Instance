@@ -1,0 +1,45 @@
+  private fun initializeAirborne() {
+      Airborne(this.applicationContext, "https://example.com/airborne/release-config", object : AirborneInterface(){
+          override fun getNamespace(): String {
+              return "example-new"
+          }
+
+          override fun getDimensions(): HashMap<String, String> {
+              val map = HashMap<String, String>()
+              map.put("city", "bangalore")
+              return map
+          }
+
+          override fun getIndexBundlePath(): String {
+              return "index.android.bundle"
+          }
+
+          override fun getLazyDownloadCallback(): LazyDownloadCallback {
+              return object : LazyDownloadCallback {
+                  override fun fileInstalled(filePath: String, success: Boolean) {
+                      // Logic
+                  }
+
+                  override fun lazySplitsInstalled(success: Boolean) {
+                      // Logic
+                  }
+              }
+          }
+
+          override fun onBootComplete() {
+              super.onBootComplete()
+          }
+
+          override fun onEvent(
+              level: String,
+              label: String,
+              key: String,
+              value: JSONObject,
+              category: String,
+              subCategory: String
+          ) {
+              // Log the event
+          }
+      })
+    Log.i("Airborne", "Airborne initialized successfully")
+  }

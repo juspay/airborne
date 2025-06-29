@@ -18,6 +18,7 @@ use actix_web::{web, App, HttpServer};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 mod dashboard;
+mod docs;
 mod middleware;
 mod organisation;
 mod release;
@@ -184,6 +185,7 @@ async fn main() -> std::io::Result<()> {
                 // Can eventually be migrated to some server side rendering
                 web::scope("/dashboard").service(dashboard::add_routes()),
             )
+            .service(docs::add_routes())
             .service(
                 web::scope("/organisations")
                     .wrap(Auth { env: env.clone() })
