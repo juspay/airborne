@@ -12,93 +12,113 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import com.android.Version
+
 buildscript {
-  ext.getExtOrDefault = {name ->
-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['Hyperota_' + name]
-  }
+    ext.getExtOrDefault = { name ->
+        return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['Airborne_' + name]
+    }
 
-  repositories {
-    google()
-    mavenCentral()
-  }
+    repositories {
+        google()
+        mavenCentral()
+    }
 
-  dependencies {
-    classpath "com.android.tools.build:gradle:8.7.2"
-    // noinspection DifferentKotlinGradleVersion
-    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
-  }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.7.2"
+        // noinspection DifferentKotlinGradleVersion
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${getExtOrDefault('kotlinVersion')}"
+    }
 }
 
+def isNewArchitectureEnabled() {
+    return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
+}
 
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
+def appProject = rootProject.allprojects.find { it.plugins.hasPlugin('com.android.application') }
+
 apply plugin: "com.facebook.react"
 
+def getExtOrDefault(name) {
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['Hyperota_' + name]
+}
+
 def getExtOrIntegerDefault(name) {
-  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Hyperota_" + name]).toInteger()
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Hyperota_" + name]).toInteger()
 }
 
 android {
-  namespace "com.hyperota"
 
-  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
-
-  defaultConfig {
-    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
-    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
-
-    buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", project.hasProperty("newArchEnabled") && project.newArchEnabled == "true" ? "true" : "false"
-  }
-
-  buildFeatures {
-    buildConfig true
-  }
-
-  buildTypes {
-    release {
-      minifyEnabled false
+    def agpVersion = Version.ANDROID_GRADLE_PLUGIN_VERSION
+    // Check AGP version for backward compatibility w/react-native versions still on gradle plugin 6
+    if (agpVersion.tokenize('.')[0].toInteger() >= 7) {
+        namespace = "in.juspay.airborneplugin"
     }
-  }
 
-  lintOptions {
-    disable "GradleCompatible"
-  }
+    compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
 
-  compileOptions {
-    sourceCompatibility JavaVersion.VERSION_1_8
-    targetCompatibility JavaVersion.VERSION_1_8
-  }
+    defaultConfig {
+        minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+        targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
 
-  sourceSets {
-    main {
-      java.srcDirs += [
-        "generated/java",
-        "generated/jni"
-      ]
+        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
     }
-  }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        debug {
+            initWith release
+        }
+
+        release {
+            minifyEnabled false
+        }
+    }
+
+    lintOptions {
+        disable "GradleCompatible"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs += [
+                "generated/java",
+                "generated/jni"
+            ]
+        }
+    }
 }
 
 repositories {
-  mavenLocal()
-  mavenCentral()
-  google()
-  maven { url "https://maven.juspay.in/hyper-sdk/" }
+    mavenLocal()
+    mavenCentral()
+    google()
+    maven { url "https://maven.juspay.in/hyper-sdk/" }
 }
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
 
 dependencies {
-  implementation "com.facebook.react:react-android"
-  implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation "com.facebook.react:react-android"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
-  // HyperOTA SDK dependency
-  implementation "in.juspay:hyperota:0.0.1-xota.03"
+    // Airborne SDK dependency
+    api "in.juspay:airborne:0.0.1-xota.13"
 }
 
 react {
-  jsRootDir = file("../src/")
-  libraryName = "Hyperota"
-  codegenJavaPackageName = "com.hyperota"
+    jsRootDir = file("../src/")
+    libraryName = "AirbornePlugin"
+    codegenJavaPackageName = "in.juspay.airborneplugin"
 }

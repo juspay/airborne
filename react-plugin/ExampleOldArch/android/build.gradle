@@ -26,5 +26,3 @@ allprojects {
         maven { url "https://maven.juspay.in/hyper-sdk/" }
     }
 }
-
-apply plugin: "com.facebook.react.rootproject"

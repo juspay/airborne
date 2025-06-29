@@ -1,7 +1,7 @@
 {
-  "name": "react-native-hyperota",
+  "name": "react-native-airborne",
   "version": "0.1.0",
-  "description": "hyper ota",
+  "description": "Airborne",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
@@ -32,7 +32,7 @@
     "!**/.*"
   ],
   "scripts": {
-    "example": "yarn workspace react-native-hyperota-example",
+    "example": "yarn workspace react-native-airborne-example",
     "test": "jest",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
@@ -47,14 +47,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/manideepk90/react-native-hyperota.git"
+    "url": "git+https://github.com/manideepk90/react-native-airborne.git"
   },
   "author": "juspay <kuntimaddi.manideep@juspay.in> (https://github.com/manideepk90)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/manideepk90/react-native-hyperota/issues"
+    "url": "https://github.com/manideepk90/react-native-airborne/issues"
   },
-  "homepage": "https://github.com/manideepk90/react-native-hyperota#readme",
+  "homepage": "https://github.com/manideepk90/react-native-airborne#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -149,11 +149,11 @@
     ]
   },
   "codegenConfig": {
-    "name": "HyperotaSpec",
+    "name": "AirborneSpec",
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.hyperota"
+      "javaPackageName": "in.juspay.airborneplugin"
     }
   },
   "create-react-native-library": {

@@ -1,4 +1,4 @@
-package hyperota.example
+package airborne.example
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

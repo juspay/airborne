@@ -1,0 +1,9 @@
+{
+    "private": true,
+    "name": "hyper-ota-monorepo",
+    "workspaces": [
+        "react-plugin",
+        "react-plugin/example",
+        "react-plugin/ExampleOldArch"
+    ]
+}

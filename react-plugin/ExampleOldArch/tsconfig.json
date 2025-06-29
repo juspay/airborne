@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "react-native-hyperota": ["../src/index"]
+      "react-native-airborne": ["../src/index"]
     }
   },
   "include": [

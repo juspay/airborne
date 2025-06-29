@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "react-native-hyperota": ["./src/index"]
+      "react-native-airborne": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

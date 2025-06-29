@@ -107,9 +107,6 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-    
-    // HyperOTA SDK dependency
-    implementation "in.juspay:hyperota:0.0.1-xota.03"
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

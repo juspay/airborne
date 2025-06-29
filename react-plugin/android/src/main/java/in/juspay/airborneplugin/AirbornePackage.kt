@@ -1,4 +1,4 @@
-package com.hyperota
+package `in`.juspay.airborneplugin
 
 import com.facebook.react.TurboReactPackage
 import com.facebook.react.bridge.NativeModule
@@ -7,13 +7,13 @@ import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 import java.util.HashMap
 
-class HyperotaPackage : TurboReactPackage() {
+class AirbornePackage : TurboReactPackage() {
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
-    return if (name == HyperotaModule.NAME) {
+    return if (name == AirborneModule.NAME) {
       if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
-        HyperotaTurboModule(reactContext)
+        AirborneTurboModule(reactContext)
       } else {
-        HyperotaModule(reactContext)
+        AirborneModule(reactContext)
       }
     } else {
       null
@@ -24,9 +24,9 @@ class HyperotaPackage : TurboReactPackage() {
     return ReactModuleInfoProvider {
       val moduleInfos: MutableMap<String, ReactModuleInfo> = HashMap()
       val isTurboModule: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
-      moduleInfos[HyperotaModule.NAME] = ReactModuleInfo(
-        HyperotaModule.NAME,
-        if (isTurboModule) HyperotaTurboModule::class.java.name else HyperotaModule::class.java.name,
+      moduleInfos[AirborneModule.NAME] = ReactModuleInfo(
+          AirborneModule.NAME,
+        if (isTurboModule) AirborneTurboModule::class.java.name else AirborneModule::class.java.name,
         false,  // canOverrideExistingModule
         false,  // needsEagerInit
         true,   // hasConstants

@@ -68,57 +68,59 @@
 }
 
 - (NSString *)getBundlePath {
-    if (!self.isInitialized) {
-        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
-                                       reason:@"HyperOTA is not initialized. Call initialize first." 
-                                     userInfo:nil];
-    }
-    
-    // TODO: Get the actual bundle path from HyperOTA SDK
-    // This is a placeholder implementation
-    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:self.indexFileName ofType:nil];
-    if (!bundlePath) {
-        bundlePath = [NSString stringWithFormat:@"assets://%@", self.indexFileName];
-    }
-    
-    return bundlePath;
+//    if (!self.isInitialized) {
+//        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
+//                                       reason:@"HyperOTA is not initialized. Call initialize first." 
+//                                     userInfo:nil];
+//    }
+//    
+//    // TODO: Get the actual bundle path from HyperOTA SDK //
+//    // This is a placeholder implementation
+//    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:self.indexFileName ofType:nil];
+//    if (!bundlePath) {
+//        bundlePath = [NSString stringWithFormat:@"assets://%@", self.indexFileName];
+//    }
+//    
+//    return bundlePath;
+  return @"";
 }
 
 - (NSString *)getFileContent:(NSString *)filePath {
-    if (!self.isInitialized) {
-        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
-                                       reason:@"HyperOTA is not initialized. Call initialize first." 
-                                     userInfo:nil];
-    }
-    
-    // TODO: Read the actual file content from HyperOTA SDK
-    // This is a placeholder implementation
-    return [NSString stringWithFormat:@"File content for: %@", filePath];
+//    if (!self.isInitialized) {
+//        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
+//                                       reason:@"HyperOTA is not initialized. Call initialize first." 
+//                                     userInfo:nil];
+//    }
+//    
+//    // TODO: Read the actual file content from HyperOTA SDK //
+//    // This is a placeholder implementation
+//    return [NSString stringWithFormat:@"File content for: %@", filePath];
+  return @"";
 }
 
 - (NSString *)getReleaseConfig {
-    if (!self.isInitialized) {
-        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
-                                       reason:@"HyperOTA is not initialized. Call initialize first." 
-                                     userInfo:nil];
-    }
-    
-    // TODO: Get the actual release config from HyperOTA SDK
-    // This is a placeholder implementation
-    NSDictionary *config = @{
-        @"version": @"1.0.0",
-        @"environment": @"production",
-        @"features": @{
-            @"featureA": @YES,
-            @"featureB": @NO
-        }
-    };
-    
-    NSError *error;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:config options:0 error:&error];
-    if (jsonData) {
-        return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-    }
+//    if (!self.isInitialized) {
+//        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
+//                                       reason:@"HyperOTA is not initialized. Call initialize first." 
+//                                     userInfo:nil];
+//    }
+//    
+//    // TODO: Get the actual release config from HyperOTA SDK //
+//    // This is a placeholder implementation
+//    NSDictionary *config = @{
+//        @"version": @"1.0.0",
+//        @"environment": @"production",
+//        @"features": @{
+//            @"featureA": @YES,
+//            @"featureB": @NO
+//        }
+//    };
+//    
+//    NSError *error;
+//    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:config options:0 error:&error];
+//    if (jsonData) {
+//        return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+//    }
     
     return @"{}";
 }

@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import HyperOta from 'react-native-hyperota';
+import HyperOta from 'react-native-airborne';
 
 function App(): React.JSX.Element {
   const [releaseConfig, setReleaseConfig] = useState<string>('');
