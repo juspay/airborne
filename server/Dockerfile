@@ -39,6 +39,17 @@ RUN npm run build
 # Make sure the build succeeded
 RUN ls -la dist || echo "dist folder was not created!"
 
+WORKDIR /app
+COPY home_react/package*.json ./home_react/
+WORKDIR /app/home_react
+RUN npm install
+COPY home_react/ ./
+
+# Run the build
+RUN npm run build
+# Make sure the build succeeded
+RUN ls -la dist || echo "dist folder was not created!"
+
 # Development stage
 FROM rust:latest as dev
 WORKDIR /app
@@ -50,6 +61,7 @@ COPY . .
 # Copy the built frontend
 COPY --from=frontend-builder /app/dashboard_react/dist /app/dashboard_react/dist
 COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
+COPY --from=frontend-builder /app/home_react/dist /app/home_react/dist
 EXPOSE 8081
 CMD ["cargo", "watch", "-x", "run"]
 
@@ -82,4 +94,5 @@ COPY --from=builder /app/target/release/hyper-ota-server /app/hyper-ota-server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
 COPY --from=frontend-builder /app/dashboard_react/dist /app/dashboard_react/dist
 COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
+COPY --from=frontend-builder /app/home_react/dist /app/home_react/dist
 CMD ["/app/hyper-ota-server"]

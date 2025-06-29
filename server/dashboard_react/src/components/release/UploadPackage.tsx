@@ -74,25 +74,18 @@ export default function UploadPackage({
 
       let response;
 
-      // If there's an index file, use multipart form
-      if (indexFile) {
-        const formData = new FormData();
-        formData.append("json", JSON.stringify(packageData));
-        formData.append("index", indexFile);
+      // Use JSON endpoint if no file is uploaded
+      response = await axios.post(
+        "/organisations/applications/package/create_package_json_v1",
+        packageData,
+        { headers }
+      );
 
-        response = await axios.post(
-          "/organisations/applications/package/create_package_json_v1_multipart",
-          formData,
-          { headers }
-        );
-      } else {
-        // Use JSON endpoint if no file is uploaded
-        response = await axios.post(
-          "/organisations/applications/package/create_package_json_v1",
-          packageData,
-          { headers }
-        );
-      }
+      response = await axios.post(
+        "/organisations/applications/config/create_json_v1",
+        packageData,
+        { headers }
+      );
 
       // Call onSuccess with the package version returned
       onSuccess(response.data.version);
@@ -127,33 +120,30 @@ export default function UploadPackage({
 
   const handleCopyExample = async () => {
     const exampleJson = `{
+  "version": "1",
+  "config": {
+    "version": "1.0.0",
+    "release_config_timeout": 1000,
+    "package_timeout": 1000,
+    "properties": {
+      "tenant_info": {
+
+      }
+    }
+  },
   "package": {
-   "name": "Application_Name",
-   "version": "1.0.0",
-   "index": { 
+    "name": "Application_Name",
+    "version": "1",
+    "properties": {
+    },
+    "index": { 
      "url": "https://assets.juspay.in/bundles/index.js",
      "filePath": "index.js"
    },
-   "properties": {},
-   "important": [
-     {
-       "url": "https://assets.juspay.in/bundles/initial.js",
-       "filePath": "initial.js"
-     }
-   ],
-   "lazy": [
-     {
-       "url": "https://assets.juspay.in/images/card.png",
-       "filePath": "card.png"
-     }
-   ]
- },
- "resources": [
-	{
-       "url": "https://assets.juspay.in/configs/config.js",
-       "filePath": "config.js"
-     }
- ]
+    "important": [],
+    "lazy": []
+  },
+  "resources": []
 }`;
 
     try {
@@ -177,10 +167,10 @@ export default function UploadPackage({
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-white">
-                  Upload Package
+                  Upload Release Config
                 </h2>
                 <p className="text-white/70">
-                  Step 1: Upload Package for {application?.application}
+                  Step 1: Release Config for {application?.application}
                 </p>
               </div>
               <span className="px-4 py-2 text-sm bg-gradient-to-r from-purple-400/20 to-pink-400/20 text-purple-200 rounded-full border border-purple-300/30">
@@ -196,7 +186,7 @@ export default function UploadPackage({
                     className="hidden"
                   />
                   {indexFile ? (
-                    <div className="flex items-center justify-between w-full px-4 py-3 text-sm bg-white/10 border border-white/20 rounded-xl text-white/90">
+                    <div className="flex items-center justify-between w-full px-4 py-3 text-sm bg-white/10 border border-white/20 rounded-xl text-white/90 hidden">
                       <span className="truncate">{indexFile.name}</span>
                       <button
                         onClick={removeIndexFile}
@@ -208,7 +198,7 @@ export default function UploadPackage({
                   ) : (
                     <label
                       htmlFor="index-upload"
-                      className="inline-flex items-center w-full px-4 py-3 text-sm bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 cursor-pointer transition-all duration-200 text-white/90"
+                      className="inline-flex items-center w-full px-4 py-3 text-sm bg-white/10 border border-white/20 rounded-xl hover:bg-white/20 cursor-pointer transition-all duration-200 text-white/90 hidden"
                     >
                       <FileUp size={16} className="mr-2 text-cyan-400" />
                       Upload Index File (Optional)
@@ -273,7 +263,7 @@ export default function UploadPackage({
                 }`}
               >
                 <Save size={16} className="mr-2" />
-                {isSubmitting ? "Uploading..." : "Upload Package & Continue"}
+                {isSubmitting ? "Uploading..." : "Upload Release Config & Continue"}
               </button>
             </div>
 
@@ -281,7 +271,7 @@ export default function UploadPackage({
             <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
               <details>
                 <summary className="px-6 py-4 text-sm font-medium text-white/90 cursor-pointer hover:bg-white/10 transition-colors duration-200 rounded-xl">
-                  Package JSON Format Example
+                  Release Config Format Example
                 </summary>
                 <div className="px-6 pb-6">
                   <div className="relative">
@@ -298,34 +288,31 @@ export default function UploadPackage({
                     </button>
                     <pre className="p-4 text-xs text-white/70 overflow-x-auto bg-black/30 rounded-lg border border-white/10">
                       {`{
-  "package": {
-   "name": "Application_Name",
-   "version": "1.0.0",
-   "index": { 
-     "url": "https://assets.juspay.in/bundles/index.js",
-     "filePath": "index.js"
-   },
-   "properties": {},
-   "important": [
-     {
-       "url": "https://assets.juspay.in/bundles/initial.js",
-       "filePath": "initial.js"
-     }
-   ],
-   "lazy": [
-     {
-       "url": "https://assets.juspay.in/images/card.png",
-       "filePath": "card.png"
-     }
-   ]
- },
- "resources": [
-	{
-       "url": "https://assets.juspay.in/configs/config.js",
-       "filePath": "config.js"
-     }
- ]
-}`}
+                      "version": "1",
+                      "config": {
+                        "version": "1.0.0",
+                        "release_config_timeout": 1000,
+                        "package_timeout": 1000,
+                        "properties": {
+                          "tenant_info": {
+
+                          }
+                        }
+                      },
+                      "package": {
+                        "name": "Application_Name",
+                        "version": "1",
+                        "properties": {
+                        },
+                        "index": { 
+                        "url": "https://assets.juspay.in/bundles/index.js",
+                        "filePath": "index.js"
+                      },
+                        "important": [],
+                        "lazy": []
+                      },
+                      "resources": []
+                    }`}
                     </pre>
                   </div>
                 </div>

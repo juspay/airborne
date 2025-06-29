@@ -19,6 +19,7 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 mod dashboard;
 mod docs;
+mod home;
 mod middleware;
 mod organisation;
 mod release;
@@ -35,6 +36,8 @@ use google_sheets4::{yup_oauth2::{self, ServiceAccountAuthenticator}, Sheets, hy
 use middleware::auth::Auth;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
+
+use crate::home::index;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -185,7 +188,10 @@ async fn main() -> std::io::Result<()> {
                 // Can eventually be migrated to some server side rendering
                 web::scope("/dashboard").service(dashboard::add_routes()),
             )
+            .route("/", web::get().to(index))
+            .route("", web::get().to(index))
             .service(docs::add_routes())
+            .service(home::add_routes())
             .service(
                 web::scope("/organisations")
                     .wrap(Auth { env: env.clone() })
