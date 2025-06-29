@@ -1,16 +1,16 @@
-# HyperOTA Native Initialization Guide
+# Airborne Native Initialization Guide
 
-This guide explains how to initialize HyperOTA in native code and use it from React Native. The implementation is compatible with both the old and new React Native architectures.
+This guide explains how to initialize Airborne in native code and use it from React Native. The implementation is compatible with both the old and new React Native architectures.
 
 ## Overview
 
-HyperOTA is initialized once in native code (iOS/Android) when the app starts. After initialization, the React Native module can access the HyperOTA instance to read config files and perform other operations.
+Airborne is initialized once in native code (iOS/Android) when the app starts. After initialization, the React Native module can access the Airborne instance to read config files and perform other operations.
 
 ## Android Setup
 
-### 1. Initialize HyperOTA in MainApplication
+### 1. Initialize Airborne in MainApplication
 
-In your `MainApplication.kt` (or `.java`), initialize HyperOTA in the `onCreate` method:
+In your `MainApplication.kt` (or `.java`), initialize Airborne in the `onCreate` method:
 
 ```kotlin
 import com.hyperota.HyperotaModuleImpl
@@ -22,8 +22,8 @@ class MainApplication : Application(), ReactApplication {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize HyperOTA
-        HyperotaModuleImpl.initializeHyperOTA(
+        // Initialize Airborne
+        HyperotaModuleImpl.initializeAirborne(
             context = this,
             appId = "your-app-id",
             indexFileName = "index.android.bundle",
@@ -35,11 +35,11 @@ class MainApplication : Application(), ReactApplication {
             ),
             lazyDownloadCallback = object : LazyDownloadCallback {
                 override fun fileInstalled(filePath: String, success: Boolean) {
-                    Log.d("HyperOTA", "File $filePath installed: $success")
+                    Log.d("Airborne", "File $filePath installed: $success")
                 }
                 
                 override fun lazySplitsInstalled(success: Boolean) {
-                    Log.d("HyperOTA", "Lazy splits installed: $success")
+                    Log.d("Airborne", "Lazy splits installed: $success")
                 }
             },
             trackerCallback = object : TrackerCallback() {
@@ -63,22 +63,24 @@ class MainApplication : Application(), ReactApplication {
 }
 ```
 
-### 2. Add HyperOTA Dependency
+### 2. Add Airborne maven
 
-In your app's `android/app/build.gradle`:
+In your root's `android/build.gradle`:
 
 ```gradle
-dependencies {
-    implementation 'in.juspay:hyperota:YOUR_VERSION'
-    // ... other dependencies
+allprojects {
+    repositories {
+        maven { url "https://maven.juspay.in/hyper-sdk/" }
+        // ... other mavens
+    }
 }
 ```
 
 ## iOS Setup
 
-### 1. Initialize HyperOTA in AppDelegate
+### 1. Initialize Airborne in AppDelegate
 
-In your `AppDelegate.swift` (or `.m`), initialize HyperOTA:
+In your `AppDelegate.swift` (or `.m`), initialize Airborne:
 
 ```swift
 import UIKit
@@ -89,8 +91,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         
-        // Initialize HyperOTA
-        Hyperota.initializeHyperOTA(
+        // Initialize Airborne
+        Hyperota.initializeAirborne(
             withAppId: "your-app-id",
             indexFileName: "main.jsbundle",
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
@@ -117,8 +119,8 @@ For Objective-C:
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     
-    // Initialize HyperOTA
-    [Hyperota initializeHyperOTAWithAppId:@"your-app-id"
+    // Initialize Airborne
+    [Hyperota initializeAirborneWithAppId:@"your-app-id"
                             indexFileName:@"main.jsbundle"
                                appVersion:[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"]
                   releaseConfigTemplateUrl:@"https://your-server.com/release-config"
@@ -134,22 +136,22 @@ For Objective-C:
 @end
 ```
 
-### 2. Add HyperOTA SDK
+### 2. Add Airborne SDK
 
-Add the HyperOTA iOS SDK to your project. You can use CocoaPods, Carthage, or Swift Package Manager.
+Add the Airborne iOS SDK to your project. You can use CocoaPods, Carthage, or Swift Package Manager.
 
 For CocoaPods, add to your `Podfile`:
 
 ```ruby
-pod 'HyperOTA', '~> YOUR_VERSION'
+pod 'Airborne', '~> YOUR_VERSION'
 ```
 
 ## React Native Usage
 
-After native initialization, you can use HyperOTA in your React Native code:
+After native initialization, you can use Airborne in your React Native code:
 
 ```typescript
-import { readReleaseConfig, getFileContent, getBundlePath } from 'react-native-hyperota';
+import { readReleaseConfig, getFileContent, getBundlePath } from 'react-native-airborne';
 
 // Read release configuration
 const config = await readReleaseConfig();
@@ -177,8 +179,8 @@ The module automatically detects which architecture is being used and loads the 
 
 All methods return promises that can be rejected with error codes:
 
-- `HYPER_OTA_ERROR`: General HyperOTA errors
-- `HYPER_OTA_NOT_INIT`: HyperOTA is not initialized (shouldn't happen if initialized in native code)
+- `HYPER_OTA_ERROR`: General Airborne errors
+- `HYPER_OTA_NOT_INIT`: Airborne is not initialized (shouldn't happen if initialized in native code)
 
 ```typescript
 try {
@@ -191,9 +193,9 @@ try {
 
 ## Important Notes
 
-1. **Initialize Once**: HyperOTA should be initialized only once when the app starts. The implementation includes checks to prevent re-initialization.
+1. **Initialize Once**: Airborne should be initialized only once when the app starts. The implementation includes checks to prevent re-initialization.
 
-2. **Native Instance**: The HyperOTA instance is created and managed in native code. React Native only accesses this instance, it doesn't create its own.
+2. **Native Instance**: The Airborne instance is created and managed in native code. React Native only accesses this instance, it doesn't create its own.
 
 3. **Thread Safety**: The implementation is thread-safe on both platforms.
 
@@ -202,14 +204,14 @@ try {
 ## Troubleshooting
 
 1. **Module not found**: Make sure you've rebuilt the app after adding the native code
-2. **HyperOTA not initialized**: Ensure the initialization code runs before any React Native code tries to use the module
-3. **Build errors**: Check that you've added the HyperOTA SDK dependencies correctly
+2. **Airborne not initialized**: Ensure the initialization code runs before any React Native code tries to use the module
+3. **Build errors**: Check that you've added the Airborne SDK dependencies correctly
 
 ## Future Enhancements
 
-To fully integrate with the actual HyperOTA SDK:
+To fully integrate with the actual Airborne SDK:
 
-1. Replace the placeholder implementations in `HyperOTAiOS.m` with actual SDK calls
-2. Import the actual HyperOTA iOS SDK headers
+1. Replace the placeholder implementations in `AirborneiOS.m` with actual SDK calls
+2. Import the actual Airborne iOS SDK headers
 3. Handle the actual callbacks and events from the SDK
 4. Add more methods as needed for your use case

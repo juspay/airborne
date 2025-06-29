@@ -10,15 +10,15 @@ This module has been updated to support both the old and new React Native archit
 - Exports OTA-related functions: `readReleaseConfig`, `getFileContent`, and `getBundlePath`
 
 ### Android
-- Modified `HyperotaModule.kt` to work with the old architecture using `ReactContextBaseJavaModule`
-- Created `HyperotaTurboModule.kt` that extends from the generated `NativeHyperotaSpec` for new architecture
-- Updated `HyperotaPackage.kt` to return the appropriate module based on the architecture
+- Modified `AirborneModule.kt` to work with the old architecture using `ReactContextBaseJavaModule`
+- Created `AirborneTurboModule.kt` that extends from the generated `NativeAirborneSpec` for new architecture
+- Updated `AirbornePackage.kt` to return the appropriate module based on the architecture
 - Added `IS_NEW_ARCHITECTURE_ENABLED` build config field in `build.gradle`
-- Created `HyperOTAReact.kt` singleton to manage OTA functionality
+- Created `Airborne.kt` singleton to manage OTA functionality
 
 ### iOS
-- Updated `Hyperota.h` to conditionally import the correct headers based on `RCT_NEW_ARCH_ENABLED`
-- Modified `Hyperota.mm` to use the appropriate export macros for each architecture
+- Updated `Airborne.h` to conditionally import the correct headers based on `RCT_NEW_ARCH_ENABLED`
+- Modified `Airborne.mm` to use the appropriate export macros for each architecture
 - Added conditional compilation for TurboModule support
 - Implemented OTA methods with placeholder implementations
 
@@ -47,7 +47,7 @@ RCT_NEW_ARCH_ENABLED=1 pod install
 The API remains the same regardless of the architecture:
 
 ```typescript
-import { readReleaseConfig, getFileContent, getBundlePath } from 'react-native-hyperota';
+import { readReleaseConfig, getFileContent, getBundlePath } from 'react-native-airborne';
 
 // Read the release configuration
 const config = await readReleaseConfig();
@@ -61,18 +61,18 @@ const bundlePath = await getBundlePath();
 
 ## Android Setup
 
-For Android, you need to initialize the `HyperOTAReact` singleton in your Application class:
+For Android, you need to initialize the `Airborne` singleton in your Application class:
 
 ```kotlin
-import com.hyperota.HyperOTAReact
-import `in`.juspay.hyperota.LazyDownloadCallback
+import com.Airborne.Airborne
+import `in`.juspay.Airborne.LazyDownloadCallback
 
 class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize HyperOTA with your configuration
-        HyperOTAReact.init(
+        // Initialize Airborne with your configuration
+        Airborne.init(
             context = this,
             appId = "your-app-id",
             indexFileName = "index.android.bundle",
@@ -95,14 +95,14 @@ class MainApplication : Application() {
 
 ## Error Handling
 
-All methods return promises and will reject with error code `HYPER_OTA_NOT_INIT` if the HyperOTA SDK is not properly initialized.
+All methods return promises and will reject with error code `HYPER_OTA_NOT_INIT` if the Airborne SDK is not properly initialized.
 
 ```typescript
 try {
   const config = await readReleaseConfig();
 } catch (error) {
   if (error.code === 'HYPER_OTA_NOT_INIT') {
-    console.error('HyperOTA not initialized');
+    console.error('Airborne not initialized');
   }
 }
 ```
@@ -120,23 +120,26 @@ To test with the new architecture:
 ## Dependencies
 
 ### Android
-The module requires the HyperOTA SDK. Add to your app's `android/app/build.gradle`:
+The module requires the Airborne maven. Add to your project's `android/build.gradle`:
 
 ```gradle
-dependencies {
-    implementation "in.juspay:hyperota:VERSION" // Replace VERSION with the specific version
+allprojects {
+    repositories {
+        maven { url "https://maven.juspay.in/hyper-sdk/" }
+        // ... other mavens
+    }
 }
 ```
 
 ### iOS
-For iOS, you need to add the HyperOTA SDK to your Podfile and implement the actual SDK integration.
+For iOS, you need to add the Airborne SDK to your Podfile and implement the actual SDK integration.
 
 ## Implementation Notes
 
 The iOS implementation currently includes placeholder methods. In a production environment, you would need to:
-1. Integrate with the actual HyperOTA SDK for iOS
+1. Integrate with the actual Airborne SDK for iOS
 2. Implement proper file reading from OTA bundles
 3. Handle bundle path resolution
 4. Add proper error handling and validation
 
-The Android implementation is complete and uses the actual HyperOTA SDK.
+The Android implementation is complete and uses the actual Airborne SDK.

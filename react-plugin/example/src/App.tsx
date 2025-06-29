@@ -4,7 +4,7 @@ import {
   readReleaseConfig,
   getFileContent,
   getBundlePath,
-} from 'react-native-hyperota';
+} from 'react-native-airborne';
 
 export default function App() {
   const [releaseConfig, setReleaseConfig] = useState<string | undefined>();

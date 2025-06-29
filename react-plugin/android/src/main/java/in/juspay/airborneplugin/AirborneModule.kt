@@ -1,4 +1,4 @@
-package com.hyperota
+package `in`.juspay.airborneplugin
 
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -6,11 +6,11 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.Promise
 import com.facebook.react.module.annotations.ReactModule
 
-@ReactModule(name = HyperotaModule.NAME)
-class HyperotaModule(reactContext: ReactApplicationContext) :
+@ReactModule(name = AirborneModule.NAME)
+class AirborneModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
-  
-  private val implementation = HyperotaModuleImpl(reactContext)
+
+  private val implementation = AirborneModuleImpl(reactContext)
 
   override fun getName(): String {
     return NAME

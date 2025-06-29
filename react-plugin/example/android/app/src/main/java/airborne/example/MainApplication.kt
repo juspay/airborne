@@ -1,4 +1,4 @@
-package com.exampleoldarch
+package airborne.example
 
 import android.app.Application
 import android.util.Log
@@ -10,6 +10,7 @@ import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.load
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
+import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
 import `in`.juspay.airborneplugin.Airborne
 import `in`.juspay.airborneplugin.AirborneInterface
@@ -43,7 +44,7 @@ class MainApplication : Application(), ReactApplication {
     // Initialize Airborne before React Native
     initializeAirborne()
 
-    SoLoader.init(this, false)
+    SoLoader.init(this, OpenSourceMergedSoMapping)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
@@ -54,7 +55,7 @@ class MainApplication : Application(), ReactApplication {
     try {
         Airborne(this.applicationContext, "https://example.com/airborne/release-config", object : AirborneInterface(){
             override fun getNamespace(): String {
-                return "example-old"
+                return "example-new"
             }
 
             override fun getDimensions(): HashMap<String, String> {
@@ -94,7 +95,6 @@ class MainApplication : Application(), ReactApplication {
                 // Log the event
             }
         })
-
       Log.i("Airborne", "Airborne initialized successfully")
     } catch (e: Exception) {
       Log.e("Airborne", "Failed to initialize Airborne", e)

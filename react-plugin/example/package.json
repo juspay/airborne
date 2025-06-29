@@ -1,5 +1,5 @@
 {
-  "name": "react-native-hyperota-example",
+  "name": "react-native-airborne-example",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -12,7 +12,7 @@
   "dependencies": {
     "react": "19.0.0",
     "react-native": "0.79.2",
-    "react-native-hyperota": "*"
+    "react-native-airborne": "*"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
