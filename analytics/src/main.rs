@@ -16,7 +16,7 @@ use tower_http::trace::TraceLayer;
 use tracing::{info, error};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::{common::config::Config, core::bootstrap_clickhouse, common::models::{AppState, ErrorResponse, LoggingInfra}};
+use crate::{common::{config::Config, models::{AppState, ErrorResponse, LoggingInfra}}, core::{bootstrap_clickhouse, victoria}};
 use crate::handlers::{health, events, analytics};
 use crate::core::kafka;
 
@@ -77,8 +77,13 @@ async fn main() -> Result<()> {
             .unwrap_or_else(|_| "http://localhost:8428".to_string());
         match crate::core::victoria::Client::new(victoria_url).await {
             Ok(victoria_client) => {
+                let victoria_client_arc = Arc::new(victoria_client);
+                let vm_pusher = victoria_client_arc.clone();
+                tokio::spawn(async move {
+                    let _ = vm_pusher.run_metrics_pusher().await;
+                });
+                app_state.victoria = Some(victoria_client_arc);
                 info!("Connected to Victoria Metrics");
-                app_state.victoria = Some(Arc::new(victoria_client));
             },
             Err(e) => {
                 error!("Failed to connect to Victoria Metrics: {:?}", e);

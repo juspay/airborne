@@ -1,3 +1,5 @@
+use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
+
 pub fn strip_sql_comments(input: &str) -> String {
     enum State {
         Normal,
@@ -119,4 +121,46 @@ pub fn strip_sql_comments(input: &str) -> String {
     }
 
     out
+}
+
+/// Floor to the start of the hour (HH:00:00)
+pub fn floor_to_hour(ts_sec: i64) -> i64 {
+    let dt = Utc.timestamp(ts_sec, 0);
+    let floored = dt.date_naive().and_hms(dt.hour(), 0, 0);
+    DateTime::<Utc>::from_utc(floored, Utc).timestamp()
+}
+
+/// Floor to midnight UTC of that day (00:00:00)
+pub fn floor_to_day(ts_sec: i64) -> i64 {
+    let dt = Utc.timestamp(ts_sec, 0);
+    let floored = dt.date_naive().and_hms(0, 0, 0);
+    DateTime::<Utc>::from_utc(floored, Utc).timestamp()
+}
+
+/// Ceil to the next hour boundary (HH+1:00:00), unless already on an exact hour
+pub fn ceil_to_hour(ts_sec: i64) -> i64 {
+    let dt = Utc.timestamp(ts_sec, 0);
+    let floored = DateTime::<Utc>::from_utc(
+        dt.date_naive().and_hms(dt.hour(), 0, 0),
+        Utc,
+    );
+    if dt == floored {
+        dt.timestamp()
+    } else {
+        (floored + Duration::hours(1)).timestamp()
+    }
+}
+
+/// Ceil to next midnight UTC (00:00:00 next day), unless already at midnight
+pub fn ceil_to_day(ts_sec: i64) -> i64 {
+    let dt = Utc.timestamp(ts_sec, 0);
+    let floored = DateTime::<Utc>::from_utc(
+        dt.date_naive().and_hms(0, 0, 0),
+        Utc,
+    );
+    if dt == floored {
+        dt.timestamp()
+    } else {
+        (floored + Duration::days(1)).timestamp()
+    }
 }

@@ -75,10 +75,23 @@ services:
     volumes:
       - victoria_metrics_data:/storage
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "4000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "changeme"    # change this!
+    depends_on:
+      - victoria-metrics
+    restart: unless-stopped
+
   backend:
     image: hyper-ota-analytics:latest
     container_name: backend
-    depends_on:
+    #depends_on:
       # - kafka
       # - clickhouse-server
 
@@ -88,6 +101,7 @@ services:
       # KAFKA_BROKER_URL: kafka:29092
       # CLICKHOUSE_URL: clickhouse-server:8123
       LOGGING_INFRASTRUCTURE: "victoria-metrics" # kafka-clickhouse or victoria-metrics
+      VICTORIA_METRICS_URL: victoria-metrics:8428
 
 volumes:
   zookeeper_data:
@@ -99,4 +113,6 @@ volumes:
   clickhouse_data:
     name: ch_data
   victoria_metrics_data:
+    driver: local
+  grafana_data:
     driver: local
