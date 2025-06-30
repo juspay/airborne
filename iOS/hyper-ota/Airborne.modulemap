@@ -9,6 +9,9 @@ framework module Airborne {
     header "HPJPApplicationResources.h"
     header "HPJPResource.h"
 
+    exclude header "HPJPApplicationConstants.h"
+    exclude header "HPJPApplicationTracker.h"
+
     export *
     module * { export * }
 }
