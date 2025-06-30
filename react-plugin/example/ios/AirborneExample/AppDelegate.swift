@@ -2,7 +2,6 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
-//import react_native_hyperota
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -28,7 +27,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow(frame: UIScreen.main.bounds)
 
     factory.startReactNative(
-      withModuleName: "HyperotaExample",
+      withModuleName: "AirborneExample",
       in: window,
       launchOptions: launchOptions
     )
@@ -37,6 +36,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   }
   
   private func initializeHyperOTA() {
+      
     let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     
 //    Hyperota.initializeHyperOTA(

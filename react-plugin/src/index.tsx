@@ -24,7 +24,7 @@ const LINKING_ERROR =
 const isTurboModuleEnabled = global.__turboModuleProxy != null;
 
 const HyperotaModule = isTurboModuleEnabled
-  ? require('./NativeHyperota').default
+  ? require('./NativeAirborne').default
   : NativeModules.HyperOta;
 
 const HyperOta = HyperotaModule

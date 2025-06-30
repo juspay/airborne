@@ -9,7 +9,8 @@ We want this community to be friendly and respectful to each other. Please follo
 This project is a monorepo managed using [Yarn workspaces](https://yarnpkg.com/features/workspaces). It contains the following packages:
 
 - The library package in the root directory.
-- An example app in the `example/` directory.
+- An example app in new react native architecture in the `example/` directory.
+- An example app in old react native architecture in the `ExampleOldArch/` directory.
 
 To get started with the project, run `yarn` in the root directory to install the required dependencies for each package:
 
@@ -21,9 +22,11 @@ yarn
 
 The [example app](/example/) demonstrates usage of the library. You need to run it to test any changes you make.
 
+Make sure that you are using node 20 and java 17 while running the examples.
+
 It is configured to use the local version of the library, so any changes you make to the library's source code will be reflected in the example app. Changes to the library's JavaScript code will be reflected in the example app without a rebuild, but native code changes will require a rebuild of the example app.
 
-If you want to use Android Studio or XCode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. To edit the Objective-C or Swift files, open `example/ios/HyperotaExample.xcworkspace` in XCode and find the source files at `Pods > Development Pods > react-native-airborne`.
+If you want to use Android Studio or XCode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. Make sure that you did `pod install` in the example/ios folder. To edit the Objective-C or Swift files, open `example/ios/AirborneExample.xcworkspace` in XCode and find the source files at `Pods > Development Pods > AirborneReact`.
 
 To edit the Java or Kotlin files, open `example/android` in Android studio and find the source files at `react-native-airborne` under `Android`.
 
@@ -50,7 +53,7 @@ yarn example ios
 To confirm that the app is running with the new architecture, you can check the Metro logs for a message like this:
 
 ```sh
-Running "HyperotaExample" with {"fabric":true,"initialProps":{"concurrentRoot":true},"rootTag":1}
+Running "AirborneExample" with {"fabric":true,"initialProps":{"concurrentRoot":true},"rootTag":1}
 ```
 
 Note the `"fabric":true` and `"concurrentRoot":true` properties.

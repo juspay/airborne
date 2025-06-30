@@ -21,4 +21,4 @@ export interface Spec extends TurboModule {
   getBundlePath(): Promise<string>;
 }
 
-export default TurboModuleRegistry.getEnforcing<Spec>('HyperOta');
+export default TurboModuleRegistry.getEnforcing<Spec>('Airborne');

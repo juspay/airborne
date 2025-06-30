@@ -49,7 +49,8 @@ class Airborne (
         airborneInterface.getNamespace(),
         "",
         releaseConfigUrl,
-        trackerCallback
+        trackerCallback,
+        airborneInterface::onBootComplete
     )
 
     private val applicationManager = hyperOTAServices.createApplicationManager(airborneInterface.getDimensions())
@@ -97,34 +98,6 @@ class Airborne (
             initializer?.invoke()
                 ?: throw IllegalStateException("Airborne initializer not set. Call init() first.")
         }
-
-//        /**
-//         * Initializes the HyperOTAReact singleton.
-//         */
-//        @JvmStatic
-//        fun init(
-//            context: Context,
-//            appId: String,
-//            indexFileName: String,
-//            appVersion: String,
-//            releaseConfigTemplateUrl: String,
-//            headers: Map<String, String>? = null,
-//            lazyDownloadCallback: LazyDownloadCallback? = null,
-//            trackerCallback: TrackerCallback? = null
-//        ) {
-//            initializer = {
-//                Airborne(
-//                    context,
-//                    appId,
-//                    indexFileName,
-//                    appVersion,
-//                    releaseConfigTemplateUrl,
-//                    headers,
-//                    lazyDownloadCallback ?: defaultLazyCallback,
-//                    trackerCallback ?: defaultTrackerCallback
-//                )
-//            }
-//        }
 
         /**
          * Default LazyDownloadCallback implementation.

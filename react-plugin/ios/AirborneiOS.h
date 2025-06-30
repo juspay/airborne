@@ -5,7 +5,7 @@ NS_ASSUME_NONNULL_BEGIN
 typedef void (^HyperOTALazyDownloadCallback)(NSString *filePath, BOOL success);
 typedef void (^HyperOTALazySplitsCallback)(BOOL success);
 
-@interface HyperOTAiOS : NSObject
+@interface AirborneiOS : NSObject
 
 + (instancetype)sharedInstance;
 

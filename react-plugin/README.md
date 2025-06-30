@@ -18,8 +18,8 @@ This implementation provides a React Native module for Airborne that:
 ## Key Features
 
 ### Native Initialization
-- Airborne is initialized once in native code when the app starts
-- The instance is created before React Native initializes
+- Airborne should be initialized once in native code when the app starts
+- The instance should be created before React Native initializes
 - This ensures the Airborne instance is ready when React Native needs it
 
 ### Architecture Compatibility
@@ -35,14 +35,15 @@ This implementation provides a React Native module for Airborne that:
 ## File Structure
 
 ### Android
-- `AirborneReact.kt` - Singleton wrapper for Airborne SDK
+- `Airborne.kt` - Integration class for Airborne SDK
+- `AirborneInterface.kt` - The interface that has to be implemented by the consumer for providing all the necessary integration params.
 - `AirborneModuleImpl.kt` - Shared implementation logic
 - `AirborneModule.kt` - Old architecture module
 - `AirborneTurboModule.kt` - New architecture module
 - `NativeAirborneSpec.java` - TurboModule spec
 
 ### iOS
-- `AirborneiOS.h/m` - Singleton wrapper for Airborne SDK
+- `AirborneiOS.h/m` - Integration class for Airborne SDK
 - `Airborne.h/mm` - React Native module implementation
 - Supports both architectures with conditional compilation
 
@@ -52,7 +53,7 @@ This implementation provides a React Native module for Airborne that:
 
 ## API Methods
 
-1. **readReleaseConfig()** - Returns the release configuration as a JSON string
+1. **readReleaseConfig()** - Returns the release configuration as a stringified JSON
 2. **getFileContent(filePath)** - Reads content from a file in the OTA bundle
 3. **getBundlePath()** - Returns the path to the JavaScript bundle
 
@@ -80,16 +81,13 @@ const bundlePath = await getBundlePath();
 
 1. **Thread Safety**: Both Android and iOS implementations are thread-safe
 2. **Error Handling**: All methods return promises that reject with descriptive errors
-3. **Initialization Check**: The module checks if Airborne is initialized before operations
-4. **Placeholder Implementation**: The iOS implementation includes placeholders for the actual Airborne SDK integration
+3. **Placeholder Implementation**: The iOS implementation includes placeholders for the actual Airborne SDK integration
 
 ## Next Steps
 
 To complete the integration:
-1. Add the actual Airborne SDK dependencies for both platforms
-2. Replace placeholder implementations with actual SDK calls
-3. Implement additional Airborne features as needed
-4. Add event emitters for callbacks if required
+1. Implement additional Airborne features as needed
+2. Add event emitters for callbacks if required
 
 ## Testing
 

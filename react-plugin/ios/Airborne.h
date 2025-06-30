@@ -1,14 +1,14 @@
 #ifdef RCT_NEW_ARCH_ENABLED
-#import <HyperotaSpec/HyperotaSpec.h>
+#import <AirborneSpec/AirborneSpec.h>
 
-@interface Hyperota : NSObject <NativeHyperotaSpec>
+@interface Airborne : NSObject <NativeAirborneSpec>
 #else
 #import <React/RCTBridgeModule.h>
 
-@interface Hyperota : NSObject <RCTBridgeModule>
+@interface Airborne : NSObject <RCTBridgeModule>
 #endif
 
-+ (void)initializeHyperOTAWithAppId:(NSString *)appId
++ (void)initializeAirborneWithAppId:(NSString *)appId
                        indexFileName:(NSString *)indexFileName
                           appVersion:(NSString *)appVersion
              releaseConfigTemplateUrl:(NSString *)releaseConfigTemplateUrl

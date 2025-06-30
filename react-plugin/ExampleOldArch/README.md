@@ -1,6 +1,6 @@
-# HyperOTA React Native Example - Old Architecture
+# Airborne React Native Example - Old Architecture
 
-This example demonstrates how to use the HyperOTA React Native plugin with the old React Native architecture.
+This example demonstrates how to use the Airborne React Native plugin with the old React Native architecture.
 
 ## Setup
 
@@ -30,14 +30,13 @@ npm run ios
 
 ## Configuration
 
-The HyperOTA SDK is initialized in:
+The Airborne SDK is initialized in:
 - Android: `android/app/src/main/java/com/exampleoldarch/MainApplication.kt`
 
 Key configuration parameters:
-- `appId`: Unique identifier for your app
+- `namespace`: Unique identifier for your app
 - `indexFileName`: Name of the bundle file
-- `appVersion`: Current app version
-- `releaseConfigTemplateUrl`: URL to fetch release configurations
+- `releaseConfigUrl`: URL to fetch release configurations
 
 ## Features Demonstrated
 
