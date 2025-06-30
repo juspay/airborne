@@ -16,34 +16,7 @@
  */
 @protocol HPJPApplicationManagerDelegate <NSObject>
 
-@optional
-
-/**
- * Fetches the release configuration for a specific client.
- *
- * This method should retrieve the latest release configuration from the appropriate source
- * (typically a remote server), parse it into an HPJPApplicationManifest object, and invoke
- * the completion handler with the result.
- *
- * @param clientId The unique identifier for the client application requesting the configuration.
- *                 This ID is used to determine the appropriate configuration variant and
- *                 may affect URL construction, feature flags, or other client-specific settings.
- *
- * @param completionHandler A block to be called when the fetch operation completes.
- *                         The block takes two parameters:
- *                         - manifest: The parsed application manifest on success, nil on failure
- *                         - error: An error object on failure, nil on success
- *                         This block may be called on any queue and should handle thread safety accordingly.
- *
- * @warning The completion handler must be called exactly once, regardless of success or failure.
- *          While the application manager has a release config timeout mechanism that will
- *          eventually proceed with local configuration if no response is received.
- *
- * @note For testing purposes, implementations may provide mock data instead of making
- *       actual network requests.
- */
-- (void)fetchReleaseConfigForClientId:(NSString * _Nonnull)clientId completionHandler:(HPJPReleaseConfigCompletionHandler _Nonnull)completionHandler;
-
+@required
 
 /**
  * Returns the URL to use for fetching release configuration.
@@ -64,6 +37,7 @@
  */
 - (NSString * _Nonnull)getReleaseConfigURL;
 
+@optional
 
 /**
  * Returns HTTP headers to include when fetching release configuration.

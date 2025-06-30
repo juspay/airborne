@@ -40,7 +40,7 @@ static BOOL isFirstRunAfterAppLaunch = YES;
 
 static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 
-@interface HPJPApplicationManager()<HPJPApplicationManagerDelegate> {
+@interface HPJPApplicationManager() {
     BOOL _bootTimeoutOccurred;
     DownloadStatus _importantPackageDownloadStatus;
     DownloadStatus _lazyPackageDownloadStatus;
@@ -95,14 +95,15 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return self;
 }
 
-+ (instancetype)getSharedInstanceWithClientId:(NSString*)clientId workspace:(NSString *)workspace releaseConfigURL:(NSString * _Nullable)releaseConfigURL baseBundle:(NSBundle * _Nullable)baseBundle logger:(id<HPJPLoggerDelegate> _Nullable)logger withLocalAssets:(Boolean)local {
+
++ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger {
     @synchronized ([HPJPApplicationManager class]) {
         if(managers == nil) {
             managers = [NSMutableDictionary dictionary];
         }
         HPJPApplicationManager* manager = managers[workspace];
         if (manager == nil || (manager.releaseConfigDownloadStatus == FAILED || manager.importantPackageDownloadStatus == FAILED || manager.importantPackageDownloadStatus == COMPLETED)) {
-            manager = [[HPJPApplicationManager alloc] initWithLogger:logger clientId:clientId workspace:workspace relaseConfigURL:releaseConfigURL baseBundle:baseBundle withLocalAssets:local delegate:nil];
+            manager = [[HPJPApplicationManager alloc] initWithWorkspace:workspace delegate:delegate logger:logger];
             managers[workspace] = manager;
         } else {
             [manager.tracker addLogger:logger];
@@ -112,34 +113,13 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
 }
 
-+ (instancetype)getSharedInstanceWithClientId:(NSString*)clientId workspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger {
-    @synchronized ([HPJPApplicationManager class]) {
-        if(managers == nil) {
-            managers = [NSMutableDictionary dictionary];
-        }
-        HPJPApplicationManager* manager = managers[workspace];
-        if (manager == nil || (manager.releaseConfigDownloadStatus == FAILED || manager.importantPackageDownloadStatus == FAILED || manager.importantPackageDownloadStatus == COMPLETED)) {
-            manager = [[HPJPApplicationManager alloc] initWithLogger:logger clientId:clientId workspace:workspace relaseConfigURL:nil baseBundle:nil withLocalAssets:false delegate:delegate];
-            managers[workspace] = manager;
-        } else {
-            [manager.tracker addLogger:logger];
-        }
-
-        return manager;
-    }
-}
-
-- (instancetype)initWithLogger:(id<HPJPLoggerDelegate> _Nullable)logger clientId:(NSString*)clientId workspace:(NSString *)workspace relaseConfigURL:(NSString * _Nullable)releaseConfigURL baseBundle:(NSBundle *)baseBundle withLocalAssets:(Boolean)local delegate:(id<HPJPApplicationManagerDelegate> _Nullable)delegate {
+- (instancetype)initWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nullable)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger {
     self = [super init];
     if (self) {
         self.workspace = workspace;
         self.delegate = delegate;
         
-        if ([self.delegate respondsToSelector:@selector(getReleaseConfigURL)]) {
-            self.releaseConfigURL = [delegate getReleaseConfigURL];
-        } else {
-            self.releaseConfigURL = releaseConfigURL ? releaseConfigURL : RELEASE_CONFIG_URL;
-        }
+        self.releaseConfigURL = [delegate getReleaseConfigURL];
         
         if ([self.delegate respondsToSelector:@selector(getReleaseConfigHeaders)]) {
             self.releaseConfigHeaders = [self.delegate getReleaseConfigHeaders];
@@ -150,13 +130,13 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
         if ([self.delegate respondsToSelector:@selector(getBaseBundle)]) {
             self.baseBundle = [self.delegate getBaseBundle];
         } else {
-            self.baseBundle = baseBundle ?: [NSBundle mainBundle];
+            self.baseBundle = [NSBundle mainBundle];
         }
         
         if ([self.delegate respondsToSelector:@selector(shouldUseLocalAssets)]) {
             self.isLocalAssets = [self.delegate shouldUseLocalAssets];
         } else {
-            self.isLocalAssets = local;
+            self.isLocalAssets = false;
         }
         
         if ([self.delegate respondsToSelector:@selector(shouldDoForceUpdate)]) {
@@ -180,7 +160,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
             [self cleanUpUnwantedFiles];
         } else {
             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-                [self startDownloadForClientId:clientId];
+                [self startDownload];
             });
         }
     }
@@ -620,12 +600,12 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:JUSPAY_PACKAGE_DIR];
 }
 
-- (void)startDownloadForClientId:(NSString *)clientId {
+- (void)startDownload {
     self.releaseConfigDownloadStatus = DOWNLOADING;
     self.importantPackageDownloadStatus = DOWNLOADING;
     self.lazyPackageDownloadStatus = DOWNLOADING;
     self.resourceDownloadStatus = DOWNLOADING;
-    [self fetchReleaseConfigForClientId:clientId completionHandler:^(HPJPApplicationManifest* manifest,NSError* error) {
+    [self fetchReleaseConfigWithCompletionHandler:^(HPJPApplicationManifest* manifest,NSError* error) {
         if (error==nil && manifest != nil) {
             self.downloadedApplicationManifest = manifest;
             self.releaseConfigDownloadStatus = COMPLETED;
@@ -877,26 +857,9 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
 }
 
-- (void)fetchReleaseConfigForClientId:(NSString *)clientId completionHandler:(HPJPReleaseConfigCompletionHandler)completionHandler {
-    
-    if ([self.delegate respondsToSelector:@selector(fetchReleaseConfigForClientId:completionHandler:)]) {
-        [self.delegate fetchReleaseConfigForClientId:clientId completionHandler:completionHandler];
-        return;
-    }
-    
-    NSString* releaseConfigURL;
-    NSInteger tossValue = [self getTimedToss];
-    if ([self isCug]) {
-        releaseConfigURL = [NSString stringWithFormat:self.releaseConfigURL, @"", clientId, CUG_PATH, tossValue];
-    } else if ([self devqaDetails]) {
-        NSString* devqaTicketId = [self devqaDetails];
-        NSString* devqaPath = [NSString stringWithFormat:DEVQA_PATH, devqaTicketId];
-        releaseConfigURL = [NSString stringWithFormat:self.releaseConfigURL, @"sandbox.", clientId, devqaPath, tossValue];
-    } else {
-        releaseConfigURL = [NSString stringWithFormat:self.releaseConfigURL, @"", clientId, RELEASE_PATH, tossValue];
-    }
-    
-    NSURL *manifestUrl = [NSURL URLWithString:releaseConfigURL];
+- (void)fetchReleaseConfigWithCompletionHandler:(HPJPReleaseConfigCompletionHandler)completionHandler {
+        
+    NSURL *manifestUrl = [NSURL URLWithString:self.releaseConfigURL];
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:manifestUrl];
     [request setHTTPMethod:@"GET"];
@@ -904,10 +867,6 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     NSDictionary *networkInfo = [HPJPHelpers connectedNetworkType];
     [request setValue:networkInfo[@"network_info"] forHTTPHeaderField: @"x-network-type"];
     [request setValue:[[UIDevice currentDevice] systemVersion] forHTTPHeaderField: @"x-os-version"];
-    NSString *hyperSDKVersion = [self.baseBundle objectForInfoDictionaryKey:@"hyper_sdk_version"];
-    if (hyperSDKVersion) {
-        [request setValue:hyperSDKVersion forHTTPHeaderField: @"x-hyper-sdk-version"];
-    }
     [request setValue:self.package.version forHTTPHeaderField: @"x-package-version"];
     [request setValue:self.config.version forHTTPHeaderField: @"x-config-version"];
     
@@ -921,7 +880,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 
         NSInteger statusCode = [self getResponseCodeFromNSURLResponse:response];
         NSMutableDictionary<NSString*,id>* logData = [NSMutableDictionary dictionary];
-        logData[@"release_config_url"] = releaseConfigURL;
+        logData[@"release_config_url"] = self.releaseConfigURL;
         logData[@"status"] = [NSNumber numberWithFloat:statusCode];
         logData[@"time_taken"] = [NSNumber numberWithDouble:(([[NSDate date] timeIntervalSince1970] * 1000) - startTime)];
 

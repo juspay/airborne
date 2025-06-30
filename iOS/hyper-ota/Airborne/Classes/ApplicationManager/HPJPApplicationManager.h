@@ -36,28 +36,6 @@ NS_ASSUME_NONNULL_BEGIN
  * This method implements a singleton pattern per workspace, ensuring that only one manager
  * exists for each unique workspace identifier.
  *
- * @param clientId The unique identifier for the client application
- * @param workspace The workspace identifier used to isolate manager instances
- * @param releaseConfigURL Optional URL for fetching release configuration. If nil, uses default URL
- * @param baseBundle Optional bundle containing local assets and configuration files. If nil, uses main bundle
- * @param logger Optional logger delegate for tracking download progress and errors
- * @param local Boolean flag indicating whether to use local assets only (bypasses network downloads)
- *
- * @return Shared HPJPApplicationManager instance for the specified workspace
- *
- * @note If a manager already exists for the workspace and meets reuse criteria, the existing
- *       instance is returned with the logger added to its tracker
- * @note A new manager is created if none exists or if the existing manager has failed/completed states
- */
-+ (instancetype)getSharedInstanceWithClientId:(NSString*)clientId workspace:(NSString *)workspace releaseConfigURL:(NSString * _Nullable)releaseConfigURL baseBundle:(NSBundle * _Nullable)baseBundle logger:(id<HPJPLoggerDelegate> _Nullable)logger withLocalAssets:(Boolean)local;
-
-
-/**
- * Returns a shared instance of HPJPApplicationManager for the specified workspace.
- * This method implements a singleton pattern per workspace, ensuring that only one manager
- * exists for each unique workspace identifier.
- *
- * @param clientId The unique identifier for the client application
  * @param workspace The workspace identifier used to isolate manager instances
  * @param delegate An object conforming to HPJPApplicationManagerDelegate
  * @param logger Optional logger delegate for tracking download progress, errors, and analytics.
@@ -66,7 +44,7 @@ NS_ASSUME_NONNULL_BEGIN
  *       instance is returned with the logger added to its tracker
  * @note A new manager is created if none exists or if the existing manager has failed/completed states
  */
-+ (instancetype)getSharedInstanceWithClientId:(NSString*)clientId workspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger;
++ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger;
 
 /**
  * Returns the current application manifest containing package, configuration, and resource information.
