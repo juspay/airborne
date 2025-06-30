@@ -40,3 +40,5 @@ node_modules/
 # iOS
 *xcworkspace/xcuserdata/*
 xcuserdata/
+.build
+Package.resolved
