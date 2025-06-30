@@ -2,18 +2,26 @@ use prometheus::{
     CounterVec, HistogramVec, GaugeVec, Registry, 
     Opts, HistogramOpts, TextEncoder, Encoder
 };
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use anyhow::Result;
+use std::time::Duration;
+use tracing::{info, error};
+use reqwest::Client as HttpClient;
+use tokio::time::interval;
 
-use crate::common::models::{
-    OtaEvent, VersionDistribution, VersionMetrics, ActiveDevicesMetrics, 
-    DailyActiveDevices, FailureAnalytics, ErrorFrequency,
-    AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval
-};
+use crate::{common::{models::{
+    ActiveDevicesMetrics, AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval, DailyActiveDevices, ErrorFrequency, FailureAnalytics, OtaEvent, VersionDistribution, VersionMetrics
+}, utils}, core::victoria::query_builder::VictoriaQuery};
+
+
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
+use std::collections::HashMap;
 
 pub mod client;
+mod query_builder;
 
-/// Victoria Metrics client that mirrors ClickHouse functionality
+/// Victoria Metrics client 
 #[derive(Clone)]
 pub struct Client {
     registry: Registry,
@@ -163,6 +171,15 @@ impl Client {
         registry.register(Box::new(ota_device_type_total.clone()))?;
         
         let query_client = client::VictoriaMetricsQueryClient::new(victoria_metrics_url);
+
+        let mut buffer = vec![];
+        let encoder = TextEncoder::new();
+        let metric_families = registry.gather();
+        encoder.encode(&metric_families, &mut buffer).unwrap();
+
+        // Output to the standard output.
+        println!("Yuvraj Registry {}", String::from_utf8(buffer).unwrap());
+
         
         Ok(Self {
             registry,
@@ -601,7 +618,49 @@ impl Client {
         }
     }
 
-    /// Get adoption metrics hourly parallel (mirrors ClickHouse get_adoption_metrics_hourly_parallel)
+    fn create_victoria_queries_for_counters(
+        &self,
+        org_id: &str,
+        app_id: &str,
+        release_id: &str,
+        interval: AnalyticsInterval
+    ) -> Vec<(String, String)> {
+        let mut queries = Vec::new();
+        for metric in [
+            "ota_downloads_total",
+            "ota_download_failures_total",
+            "ota_applies_total",
+            "ota_apply_failures_total",
+            "ota_rollback_initiated_total",
+            "ota_rollback_completed_total",
+            "ota_rollback_failures_total",
+            "ota_update_checks_total",
+            "ota_update_available_total",
+        ] {
+            let base_query = VictoriaQuery::new()
+                .metric_name(metric)
+                .labels(vec![
+                    ("org_id".to_string(), org_id.to_string()),
+                    ("app_id".to_string(), app_id.to_string()),
+                    ("release_id".to_string(), release_id.to_string())
+                ])
+                .operation("sum")
+                .time_bucket(match interval {
+                    AnalyticsInterval::Hour => "1h",
+                    AnalyticsInterval::Day => "1d",
+                    AnalyticsInterval::Week => "7d",
+                    AnalyticsInterval::Month => "30d",
+                })
+                .group_by_labels(vec!["org_id", "app_id", "release_id"])
+                .build();
+
+            queries.push((metric.to_string(), base_query));
+        }
+
+        queries
+    }
+
+    /// Get adoption metrics hourly parallel
     pub async fn get_adoption_metrics_hourly_parallel(
         &self,
         org_id: &str,
@@ -609,50 +668,84 @@ impl Client {
         release_id: &str,
         ts_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        // Query for hourly adoption metrics over a 24-hour period
-        let start_time = ts_millis / 1000;
-        let end_time = start_time + 24 * 60 * 60; // 24 hours later
-        
-        let query = format!(
-            r#"sum by (time) (
-                rate(ota_downloads_total{{org_id="{}",app_id="{}",release_id="{}"}}[1h])
-            )"#,
-            org_id, app_id, release_id
+        let end_time = utils::floor_to_hour(ts_millis);
+        let start_time = end_time - 24 * 60 * 60; // last 24 h
+
+        info!(
+            "Getting hourly adoption metrics for org: {}, app: {}, release: {}, from: {}, to: {}",
+            org_id, app_id, release_id, start_time, end_time
         );
 
-        let response = self.query_client.query_range(
-            &query,
-            start_time,
-            end_time,
-            "1h"
-        ).await?;
+        let queries = self.create_victoria_queries_for_counters(
+            org_id,
+            app_id,
+            release_id,
+            AnalyticsInterval::Hour,
+        );
 
-        let mut time_breakdown = Vec::new();
-        for result in response.data.result {
-            if let Some(values) = result.values {
-                for (timestamp, count_str) in values {
-                    let count: u64 = count_str.parse().unwrap_or(0);
-                    let dt = DateTime::from_timestamp(timestamp as i64, 0)
-                        .unwrap_or_else(|| Utc::now());
-                    
-                    time_breakdown.push(AdoptionTimeSeries {
-                        time_slot: dt,
-                        download_success: count,
-                        download_failures: 0,
-                        apply_success: count, // Assume successful downloads result in successful applies
-                        apply_failures: 0,
-                        rollbacks_initiated: 0,
-                        rollbacks_completed: 0,
-                        rollback_failures: 0,
-                        update_checks: 0,
-                        update_available: 0,
-                    });
+        let mut futures = FuturesUnordered::new();
+        for (metric_name, promql) in queries {
+            let client = self.query_client.clone();
+            futures.push(async move {
+                let resp = client
+                    .query_range(&promql, start_time, end_time, "1h")
+                    .await?;
+                let points = resp
+                    .data
+                    .result
+                    .into_iter()
+                    .flat_map(|series| {
+                        series
+                            .values
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|(ts, v)| (ts as i64, v.parse().unwrap_or(0)))
+                    })
+                    .collect::<Vec<_>>();
+                Ok::<_, anyhow::Error>((metric_name, points))
+            });
+        }
+
+        let mut map: HashMap<i64, AdoptionTimeSeries> = HashMap::new();
+        while let Some(batch) = futures.next().await {
+            let (metric, data_points) = batch?; // propagate error if any
+            for (ts, count) in data_points {
+                let entry = map.entry(ts).or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: DateTime::from_timestamp(ts, 0)
+                        .unwrap_or(Utc::now()),
+                    download_success: 0,
+                    download_failures: 0,
+                    apply_success: 0,
+                    apply_failures: 0,
+                    rollbacks_initiated: 0,
+                    rollbacks_completed: 0,
+                    rollback_failures: 0,
+                    update_checks: 0,
+                    update_available: 0,
+                });
+                match metric.as_str() {
+                    "ota_downloads_total"           => entry.download_success      = count,
+                    "ota_download_failures_total"   => entry.download_failures     = count,
+                    "ota_applies_total"             => entry.apply_success         = count,
+                    "ota_apply_failures_total"      => entry.apply_failures        = count,
+                    "ota_rollback_initiated_total"  => entry.rollbacks_initiated   = count,
+                    "ota_rollback_completed_total"  => entry.rollbacks_completed   = count,
+                    "ota_rollback_failures_total"   => entry.rollback_failures     = count,
+                    "ota_update_checks_total"       => entry.update_checks         = count,
+                    "ota_update_available_total"    => entry.update_available      = count,
+                    _                               => {}
                 }
             }
         }
-        
-        Ok(time_breakdown)
+
+        let mut series = map.into_iter()
+            .map(|(_, v)| v)
+            .collect::<Vec<_>>();
+        series.sort_by_key(|s| s.time_slot.timestamp());
+
+        Ok(series)
     }
+
 
     /// Get adoption metrics daywise parallel (mirrors ClickHouse get_adoption_metrics_daywise_parallel)
     pub async fn get_adoption_metrics_daywise_parallel(
@@ -663,48 +756,120 @@ impl Client {
         start_date_millis: i64,
         end_date_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        // Query for daily adoption metrics over the specified period
-        let start_time = start_date_millis / 1000;
-        let end_time = end_date_millis / 1000;
-        
-        let query = format!(
-            r#"sum by (time) (
-                rate(ota_downloads_total{{org_id="{}",app_id="{}",release_id="{}"}}[1d])
-            )"#,
-            org_id, app_id, release_id
+        let start_time = utils::floor_to_day(start_date_millis);
+        let end_time   = utils::ceil_to_day(end_date_millis);
+
+        info!(
+            "Getting daywise adoption metrics for org: {}, app: {}, release: {}, from: {}, to: {}",
+            org_id, app_id, release_id, start_time, end_time
         );
 
-        let response = self.query_client.query_range(
-            &query,
-            start_time,
-            end_time,
-            "1d"
-        ).await?;
+        let queries = self.create_victoria_queries_for_counters(
+            org_id,
+            app_id,
+            release_id,
+            AnalyticsInterval::Day,
+        );
 
-        let mut time_breakdown = Vec::new();
-        for result in response.data.result {
-            if let Some(values) = result.values {
-                for (timestamp, count_str) in values {
-                    let count: u64 = count_str.parse().unwrap_or(0);
-                    let dt = DateTime::from_timestamp(timestamp as i64, 0)
-                        .unwrap_or_else(|| Utc::now());
-                    
-                    time_breakdown.push(AdoptionTimeSeries {
-                        time_slot: dt,
-                        download_success: count,
-                        download_failures: 0,
-                        apply_success: count, // Assume successful downloads result in successful applies
-                        apply_failures: 0,
-                        rollbacks_initiated: 0,
-                        rollbacks_completed: 0,
-                        rollback_failures: 0,
-                        update_checks: 0,
-                        update_available: 0,
-                    });
+        let mut futures = FuturesUnordered::new();
+        for (metric_name, promql) in queries {
+            let client = self.query_client.clone();
+            futures.push(async move {
+                let resp = client
+                    .query_range(&promql, start_time, end_time, "1d")
+                    .await?;
+                // flatten each series’ values into Vec<(timestamp_sec, count)>
+                let points = resp
+                    .data
+                    .result
+                    .into_iter()
+                    .flat_map(|series| {
+                        series
+                            .values
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|(ts, v)| (ts as i64, v.parse().unwrap_or(0)))
+                    })
+                    .collect::<Vec<_>>();
+                Ok::<_, anyhow::Error>((metric_name, points))
+            });
+        }
+
+        let mut map: HashMap<i64, AdoptionTimeSeries> = HashMap::new();
+        while let Some(batch) = futures.next().await {
+            let (metric, data_points) = batch?; // bubbles up errors
+            for (ts, count) in data_points {
+                let entry = map.entry(ts).or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: DateTime::from_timestamp(ts, 0)
+                        .unwrap_or(Utc::now()),
+                    download_success:      0,
+                    download_failures:     0,
+                    apply_success:         0,
+                    apply_failures:        0,
+                    rollbacks_initiated:   0,
+                    rollbacks_completed:   0,
+                    rollback_failures:     0,
+                    update_checks:         0,
+                    update_available:      0,
+                });
+                match metric.as_str() {
+                    "ota_downloads_total"           => entry.download_success      = count,
+                    "ota_download_failures_total"   => entry.download_failures     = count,
+                    "ota_applies_total"             => entry.apply_success         = count,
+                    "ota_apply_failures_total"      => entry.apply_failures        = count,
+                    "ota_rollback_initiated_total"  => entry.rollbacks_initiated   = count,
+                    "ota_rollback_completed_total"  => entry.rollbacks_completed   = count,
+                    "ota_rollback_failures_total"   => entry.rollback_failures     = count,
+                    "ota_update_checks_total"       => entry.update_checks         = count,
+                    "ota_update_available_total"    => entry.update_available      = count,
+                    _                               => {}
                 }
             }
         }
+
+        let mut series = map.into_iter()
+            .map(|(_, v)| v)
+            .collect::<Vec<_>>();
+        series.sort_by_key(|s| s.time_slot.timestamp());
+
         
-        Ok(time_breakdown)
+
+        Ok(series)
     }
+
+    pub async fn run_metrics_pusher(&self) -> Result<()> {
+
+        let http = HttpClient::new();
+
+        let mut ticker = interval(Duration::from_secs(60));
+
+        loop {
+            ticker.tick().await;
+
+            let encoder = TextEncoder::new();
+            let metric_families = self.registry.gather();
+            let mut buffer = Vec::new();
+            encoder.encode(&metric_families, &mut buffer)?;
+            let body = String::from_utf8(buffer)?;
+
+            let push_url = format!("{}/api/v1/import/prometheus", self.query_client.base_url);
+            match http.post(&push_url).body(body).send().await {
+                Ok(resp) if resp.status().is_success() => {
+                    info!("[{}] Metrics pushed successfully", Utc::now());
+                }
+                Ok(resp) => {
+                    error!(
+                        "[{}] Push failed (status={}): {}",
+                        Utc::now(),
+                        resp.status(),
+                        resp.text().await.unwrap_or_default()
+                    );
+                }
+                Err(err) => {
+                    error!("[{}] HTTP error pushing metrics: {}", Utc::now(), err);
+                }
+            }
+        }
+    }
+
 }

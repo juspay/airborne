@@ -71,6 +71,7 @@ pub async fn ingest_event(
                     error!("Failed to send event to Kafka: {:?}", e);
                     return Err(AppError::Internal("Failed to send event to Kafka".to_string()).into());
                 }
+                info!("Successfully queued OTA event: {:?}", event.event_id);
             },
             None => {
                 return Err(AppError::Internal("Kafka client not initialized".to_string()).into());
@@ -83,6 +84,7 @@ pub async fn ingest_event(
                     error!("Failed to send event to Victoria Metrics: {:?}", e);
                     return Err(AppError::Internal("Failed to send event to Victoria Metrics".to_string()).into());
                 }
+                info!("Successfully saved OTA event: {:?}", event.event_id);
             },
             None => {
                 return Err(AppError::Internal("Victoria Metrics client not initialized".to_string()).into());
@@ -92,8 +94,6 @@ pub async fn ingest_event(
         return Err(AppError::Internal("Unsupported logging infrastructure".to_string()).into());
         
     }
-
-    info!("Successfully queued OTA event: {:?}", event.event_id);
 
     Ok(Json(json!({
         "status": "success",

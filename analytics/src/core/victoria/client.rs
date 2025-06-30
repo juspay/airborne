@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct VictoriaMetricsQueryClient {
-    client: Client,
-    base_url: String,
+    pub client: Client,
+    pub base_url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
