@@ -331,7 +331,7 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold mb-4">
                 {currentSection.title}
               </h2>
-              <div className="whitespace-pre-wrap">
+              <div className="prose prose-invert">
                 <ReactMarkdown>
                   {currentSection.doc}
                 </ReactMarkdown>
