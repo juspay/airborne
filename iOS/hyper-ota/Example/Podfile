@@ -1,0 +1,9 @@
+platform :ios, '12.0'
+use_frameworks!
+
+target 'AirborneDemo' do
+  
+  pod 'FLEX', '5.22.10'
+  
+  pod 'Airborne', :path => '../'
+end

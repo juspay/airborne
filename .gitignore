@@ -36,3 +36,7 @@ google-services.json
 node_modules/
 
 *.yarn
+
+# iOS
+*xcworkspace/xcuserdata/*
+xcuserdata/
