@@ -21,8 +21,6 @@ use actix_web::{
 };
 use application::Application;
 use google_sheets4::api::ValueRange;
-use hyper_rustls::HttpsConnector;
-use hyper::Client;
 use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -98,7 +96,6 @@ async fn request_organisation(
         .cloned()
         .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
     let admin_token = auth_response.admin_token.clone();
-    let sub = &auth_response.sub;
     let client = reqwest::Client::new();
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
     let realm = state.env.realm.clone();
