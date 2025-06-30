@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'Airborne'
-  s.version          = '0.1.0'
+  s.version          = '0.0.1'
   s.summary          = 'An OTA update plugin for Android, iOS and React Native applications.'
   s.description      = <<-DESC
 Hyper OTA empowers developers to effortlessly integrate Over-The-Air (OTA) update capabilities into their Android, iOS, and React Native applications.
@@ -15,7 +15,7 @@ Our primary focus is to provide robust, easy-to-use SDKs and plugins that stream
   
   s.source = {
     :git  => 'https://github.com/juspay/airborne.git',
-    :branch => 'main'
+    :tag  => "ios/#{s.version}"
   }
 
   s.source_files       = 'iOS/hyper-ota/Airborne/Classes/**/*.{h,m,swift}'
@@ -24,4 +24,5 @@ Our primary focus is to provide robust, easy-to-use SDKs and plugins that stream
 
   s.platform     = :ios, "12.0"
   s.dependency 'HyperCore', '0.1.3'
+  s.swift_versions = ['5.0']
 end
