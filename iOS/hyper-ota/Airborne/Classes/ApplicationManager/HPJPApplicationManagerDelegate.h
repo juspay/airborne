@@ -8,7 +8,11 @@
 #ifndef HPJPApplicationManagerDelegate_h
 #define HPJPApplicationManagerDelegate_h
 
+#ifdef SPM_BUILD
+#import "HPJPApplicationManifest.h"
+#else
 #import <Airborne/HPJPApplicationManifest.h>
+#endif
 
 /**
  * Protocol defining the interface for application manager delegates responsible for
