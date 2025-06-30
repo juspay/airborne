@@ -10,8 +10,15 @@
 
 #import <WebKit/WKWebView.h>
 #import <HyperCore/HPJPLoggerDelegate.h>
+
+#ifdef SPM_BUILD
+#import "HPJPApplicationManifest.h"
+#import "HPJPApplicationManagerDelegate.h"
+#else
 #import <Airborne/HPJPApplicationManifest.h>
 #import <Airborne/HPJPApplicationManagerDelegate.h>
+#endif
+
 
 @class HPJPSessionManager;
 

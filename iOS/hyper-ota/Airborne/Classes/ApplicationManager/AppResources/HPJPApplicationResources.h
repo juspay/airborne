@@ -7,7 +7,11 @@
 
 #import <Foundation/Foundation.h>
 #import <HyperCore/HPJPFileUtil.h>
+#ifdef SPM_BUILD
+#import "HPJPResource.h"
+#else
 #import <Airborne/HPJPResource.h>
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 

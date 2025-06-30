@@ -10,9 +10,15 @@
 
 #import <Foundation/Foundation.h>
 #import <HyperCore/HPJPFileUtil.h>
+#ifdef SPM_BUILD
+#import "HPJPApplicationConfig.h"
+#import "HPJPApplicationPackage.h"
+#import "HPJPApplicationResources.h"
+#else
 #import <Airborne/HPJPApplicationConfig.h>
 #import <Airborne/HPJPApplicationPackage.h>
 #import <Airborne/HPJPApplicationResources.h>
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 

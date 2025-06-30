@@ -18,13 +18,14 @@ let package = Package(
         .package(name: "HyperCore", url: "https://github.com/juspay/hypercore-ios.git", .exact("0.1.3"))
     ],
     targets: [
+        // Single target that works with existing structure
         .target(
             name: "Airborne",
             dependencies: [
                 "HyperCore"
             ],
             path: "iOS/hyper-ota/Airborne/Classes",
-            publicHeadersPath: ".",
+            publicHeadersPath: ".", // Use current directory as public headers path
             cSettings: [
                 .headerSearchPath("."),
                 .headerSearchPath("ApplicationManager"),
@@ -35,6 +36,7 @@ let package = Package(
                 .headerSearchPath("ApplicationManager/Constants"),
                 .headerSearchPath("ApplicationManager/Resource"),
                 .headerSearchPath("ApplicationManager/Tracker"),
+                .define("SPM_BUILD", to: "1")
             ]
         ),
     ]
