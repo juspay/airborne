@@ -1,25 +1,13 @@
 import { Button } from "@/components/ui/button";
-import { Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { Github } from "lucide-react";
 
 export function Footer() {
   const links = {
     product: [
-      { name: "Features", href: "#features" },
-      { name: "Pricing", href: "#pricing" },
-      { name: "Documentation", href: "/docs/home" },
-      { name: "API Reference", href: "#api" }
-    ],
-    company: [
-      { name: "About", href: "#about" },
-      { name: "Blog", href: "#blog" },
-      { name: "Careers", href: "#careers" },
-      { name: "Contact", href: "#contact" }
+      { name: "Documentation", href: "/docs/home" }
     ],
     resources: [
-      { name: "Getting Started", href: "/dashboard" },
-      { name: "Examples", href: "#examples" },
-      { name: "Community", href: "#community" },
-      { name: "Support", href: "#support" }
+      { name: "Getting Started", href: "/dashboard" }
     ]
   };
 
@@ -34,18 +22,11 @@ export function Footer() {
               Deploy with confidence, scale with ease.
             </p>
             <div className="flex gap-4">
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 bg-white/5">
-                <Github className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 bg-white/5">
-                <Twitter className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 bg-white/5">
-                <Linkedin className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 bg-white/5">
-                <Mail className="h-4 w-4" />
-              </Button>
+              <a href="https://github.com/juspay/airborne" target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" className="border-white/30 text-white hover:bg-white/10 bg-white/5">
+                  <Github className="h-4 w-4" />
+                </Button>
+              </a>
             </div>
           </div>
           
@@ -62,18 +43,6 @@ export function Footer() {
             </ul>
           </div>
           
-          <div>
-            <h4 className="text-white font-semibold mb-4">Company</h4>
-            <ul className="space-y-3">
-              {links.company.map((link) => (
-                <li key={link.name}>
-                  <a href={link.href} className="text-white/70 hover:text-white transition-colors">
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
           
           <div>
             <h4 className="text-white font-semibold mb-4">Resources</h4>
@@ -93,14 +62,6 @@ export function Footer() {
           <p className="text-white/50 text-sm">
             © 2024 Airborne. All rights reserved.
           </p>
-          <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="#privacy" className="text-white/50 hover:text-white text-sm transition-colors">
-              Privacy Policy
-            </a>
-            <a href="#terms" className="text-white/50 hover:text-white text-sm transition-colors">
-              Terms of Service
-            </a>
-          </div>
         </div>
       </div>
     </footer>
