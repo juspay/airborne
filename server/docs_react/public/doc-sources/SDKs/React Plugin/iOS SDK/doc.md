@@ -1,10 +1,4 @@
-# iOS SDK Developer Docs
-
 This document provides instructions on how to integrate the Airborne iOS SDK into your application.
-
-## Installation
-
-(Instructions for installation will be added here.)
 
 ## iOS Integration
 

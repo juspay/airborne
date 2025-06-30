@@ -67,12 +67,6 @@
       "order.json"
     ]
   },
-  "Server": {
-    "files": [
-      "content.json",
-      "doc.md"
-    ]
-  },
   "files": [
     "order.json"
   ]
