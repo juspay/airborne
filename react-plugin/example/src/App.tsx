@@ -12,11 +12,11 @@ export default function App() {
   const [fileContent, setFileContent] = useState<string | undefined>();
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // HyperOTA is initialized in native code (MainApplication.kt for Android, AppDelegate.swift for iOS)
+  // Airborne is initialized in native code (MainApplication.kt for Android, AppDelegate.swift for iOS)
   // This ensures the instance is ready before React Native starts
 
   useEffect(() => {
-    // Test if HyperOTA is initialized by trying to get the bundle path
+    // Test if Airborne is initialized by trying to get the bundle path
     getBundlePath()
       .then(() => setIsInitialized(true))
       .catch(() => setIsInitialized(false));
@@ -51,7 +51,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>React Native HyperOTA</Text>
+      <Text style={styles.title}>React Native Airborne</Text>
 
       <View style={styles.statusContainer}>
         <Text style={styles.statusText}>

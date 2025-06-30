@@ -8,62 +8,7 @@ Airborne is initialized once in native code (iOS/Android) when the app starts. A
 
 ## Android Setup
 
-### 1. Initialize Airborne in MainApplication
-
-In your `MainApplication.kt` (or `.java`), initialize Airborne in the `onCreate` method:
-
-```kotlin
-import com.hyperota.HyperotaModuleImpl
-import `in`.juspay.hyperota.LazyDownloadCallback
-import `in`.juspay.hyperota.TrackerCallback
-
-class MainApplication : Application(), ReactApplication {
-    
-    override fun onCreate() {
-        super.onCreate()
-        
-        // Initialize Airborne
-        HyperotaModuleImpl.initializeAirborne(
-            context = this,
-            appId = "your-app-id",
-            indexFileName = "index.android.bundle",
-            appVersion = BuildConfig.VERSION_NAME,
-            releaseConfigTemplateUrl = "https://your-server.com/release-config",
-            headers = mapOf(
-                "Authorization" to "Bearer your-token",
-                "X-Custom-Header" to "value"
-            ),
-            lazyDownloadCallback = object : LazyDownloadCallback {
-                override fun fileInstalled(filePath: String, success: Boolean) {
-                    Log.d("Airborne", "File $filePath installed: $success")
-                }
-                
-                override fun lazySplitsInstalled(success: Boolean) {
-                    Log.d("Airborne", "Lazy splits installed: $success")
-                }
-            },
-            trackerCallback = object : TrackerCallback() {
-                override fun track(
-                    category: String,
-                    subCategory: String,
-                    level: String,
-                    label: String,
-                    key: String,
-                    value: Any
-                ) {
-                    // Your tracking implementation
-                }
-            }
-        )
-        
-        // Rest of your initialization code...
-        SoLoader.init(this, OpenSourceMergedSoMapping)
-        // ...
-    }
-}
-```
-
-### 2. Add Airborne maven
+### 1. Add Airborne maven
 
 In your root's `android/build.gradle`:
 
@@ -72,6 +17,96 @@ allprojects {
     repositories {
         maven { url "https://maven.juspay.in/hyper-sdk/" }
         // ... other mavens
+    }
+}
+```
+
+
+### 2. Initialize Airborne in MainApplication
+
+In your `MainApplication.kt` (or `.java`), initialize Airborne in the `onCreate` method and override `getJSBundleFile` method of `ReactNativeHost` adnd return `airborneInstance.getBundlePath()` from there.
+
+```kotlin
+import android.app.Application
+import `in`.juspay.airborneplugin.Airborne
+import `in`.juspay.airborneplugin.AirborneInterface
+import `in`.juspay.airborne.LazyDownloadCallback
+
+class MainApplication : Application(), ReactApplication {
+
+    private lateinit var airborneInstance: Airborne
+    override val reactNativeHost: ReactNativeHost =
+        object : DefaultReactNativeHost(this) {
+
+            override fun getJSBundleFile(): String? {
+                return airborneInstance.getBundlePath()
+            }
+            // Other overridden methods
+        }
+
+    override val reactHost: ReactHost
+        get() = getDefaultReactHost(applicationContext, reactNativeHost)
+
+    override fun onCreate() {
+        super.onCreate()
+
+        // Initialize Airborne before React Native
+        initializeAirborne()
+
+        // Rest of your code in onCreate
+    }
+
+    private fun initializeAirborne() {
+        try {
+            airborneInstance = Airborne(
+                this.applicationContext,
+                "https://example.com/airborne/release-config",
+                object : AirborneInterface() {
+                    override fun getNamespace(): String {
+                        return "example-new" // return your app's package name or some identifier of your app. 
+                    }
+
+                    override fun getDimensions(): HashMap<String, String> {
+                        val map = HashMap<String, String>()
+                        map.put("city", "bangalore")
+                        return map
+                    }
+
+                    override fun getIndexBundlePath(): String {
+                        return "index.android.bundle" // return your react app's bundled index file name. 
+                    }
+
+                    override fun getLazyDownloadCallback(): LazyDownloadCallback {
+                        return object : LazyDownloadCallback {
+                            override fun fileInstalled(filePath: String, success: Boolean) {
+                                // Logic
+                            }
+
+                            override fun lazySplitsInstalled(success: Boolean) {
+                                // Logic
+                            }
+                        }
+                    }
+
+                    override fun onBootComplete() {
+                        super.onBootComplete()
+                    }
+
+                    override fun onEvent(
+                        level: String,
+                        label: String,
+                        key: String,
+                        value: JSONObject,
+                        category: String,
+                        subCategory: String
+                    ) {
+                        // Logic to process ota events, for logging/analytics purpose.
+                    }
+                })
+            Log.i("Airborne", "Airborne initialized successfully")
+        } catch (e: Exception) {
+            Log.e("Airborne", "Failed to initialize Airborne", e)
+        }
     }
 }
 ```
@@ -179,7 +214,7 @@ The module automatically detects which architecture is being used and loads the 
 
 All methods return promises that can be rejected with error codes:
 
-- `HYPER_OTA_ERROR`: General Airborne errors
+- `AIRBORNE_ERROR`: General Airborne errors
 - `HYPER_OTA_NOT_INIT`: Airborne is not initialized (shouldn't happen if initialized in native code)
 
 ```typescript
@@ -193,25 +228,20 @@ try {
 
 ## Important Notes
 
-1. **Initialize Once**: Airborne should be initialized only once when the app starts. The implementation includes checks to prevent re-initialization.
+1. **Native Instance**: The Airborne instance should be created and managed in native code. React Native only accesses this instance, it doesn't create its own.
 
-2. **Native Instance**: The Airborne instance is created and managed in native code. React Native only accesses this instance, it doesn't create its own.
+2. **Thread Safety**: The implementation is thread-safe on both platforms.
 
-3. **Thread Safety**: The implementation is thread-safe on both platforms.
-
-4. **Callbacks**: The lazy download and tracker callbacks are handled in native code. You can expose these to React Native if needed by adding event emitters.
+3. **Callbacks**: The lazy download and onEvent should be handled in native code. You can expose these to React Native if needed by adding event emitters.
 
 ## Troubleshooting
 
 1. **Module not found**: Make sure you've rebuilt the app after adding the native code
 2. **Airborne not initialized**: Ensure the initialization code runs before any React Native code tries to use the module
 3. **Build errors**: Check that you've added the Airborne SDK dependencies correctly
+4. **Compatibility**: Please use node 20, java 17 to run the example apps.
 
 ## Future Enhancements
 
-To fully integrate with the actual Airborne SDK:
-
-1. Replace the placeholder implementations in `AirborneiOS.m` with actual SDK calls
-2. Import the actual Airborne iOS SDK headers
-3. Handle the actual callbacks and events from the SDK
-4. Add more methods as needed for your use case
+1. Handle the actual callbacks and events from the SDK
+2. Add more methods as needed for your use case

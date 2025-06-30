@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import HyperOta from 'react-native-airborne';
+import Airborne from 'react-native-airborne';
 
 function App(): React.JSX.Element {
   const [releaseConfig, setReleaseConfig] = useState<string>('');
@@ -20,7 +20,7 @@ function App(): React.JSX.Element {
     try {
       setLoading(true);
       setError('');
-      const config = await HyperOta.readReleaseConfig();
+      const config = await Airborne.readReleaseConfig();
       setReleaseConfig(JSON.stringify(config, null, 2));
     } catch (e) {
       setError(`Failed to load release config: ${e}`);
@@ -33,7 +33,7 @@ function App(): React.JSX.Element {
     try {
       setLoading(true);
       setError('');
-      const path = await HyperOta.getBundlePath();
+      const path = await Airborne.getBundlePath();
       setBundlePath(path);
     } catch (e) {
       setError(`Failed to get bundle path: ${e}`);
@@ -53,7 +53,7 @@ function App(): React.JSX.Element {
       <StatusBar barStyle="dark-content" />
       <ScrollView contentInsetAdjustmentBehavior="automatic">
         <View style={styles.header}>
-          <Text style={styles.title}>HyperOTA Example</Text>
+          <Text style={styles.title}>Airborne Example</Text>
           <Text style={styles.subtitle}>Old Architecture</Text>
         </View>
 

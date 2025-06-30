@@ -1,15 +1,15 @@
-#import "HyperOTAiOS.h"
+#import "AirborneiOS.h"
 
-@interface HyperOTAiOS ()
+@interface AirborneiOS ()
 @property (nonatomic, assign) BOOL isInitialized;
 @property (nonatomic, strong) NSString *indexFileName;
-// In a real implementation, you would have references to the actual HyperOTA SDK objects here
+// In a real implementation, you would have references to the actual Airborne SDK objects here
 @end
 
-@implementation HyperOTAiOS
+@implementation AirborneiOS
 
 + (instancetype)sharedInstance {
-    static HyperOTAiOS *sharedInstance = nil;
+    static AirborneiOS *sharedInstance = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         sharedInstance = [[self alloc] init];
@@ -34,13 +34,13 @@
         lazySplitsCallback:(nullable HyperOTALazySplitsCallback)lazySplitsCallback {
     
     if (self.isInitialized) {
-        NSLog(@"HyperOTAiOS: Already initialized");
+        NSLog(@"AirborneiOS: Already initialized");
         return;
     }
     
     self.indexFileName = indexFileName;
     
-    // TODO: Initialize the actual HyperOTA SDK here
+    // TODO: Initialize the actual Airborne SDK here
     // This is a placeholder implementation
     // In a real implementation, you would:
     // 1. Import the HyperOTA iOS SDK
@@ -48,7 +48,7 @@
     // 3. Create an ApplicationManager
     // 4. Load the application
     
-    NSLog(@"HyperOTAiOS: Initializing with appId: %@, indexFileName: %@, appVersion: %@", 
+    NSLog(@"AirborneiOS: Initializing with appId: %@, indexFileName: %@, appVersion: %@",
           appId, indexFileName, appVersion);
     
     self.isInitialized = YES;

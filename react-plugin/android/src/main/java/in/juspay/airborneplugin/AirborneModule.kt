@@ -32,6 +32,6 @@ class AirborneModule(reactContext: ReactApplicationContext) :
   }
 
   companion object {
-    const val NAME = "HyperOta"
+    const val NAME = "Airborne"
   }
 }

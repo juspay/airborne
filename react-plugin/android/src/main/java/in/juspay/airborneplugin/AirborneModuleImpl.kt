@@ -4,7 +4,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.Promise
 
 /**
- * Implementation class that handles the actual HyperOTA operations.
+ * Implementation class that handles the actual Airborne operations.
  * This class is shared between old and new architecture modules.
  */
 class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
@@ -13,7 +13,7 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
 //        private var isInitialized = false
 
 //        /**
-//         * Initialize HyperOTA from native code (typically from MainApplication)
+//         * Initialize Airborne from native code (typically from MainApplication)
 //         */
 //        @JvmStatic
 //        fun initializeHyperOTA(
@@ -47,7 +47,7 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
             val config = Airborne.instance.getReleaseConfig()
             promise.resolve(config)
         } catch (e: Exception) {
-            promise.reject("HYPER_OTA_ERROR", "Failed to read release config: ${e.message}", e)
+            promise.reject("AIRBORNE_ERROR", "Failed to read release config: ${e.message}", e)
         }
     }
 
@@ -56,7 +56,7 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
             val content = Airborne.instance.getFileContent(filePath)
             promise.resolve(content)
         } catch (e: Exception) {
-            promise.reject("HYPER_OTA_ERROR", "Failed to read file content: ${e.message}", e)
+            promise.reject("AIRBORNE_ERROR", "Failed to read file content: ${e.message}", e)
         }
     }
 
@@ -65,7 +65,7 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
             val path = Airborne.instance.getBundlePath()
             promise.resolve(path)
         } catch (e: Exception) {
-            promise.reject("HYPER_OTA_ERROR", "Failed to get bundle path: ${e.message}", e)
+            promise.reject("AIRBORNE_ERROR", "Failed to get bundle path: ${e.message}", e)
         }
     }
 }

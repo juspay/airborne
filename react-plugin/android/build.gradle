@@ -43,11 +43,11 @@ def appProject = rootProject.allprojects.find { it.plugins.hasPlugin('com.androi
 apply plugin: "com.facebook.react"
 
 def getExtOrDefault(name) {
-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['Hyperota_' + name]
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['Airborne_' + name]
 }
 
 def getExtOrIntegerDefault(name) {
-    return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Hyperota_" + name]).toInteger()
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Airborne_" + name]).toInteger()
 }
 
 android {
@@ -114,7 +114,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
     // Airborne SDK dependency
-    api "in.juspay:airborne:0.0.1-xota.13"
+    api "in.juspay:airborne:0.0.1-xota.15"
 }
 
 react {
