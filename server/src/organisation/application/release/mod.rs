@@ -15,8 +15,8 @@
 use std::collections::HashMap;
 
 use actix_web::{
-    error, get, post,
-    web::{self, Json, ReqData},
+    error, get, post, patch,
+    web::{self, Json, ReqData, Path},
     Result, Scope,
 };
 use aws_smithy_types::Document;
@@ -40,7 +40,7 @@ use crate::{
 };
 
 pub fn add_routes() -> Scope {
-    Scope::new("").service(create).service(list_releases)
+    Scope::new("").service(create).service(list_releases).service(ramp_release).service(conclude_release).service(get_experiment_details)
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,6 +77,50 @@ struct ReleaseHistoryEntry {
     created_by: String,
     metadata: serde_json::Value,
 }
+
+#[derive(Debug, Deserialize)]
+struct RampReleaseRequest {
+    traffic_percentage: u8,
+    change_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConcludeReleaseRequest {
+    chosen_variant: String,
+    change_reason: Option<String>,
+}
+
+#[derive(Serialize)]
+struct RampReleaseResponse {
+    success: bool,
+    message: String,
+    experiment_id: String,
+    traffic_percentage: u8,
+}
+
+#[derive(Serialize)]
+struct ConcludeReleaseResponse {
+    success: bool,
+    message: String,
+    experiment_id: String,
+    chosen_variant: String,
+}
+
+#[derive(Serialize)]
+struct ExperimentDetailsResponse {
+    experiment_id: String,
+    traffic_percentage: i32,
+    status: String,
+    variants: Vec<ExperimentVariant>,
+}
+
+#[derive(Serialize)]
+struct ExperimentVariant {
+    id: String,
+    name: String,
+    variant_type: String,
+}
+
 
 #[post("/create")]
 async fn create(
@@ -193,8 +237,10 @@ async fn create(
         .build()
         .map_err(error::ErrorInternalServerError)?;
 
+    let experimental_variant_id = format!("experimental_{}", pkg_version);
+    
     let experimental_variant = VariantBuilder::default()
-        .id("experimental_{}".to_string())
+        .id(experimental_variant_id.clone())
         .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
         .overrides(Document::from(experimental_overrides))
         .build()
@@ -257,6 +303,29 @@ async fn create(
     //     .await
     //     .map_err(error::ErrorInternalServerError)?;
 
+    let mut release_metadata = req
+        .metadata
+        .clone()
+        .unwrap_or_else(|| serde_json::json!({}));
+    
+    let experiment_variant_id = format!("experimental_{}", pkg_version);
+    
+    if let serde_json::Value::Object(ref mut map) = release_metadata {
+        map.insert("experiment_id".to_string(), serde_json::Value::String(experiment_id_for_ramping.clone()));
+        map.insert("variants".to_string(), serde_json::json!([
+            {"id": "control", "name": "Control (Original)"},
+            {"id": experiment_variant_id, "name": format!("Experimental (v{})", pkg_version)}
+        ]));
+    } else {
+        release_metadata = serde_json::json!({
+            "experiment_id": experiment_id_for_ramping.clone(),
+            "variants": [
+                {"id": "control", "name": "Control (Original)"},
+                {"id": experiment_variant_id, "name": format!("Experimental (v{})", pkg_version)}
+            ]
+        });
+    }
+
     let new_release = ReleaseEntry {
         id: release_id,
         org_id: organisation,
@@ -265,10 +334,7 @@ async fn create(
         config_version: config.config_version.clone(),
         created_at: now,
         created_by: user_id,
-        metadata: req
-            .metadata
-            .clone()
-            .unwrap_or_else(|| serde_json::json!({})),
+        metadata: release_metadata,
     };
 
     diesel::insert_into(releases)
@@ -322,3 +388,265 @@ async fn list_releases(
         releases: release_history,
     }))
 }
+
+#[patch("/{release_id}/ramp")]
+async fn ramp_release(
+    release_id: Path<String>,
+    req: Json<RampReleaseRequest>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<RampReleaseResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let release_uuid = Uuid::parse_str(&release_id)
+        .map_err(|_| error::ErrorBadRequest("Invalid release ID format"))?;
+
+    let release = releases
+        .filter(
+            id.eq(release_uuid)
+                .and(org_id.eq(&organisation))
+                .and(app_id.eq(&application)),
+        )
+        .first::<ReleaseEntry>(&mut conn)
+        .map_err(|_| error::ErrorNotFound("Release not found"))?;
+
+    let experiment_id = release
+        .metadata
+        .get("experiment_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| error::ErrorBadRequest("No experiment associated with this release"))?;
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+    println!(
+        "Ramping experiment {} to {}% traffic for release {} in workspace {} org {}",
+        experiment_id, req.traffic_percentage, release_id, workspace_name, superposition_org_id_from_env
+    );
+
+    state
+        .superposition_client
+        .ramp_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .id(experiment_id.to_string())
+        .traffic_percentage(req.traffic_percentage as i32)
+        .change_reason(
+            req.change_reason
+                .clone()
+                .unwrap_or_else(|| format!("Ramping release {} to {}% traffic", release_id, req.traffic_percentage))
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to ramp experiment: {:?}", e);
+            error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
+        })?;
+
+    println!("Successfully ramped experiment {}", experiment_id);
+
+    Ok(Json(RampReleaseResponse {
+        success: true,
+        message: format!("Release experiment ramped to {}% traffic", req.traffic_percentage),
+        experiment_id: experiment_id.to_string(),
+        traffic_percentage: req.traffic_percentage,
+    }))
+}
+
+#[patch("/{release_id}/conclude")]
+async fn conclude_release(
+    release_id: Path<String>,
+    req: Json<ConcludeReleaseRequest>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<ConcludeReleaseResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let release_uuid = Uuid::parse_str(&release_id)
+        .map_err(|_| error::ErrorBadRequest("Invalid release ID format"))?;
+
+    let release = releases
+        .filter(
+            id.eq(release_uuid)
+                .and(org_id.eq(&organisation))
+                .and(app_id.eq(&application)),
+        )
+        .first::<ReleaseEntry>(&mut conn)
+        .map_err(|_| error::ErrorNotFound("Release not found"))?;
+
+    let experiment_id = release
+        .metadata
+        .get("experiment_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| error::ErrorBadRequest("No experiment associated with this release"))?;
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+    let experiment_details = state
+        .superposition_client
+        .get_experiment()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .id(experiment_id.to_string())
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to get experiment details: {:?}", e);
+            error::ErrorInternalServerError("Failed to get experiment details from Superposition")
+        })?;
+
+
+    let transformed_variant_id = experiment_details
+        .variants
+        .iter()
+        .find(|variant| {
+            let matches = variant.id.ends_with(&format!("-{}", req.chosen_variant));
+            matches
+        })
+        .map(|variant| variant.id.clone())
+        .ok_or_else(|| {
+            error::ErrorBadRequest(format!("Variant '{}' not found in experiment. Available variants: {:?}", 
+                req.chosen_variant, 
+                experiment_details.variants.iter().map(|v| &v.id).collect::<Vec<_>>()))
+        })?;
+
+    println!(
+        "Concluding experiment {} with transformed variant {} (original: {}) for release {}",
+        experiment_id, transformed_variant_id, req.chosen_variant, release_id
+    );
+
+    state
+        .superposition_client
+        .conclude_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .id(experiment_id.to_string())
+        .chosen_variant(transformed_variant_id.clone())
+        .change_reason(
+            req.change_reason
+                .clone()
+                .unwrap_or_else(|| format!("Concluding release {} with variant {}", release_id, req.chosen_variant))
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to conclude experiment: {:?}", e);
+            error::ErrorInternalServerError("Failed to conclude experiment in Superposition")
+        })?;
+
+    println!("Successfully concluded experiment {} with variant {}", experiment_id, transformed_variant_id);
+
+    Ok(Json(ConcludeReleaseResponse {
+        success: true,
+        message: format!("Release experiment concluded with variant {}", req.chosen_variant),
+        experiment_id: experiment_id.to_string(),
+        chosen_variant: req.chosen_variant.clone(),
+    }))
+}
+
+#[get("/experiment/{experiment_id}")]
+async fn get_experiment_details(
+    experiment_id: Path<String>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<ExperimentDetailsResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, READ).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, READ).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+    let experiment_details = state
+        .superposition_client
+        .get_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .id(experiment_id.to_string())
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to get experiment details: {:?}", e);
+            error::ErrorInternalServerError("Failed to get experiment details from Superposition")
+        })?;
+
+
+    let variants = experiment_details
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_type_str = match variant.variant_type {
+                superposition_rust_sdk::types::VariantType::Control => "control",
+                superposition_rust_sdk::types::VariantType::Experimental => "experimental",
+                _ => "unknown",
+            };
+            
+            ExperimentVariant {
+                id: variant.id.clone(),
+                name: if variant_type_str == "control" {
+                    "Control (Original)".to_string()
+                } else {
+                    format!("Experimental ({})", variant.id)
+                },
+                variant_type: variant_type_str.to_string(),
+            }
+        })
+        .collect();
+
+    let status_str = match experiment_details.status {
+        superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
+        superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS", 
+        superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
+        superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
+        _ => "UNKNOWN",
+    };
+
+    Ok(Json(ExperimentDetailsResponse {
+        experiment_id: experiment_id.to_string(),
+        traffic_percentage: experiment_details.traffic_percentage,
+        status: status_str.to_string(),
+        variants,
+    }))
+}
+

@@ -3,10 +3,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReleaseWorkflow from "../release/ReleaseWorkflow";
 import UserManagement from "./UserManagement";
-import { AppWindow, Plus, ArrowLeft, Activity, Clock, Globe, Package, ChevronDown, ChevronUp, Rocket, FileJson, ListRestart, Eye } from "lucide-react";
+import { AppWindow, Plus, ArrowLeft, Activity, Clock, Globe, Package, ChevronDown, ChevronUp, Rocket, FileJson, ListRestart, Eye, History } from "lucide-react";
 import axios from "../../api/axios";
 import CreateDimension from '../dimension/CreateDimension';
 import DimensionPriority from '../dimension/DimensionPriority';
+import ReleaseHistory from '../release/ReleaseHistory';
 
 interface ReleaseInfo {
   config: {
@@ -53,12 +54,11 @@ export default function ApplicationDetails({
   application,
   organization,
   activeTab,
-  onTabChange,
+  onTabChange: _onTabChange, // eslint-disable-line @typescript-eslint/no-unused-vars
   onInviteUser,
   onAppSelect,
   onCreateApp,
 }: ApplicationDetailsProps) {
-  console.log(onTabChange)
   const [isReleaseModalOpen, setIsReleaseModalOpen] = useState(false);
   const [isDimensionModalOpen, setIsDimensionModalOpen] = useState(false);
   const [releaseInfo, setReleaseInfo] = useState<ReleaseInfo | null>(null);
@@ -66,10 +66,15 @@ export default function ApplicationDetails({
   const [showConfigDetails, setShowConfigDetails] = useState(false);
   const [isDimensionPriorityOpen, setIsDimensionPriorityOpen] = useState(false);
   const navigate = useNavigate();
+  const [showReleaseHistory, setShowReleaseHistory] = useState(false);
 
   useEffect(() => {
     setIsReleaseModalOpen(false);
+    setShowReleaseHistory(false);
+    setIsDimensionModalOpen(false);
+    setIsDimensionPriorityOpen(false);
   }, [activeTab]);
+
 
   const handleRelease = () => {
     setIsReleaseModalOpen(true);
@@ -371,6 +376,16 @@ export default function ApplicationDetails({
         </button>
 
         <button
+          onClick={() => {
+            setShowReleaseHistory(true);
+          }}
+          className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-emerald-500/20 flex items-center"
+        >
+          <History size={18} className="mr-2" />
+          Release History
+        </button>
+
+        <button
           onClick={() => setIsDimensionModalOpen(true)}
           className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-500/20 flex items-center"
         >
@@ -398,34 +413,78 @@ export default function ApplicationDetails({
       {/* Content */}
       <div className="flex-1">
         {activeTab === "applications" ? (
-          isReleaseModalOpen ? (
-            <ReleaseWorkflow
-              application={application}
-              organization={organization}
-              onClose={handleCloseRelease}
-              onComplete={async () => {
-                await fetchReleaseInfo();
-                handleCloseRelease();
-              }}
-            />
-          ) : isDimensionModalOpen && application ? (
-            <CreateDimension
-              application={application.application}
-              organization={organization.name}
-              onClose={() => setIsDimensionModalOpen(false)}
-              onSuccess={handleDimensionSuccess}
-            />
-          ) : isDimensionPriorityOpen && application ? (
-            <DimensionPriority
-              application={application.application}
-              organization={organization.name}
-              onClose={() => setIsDimensionPriorityOpen(false)}
-            />
-          ) : application ? (
-            renderApplicationDetails()
-          ) : (
-            renderApplicationList()
-          )
+          (() => {
+
+            if (isReleaseModalOpen) {
+              return (
+                <ReleaseWorkflow
+                  application={application}
+                  organization={organization}
+                  onClose={handleCloseRelease}
+                  onComplete={async () => {
+                    await fetchReleaseInfo();
+                    handleCloseRelease();
+                  }}
+                />
+              );
+            }
+
+            if (showReleaseHistory && application) {
+              return (
+                <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
+                  <div className="px-6 py-6 border-b border-white/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <button
+                          onClick={() => setShowReleaseHistory(false)}
+                          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all duration-200 mr-4"
+                        >
+                          <ArrowLeft size={20} />
+                        </button>
+                        <div>
+                          <h3 className="text-xl font-semibold text-white mb-1">Release History</h3>
+                          <p className="text-white/60 text-sm">Manage experiments and track releases</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <ReleaseHistory
+                      organisation={organization.name}
+                      application={application.application}
+                    />
+                  </div>
+                </div>
+              );
+            }
+
+            if (isDimensionModalOpen && application) {
+              return (
+                <CreateDimension
+                  application={application.application}
+                  organization={organization.name}
+                  onClose={() => setIsDimensionModalOpen(false)}
+                  onSuccess={handleDimensionSuccess}
+                />
+              );
+            }
+
+            if (isDimensionPriorityOpen && application) {
+              return (
+                <DimensionPriority
+                  application={application.application}
+                  organization={organization.name}
+                  onClose={() => setIsDimensionPriorityOpen(false)}
+                />
+              );
+            }
+
+            if (application) {
+              return renderApplicationDetails();
+            }
+
+            return renderApplicationList();
+          })()
         ) : (
           <UserManagement
             organization={organization}
