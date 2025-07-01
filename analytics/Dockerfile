@@ -1,10 +1,17 @@
 # Build stage
-FROM rust:1.75 as builder
+FROM rust:1.82 as builder
 
 WORKDIR /app
 
+# install C libs and pkg-config for build scripts
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      pkg-config \
+      libsasl2-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy manifests
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml init-clickhouse.sql ./
 
 # Create a dummy main.rs to cache dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
@@ -25,6 +32,8 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    libsasl2-2 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -34,6 +43,7 @@ WORKDIR /app
 
 # Copy the binary from builder stage
 COPY --from=builder /app/target/release/analytics-server .
+COPY --from=builder /app/init-clickhouse.sql .
 
 # Change ownership to app user
 RUN chown analytics:analytics analytics-server
@@ -42,11 +52,11 @@ RUN chown analytics:analytics analytics-server
 USER analytics
 
 # Expose port
-EXPOSE 8080
+EXPOSE 6400
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD curl -f http://localhost:6400/health || exit 1
 
 # Run the application
 CMD ["./analytics-server"]
