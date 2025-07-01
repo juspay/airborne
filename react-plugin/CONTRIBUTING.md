@@ -28,7 +28,7 @@ It is configured to use the local version of the library, so any changes you mak
 
 If you want to use Android Studio or XCode to edit the native code, you can open the `example/android` or `example/ios` directories respectively in those editors. Make sure that you did `pod install` in the example/ios folder. To edit the Objective-C or Swift files, open `example/ios/AirborneExample.xcworkspace` in XCode and find the source files at `Pods > Development Pods > AirborneReact`.
 
-To edit the Java or Kotlin files, open `example/android` in Android studio and find the source files at `react-native-airborne` under `Android`.
+To edit the Java or Kotlin files, open `example/android` in Android studio and find the source files at `airborne-react-native` under `Android`.
 
 You can use various commands from the root directory to work with the project.
 

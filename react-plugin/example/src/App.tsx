@@ -4,7 +4,7 @@ import {
   readReleaseConfig,
   getFileContent,
   getBundlePath,
-} from 'react-native-airborne';
+} from 'airborne-react-native';
 
 export default function App() {
   const [releaseConfig, setReleaseConfig] = useState<string | undefined>();

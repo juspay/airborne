@@ -1,11 +1,11 @@
-# react-native-airborne
+# airborne-react-native
 
 airborne
 
 ## Installation
 
 ```sh
-npm install react-native-airborne
+npm install airborne-react-native
 ```
 
 # React Native Airborne Implementation Summary
@@ -65,7 +65,7 @@ This implementation provides a React Native module for Airborne that:
 
 ### React Native Usage
 ```typescript
-import { readReleaseConfig, getFileContent, getBundlePath } from 'react-native-Airborne';
+import { readReleaseConfig, getFileContent, getBundlePath } from 'airborne-react-native';
 
 // Read configuration
 const config = await readReleaseConfig();

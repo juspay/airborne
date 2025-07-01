@@ -1,5 +1,5 @@
 {
-  "name": "react-native-airborne",
+  "name": "airborne-react-native",
   "version": "0.1.0",
   "description": "Airborne",
   "main": "./lib/module/index.js",
@@ -32,7 +32,7 @@
     "!**/.*"
   ],
   "scripts": {
-    "example": "yarn workspace react-native-airborne-example",
+    "example": "yarn workspace airborne-react-native-example",
     "test": "jest",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
@@ -47,14 +47,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/manideepk90/react-native-airborne.git"
+    "url": "git+https://github.com/juspay/airborne.git"
   },
-  "author": "juspay <kuntimaddi.manideep@juspay.in> (https://github.com/manideepk90)",
+  "author": "juspay <kuntimaddi.manideep@juspay.in> (https://github.com/juspay)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/manideepk90/react-native-airborne/issues"
+    "url": "https://github.com/juspay/airborne/issues"
   },
-  "homepage": "https://github.com/manideepk90/react-native-airborne#readme",
+  "homepage": "https://github.com/juspay/airborne#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

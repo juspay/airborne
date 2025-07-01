@@ -63,7 +63,7 @@ class MainApplication : Application(), ReactApplication {
                 "https://example.com/airborne/release-config",
                 object : AirborneInterface() {
                     override fun getNamespace(): String {
-                        return "example-new" // return your app's package name or some identifier of your app. 
+                        return "example-new" // return your app's package name or some identifier of your app.
                     }
 
                     override fun getDimensions(): HashMap<String, String> {
@@ -73,7 +73,7 @@ class MainApplication : Application(), ReactApplication {
                     }
 
                     override fun getIndexBundlePath(): String {
-                        return "index.android.bundle" // return your react app's bundled index file name. 
+                        return "index.android.bundle" // return your react app's bundled index file name.
                     }
 
                     override fun getLazyDownloadCallback(): LazyDownloadCallback {
@@ -123,9 +123,9 @@ import react_native_hyperota
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
-    
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        
+
         // Initialize Airborne
         Hyperota.initializeAirborne(
             withAppId: "your-app-id",
@@ -137,7 +137,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 "X-Custom-Header": "value"
             ]
         )
-        
+
         // Rest of your initialization code...
         return true
     }
@@ -153,7 +153,7 @@ For Objective-C:
 @implementation AppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    
+
     // Initialize Airborne
     [Hyperota initializeAirborneWithAppId:@"your-app-id"
                             indexFileName:@"main.jsbundle"
@@ -163,7 +163,7 @@ For Objective-C:
                                       @"Authorization": @"Bearer your-token",
                                       @"X-Custom-Header": @"value"
                                   }];
-    
+
     // Rest of your initialization code...
     return YES;
 }
@@ -186,7 +186,7 @@ pod 'Airborne', '~> YOUR_VERSION'
 After native initialization, you can use Airborne in your React Native code:
 
 ```typescript
-import { readReleaseConfig, getFileContent, getBundlePath } from 'react-native-airborne';
+import { readReleaseConfig, getFileContent, getBundlePath } from 'airborne-react-native';
 
 // Read release configuration
 const config = await readReleaseConfig();

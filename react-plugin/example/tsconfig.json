@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "react-native-airborne": ["../src/index"]
+      "airborne-react-native": ["../src/index"]
     }
   },
   "include": [

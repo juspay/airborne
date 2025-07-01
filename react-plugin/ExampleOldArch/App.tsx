@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Airborne from 'react-native-airborne';
+import Airborne from 'airborne-react-native';
 
 function App(): React.JSX.Element {
   const [releaseConfig, setReleaseConfig] = useState<string>('');
