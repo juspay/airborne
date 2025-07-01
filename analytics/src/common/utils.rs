@@ -133,7 +133,7 @@ pub fn floor_to_hour(ts_sec: i64) -> i64 {
 /// Floor to midnight UTC of that day (00:00:00)
 pub fn floor_to_day(ts_sec: i64) -> i64 {
     let dt = Utc.timestamp(ts_sec, 0);
-    let floored = dt.date_naive().and_hms(0, 0, 0);
+    let floored = dt.date_naive().and_hms(23, 59, 59);
     DateTime::<Utc>::from_utc(floored, Utc).timestamp()
 }
 
