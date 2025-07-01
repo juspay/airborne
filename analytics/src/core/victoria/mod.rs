@@ -4,7 +4,7 @@ use prometheus::{
 };
 use chrono::{DateTime, Utc};
 use anyhow::Result;
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 use tracing::{info, error};
 use reqwest::Client as HttpClient;
 use tokio::time::interval;
@@ -706,7 +706,7 @@ impl Client {
             });
         }
 
-        let mut map: HashMap<i64, AdoptionTimeSeries> = HashMap::new();
+        let mut map: BTreeMap<i64, AdoptionTimeSeries> = BTreeMap::new();
         while let Some(batch) = futures.next().await {
             let (metric, data_points) = batch?; // propagate error if any
             for (ts, count) in data_points {
@@ -738,6 +738,25 @@ impl Client {
             }
         }
 
+        let mut current_time = start_time;
+        while current_time < end_time {
+            let _ = map.entry(current_time).or_insert_with(|| AdoptionTimeSeries {
+                time_slot: DateTime::from_timestamp(current_time, 0)
+                    .unwrap_or(Utc::now()),
+                download_success:      0,
+                download_failures:     0,
+                apply_success:         0,
+                apply_failures:        0,
+                rollbacks_initiated:   0,
+                rollbacks_completed:   0,
+                rollback_failures:     0,
+                update_checks:         0,
+                update_available:      0,
+            });
+            
+            current_time += 60 * 60; // increment by one hour
+        }
+
         let mut series = map.into_iter()
             .map(|(_, v)| v)
             .collect::<Vec<_>>();
@@ -757,7 +776,7 @@ impl Client {
         end_date_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
         let start_time = utils::floor_to_day(start_date_millis);
-        let end_time   = utils::ceil_to_day(end_date_millis);
+        let end_time   = utils::floor_to_day(end_date_millis);
 
         info!(
             "Getting daywise adoption metrics for org: {}, app: {}, release: {}, from: {}, to: {}",
@@ -795,7 +814,7 @@ impl Client {
             });
         }
 
-        let mut map: HashMap<i64, AdoptionTimeSeries> = HashMap::new();
+        let mut map: BTreeMap<i64, AdoptionTimeSeries> = BTreeMap::new();
         while let Some(batch) = futures.next().await {
             let (metric, data_points) = batch?; // bubbles up errors
             for (ts, count) in data_points {
@@ -827,12 +846,28 @@ impl Client {
             }
         }
 
-        let mut series = map.into_iter()
+        let mut current_time = start_time;
+        while current_time < end_time {
+            let _ = map.entry(current_time).or_insert_with(|| AdoptionTimeSeries {
+                time_slot: DateTime::from_timestamp(current_time, 0)
+                    .unwrap_or(Utc::now()),
+                download_success:      0,
+                download_failures:     0,
+                apply_success:         0,
+                apply_failures:        0,
+                rollbacks_initiated:   0,
+                rollbacks_completed:   0,
+                rollback_failures:     0,
+                update_checks:         0,
+                update_available:      0,
+            });
+            
+            current_time += 24 * 60 * 60; // increment by one day
+        }
+
+        let series = map.into_iter()
             .map(|(_, v)| v)
             .collect::<Vec<_>>();
-        series.sort_by_key(|s| s.time_slot.timestamp());
-
-        
 
         Ok(series)
     }
