@@ -2,14 +2,17 @@ use axum::{extract::State, response::Json};
 use chrono::Utc;
 
 use crate::{
-    common::{error::AppResult, models::{HealthResponse, LoggingInfra, ServiceHealthCheck, SystemMetrics}},
+    common::{
+        error::AppResult,
+        models::{HealthResponse, LoggingInfra, ServiceHealthCheck, SystemMetrics},
+    },
     AppState,
 };
 
 pub async fn health_check(State(state): State<AppState>) -> AppResult<Json<HealthResponse>> {
     // Check ClickHouse connection
-    let clickhouse_healthy = 
-    if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse {
+    let clickhouse_healthy = if state.config.logging_infrastructure == LoggingInfra::KafkaClickhouse
+    {
         match state.clickhouse {
             Some(client) => {
                 let clickhouse_healthy = match client.query("SELECT 1").fetch_one::<u8>().await {
@@ -31,8 +34,7 @@ pub async fn health_check(State(state): State<AppState>) -> AppResult<Json<Healt
     };
 
     // Check Victoria Metrics connection
-    let victoria_healthy = 
-    if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
+    let victoria_healthy = if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
         match state.victoria {
             Some(client) => {
                 // Simple check by getting metrics - if this works, Victoria Metrics is healthy

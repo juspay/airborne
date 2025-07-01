@@ -48,10 +48,8 @@ impl Config {
                     .unwrap_or(6400),
             },
             kafka: KafkaConfig {
-                brokers: env::var("KAFKA_BROKERS")
-                    .unwrap_or_else(|_| "localhost:9092".to_string()),
-                topic: env::var("KAFKA_TOPIC")
-                    .unwrap_or_else(|_| "ota-events".to_string()),
+                brokers: env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string()),
+                topic: env::var("KAFKA_TOPIC").unwrap_or_else(|_| "ota-events".to_string()),
                 consumer_group: env::var("KAFKA_CONSUMER_GROUP")
                     .unwrap_or_else(|_| "ota-analytics-consumer".to_string()),
                 security_protocol: env::var("KAFKA_SECURITY_PROTOCOL").ok(),

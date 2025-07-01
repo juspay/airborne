@@ -3,18 +3,20 @@ pub mod models;
 use std::collections::BTreeMap;
 
 use anyhow::{Ok, Result};
+use chrono::{Datelike, NaiveDate, TimeZone, Utc};
 use clickhouse::{Client as ClickHouseClient, Row};
 use serde::{Deserialize, Serialize};
 use time::{Date, Duration, OffsetDateTime, Time};
-use tracing::{info};
-use chrono::{Datelike, NaiveDate, TimeZone, Utc};
+use tracing::info;
 use uuid::Uuid;
 
 use crate::common::config::ClickHouseConfig;
-use crate::core::clickhouse::models::OtaEventRow;
 use crate::common::models::{
-    ActiveDevicesMetrics, AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval, DailyActiveDevices, DailyFailures, ErrorFrequency, FailureAnalytics, OtaEvent, VersionDistribution, VersionMetrics
+    ActiveDevicesMetrics, AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval,
+    DailyActiveDevices, DailyFailures, ErrorFrequency, FailureAnalytics, OtaEvent,
+    VersionDistribution, VersionMetrics,
 };
+use crate::core::clickhouse::models::OtaEventRow;
 
 #[derive(Clone)]
 pub struct Client {
@@ -42,7 +44,10 @@ impl Client {
         };
 
         // The schema is now initialized via init-clickhouse.sql
-        info!("ClickHouse client initialized for database: {}", config.database);
+        info!(
+            "ClickHouse client initialized for database: {}",
+            config.database
+        );
 
         Ok(client_instance)
     }
@@ -54,7 +59,6 @@ impl Client {
 
     /// Insert OTA event into the raw events table
     pub async fn insert_ota_event(&self, event: &OtaEvent) -> Result<()> {
-
         let row = OtaEventRow {
             org_id: event.org_id.clone(),
             app_id: event.app_id.clone(),
@@ -78,7 +82,9 @@ impl Client {
             download_size_bytes: event.download_size_bytes,
             download_time_ms: event.download_time_ms,
             apply_time_ms: event.apply_time_ms,
-            payload: event.payload.as_ref()
+            payload: event
+                .payload
+                .as_ref()
                 .map(|p| serde_json::to_string(p).unwrap_or_else(|_| "{}".to_string()))
                 .unwrap_or_else(|| "{}".to_string()),
             user_agent: event.user_agent.clone(),
@@ -89,18 +95,24 @@ impl Client {
         insert.write(&row).await?;
         insert.end().await?;
 
-        info!("OTA event inserted: {} for org {} and app {}", event.event_type.to_string(), event.org_id, event.app_id);
+        info!(
+            "OTA event inserted: {} for org {} and app {}",
+            event.event_type.to_string(),
+            event.org_id,
+            event.app_id
+        );
         Ok(())
     }
 
     fn days_from_epoch_chrono(ts_secs: i64) -> u16 {
         let dt = chrono::TimeZone::timestamp(&Utc, ts_secs, 0);
 
-        let epoch_date = chrono::TimeZone::ymd(&Utc, 1970, 1, 1).and_hms(0, 0, 0).date();
+        let epoch_date = chrono::TimeZone::ymd(&Utc, 1970, 1, 1)
+            .and_hms(0, 0, 0)
+            .date();
 
         dt.date().signed_duration_since(epoch_date).num_days() as u16
     }
-
 
     pub async fn insert_ota_events_batch(&self, events: Vec<OtaEvent>) -> Result<()> {
         if events.is_empty() {
@@ -108,37 +120,42 @@ impl Client {
         }
 
         let events_len = events.len();
-        let rows: Vec<OtaEventRow> = events.into_iter().map(|event| {
-            OtaEventRow {
-                org_id: event.org_id,
-                app_id: event.app_id,
-                device_id: event.device_id,
-                session_id: event.session_id,
-                event_type: event.event_type.to_string(),
-                event_id: event.event_id.unwrap_or_else(|| Uuid::new_v4()),
-                timestamp: event.timestamp.timestamp_millis(),
-                event_date: Self::days_from_epoch_chrono(event.timestamp.timestamp()), // Convert to ClickHouse date format (days since 1970-01-01)
-                release_id: event.release_id,
-                current_js_version: event.current_js_version,
-                target_js_version: event.target_js_version,
-                rollout_percentage: event.rollout_percentage,
-                os_version: event.os_version,
-                app_version: event.app_version,
-                device_type: event.device_type,
-                network_type: event.network_type,
-                error_code: event.error_code,
-                error_message: event.error_message,
-                stack_trace: event.stack_trace,
-                download_size_bytes: event.download_size_bytes,
-                download_time_ms: event.download_time_ms,
-                apply_time_ms: event.apply_time_ms,
-                payload: event.payload.as_ref()
-                    .map(|p| serde_json::to_string(p).unwrap_or_else(|_| "{}".to_string()))
-                    .unwrap_or_else(|| "{}".to_string()),
-                user_agent: event.user_agent,
-                ip_address: event.ip_address,
-            }
-        }).collect();
+        let rows: Vec<OtaEventRow> = events
+            .into_iter()
+            .map(|event| {
+                OtaEventRow {
+                    org_id: event.org_id,
+                    app_id: event.app_id,
+                    device_id: event.device_id,
+                    session_id: event.session_id,
+                    event_type: event.event_type.to_string(),
+                    event_id: event.event_id.unwrap_or_else(|| Uuid::new_v4()),
+                    timestamp: event.timestamp.timestamp_millis(),
+                    event_date: Self::days_from_epoch_chrono(event.timestamp.timestamp()), // Convert to ClickHouse date format (days since 1970-01-01)
+                    release_id: event.release_id,
+                    current_js_version: event.current_js_version,
+                    target_js_version: event.target_js_version,
+                    rollout_percentage: event.rollout_percentage,
+                    os_version: event.os_version,
+                    app_version: event.app_version,
+                    device_type: event.device_type,
+                    network_type: event.network_type,
+                    error_code: event.error_code,
+                    error_message: event.error_message,
+                    stack_trace: event.stack_trace,
+                    download_size_bytes: event.download_size_bytes,
+                    download_time_ms: event.download_time_ms,
+                    apply_time_ms: event.apply_time_ms,
+                    payload: event
+                        .payload
+                        .as_ref()
+                        .map(|p| serde_json::to_string(p).unwrap_or_else(|_| "{}".to_string()))
+                        .unwrap_or_else(|| "{}".to_string()),
+                    user_agent: event.user_agent,
+                    ip_address: event.ip_address,
+                }
+            })
+            .collect();
 
         println!("Inserting {}", serde_json::json!(rows));
 
@@ -154,12 +171,11 @@ impl Client {
 
     pub async fn get_adoption_metrics_hourly_parallel(
         &self,
-        org_id:     &str,
-        app_id:     &str,
+        org_id: &str,
+        app_id: &str,
         release_id: &str,
-        ts_millis:  i64,
+        ts_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        
         fn hour_to_datetime(date_millis: i64, hour: u8) -> chrono::DateTime<chrono::Utc> {
             let nd = Utc.timestamp_millis(date_millis);
             nd.date_naive()
@@ -204,15 +220,16 @@ impl Client {
             }
         };
 
-        let downloads_fut        = make_fetch("hourly_downloads", "download_count");
-        let applies_fut          = make_fetch("hourly_applies", "apply_count");
-        let dl_failures_fut      = make_fetch("hourly_download_failures", "download_failure_count");
-        let ap_failures_fut      = make_fetch("hourly_apply_failures", "apply_failure_count");
-        let rb_inits_fut         = make_fetch("hourly_rollback_initiates", "rollback_initiate_count");
-        let rollbacks_fut        = make_fetch("hourly_rollback_completes", "rollback_complete_count");
-        let rb_failures_fut      = make_fetch("hourly_rollback_failures", "rollback_failures_count");
-        let update_checks_fut    = make_fetch("hourly_update_checks", "update_check_count");
-        let update_available_fut = make_fetch("hourly_update_availables", "update_availability_count");
+        let downloads_fut = make_fetch("hourly_downloads", "download_count");
+        let applies_fut = make_fetch("hourly_applies", "apply_count");
+        let dl_failures_fut = make_fetch("hourly_download_failures", "download_failure_count");
+        let ap_failures_fut = make_fetch("hourly_apply_failures", "apply_failure_count");
+        let rb_inits_fut = make_fetch("hourly_rollback_initiates", "rollback_initiate_count");
+        let rollbacks_fut = make_fetch("hourly_rollback_completes", "rollback_complete_count");
+        let rb_failures_fut = make_fetch("hourly_rollback_failures", "rollback_failures_count");
+        let update_checks_fut = make_fetch("hourly_update_checks", "update_check_count");
+        let update_available_fut =
+            make_fetch("hourly_update_availables", "update_availability_count");
 
         let (
             downloads_res,
@@ -236,94 +253,115 @@ impl Client {
             update_available_fut,
         );
 
-        let downloads_rows        = downloads_res?;
-        let applies_rows          = applies_res?;
-        let dl_failures_rows      = dl_failures_res?;
-        let ap_failures_rows      = ap_failures_res?;
-        let rollback_inits_rows   = rollback_inits_res?;
-        let rollbacks_rows        = rollbacks_res?;
-        let rb_failures_rows      = rb_failures_res?;
-        let update_checks_rows    = update_checks_res?;
+        let downloads_rows = downloads_res?;
+        let applies_rows = applies_res?;
+        let dl_failures_rows = dl_failures_res?;
+        let ap_failures_rows = ap_failures_res?;
+        let rollback_inits_rows = rollback_inits_res?;
+        let rollbacks_rows = rollbacks_res?;
+        let rb_failures_rows = rb_failures_res?;
+        let update_checks_rows = update_checks_res?;
         let update_available_rows = update_available_res?;
 
         let mut adoption_map: BTreeMap<u8, AdoptionTimeSeries> = BTreeMap::new();
 
         for hour in 0..24 {
-            adoption_map.insert(hour, AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                download_success: 0,
-                apply_success: 0,
-                download_failures: 0,
-                apply_failures: 0,
-                rollbacks_completed: 0,
-                rollback_failures: 0,
-                rollbacks_initiated: 0,
-                update_checks: 0,
-                update_available: 0,
-            });
+            adoption_map.insert(
+                hour,
+                AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    download_success: 0,
+                    apply_success: 0,
+                    download_failures: 0,
+                    apply_failures: 0,
+                    rollbacks_completed: 0,
+                    rollback_failures: 0,
+                    rollbacks_initiated: 0,
+                    update_checks: 0,
+                    update_available: 0,
+                },
+            );
         }
 
         for (hour, cnt) in downloads_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.download_success += cnt;
         }
         for (hour, cnt) in applies_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.apply_success += cnt;
         }
         for (hour, cnt) in dl_failures_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.download_failures += cnt;
         }
         for (hour, cnt) in ap_failures_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.apply_failures += cnt;
         }
         for (hour, cnt) in rollback_inits_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.rollbacks_initiated = cnt;
         }
         for (hour, cnt) in rollbacks_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.rollbacks_completed = cnt;
         }
         for (hour, cnt) in rb_failures_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.rollback_failures = cnt;
         }
         for (hour, cnt) in update_checks_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.update_checks = cnt;
         }
         for (hour, cnt) in update_available_rows {
-            let entry = adoption_map.entry(hour).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: hour_to_datetime(ts_millis, hour),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(hour)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: hour_to_datetime(ts_millis, hour),
+                    ..Default::default()
+                });
             entry.update_available = cnt;
         }
 
@@ -358,13 +396,12 @@ impl Client {
 
     pub async fn get_adoption_metrics_daywise_parallel(
         &self,
-        org_id:     &str,
-        app_id:     &str,
+        org_id: &str,
+        app_id: &str,
         release_id: &str,
         start_date_millis: i64,
         end_date_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        
         fn date_millis_to_datetime(date_millis: i64) -> chrono::DateTime<chrono::Utc> {
             let nd = Utc.timestamp_millis(date_millis);
             nd.date_naive()
@@ -374,12 +411,11 @@ impl Client {
                 .unwrap_or_else(|| Utc::now())
         }
 
-
         #[derive(Row, Serialize, Deserialize, Debug)]
         struct RawCHEventAggregate {
             cnt: u64,
             #[serde(with = "clickhouse::serde::time::date")]
-            event_date: time::Date
+            event_date: time::Date,
         }
 
         let make_fetch = |view_name: &'static str, column_alias: &'static str| {
@@ -415,21 +451,27 @@ impl Client {
                 while let Some(raw_aggregate) = cursor.next().await? {
                     rows.push(raw_aggregate);
                 }
-                println!("Fetched {} rows from {} and rows: {:?}", rows.len(), view_name, rows);
+                println!(
+                    "Fetched {} rows from {} and rows: {:?}",
+                    rows.len(),
+                    view_name,
+                    rows
+                );
                 Ok(rows)
             }
         };
 
         // Spawn six futures in parallel:
-        let downloads_fut        = make_fetch("daily_downloads", "download_count");
-        let applies_fut          = make_fetch("daily_applies", "apply_count");
-        let dl_failures_fut      = make_fetch("daily_download_failures", "download_failure_count");
-        let ap_failures_fut      = make_fetch("daily_apply_failures", "apply_failure_count");
-        let rb_inits_fut         = make_fetch("daily_rollback_initiates", "rollback_initiate_count");
-        let rollbacks_fut        = make_fetch("daily_rollback_completes", "rollback_complete_count");
-        let rb_failures_fut      = make_fetch("daily_rollback_failures", "rollback_failures_count");
-        let update_checks_fut    = make_fetch("daily_update_checks", "update_check_count");
-        let update_available_fut = make_fetch("daily_update_availables", "update_availability_count");
+        let downloads_fut = make_fetch("daily_downloads", "download_count");
+        let applies_fut = make_fetch("daily_applies", "apply_count");
+        let dl_failures_fut = make_fetch("daily_download_failures", "download_failure_count");
+        let ap_failures_fut = make_fetch("daily_apply_failures", "apply_failure_count");
+        let rb_inits_fut = make_fetch("daily_rollback_initiates", "rollback_initiate_count");
+        let rollbacks_fut = make_fetch("daily_rollback_completes", "rollback_complete_count");
+        let rb_failures_fut = make_fetch("daily_rollback_failures", "rollback_failures_count");
+        let update_checks_fut = make_fetch("daily_update_checks", "update_check_count");
+        let update_available_fut =
+            make_fetch("daily_update_availables", "update_availability_count");
 
         // Run them concurrently
         let (
@@ -454,111 +496,134 @@ impl Client {
             update_available_fut,
         );
 
-        let downloads_rows        = downloads_res?;
-        let applies_rows          = applies_res?;
-        let dl_failures_rows      = dl_failures_res?;
-        let ap_failures_rows      = ap_failures_res?;
-        let rollback_inits_rows   = rollback_inits_res?;
-        let rollbacks_rows        = rollbacks_res?;
-        let rb_failures_rows      = rb_failures_res?;
-        let update_checks_rows    = update_checks_res?;
+        let downloads_rows = downloads_res?;
+        let applies_rows = applies_res?;
+        let dl_failures_rows = dl_failures_res?;
+        let ap_failures_rows = ap_failures_res?;
+        let rollback_inits_rows = rollback_inits_res?;
+        let rollbacks_rows = rollbacks_res?;
+        let rb_failures_rows = rb_failures_res?;
+        let update_checks_rows = update_checks_res?;
         let update_available_rows = update_available_res?;
 
         let mut adoption_map: BTreeMap<i64, AdoptionTimeSeries> = BTreeMap::new();
 
         fn make_map_key(date: time::Date) -> i64 {
-            let naive_date = NaiveDate::from_ymd_opt(date.year() as i32, date.month() as u32, date.day() as u32)
-                .expect("Invalid date");
-            let dt = chrono::DateTime::<chrono::Utc>::from_utc(naive_date.and_hms(0, 0, 0), chrono::Utc);
+            let naive_date =
+                NaiveDate::from_ymd_opt(date.year() as i32, date.month() as u32, date.day() as u32)
+                    .expect("Invalid date");
+            let dt =
+                chrono::DateTime::<chrono::Utc>::from_utc(naive_date.and_hms(0, 0, 0), chrono::Utc);
             dt.timestamp_millis()
         }
 
         for date in Self::dates_between(start_date_millis, end_date_millis) {
             let key = make_map_key(date);
-            adoption_map.insert(key, AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                download_success: 0,
-                apply_success: 0,
-                download_failures: 0,
-                apply_failures: 0,
-                rollbacks_completed: 0,
-                rollback_failures: 0,
-                rollbacks_initiated: 0,
-                update_checks: 0,
-                update_available: 0,
-            });
+            adoption_map.insert(
+                key,
+                AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    download_success: 0,
+                    apply_success: 0,
+                    download_failures: 0,
+                    apply_failures: 0,
+                    rollbacks_completed: 0,
+                    rollback_failures: 0,
+                    rollbacks_initiated: 0,
+                    update_checks: 0,
+                    update_available: 0,
+                },
+            );
         }
 
         for row in downloads_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.download_success += row.cnt;
         }
         for row in applies_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.apply_success += row.cnt;
         }
         for row in dl_failures_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.download_failures += row.cnt;
         }
         for row in ap_failures_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.apply_failures += row.cnt;
         }
         for row in rollback_inits_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.rollbacks_initiated = row.cnt;
         }
         for row in rollbacks_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.rollbacks_completed = row.cnt;
         }
         for row in rb_failures_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.rollback_failures = row.cnt;
         }
         for row in update_checks_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.update_checks = row.cnt;
         }
         for row in update_available_rows {
             let key = make_map_key(row.event_date);
-            let entry = adoption_map.entry(key).or_insert_with(|| AdoptionTimeSeries {
-                time_slot: date_millis_to_datetime(key),
-                ..Default::default()
-            });
+            let entry = adoption_map
+                .entry(key)
+                .or_insert_with(|| AdoptionTimeSeries {
+                    time_slot: date_millis_to_datetime(key),
+                    ..Default::default()
+                });
             entry.update_available = row.cnt;
         }
 
@@ -574,34 +639,40 @@ impl Client {
         date_millis: i64,
         interval: AnalyticsInterval,
         start_date_millis: i64,
-        end_date_millis: i64
+        end_date_millis: i64,
     ) -> Result<AdoptionMetrics> {
-
         match interval {
             AnalyticsInterval::Hour => {
-                let hourly_adoption_metrics = self.get_adoption_metrics_hourly_parallel(org_id, app_id, release_id, date_millis);
+                let hourly_adoption_metrics = self.get_adoption_metrics_hourly_parallel(
+                    org_id,
+                    app_id,
+                    release_id,
+                    date_millis,
+                );
 
-                Ok(
-                    AdoptionMetrics {
-                        org_id: org_id.to_string(),
-                        app_id: app_id.to_string(),
-                        release_id: release_id.to_string(),
-                        time_breakdown: hourly_adoption_metrics.await?,
-                    }
-                )
-            },
+                Ok(AdoptionMetrics {
+                    org_id: org_id.to_string(),
+                    app_id: app_id.to_string(),
+                    release_id: release_id.to_string(),
+                    time_breakdown: hourly_adoption_metrics.await?,
+                })
+            }
             AnalyticsInterval::Day => {
-                let daywise_adoption_metrics = self.get_adoption_metrics_daywise_parallel(org_id, app_id, release_id, start_date_millis, end_date_millis);
+                let daywise_adoption_metrics = self.get_adoption_metrics_daywise_parallel(
+                    org_id,
+                    app_id,
+                    release_id,
+                    start_date_millis,
+                    end_date_millis,
+                );
 
-                Ok(
-                    AdoptionMetrics {
-                        org_id: org_id.to_string(),
-                        app_id: app_id.to_string(),
-                        release_id: release_id.to_string(),
-                        time_breakdown: daywise_adoption_metrics.await?,
-                    }
-                )
-            },
+                Ok(AdoptionMetrics {
+                    org_id: org_id.to_string(),
+                    app_id: app_id.to_string(),
+                    release_id: release_id.to_string(),
+                    time_breakdown: daywise_adoption_metrics.await?,
+                })
+            }
             AnalyticsInterval::Week => todo!(),
             AnalyticsInterval::Month => todo!(),
         }
@@ -661,13 +732,13 @@ impl Client {
     }
 
     pub async fn get_active_devices_metrics(
-    &self,
-    org_id: &str,
-    app_id: &str,
-    days: u32,
-) -> Result<ActiveDevicesMetrics> {
-    let sql = format!(
-        r#"
+        &self,
+        org_id: &str,
+        app_id: &str,
+        days: u32,
+    ) -> Result<ActiveDevicesMetrics> {
+        let sql = format!(
+            r#"
         SELECT
             eventDate AS event_date,
             uniq(deviceId) AS active_devices
@@ -679,38 +750,45 @@ impl Client {
         GROUP BY eventDate
         ORDER BY eventDate
         "#,
-        org_id, app_id, days
-    );
+            org_id, app_id, days
+        );
 
-    // Fetch (Date, UInt64) directly—Date maps to chrono::NaiveDate
-     #[derive(Row, Serialize, Deserialize, Debug)]
-    struct ActiveDevicesRow {
-        #[serde(with = "clickhouse::serde::time::date")]
-        event_date: time::Date,
-        active_devices: u64,
-    }
-
-    let mut cursor = self.client.query(&sql).fetch::<ActiveDevicesRow>()?;
-    let mut daily_breakdown = Vec::new();
-    let mut total_active_devices = 0u64;
-
-    while let Some(row) = cursor.next().await? {
-        if row.active_devices > total_active_devices {
-            total_active_devices = row.active_devices;
+        // Fetch (Date, UInt64) directly—Date maps to chrono::NaiveDate
+        #[derive(Row, Serialize, Deserialize, Debug)]
+        struct ActiveDevicesRow {
+            #[serde(with = "clickhouse::serde::time::date")]
+            event_date: time::Date,
+            active_devices: u64,
         }
 
-        let date = chrono::NaiveDate::from_ymd_opt(row.event_date.year() as i32, row.event_date.month() as u32, row.event_date.day() as u32)
-            .expect("Invalid date conversion from time::Date to chrono::NaiveDate");
-        daily_breakdown.push(DailyActiveDevices { date, active_devices: row.active_devices });
-    }
+        let mut cursor = self.client.query(&sql).fetch::<ActiveDevicesRow>()?;
+        let mut daily_breakdown = Vec::new();
+        let mut total_active_devices = 0u64;
 
-    Ok(ActiveDevicesMetrics {
-        org_id: org_id.to_string(),
-        app_id: app_id.to_string(),
-        daily_breakdown,
-        total_active_devices,
-    })
-}
+        while let Some(row) = cursor.next().await? {
+            if row.active_devices > total_active_devices {
+                total_active_devices = row.active_devices;
+            }
+
+            let date = chrono::NaiveDate::from_ymd_opt(
+                row.event_date.year() as i32,
+                row.event_date.month() as u32,
+                row.event_date.day() as u32,
+            )
+            .expect("Invalid date conversion from time::Date to chrono::NaiveDate");
+            daily_breakdown.push(DailyActiveDevices {
+                date,
+                active_devices: row.active_devices,
+            });
+        }
+
+        Ok(ActiveDevicesMetrics {
+            org_id: org_id.to_string(),
+            app_id: app_id.to_string(),
+            daily_breakdown,
+            total_active_devices,
+        })
+    }
 
     /// Get active devices metrics
     pub async fn get_active_devices_metrics1(
@@ -746,7 +824,10 @@ impl Client {
             // Convert ClickHouse Date (days since 1900-01-01) to NaiveDate
             let date = chrono::NaiveDate::from_num_days_from_ce_opt(date_days as i32 + 693_594)
                 .unwrap_or_else(|| chrono::Utc::now().date_naive());
-            daily_breakdown.push(DailyActiveDevices { date, active_devices });
+            daily_breakdown.push(DailyActiveDevices {
+                date,
+                active_devices,
+            });
         }
 
         Ok(ActiveDevicesMetrics {
@@ -786,7 +867,8 @@ impl Client {
             where_clause
         );
 
-        let (total_failures, total_rollbacks): (u64, u64) = self.client
+        let (total_failures, total_rollbacks): (u64, u64) = self
+            .client
             .query(&totals_sql)
             .fetch_one()
             .await
@@ -814,7 +896,11 @@ impl Client {
             // Convert ClickHouse Date (days since 1900-01-01) to NaiveDate
             let date = chrono::NaiveDate::from_num_days_from_ce_opt(date_days as i32 + 693_594)
                 .unwrap_or_else(|| chrono::Utc::now().date_naive());
-            failure_rate_trend.push(DailyFailures { date, failures, rollbacks });
+            failure_rate_trend.push(DailyFailures {
+                date,
+                failures,
+                rollbacks,
+            });
         }
 
         // Get common errors

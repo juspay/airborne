@@ -5,8 +5,8 @@ use anyhow::Result;
 use tracing::info;
 
 pub mod clickhouse;
-pub mod victoria;
 pub mod kafka;
+pub mod victoria;
 
 pub async fn bootstrap_clickhouse(config: &Config) -> Result<Arc<clickhouse::Client>> {
     // Initialize ClickHouse client
