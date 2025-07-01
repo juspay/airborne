@@ -91,17 +91,13 @@ services:
   backend:
     image: hyper-ota-analytics:latest
     container_name: backend
-    #depends_on:
-      # - kafka
-      # - clickhouse-server
-
     ports:
       - "6400:6400"
     environment:
-      # KAFKA_BROKER_URL: kafka:29092
-      # CLICKHOUSE_URL: clickhouse-server:8123
-      LOGGING_INFRASTRUCTURE: "victoria-metrics" # kafka-clickhouse or victoria-metrics
-      VICTORIA_METRICS_URL: victoria-metrics:8428
+      KAFKA_BROKER_URL:       ${KAFKA_BROKER_URL:-kafka:29092}
+      CLICKHOUSE_URL:         ${CLICKHOUSE_URL:-clickhouse-server:8123}
+      LOGGING_INFRASTRUCTURE: ${LOGGING_INFRASTRUCTURE:-victoria-metrics}  # kafka-clickhouse or victoria-metrics
+      VICTORIA_METRICS_URL:   ${VICTORIA_METRICS_URL:-victoria-metrics:8428}
 
 volumes:
   zookeeper_data:

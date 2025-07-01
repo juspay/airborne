@@ -15,70 +15,36 @@ build-release: ## Build the application in release mode
 run: ## Run the application
 	cargo run
 
-test: ## Run tests
-	cargo test
-
-test-verbose: ## Run tests with verbose output
-	cargo test -- --nocapture
-
 fmt: ## Format code
 	cargo fmt
-
-clippy: ## Run clippy linter
-	cargo clippy -- -D warnings
 
 clean: ## Clean build artifacts
 	cargo clean
 
-# Development environment
 dev-up: ## Start development environment (Kafka, ClickHouse)
 	docker-compose up -d
 	@echo "Development environment started!"
 	@echo "Kafka UI: http://localhost:8080"
 	@echo "ClickHouse: http://localhost:8123"
 
-dev-down: ## Stop development environment
-	docker-compose down
+# ──────────────────────────────────────────────
+# Default env‐files (you can override these in your shell or on the make command line)
+ENV_FILE_KC    ?= .env.kafka-clickhouse
+ENV_FILE_VM    ?= .env.victoria-metrics
+# ──────────────────────────────────────────────
 
-dev-logs: ## Show logs from development environment
-	docker-compose logs -f
+run-dev-kafka-clickhouse:
+	@echo "⏳ Starting dev environment: Kafka + ClickHouse"
+	docker compose --env-file $(ENV_FILE_KC) up -d zookeeper kafka clickhouse-server kafka-ui && cargo watch -x run
+	@echo "✅ Development environment started with Kafka and ClickHouse!"
+	@echo "   • Kafka UI:     http://localhost:8080"
+	@echo "   • ClickHouse:   http://localhost:8123"
+	@echo "   • Backend API:  http://localhost:6400"
 
-# Docker
-docker-build: ## Build Docker image
-	docker build -t analytics-server .
-
-docker-run: ## Run Docker container
-	docker run -p 8080:8080 --env-file .env analytics-server
-
-# Database operations
-clickhouse-shell: ## Connect to ClickHouse shell
-	docker exec -it clickhouse clickhouse-client
-
-kafka-topics: ## List Kafka topics
-	docker exec -it kafka kafka-topics --bootstrap-server localhost:9092 --list
-
-kafka-console-consumer: ## Start Kafka console consumer
-	docker exec -it kafka kafka-console-consumer --bootstrap-server localhost:9092 --topic analytics-events --from-beginning
-
-# API testing
-test-health: ## Test health endpoint
-	curl -X GET http://localhost:8080/health | jq .
-
-test-ingest: ## Test event ingestion
-	curl -X POST http://localhost:8080/events \
-		-H "Content-Type: application/json" \
-		-d '{"event_name": "test_event", "user_id": "test_user", "properties": {"test": "data"}}' | jq .
-
-test-query: ## Test event querying
-	curl -X POST http://localhost:8080/events/query \
-		-H "Content-Type: application/json" \
-		-d '{"event_name": "test_event", "limit": 10}' | jq .
-
-# Setup
-setup: ## Initial setup for development
-	@echo "Setting up development environment..."
-	cp .env.example .env
-	make dev-up
-	@echo "Waiting for services to be ready..."
-	sleep 10
-	@echo "Setup complete! You can now run 'make run' to start the server."
+run-dev-victoria-metrics:
+	@echo "⏳ Starting dev environment: Grafana + Victoria Metrics"
+	docker compose --env-file $(ENV_FILE_VM) up -d grafana victoria-metrics && cargo watch -x run
+	@echo "✅ Development environment started with Grafana & Victoria Metrics!"
+	@echo "   • Grafana:          http://localhost:4000"
+	@echo "   • Victoria Metrics: http://localhost:8428"
+	@echo "   • Backend API:      http://localhost:6400"
