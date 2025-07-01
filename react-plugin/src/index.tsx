@@ -23,12 +23,12 @@ const LINKING_ERROR =
 // @ts-expect-error
 const isTurboModuleEnabled = global.__turboModuleProxy != null;
 
-const HyperotaModule = isTurboModuleEnabled
+const AirborneModule = isTurboModuleEnabled
   ? require('./NativeAirborne').default
-  : NativeModules.HyperOta;
+  : NativeModules.Airborne;
 
-const HyperOta = HyperotaModule
-  ? HyperotaModule
+const Airborne = AirborneModule
+  ? AirborneModule
   : new Proxy(
       {},
       {
@@ -39,15 +39,15 @@ const HyperOta = HyperotaModule
     );
 
 export function readReleaseConfig(): Promise<string> {
-  return HyperOta.readReleaseConfig();
+  return Airborne.readReleaseConfig();
 }
 
 export function getFileContent(filePath: string): Promise<string> {
-  return HyperOta.getFileContent(filePath);
+  return Airborne.getFileContent(filePath);
 }
 
 export function getBundlePath(): Promise<string> {
-  return HyperOta.getBundlePath();
+  return Airborne.getBundlePath();
 }
 
-export default HyperOta;
+export default Airborne;

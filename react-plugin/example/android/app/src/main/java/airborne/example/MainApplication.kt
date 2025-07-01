@@ -88,10 +88,6 @@ class MainApplication : Application(), ReactApplication {
                         }
                     }
 
-                    override fun onBootComplete() {
-                        super.onBootComplete()
-                    }
-
                     override fun onEvent(
                         level: String,
                         label: String,
