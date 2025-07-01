@@ -21,6 +21,7 @@ use actix_web::{
     Result, Scope,
 };
 use aws_smithy_types::Document;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use superposition_rust_sdk::operation::get_resolved_config::GetResolvedConfigOutput;
@@ -175,13 +176,15 @@ async fn serve_release(
         superposition_org_id_from_env
     );
 
+    let toss = rand::thread_rng().gen_range(1..=100);
+
     let applicable_variants = context.iter().fold(
         state
             .superposition_client
             .applicable_variants()
             .workspace_id(workspace_name.clone())
             .org_id(superposition_org_id_from_env.clone())
-            .toss(-1),
+            .toss(toss),
         |builder, (key, value)| {
             builder.context(
                 key.clone(),
