@@ -1,4 +1,4 @@
-.PHONY: help build run test clean docker-build docker-run dev-up dev-down
+.PHONY: help build run clean run-dev-kafka-clickhouse run-dev-victoria-metrics
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -13,19 +13,13 @@ build-release: ## Build the application in release mode
 	cargo build --release
 
 run: ## Run the application
-	cargo run
+	make run-dev-victoria-metrics
 
 fmt: ## Format code
 	cargo fmt
 
 clean: ## Clean build artifacts
 	cargo clean
-
-dev-up: ## Start development environment (Kafka, ClickHouse)
-	docker-compose up -d
-	@echo "Development environment started!"
-	@echo "Kafka UI: http://localhost:8080"
-	@echo "ClickHouse: http://localhost:8123"
 
 # ──────────────────────────────────────────────
 # Default env‐files (you can override these in your shell or on the make command line)
