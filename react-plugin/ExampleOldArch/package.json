@@ -10,9 +10,9 @@
     "test": "jest"
   },
   "dependencies": {
+    "airborne-react-native": "*",
     "react": "18.2.0",
-    "react-native": "0.74.5",
-    "airborne-react-native": "*"
+    "react-native": "0.74.5"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
