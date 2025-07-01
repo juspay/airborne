@@ -164,3 +164,19 @@ pub fn ceil_to_day(ts_sec: i64) -> i64 {
         (floored + Duration::days(1)).timestamp()
     }
 }
+
+/// Normalize a Unix timestamp to seconds.
+/// 
+/// If `ts` looks like milliseconds (i.e. > 10⁹⁹), this will divide by 1_000.
+/// Otherwise it returns `ts` unchanged.
+pub fn normalize_to_secs(ts: i64) -> i64 {
+    // Any timestamp > 10_000_000_000 is almost certainly in milliseconds
+    // since current Unix time in seconds is around 1.8e9 (10 digits).
+    const MILLIS_THRESHOLD: i64 = 10_000_000_000;
+    
+    if ts.abs() > MILLIS_THRESHOLD {
+        ts / 1_000
+    } else {
+        ts
+    }
+}

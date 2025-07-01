@@ -668,7 +668,7 @@ impl Client {
         release_id: &str,
         ts_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        let end_time = utils::floor_to_hour(ts_millis);
+        let end_time = utils::floor_to_hour(utils::normalize_to_secs(ts_millis));
         let start_time = end_time - 24 * 60 * 60; // last 24 h
 
         info!(
@@ -775,8 +775,8 @@ impl Client {
         start_date_millis: i64,
         end_date_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        let start_time = utils::floor_to_day(start_date_millis);
-        let end_time   = utils::floor_to_day(end_date_millis);
+        let start_time = utils::floor_to_day(utils::normalize_to_secs(start_date_millis));
+        let end_time   = utils::floor_to_day(utils::normalize_to_secs(end_date_millis));
 
         info!(
             "Getting daywise adoption metrics for org: {}, app: {}, release: {}, from: {}, to: {}",
