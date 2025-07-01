@@ -1,6 +1,8 @@
 #import "Airborne.h"
 #import "AirborneiOS.h"
 #import <React/RCTLog.h>
+#import <Airborne/Airborne.h>
+#import <Airborne/Airborne-Swift.h>
 
 @implementation Airborne
 
@@ -11,17 +13,8 @@ RCT_EXPORT_MODULE(Airborne)
                           appVersion:(NSString *)appVersion
              releaseConfigTemplateUrl:(NSString *)releaseConfigTemplateUrl
                              headers:(nullable NSDictionary<NSString *, NSString *> *)headers {
-    [[AirborneiOS sharedInstance] initializeWithAppId:appId
-                                         indexFileName:indexFileName
-                                            appVersion:appVersion
-                               releaseConfigTemplateUrl:releaseConfigTemplateUrl
-                                               headers:headers
-                                  lazyDownloadCallback:^(NSString *filePath, BOOL success) {
-                                      RCTLogInfo(@"Airborne: File %@ - %@", filePath, success ? @"installed" : @"failed");
-                                  }
-                                   lazySplitsCallback:^(BOOL success) {
-                                      RCTLogInfo(@"Airborne: Lazy splits - %@", success ? @"installed" : @"failed");
-                                  }];
+    
+    [[AirborneServices alloc] initWithReleaseConfigURL:@"" delegate:nil];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED
