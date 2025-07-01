@@ -1,6 +1,6 @@
+use anyhow::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -47,7 +47,8 @@ impl VictoriaMetricsQueryClient {
 
     pub async fn query(&self, query: &str) -> Result<QueryResponse> {
         let url = format!("{}/api/v1/query", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .query(&[("query", query)])
             .send()
@@ -65,7 +66,8 @@ impl VictoriaMetricsQueryClient {
         step: &str,
     ) -> Result<RangeQueryResponse> {
         let url = format!("{}/api/v1/query_range", self.base_url);
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .query(&[
                 ("query", query),

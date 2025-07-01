@@ -1,16 +1,19 @@
 use axum::{
-    extract::{State, ConnectInfo},
-    response::Json,
+    extract::{ConnectInfo, State},
     http::HeaderMap,
+    response::Json,
 };
 use chrono::Utc;
 use serde_json::json;
 use std::net::SocketAddr;
-use tracing::{info, error};
+use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::{
-    common::{error::{AppError, AppResult}, models::{LoggingInfra, OtaEvent, OtaEventRequest}},
+    common::{
+        error::{AppError, AppResult},
+        models::{LoggingInfra, OtaEvent, OtaEventRequest},
+    },
     AppState,
 };
 
@@ -23,7 +26,9 @@ pub async fn ingest_event(
     info!("Ingesting OTA event: {:?}", request.event_type);
 
     if request.device_id.is_empty() {
-        return Err(AppError::Validation("Device ID cannot be empty".to_string()));
+        return Err(AppError::Validation(
+            "Device ID cannot be empty".to_string(),
+        ));
     }
 
     let user_agent = headers
@@ -69,10 +74,12 @@ pub async fn ingest_event(
             Some(kafka) => {
                 if let Err(e) = kafka.send_ota_event(&event).await {
                     error!("Failed to send event to Kafka: {:?}", e);
-                    return Err(AppError::Internal("Failed to send event to Kafka".to_string()).into());
+                    return Err(
+                        AppError::Internal("Failed to send event to Kafka".to_string()).into(),
+                    );
                 }
                 info!("Successfully queued OTA event: {:?}", event.event_id);
-            },
+            }
             None => {
                 return Err(AppError::Internal("Kafka client not initialized".to_string()).into());
             }
@@ -82,17 +89,22 @@ pub async fn ingest_event(
             Some(victoria) => {
                 if let Err(e) = victoria.insert_ota_event(&event).await {
                     error!("Failed to send event to Victoria Metrics: {:?}", e);
-                    return Err(AppError::Internal("Failed to send event to Victoria Metrics".to_string()).into());
+                    return Err(AppError::Internal(
+                        "Failed to send event to Victoria Metrics".to_string(),
+                    )
+                    .into());
                 }
                 info!("Successfully saved OTA event: {:?}", event.event_id);
-            },
+            }
             None => {
-                return Err(AppError::Internal("Victoria Metrics client not initialized".to_string()).into());
+                return Err(AppError::Internal(
+                    "Victoria Metrics client not initialized".to_string(),
+                )
+                .into());
             }
         }
     } else {
         return Err(AppError::Internal("Unsupported logging infrastructure".to_string()).into());
-        
     }
 
     Ok(Json(json!({
@@ -102,5 +114,3 @@ pub async fn ingest_event(
         "timestamp": Utc::now()
     })))
 }
-
-

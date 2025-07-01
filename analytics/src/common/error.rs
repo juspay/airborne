@@ -12,25 +12,25 @@ use crate::common::models::ErrorResponse;
 pub enum AppError {
     #[error("Database error: {0}")]
     Database(#[from] clickhouse::error::Error),
-    
+
     #[error("Database error: {0}")]
     DatabaseError(String),
-    
+
     #[error("Kafka error: {0}")]
     Kafka(#[from] rdkafka::error::KafkaError),
-    
+
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
-    
+
     #[error("Configuration error: {0}")]
     Config(#[from] anyhow::Error),
-    
+
     #[error("Validation error: {0}")]
     Validation(String),
-    
+
     #[error("Not found: {0}")]
     NotFound(String),
-    
+
     #[error("Internal server error: {0}")]
     Internal(String),
 }

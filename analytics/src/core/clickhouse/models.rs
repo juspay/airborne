@@ -1,5 +1,5 @@
-use clickhouse::{Row};
-use serde::{Serialize};
+use clickhouse::Row;
+use serde::Serialize;
 
 #[derive(Row, Serialize)]
 pub struct OtaEventRow {
@@ -46,7 +46,7 @@ pub struct OtaEventRow {
     pub download_time_ms: Option<u64>,
     #[serde(rename = "applyTimeMs")]
     pub apply_time_ms: Option<u64>,
-    pub payload: String,  // Changed to Option<String> to match Nullable(String)
+    pub payload: String, // Changed to Option<String> to match Nullable(String)
     #[serde(rename = "userAgent")]
     pub user_agent: Option<String>,
     #[serde(rename = "ipAddress")]

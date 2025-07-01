@@ -3,11 +3,11 @@ use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 pub fn strip_sql_comments(input: &str) -> String {
     enum State {
         Normal,
-        InSingleQuote,      // inside '…'
-        InDoubleQuote,      // inside "…"
-        InBacktick,         // inside `…`
-        InLineComment,      // after `--` or `#`, until end of line
-        InBlockComment,     // after `/*`, until `*/`
+        InSingleQuote,  // inside '…'
+        InDoubleQuote,  // inside "…"
+        InBacktick,     // inside `…`
+        InLineComment,  // after `--` or `#`, until end of line
+        InBlockComment, // after `/*`, until `*/`
     }
 
     let mut out = String::with_capacity(input.len());
@@ -140,10 +140,7 @@ pub fn floor_to_day(ts_sec: i64) -> i64 {
 /// Ceil to the next hour boundary (HH+1:00:00), unless already on an exact hour
 pub fn ceil_to_hour(ts_sec: i64) -> i64 {
     let dt = Utc.timestamp(ts_sec, 0);
-    let floored = DateTime::<Utc>::from_utc(
-        dt.date_naive().and_hms(dt.hour(), 0, 0),
-        Utc,
-    );
+    let floored = DateTime::<Utc>::from_utc(dt.date_naive().and_hms(dt.hour(), 0, 0), Utc);
     if dt == floored {
         dt.timestamp()
     } else {
@@ -154,10 +151,7 @@ pub fn ceil_to_hour(ts_sec: i64) -> i64 {
 /// Ceil to next midnight UTC (00:00:00 next day), unless already at midnight
 pub fn ceil_to_day(ts_sec: i64) -> i64 {
     let dt = Utc.timestamp(ts_sec, 0);
-    let floored = DateTime::<Utc>::from_utc(
-        dt.date_naive().and_hms(0, 0, 0),
-        Utc,
-    );
+    let floored = DateTime::<Utc>::from_utc(dt.date_naive().and_hms(0, 0, 0), Utc);
     if dt == floored {
         dt.timestamp()
     } else {
@@ -166,14 +160,14 @@ pub fn ceil_to_day(ts_sec: i64) -> i64 {
 }
 
 /// Normalize a Unix timestamp to seconds.
-/// 
+///
 /// If `ts` looks like milliseconds (i.e. > 10⁹⁹), this will divide by 1_000.
 /// Otherwise it returns `ts` unchanged.
 pub fn normalize_to_secs(ts: i64) -> i64 {
     // Any timestamp > 10_000_000_000 is almost certainly in milliseconds
     // since current Unix time in seconds is around 1.8e9 (10 digits).
     const MILLIS_THRESHOLD: i64 = 10_000_000_000;
-    
+
     if ts.abs() > MILLIS_THRESHOLD {
         ts / 1_000
     } else {

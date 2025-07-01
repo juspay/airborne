@@ -59,37 +59,37 @@ pub struct OtaEvent {
     pub app_id: String,
     pub device_id: String,
     pub session_id: Option<String>,
-    
+
     // Event metadata
     pub event_type: OtaEventType,
     pub event_id: Option<Uuid>,
     pub timestamp: DateTime<Utc>,
-    
+
     // Release information
     pub release_id: Option<String>,
     pub current_js_version: Option<String>,
     pub target_js_version: Option<String>,
     pub rollout_percentage: Option<u8>,
-    
+
     // Device/Environment context
     pub os_version: Option<String>,
     pub app_version: Option<String>,
     pub device_type: Option<String>,
     pub network_type: Option<String>,
-    
+
     // Error information
     pub error_code: Option<String>,
     pub error_message: Option<String>,
     pub stack_trace: Option<String>,
-    
+
     // Performance metrics
     pub download_size_bytes: Option<u64>,
     pub download_time_ms: Option<u64>,
     pub apply_time_ms: Option<u64>,
-    
+
     // Additional payload
     pub payload: Option<Value>,
-    
+
     // Request metadata (filled by server)
     pub user_agent: Option<String>,
     pub ip_address: Option<String>,
@@ -120,7 +120,7 @@ pub enum AnalyticsInterval {
     Day,
     Hour,
     Week,
-    Month
+    Month,
 }
 
 impl ToString for AnalyticsInterval {
@@ -162,29 +162,29 @@ pub struct OtaEventIngestRequest {
     pub device_id: String,
     pub session_id: Option<String>,
     pub event_type: OtaEventType,
-    
+
     // Release information
     pub release_id: Option<String>,
     pub current_js_version: Option<String>,
     pub target_js_version: Option<String>,
     pub rollout_percentage: Option<u8>,
-    
+
     // Device context
     pub os_version: Option<String>,
     pub app_version: Option<String>,
     pub device_type: Option<String>,
     pub network_type: Option<String>,
-    
+
     // Error info (if applicable)
     pub error_code: Option<String>,
     pub error_message: Option<String>,
     pub stack_trace: Option<String>,
-    
+
     // Performance metrics
     pub download_size_bytes: Option<u64>,
     pub download_time_ms: Option<u64>,
     pub apply_time_ms: Option<u64>,
-    
+
     // Additional payload
     pub payload: Option<Value>,
 }
@@ -379,8 +379,7 @@ impl ErrorResponse {
 // so you can just `return ErrorResponse` from handlers or layers
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
-        let status = StatusCode::from_u16(self.code)
-            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status = StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         (status, Json(self)).into_response()
     }
 }

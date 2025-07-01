@@ -74,7 +74,9 @@ impl VictoriaQuery {
         } else {
             let mut sel = self.metric_name.clone();
             if !self.labels.is_empty() {
-                let lbl_text = self.labels.iter()
+                let lbl_text = self
+                    .labels
+                    .iter()
                     .map(|(k, v)| format!(r#"{}="{}""#, k, v))
                     .collect::<Vec<_>>()
                     .join(",");
@@ -96,7 +98,8 @@ impl VictoriaQuery {
 
         // 3. Aggregation
         if let Some(ref agg) = self.group_by {
-            let lbls = self.group_by_labels
+            let lbls = self
+                .group_by_labels
                 .as_ref()
                 .map(|v| v.join(","))
                 .unwrap_or_default();
