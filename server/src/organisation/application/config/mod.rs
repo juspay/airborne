@@ -49,7 +49,7 @@ struct ConfigJsonV1Request {
 struct ConfigV1 {
     version: String,
     release_config_timeout: i32,
-    package_timeout: i32,
+    boot_timeout: i32,
     #[serde(flatten)]
     properties: serde_json::Value,
 }
@@ -125,7 +125,7 @@ async fn create_config_json_v1(
             version: ver,
             config_version: req.config.version.clone(),
             release_config_timeout: req.config.release_config_timeout,
-            package_timeout: req.config.package_timeout,
+            package_timeout: req.config.boot_timeout,
             tenant_info,
             properties,
         })
@@ -201,7 +201,7 @@ async fn create_config_json_v1_multipart(
             version: ver,
             config_version: req.config.version.clone(),
             release_config_timeout: req.config.release_config_timeout,
-            package_timeout: req.config.package_timeout,
+            package_timeout: req.config.boot_timeout,
             tenant_info,
             properties,
         })
