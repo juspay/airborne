@@ -346,13 +346,13 @@ async fn generate_aar(release_config: &ReleaseConfig) -> Result<String> {
     })?;
 
     // Download lazy block
-    let important_futures = release_config.package.lazy.iter()
+    let lazy_futures = release_config.package.lazy.iter()
         .map(|file| {
             let target_path = directory_base.join(file.file_path.as_str());
             download_file(&file.url, target_path)
         });
 
-    let _ = try_join_all(important_futures).await.map_err(|e| {
+    let _ = try_join_all(lazy_futures).await.map_err(|e| {
         error::ErrorInternalServerError(format!("Failed to download lazy files: {}", e))
     })?;
 
