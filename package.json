@@ -3,6 +3,7 @@
     "name": "hyper-ota-monorepo",
     "workspaces": [
         "react-plugin",
+        "airborne_cli",
         "react-plugin/example",
         "react-plugin/ExampleOldArch"
     ]
