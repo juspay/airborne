@@ -1,0 +1,28 @@
+{
+  "name": "airborne-cli-react-native",
+  "version": "0.0.1",
+  "description": "Cli for Airborne",
+  "main": "bin/index.js",
+  "bin": {
+    "build-airborne": "bin/index.js"
+  },
+  "scripts": {
+    "cli": "node bin/index.js"
+  },
+  "keywords": [
+    "cli",
+    "react",
+    "component-generator"
+  ],
+  "author": "Yaswanth Polisetti",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "inquirer": "^12.6.3",
+    "react-dom": "^18.0.0",
+    "react-scripts": "^5.0.0"
+  },
+  "devDependencies": {
+    "commander": "^14.0.0"
+  }
+}
