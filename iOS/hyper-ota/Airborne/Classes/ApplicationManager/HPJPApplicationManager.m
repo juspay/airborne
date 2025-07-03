@@ -216,7 +216,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
     
     // Move all files from temp to main
-    NSArray *tempFiles = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:JUSPAY_TEMP_DIR includeSubfolders:NO];
+    NSArray *tempFiles = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:JUSPAY_TEMP_DIR includeSubfolders:YES];
     BOOL allMoveSuccessful = YES;
     
     [self.tracker trackInfo:@"temp_package_installation_started"
@@ -752,7 +752,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
         isFirstRunAfterAppLaunch = NO;
         
         // Get all files in the package directory
-        NSArray *allPackageFiles = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:JUSPAY_MAIN_DIR includeSubfolders:NO];
+        NSArray *allPackageFiles = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:JUSPAY_MAIN_DIR includeSubfolders:YES];
         NSMutableSet<NSString *> *requiredFiles = [NSMutableSet set];
         
         // Add files from current package
@@ -791,7 +791,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
         }
 
         // cleanup of temp resources
-        NSArray<NSString*> *resourceFileNames = [self getAllFilesInDirectory:JUSPAY_RESOURCE_DIR subFolder:@"" includeSubfolders:NO];
+        NSArray<NSString*> *resourceFileNames = [self getAllFilesInDirectory:JUSPAY_RESOURCE_DIR subFolder:@"" includeSubfolders:YES];
         for (NSString* fileName in resourceFileNames) {
             [self deleteFile:fileName subFolder:@"" inFolder:JUSPAY_RESOURCE_DIR];
         }
@@ -1386,7 +1386,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 
 - (BOOL)isAppInstalledWithPackage:(HPJPApplicationPackage *)package inSubFolder:(NSString *)subFolder {
     
-    NSArray<NSString *>* downloadedFileNames = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:subFolder includeSubfolders:NO];
+    NSArray<NSString *>* downloadedFileNames = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:subFolder includeSubfolders:YES];
     for (HPJPResource *split in package.allImportantSplits) {
         NSString* fileNameOnDisk = [self jsFileNameFor:split.filePath];
         if (![downloadedFileNames containsObject:fileNameOnDisk]) {
