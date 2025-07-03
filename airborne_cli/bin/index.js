@@ -175,9 +175,9 @@ async function buildAirborne(platform, options) {
         } else {
             let defaultOutputPath = ""
             if (platform === "android") {
-                defaultOutputPath = path.join(process.cwd(), 'android', 'app', 'src', 'main', 'assets', `${airborneConfig.namespace}_release_config.json`);
+                defaultOutputPath = path.join(process.cwd(), 'android', 'app', 'src', 'main', 'assets', airborneConfig.namespace, "release_config.json");
             } else {
-                defaultOutputPath = path.join(process.cwd(), 'ios', `${airborneConfig.namespace}_release_config.json`);
+                defaultOutputPath = path.join(process.cwd(), 'ios', airborneConfig.namespace, "release_config.json");
             }
 
             // Create directories if they don't exist
