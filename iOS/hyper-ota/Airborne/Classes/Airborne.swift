@@ -60,12 +60,15 @@ import Foundation
      *
      * This callback indicates that the application is ready to load the packages & resources
      *
+     * @param indexBundlePath The file system path to the index bundle file that should
+     *                     be used as the entry point for the downloaded content.
+     *
      * @note This method is called on a background queue. Dispatch UI updates
      *       to the main queue if needed.
      * @note Boot completion occurs even if some downloads failed or timed out.
      *       Check the release configuration for actual status.
      */
-    @objc optional func onBootComplete() -> Void
+    @objc optional func onBootComplete(indexBundlePath: String) -> Void
     
     /**
      * Called when significant events occur during the OTA update process.
@@ -155,7 +158,9 @@ import Foundation
     private func startApplicationManager() {
         self.applicationManager = HPJPApplicationManager.getSharedInstance(withWorkspace: self.namespace, delegate: self, logger: self)
         self.applicationManager?.waitForPackagesAndResources { [weak self] _ in
-            self?.delegate?.onBootComplete?()
+            if let indexBundlePath = self?.getIndexBundlePath() {
+                self?.delegate?.onBootComplete?(indexBundlePath: indexBundlePath)
+            }
         }
     }
 }
