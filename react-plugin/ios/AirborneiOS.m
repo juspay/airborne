@@ -1,128 +1,114 @@
 #import "AirborneiOS.h"
+#import "Airborne/Airborne.h"
 
-@interface AirborneiOS ()
-@property (nonatomic, assign) BOOL isInitialized;
-@property (nonatomic, strong) NSString *indexFileName;
-// In a real implementation, you would have references to the actual Airborne SDK objects here
+
+@interface AirborneLocalDelegate : NSObject<AirborneDelegate>
+@property (nonatomic, weak) NSString* ns;
+@property (nonatomic, weak) id<AirborneReactDelegate> delegate;
+-(instancetype)initWithNamespace:(NSString*) ns
+                        delegate:(id<AirborneReactDelegate>) delegate;
 @end
 
-@implementation AirborneiOS
+@implementation AirborneLocalDelegate
 
-+ (instancetype)sharedInstance {
-    static AirborneiOS *sharedInstance = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sharedInstance = [[self alloc] init];
-    });
-    return sharedInstance;
-}
-
-- (instancetype)init {
+-(instancetype)initWithNamespace:(NSString*) ns delegate:(id<AirborneReactDelegate>) del {
     self = [super init];
     if (self) {
-        _isInitialized = NO;
+        _ns = ns;
+        _delegate = del;
     }
     return self;
 }
 
-- (void)initializeWithAppId:(NSString *)appId
-              indexFileName:(NSString *)indexFileName
-                 appVersion:(NSString *)appVersion
-    releaseConfigTemplateUrl:(NSString *)releaseConfigTemplateUrl
-                    headers:(nullable NSDictionary<NSString *, NSString *> *)headers
-       lazyDownloadCallback:(nullable HyperOTALazyDownloadCallback)lazyDownloadCallback
-        lazySplitsCallback:(nullable HyperOTALazySplitsCallback)lazySplitsCallback {
-    
-    if (self.isInitialized) {
-        NSLog(@"AirborneiOS: Already initialized");
-        return;
-    }
-    
-    self.indexFileName = indexFileName;
-    
-    // TODO: Initialize the actual Airborne SDK here
-    // This is a placeholder implementation
-    // In a real implementation, you would:
-    // 1. Import the HyperOTA iOS SDK
-    // 2. Initialize HyperOTAServices with the provided parameters
-    // 3. Create an ApplicationManager
-    // 4. Load the application
-    
-    NSLog(@"AirborneiOS: Initializing with appId: %@, indexFileName: %@, appVersion: %@",
-          appId, indexFileName, appVersion);
-    
-    self.isInitialized = YES;
-    
-    // Simulate callbacks for demo purposes
-    if (lazyDownloadCallback) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            lazyDownloadCallback(@"demo/file.js", YES);
-        });
-    }
-    
-    if (lazySplitsCallback) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            lazySplitsCallback(YES);
-        });
-    }
+- (NSString *)namespace{
+    return self.ns;
 }
 
-- (NSString *)getBundlePath {
-//    if (!self.isInitialized) {
-//        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
-//                                       reason:@"HyperOTA is not initialized. Call initialize first." 
-//                                     userInfo:nil];
-//    }
-//    
-//    // TODO: Get the actual bundle path from HyperOTA SDK //
-//    // This is a placeholder implementation
-//    NSString *bundlePath = [[NSBundle mainBundle] pathForResource:self.indexFileName ofType:nil];
-//    if (!bundlePath) {
-//        bundlePath = [NSString stringWithFormat:@"assets://%@", self.indexFileName];
-//    }
-//    
-//    return bundlePath;
-  return @"";
+- (NSDictionary *)dimensions{
+    if(_delegate == nil) return @{};
+    return [_delegate getDimensions];
 }
 
-- (NSString *)getFileContent:(NSString *)filePath {
-//    if (!self.isInitialized) {
-//        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
-//                                       reason:@"HyperOTA is not initialized. Call initialize first." 
-//                                     userInfo:nil];
-//    }
-//    
-//    // TODO: Read the actual file content from HyperOTA SDK //
-//    // This is a placeholder implementation
-//    return [NSString stringWithFormat:@"File content for: %@", filePath];
-  return @"";
+- (void)onBootCompleteWithIndexBundlePath:(NSString *)indexBundlePath{
+    if (_delegate == nil) return;
+    [_delegate onBootComplete:indexBundlePath];
 }
 
-- (NSString *)getReleaseConfig {
-//    if (!self.isInitialized) {
-//        @throw [NSException exceptionWithName:@"HyperOTANotInitialized" 
-//                                       reason:@"HyperOTA is not initialized. Call initialize first." 
-//                                     userInfo:nil];
-//    }
-//    
-//    // TODO: Get the actual release config from HyperOTA SDK //
-//    // This is a placeholder implementation
-//    NSDictionary *config = @{
-//        @"version": @"1.0.0",
-//        @"environment": @"production",
-//        @"features": @{
-//            @"featureA": @YES,
-//            @"featureB": @NO
-//        }
-//    };
-//    
-//    NSError *error;
-//    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:config options:0 error:&error];
-//    if (jsonData) {
-//        return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-//    }
-    
-    return @"{}";
+-(void)onEventWithLevel:(NSString *)level label:(NSString *)label key:(NSString *)key value:(NSDictionary<NSString *,id> *)value category:(NSString *)category subcategory:(NSString *)subcategory{
+    if (_delegate == nil) return;
+    [_delegate onEventWithLevel:level label:label key:key value:value category:category subcategory:subcategory];
 }
 
 @end
+
+
+@interface AirborneiOS ()
+@property (nonatomic, strong) NSString* ns;
+@property (nonatomic, strong) AirborneServices* air;
+@property (nonatomic, strong) id<AirborneDelegate> delegate;
+@property (nonatomic, strong) AirborneLocalDelegate* delegateproxy;
+
+@end
+
+@implementation AirborneiOS
+
++ (instancetype)sharedInstanceWithNamespace:(NSString *)namespace{
+    static NSMutableDictionary<NSString *, AirborneiOS *> *instances = nil;
+    static dispatch_queue_t syncQueue;
+    static dispatch_once_t onceToken;
+
+    // Initialize dictionary and queue once
+    dispatch_once(&onceToken, ^{
+        instances = [NSMutableDictionary dictionary];
+        syncQueue = dispatch_queue_create("in.juspay.Airborne.singleton", DISPATCH_QUEUE_CONCURRENT);
+    });
+
+    __block AirborneiOS *instance = nil;
+
+    // Read existing instance (concurrent)
+    dispatch_sync(syncQueue, ^{
+        instance = instances[namespace];
+    });
+
+    if (instance == nil) {
+        // Write new instance (barrier to prevent concurrent writes)
+        dispatch_barrier_sync(syncQueue, ^{
+            if (!instances[namespace]) {
+                instances[namespace] = [[self alloc] initWithNamespace:namespace];
+            }
+            instance = instances[namespace];
+        });
+    }
+
+    return instance;
+}
+
+
+- (instancetype)initWithNamespace:(NSString *) ns{
+    self = [super init];
+    if (self) {
+        _ns = ns;
+        
+    }
+    return self;
+}
+
+- (void)loadWithReleaseConfig:(NSString *) rcurl delegate:(id<AirborneReactDelegate>) delegate{
+    _delegateproxy = [[AirborneLocalDelegate alloc] initWithNamespace: self.ns delegate:delegate];
+    _air = [[AirborneServices alloc] initWithReleaseConfigURL:rcurl delegate:_delegateproxy];
+}
+
+- (NSString *)getBundlePath {
+    return [_air getIndexBundlePath] ;
+}
+
+- (NSString *)getFileContent:(NSString *)filePath {
+    return [_air getFileContentAtPath:filePath];
+}
+
+- (NSString *)getReleaseConfig {
+    return [_air getReleaseConfig];
+}
+
+@end
+

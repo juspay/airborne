@@ -2,57 +2,83 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
-import Airborne
+import AirborneReact
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate, RCTBridgeDelegate {
+
   var window: UIWindow?
+  var launchOptions: [UIApplication.LaunchOptionsKey: Any]?
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
-    
-  var airborne: AirborneServices?
 
+  var bridge: RCTBridge?
+  var bundlePath: String?
+    
+    
   func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // Initialize HyperOTA before React Native
+    // Save launch options for later use
+    self.launchOptions = launchOptions
+
+    // Initialize HyperOTA first
     initializeHyperOTA()
-    
-    let delegate = ReactNativeDelegate()
-    let factory = RCTReactNativeFactory(delegate: delegate)
-    delegate.dependencyProvider = RCTAppDependencyProvider()
 
-    reactNativeDelegate = delegate
-    reactNativeFactory = factory
-
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "AirborneExample",
-      in: window,
-      launchOptions: launchOptions
-    )
+    // Create the main window early
+    self.window = UIWindow(frame: UIScreen.main.bounds)
 
     return true
   }
-  
+    
+    // Required by RCTBridgeDelegate – provides JS bundle path
+    func sourceURL(for bridge: RCTBridge) -> URL? {
+        guard let path = bundlePath else {
+            fatalError("Bundle path is not set. Call onBootComplete(bundlePath:) first.")
+        }
+        return URL(fileURLWithPath: path)
+    }
+
+    @objc func onBootComplete(_ bundlePath: String) {
+        DispatchQueue.main.async {
+            self.bundlePath = bundlePath
+
+            self.bridge = RCTBridge(delegate: self, launchOptions: nil)
+
+            let rootView = RCTRootView(bridge: self.bridge!, moduleName: "AirborneExample", initialProperties: nil)
+            rootView.backgroundColor = UIColor.white
+
+            let rootViewController = UIViewController()
+            rootViewController.view = rootView
+
+            self.window = UIWindow(frame: UIScreen.main.bounds)
+            self.window?.rootViewController = rootViewController
+            self.window?.makeKeyAndVisible()
+        }
+    }
+
+    func getDimensions() -> [String : String] {
+    return [:]
+  }
+
+  func onEvent(
+    withLevel level: String,
+    label: String,
+    key: String,
+    value: [String : Any],
+    category: String,
+    subcategory: String
+  ) {
+      print("Event: \(key) = \(value)")
+  }
+
   private func initializeHyperOTA() {
-      
-    let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-    
-//    Hyperota.initializeHyperOTA(
-//      withAppId: "hyperota-example-app",
-//      indexFileName: "main.jsbundle",
-//      appVersion: appVersion,
-//      releaseConfigTemplateUrl: "https://example.com/hyperota/release-config",
-//      headers: [
-//        "X-App-Version": appVersion,
-//        "X-Platform": "iOS"
-//      ]
-//    )
-    
+    Airborne.initializeAirborne(
+      withReleaseConfigUrl: "https://airborne.sandbox.juspay.in/release/airborne-react-example/ios",
+      delegate: self
+    )
     print("HyperOTA: Initialized successfully")
   }
 }
