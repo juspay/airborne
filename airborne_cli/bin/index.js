@@ -59,7 +59,7 @@ async function fillConfig(airborneConfig, options) {
         "config_timeout": options?.config_timeout ?? airborneConfig?.config_timeout ?? await promptUser('\n⚙️  Configuration Setup Required\n Please enter the config_timeout value: '),
         "boot_timeout": options?.boot_timeout ?? airborneConfig?.boot_timeout ?? await promptUser('\n Please enter the boot_timeout value: '),
         "js_entry_file": options?.js_entry_file ?? airborneConfig?.js_entry_file ?? "index.js",
-        "namespace": options?.namespace ?? airborneConfig?.namespace ?? await promptUser('\n Please enter namespace value: '),
+        "namespace": options?.namespace ?? airborneConfig?.namespace ?? await promptUser('\n Please enter namespace value [default]: '),
         "android": {
             "index_file_path": airborneConfig?.android?.index_file_path ?? "index.android.bundle"
         },
@@ -161,9 +161,8 @@ async function buildAirborne(platform, options) {
             console.log('❌ boot_timeout is required. Exiting...');
             process.exit(1);
         }
-        if (!airborneConfig.namespace) {
-            console.log('❌ namespace_timeout is required. Exiting...');
-            process.exit(1);
+        if (airborneConfig.namespace === undefined || airborneConfig.namespace === "default") {
+            airborneConfig.namespace = "default"
         }
 
         const buildResult = await performAirborneBuildLogic(airborneConfig, platform);

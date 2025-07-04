@@ -1,0 +1,12 @@
+{
+  "config_timeout": "1000",
+  "boot_timeout": "2000",
+  "namespace": "your-namespace",
+  "js_entry_file": "index.js",
+  "android": {
+    "index_file_path": "index.android.bundle"
+  },
+  "ios": {
+    "index_file_path": "main.jsbundle"
+  }
+}
