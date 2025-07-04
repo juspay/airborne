@@ -1,4 +1,11 @@
 {
+  "CLI": {
+    "files": [
+      "airborne-config.json Format",
+      "content.json",
+      "doc.md"
+    ]
+  },
   "Introduction": {
     "Happy Case": {
       "files": [

@@ -7,7 +7,8 @@
     "build-airborne": "bin/index.js"
   },
   "scripts": {
-    "cli": "node bin/index.js"
+    "cli": "node bin/index.js",
+    "release": "release-it --only-version"
   },
   "keywords": [
     "cli",
@@ -15,7 +16,11 @@
     "component-generator"
   ],
   "author": "Yaswanth Polisetti",
-  "license": "ISC",
+  "license": "MIT",
+  "homepage": "https://github.com/juspay/airborne#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "dependencies": {
     "chalk": "^5.4.1",
     "inquirer": "^12.6.3",
@@ -23,6 +28,27 @@
     "react-scripts": "^5.0.0"
   },
   "devDependencies": {
-    "commander": "^14.0.0"
+    "commander": "^14.0.0",
+    "release-it": "^17.10.0",
+    "@release-it/conventional-changelog": "^9.0.2"
+  },
+  "release-it": {
+    "git": {
+      "commitMessage": "chore: release ${version}",
+      "tagName": "v${version}"
+    },
+    "npm": {
+      "publish": true
+    },
+    "github": {
+      "release": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": {
+          "name": "angular"
+        }
+      }
+    }
   }
 }
