@@ -5,18 +5,12 @@ import ReactAppDependencyProvider
 import AirborneReact
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate, RCTBridgeDelegate {
-
+class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate {
   var window: UIWindow?
   var launchOptions: [UIApplication.LaunchOptionsKey: Any]?
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
-
-  var bridge: RCTBridge?
-  var bundlePath: String?
-    
-    
   func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -32,30 +26,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate, RC
 
     return true
   }
-    
-    // Required by RCTBridgeDelegate – provides JS bundle path
-    func sourceURL(for bridge: RCTBridge) -> URL? {
-        guard let path = bundlePath else {
-            fatalError("Bundle path is not set. Call onBootComplete(bundlePath:) first.")
-        }
-        return URL(fileURLWithPath: path)
-    }
 
     @objc func onBootComplete(_ bundlePath: String) {
-        DispatchQueue.main.async {
-            self.bundlePath = bundlePath
+        DispatchQueue.main.async { [self] in
 
-            self.bridge = RCTBridge(delegate: self, launchOptions: nil)
+            let delegate = ReactNativeDelegate(customPath: bundlePath)
+            let factory = RCTReactNativeFactory(delegate: delegate)
+            delegate.dependencyProvider = RCTAppDependencyProvider()
 
-            let rootView = RCTRootView(bridge: self.bridge!, moduleName: "AirborneExample", initialProperties: nil)
-            rootView.backgroundColor = UIColor.white
+            reactNativeDelegate = delegate
+            reactNativeFactory = factory
 
-            let rootViewController = UIViewController()
-            rootViewController.view = rootView
+            factory.startReactNative(
+            withModuleName: "AirborneExample",
+            in: window,
+            launchOptions: self.launchOptions
+            )
 
-            self.window = UIWindow(frame: UIScreen.main.bounds)
-            self.window?.rootViewController = rootViewController
-            self.window?.makeKeyAndVisible()
         }
     }
 
@@ -84,15 +71,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate, RC
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
+
+    private let customPath: String
+
+    init(customPath: String) {
+      self.customPath = customPath
+      super.init()
+    }
+
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     self.bundleURL()
   }
 
   override func bundleURL() -> URL? {
-#if DEBUG
+#if !DEBUG
     RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    URL(fileURLWithPath: customPath)
 #endif
   }
 }
