@@ -47,8 +47,12 @@
         "files": [
           "Get JS Bundle",
           "Initialise Airborne Instance",
+          "Initialize Airborne.kt",
           "content.json",
-          "doc.md"
+          "doc.md",
+          "getDimensions.kt",
+          "onBootComplete.kt",
+          "onEvent.kt"
         ]
       },
       "files": [
@@ -58,12 +62,27 @@
         "doc.md",
         "order.json"
       ],
+      "JS SDK": {
+        "files": [
+          "content.json",
+          "doc.md",
+          "getBundlePath.js",
+          "getFileContent.js",
+          "readReleaseConfig.js"
+        ]
+      },
       "iOS SDK": {
         "files": [
-          "code.swift",
+          "Conform to AirborneReactDelegate",
+          "Import AirborneReact",
+          "Initialize Airborne",
+          "code",
           "content.json",
           "delegate.h",
-          "doc.md"
+          "doc.md",
+          "getDimensions",
+          "onBootComplete",
+          "onEvent"
         ]
       }
     },

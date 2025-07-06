@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "airborne-react-plugin": "https://github.com/juspay/airborne/tarball/main#subdir=react-plugin"
+    "airborne-react-plugin": "0.2.0"
   }
 }

@@ -1,0 +1,10 @@
+func onEvent(
+  withLevel level: String,
+  label: String,
+  key: String,
+  value: [String : Any],
+  category: String,
+  subcategory: String
+) {
+    print("Event: \(key) = \(value)")
+}

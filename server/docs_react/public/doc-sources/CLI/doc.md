@@ -1,5 +1,3 @@
-# README.md
-
 ## Project Overview
 
 Airborne CLI is a React Native build tool that generates custom bundle configurations for Android and iOS platforms. It creates release configuration JSON file with bundling information, file paths, and timeout settings.

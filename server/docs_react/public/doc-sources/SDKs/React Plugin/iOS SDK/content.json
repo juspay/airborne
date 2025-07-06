@@ -1,4 +1,26 @@
 [
-  { "type": "code", "filename": "code.swift" },
-  { "type": "code", "filename": "delegate.h" }
+  {
+    "type": "code",
+    "filename": "Import AirborneReact"
+  },
+  {
+    "type": "code",
+    "filename": "Conform to AirborneReactDelegate"
+  },
+  {
+    "type": "code",
+    "filename": "Initialize Airborne"
+  },
+  {
+    "type": "code",
+    "filename": "onBootComplete"
+  },
+  {
+    "type": "code",
+    "filename": "getDimensions"
+  },
+  {
+    "type": "code",
+    "filename": "onEvent"
+  }
 ]
