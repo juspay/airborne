@@ -1,15 +1,29 @@
-This document provides instructions on how to integrate the Airborne iOS SDK into your application.
+This document outlines the steps to integrate the AirborneReact SDK into your iOS application.
 
-## iOS Integration
+## 1. Import AirborneReact
 
-To integrate the Airborne SDK on iOS, you need to initialize it in your `AppDelegate.swift` or the main `ViewController.swift` file.
+First, you need to import the `AirborneReact` framework in your `AppDelegate.swift` file.
 
-1.  **Import Airborne:** Add `import Airborne` to the top of your file.
-2.  **Initialize AirborneServices:** Create an instance of `AirborneServices` within your `viewDidLoad` method (or equivalent entry point), providing your release configuration URL and a delegate.
+## 2. Conform to AirborneReactDelegate
 
-An example of how to initialize the SDK is available in the code file on the right.
+Next, make your `AppDelegate` class conform to the `AirborneReactDelegate` protocol.
 
-### `AirborneServices` Parameters
+## 3. Initialize Airborne
 
--   `releaseConfigURL`: The URL for fetching release configurations.
--   `delegate`: A delegate that conforms to the `AirborneDelegate` protocol to handle events.
+Initialize the Airborne SDK within the `application(_:didFinishLaunchingWithOptions:)` method. This is typically done by calling a helper method like `initializeHyperOTA()`.
+
+## 4. Implement Delegate Methods
+
+You need to implement the required methods from the `AirborneReactDelegate` protocol.
+
+### onBootComplete
+
+This method is called when the Airborne bundle is ready. You should use this to start your React Native application.
+
+### getDimensions
+
+This method allows you to provide custom dimensions to the Airborne SDK.
+
+### onEvent
+
+This method is a callback for events from the Airborne SDK.

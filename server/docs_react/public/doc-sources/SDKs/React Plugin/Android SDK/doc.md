@@ -1,19 +1,21 @@
-To integrate the react plugin on the android application. You need to instantiate the Airborne instance with application context, release config url and an AirborneInterface.
+This document outlines the steps to integrate the AirborneReact SDK into your Android application.
 
-It is preferable to call this function onCreate of your application to allow maximum time for downloads.
+## 1. Initialize Airborne
 
-The AirborneInterface consists of the following functions.
+Initialize the Airborne SDK within the `onCreate()` method of your `MainApplication.kt` file.
 
-**getNamespace** : In case there are multiple instances of airborne running in the application. Each unique namespace string is assigned a storage location.
+## 2. Implement AirborneInterface
 
-**getDimensions** : This is a hash map of properties used for bucketing releases made on the server. Values sent here are sent to the release config call as a request header.
+You need to implement the required methods from the `AirborneInterface`.
 
-**getIndexBundlePath** : This function expects the default path for picking up the boot bundle in react app. 
+### getDimensions
 
-**getLazyDownloadCallback** : This function accepts a callback to infrom the application on availability of each lazy file entry. There are 2 interface functions to be implemented
-- **fileInstalled** (filePath: String, success: Boolean) : File at filePath has completed downloads. Success indicates if the download was successful or has failed.
-- **lazySplitsInstalled** : This function is used to indicate that all lazy files have completed downloading.
+This method allows you to provide custom dimensions to the Airborne SDK.
 
-**onBootComplete** : This callback indicates that download has completed. You should create your ReactInstanceManager at this point.
+### onEvent
 
-**onEvent** : This function triggers analytics events to the application. Events triggered are mentioned in the events section
+This method is a callback for events from the Airborne SDK.
+
+### onBootComplete
+
+This method is called when the Airborne bundle is ready. You should use this to set the bundle path for React Native.
