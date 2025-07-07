@@ -24,6 +24,7 @@ import `in`.juspay.hyperota.network.OTANetUtils
 import `in`.juspay.hyperota.ota.Constants.CONFIG_FILE_NAME
 import `in`.juspay.hyperota.ota.Constants.DEFAULT_CONFIG
 import `in`.juspay.hyperota.ota.Constants.DEFAULT_RESOURCES
+import `in`.juspay.airborne.ota.Constants.APP_DIR
 import `in`.juspay.hyperota.ota.Constants.PACKAGE_DIR_NAME
 import `in`.juspay.hyperota.ota.Constants.PACKAGE_MANIFEST_FILE_NAME
 import `in`.juspay.hyperota.ota.Constants.RC_VERSION_FILE_NAME
@@ -51,6 +52,7 @@ class ApplicationManager(
     private val workspace = otaServices.workspace
     private val tracker = otaServices.trackerCallback
     private var indexFolderPath = ""
+    private val assetUtils = AssetUtils(otaServices.ctx, otaServices.fileProviderService, tracker)
 
     fun loadApplication(unSanitizedClientId: String, lazyDownloadCallback: LazyDownloadCallback? = null) {
         doAsync {
@@ -71,6 +73,12 @@ class ApplicationManager(
                     }
                     val contextRef = CONTEXT_MAP[clientId] ?: newRef
                     releaseConfig = readReleaseConfig(contextRef)
+
+                    val firstCleanUp = otaServices.isFirstCleanUp()
+                    if (firstCleanUp && releaseConfig != null) {
+                        handleFirstTimeAssetCopy(releaseConfig!!)
+                    }
+
                     if (shouldUpdate) {
                         releaseConfig = tryUpdate(clientId, initialized, contextRef, lazyDownloadCallback)
                     } else {
@@ -94,6 +102,43 @@ class ApplicationManager(
                 loadWaitTask.complete()
                 logTimeTaken(startTime, "loadApplication")
             }
+        }
+    }
+
+    private fun handleFirstTimeAssetCopy(releaseConfig: ReleaseConfig) {
+        val startTime = System.currentTimeMillis()
+        try {
+            Log.d(TAG, "Starting first-time asset copy")
+
+            val result = assetUtils.copyAssetsFromBundle(releaseConfig, "$APP_DIR/$PACKAGE_DIR_NAME")
+            
+            when (result) {
+                is AssetUtils.AssetCopyResult.Success -> {
+                    Log.d(TAG, "Asset copy completed successfully: ${result.successCount} assets copied")
+                    trackInfo("first_time_asset_copy_success", JSONObject()
+                        .put("assets_copied", result.successCount)
+                        .put("time_taken_ms", System.currentTimeMillis() - startTime)
+                    )
+                }
+                is AssetUtils.AssetCopyResult.PartialSuccess -> {
+                    Log.w(TAG, "Asset copy partially successful: ${result.successCount} copied, ${result.failureCount} failed")
+                    trackInfo("first_time_asset_copy_partial", JSONObject()
+                        .put("assets_copied", result.successCount)
+                        .put("assets_failed", result.failureCount)
+                        .put("failures", JSONArray(result.failures))
+                        .put("time_taken_ms", System.currentTimeMillis() - startTime)
+                    )
+                }
+                is AssetUtils.AssetCopyResult.Error -> {
+                    Log.e(TAG, "Asset copy failed: ${result.message}")
+                    trackError("first_time_asset_copy_error", result.message)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during first-time asset copy", e)
+            trackError("first_time_asset_copy_exception", "Exception during first-time asset copy", e)
+        } finally {
+            logTimeTaken(startTime, "handleFirstTimeAssetCopy")
         }
     }
 
