@@ -1,0 +1,3 @@
+func getBundle() -> Bundle {
+    return Bundle.main
+}

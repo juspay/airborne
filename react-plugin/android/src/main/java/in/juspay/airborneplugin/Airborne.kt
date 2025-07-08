@@ -50,7 +50,7 @@ class Airborne (
         "",
         releaseConfigUrl,
         trackerCallback,
-        airborneInterface::onBootComplete
+        this::bootComplete
     )
 
     private val applicationManager = hyperOTAServices.createApplicationManager(airborneInterface.getDimensions())
@@ -60,13 +60,17 @@ class Airborne (
         applicationManager.loadApplication(airborneInterface.getNamespace(), airborneInterface.getLazyDownloadCallback())
     }
 
+    private fun bootComplete(filePath: String) {
+        airborneInterface.onBootComplete(filePath.ifEmpty { "assets://${applicationManager.getBundledIndexPath().ifEmpty { "index.android.bundle" }}" })
+    }
+
     /**
      * @return The path of the index bundle, or asset path fallback if empty.
      */
     @Keep
     fun getBundlePath(): String {
         val filePath = applicationManager.getIndexBundlePath()
-        return filePath.ifEmpty { "assets://${airborneInterface.getIndexBundlePath()}" }
+        return filePath.ifEmpty { "assets://${applicationManager.getBundledIndexPath().ifEmpty { "index.android.bundle" }}" }
     }
 
     /**

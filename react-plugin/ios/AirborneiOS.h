@@ -20,6 +20,20 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSDictionary<NSString *, NSString *> *)getDimensions;
 
 /**
+ * Returns the namespace, an unique identifier of the app/sdk.
+ *
+ * This namespace is used to store the files in the internal storage.
+ * and also to read the bundled release config.
+ *
+ * @return the namespace, an unique identifier of the app/sdk.
+ *         If not implemented, defaults to an default.
+ */
+- (NSString *)getNamespace;
+
+
+- (NSBundle *)getBundle;
+
+/**
  * Called when the OTA boot process has completed successfully.
  *
  * This callback indicates that the application is ready to load the packages & resources

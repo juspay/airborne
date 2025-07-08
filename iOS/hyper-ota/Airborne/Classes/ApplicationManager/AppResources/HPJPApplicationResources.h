@@ -19,6 +19,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonnull) NSDictionary<NSString*, HPJPResource *>* resources;
 
+@property (nonatomic, assign) BOOL isDefaultInit;
+
 - (instancetype _Nullable)initWithDictionary:(NSDictionary *)dictionary error:(NSError * _Nullable *)error;
 - (instancetype)initWithFileUtil:(HPJPFileUtil *)fileUtil error:(NSError * _Nullable *)error;
 - (id)toDictionary;

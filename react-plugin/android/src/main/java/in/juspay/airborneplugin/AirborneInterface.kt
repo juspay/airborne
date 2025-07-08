@@ -9,10 +9,6 @@ abstract class AirborneInterface {
         return "default"
     }
 
-    open fun getIndexBundlePath(): String {
-        return "index.android.bundle"
-    }
-
     open fun getDimensions(): HashMap<String, String> {
         return hashMapOf()
     }

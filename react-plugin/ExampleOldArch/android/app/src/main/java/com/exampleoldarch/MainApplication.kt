@@ -63,10 +63,6 @@ class MainApplication : Application(), ReactApplication {
                 return map
             }
 
-            override fun getIndexBundlePath(): String {
-                return "index.android.bundle"
-            }
-
             override fun getLazyDownloadCallback(): LazyDownloadCallback {
                 return object : LazyDownloadCallback {
                     override fun fileInstalled(filePath: String, success: Boolean) {
@@ -79,8 +75,8 @@ class MainApplication : Application(), ReactApplication {
                 }
             }
 
-            override fun onBootComplete() {
-                super.onBootComplete()
+            override fun onBootComplete(indexFilePath: String) {
+                super.onBootComplete(indexFilePath)
             }
 
             override fun onEvent(

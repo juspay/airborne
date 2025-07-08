@@ -9,6 +9,10 @@
   },
   {
     "type": "code",
+    "filename": "getNamespace.kt"
+  },
+  {
+    "type": "code",
     "filename": "onEvent.kt"
   },
   {

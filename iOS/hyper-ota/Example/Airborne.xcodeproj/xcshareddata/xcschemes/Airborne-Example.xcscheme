@@ -63,12 +63,21 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
+            BlueprintIdentifier = "DC9DB6AD2E0E93B600149E81"
+            BuildableName = "AirborneDemo.app"
+            BlueprintName = "AirborneDemo"
+            ReferencedContainer = "container:Airborne.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
             BlueprintIdentifier = "6003F589195388D20070C39A"
             BuildableName = "Airborne_Example.app"
             BlueprintName = "Airborne_Example"
             ReferencedContainer = "container:Airborne.xcodeproj">
          </BuildableReference>
-      </BuildableProductRunnable>
+      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -86,6 +95,15 @@
             ReferencedContainer = "container:Airborne.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "6003F589195388D20070C39A"
+            BuildableName = "Airborne_Example.app"
+            BlueprintName = "Airborne_Example"
+            ReferencedContainer = "container:Airborne.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">
