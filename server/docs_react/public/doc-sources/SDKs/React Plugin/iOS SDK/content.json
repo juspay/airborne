@@ -21,6 +21,14 @@
   },
   {
     "type": "code",
+    "filename": "getNamespace"
+  },
+  {
+    "type": "code",
+    "filename": "getBundle"
+  },
+  {
+    "type": "code",
     "filename": "onEvent"
   }
 ]

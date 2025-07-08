@@ -13,11 +13,10 @@
 		6003F5B2195388D20070C39A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6003F591195388D20070C39A /* UIKit.framework */; };
 		6003F5BA195388D20070C39A /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 6003F5B8195388D20070C39A /* InfoPlist.strings */; };
 		6003F5BC195388D20070C39A /* Tests.m in Sources */ = {isa = PBXBuildFile; fileRef = 6003F5BB195388D20070C39A /* Tests.m */; };
+		D17A3ACA2E1BBA1C00E7FC5C /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D17A3AC82E1BBA1C00E7FC5C /* Main.storyboard */; };
 		DC9DB7DF2E0EA21D00149E81 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DB7CF2E0EA21D00149E81 /* AppDelegate.swift */; };
 		DC9DB7E22E0EA21D00149E81 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DB7D72E0EA21D00149E81 /* SceneDelegate.swift */; };
 		DC9DB7E32E0EA21D00149E81 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DB7D82E0EA21D00149E81 /* ViewController.swift */; };
-		DC9DB7E52E0EA21D00149E81 /* new_release_config.json in Resources */ = {isa = PBXBuildFile; fileRef = DC9DB7D62E0EA21D00149E81 /* new_release_config.json */; };
-		DC9DB7E72E0EA21D00149E81 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = DC9DB7D52E0EA21D00149E81 /* Main.storyboard */; };
 		DC9DB7E82E0EA21D00149E81 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DC9DB7D02E0EA21D00149E81 /* Assets.xcassets */; };
 		DC9DB7E92E0EA21D00149E81 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = DC9DB7D32E0EA21D00149E81 /* LaunchScreen.storyboard */; };
 /* End PBXBuildFile section */
@@ -38,13 +37,12 @@
 		9E5056CE52CB52FDFDA7F34D /* Pods-AirborneDemo.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AirborneDemo.debug.xcconfig"; path = "Target Support Files/Pods-AirborneDemo/Pods-AirborneDemo.debug.xcconfig"; sourceTree = "<group>"; };
 		A91BB3664DABDD2A3DA4A8A0 /* Pods-AirborneDemo.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AirborneDemo.release.xcconfig"; path = "Target Support Files/Pods-AirborneDemo/Pods-AirborneDemo.release.xcconfig"; sourceTree = "<group>"; };
 		CB1BEA4F2BF6B1CAA1CEB300 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
+		D17A3AC92E1BBA1C00E7FC5C /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		DC9DB6AE2E0E93B600149E81 /* AirborneDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirborneDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC9DB7CF2E0EA21D00149E81 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		DC9DB7D02E0EA21D00149E81 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DC9DB7D12E0EA21D00149E81 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DC9DB7D22E0EA21D00149E81 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		DC9DB7D42E0EA21D00149E81 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
-		DC9DB7D62E0EA21D00149E81 /* new_release_config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = new_release_config.json; sourceTree = "<group>"; };
 		DC9DB7D72E0EA21D00149E81 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		DC9DB7D82E0EA21D00149E81 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		DC9DB7EB2E0EA2A200149E81 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -151,9 +149,8 @@
 				DC9DB7D02E0EA21D00149E81 /* Assets.xcassets */,
 				DC9DB7D12E0EA21D00149E81 /* Info.plist */,
 				DC9DB7D32E0EA21D00149E81 /* LaunchScreen.storyboard */,
-				DC9DB7D52E0EA21D00149E81 /* Main.storyboard */,
-				DC9DB7D62E0EA21D00149E81 /* new_release_config.json */,
 				DC9DB7D72E0EA21D00149E81 /* SceneDelegate.swift */,
+				D17A3AC82E1BBA1C00E7FC5C /* Main.storyboard */,
 				DC9DB7D82E0EA21D00149E81 /* ViewController.swift */,
 			);
 			path = AirborneDemo;
@@ -252,10 +249,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DC9DB7E52E0EA21D00149E81 /* new_release_config.json in Resources */,
-				DC9DB7E72E0EA21D00149E81 /* Main.storyboard in Resources */,
 				DC9DB7E82E0EA21D00149E81 /* Assets.xcassets in Resources */,
 				DC9DB7E92E0EA21D00149E81 /* LaunchScreen.storyboard in Resources */,
+				D17A3ACA2E1BBA1C00E7FC5C /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -338,20 +334,20 @@
 			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
+		D17A3AC82E1BBA1C00E7FC5C /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D17A3AC92E1BBA1C00E7FC5C /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
 		DC9DB7D32E0EA21D00149E81 /* LaunchScreen.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
 				DC9DB7D22E0EA21D00149E81 /* Base */,
 			);
 			name = LaunchScreen.storyboard;
-			sourceTree = "<group>";
-		};
-		DC9DB7D52E0EA21D00149E81 /* Main.storyboard */ = {
-			isa = PBXVariantGroup;
-			children = (
-				DC9DB7D42E0EA21D00149E81 /* Base */,
-			);
-			name = Main.storyboard;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */

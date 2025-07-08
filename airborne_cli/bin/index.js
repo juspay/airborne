@@ -176,7 +176,7 @@ async function buildAirborne(platform, options) {
             if (platform === "android") {
                 defaultOutputPath = path.join(process.cwd(), 'android', 'app', 'src', 'main', 'assets', airborneConfig.namespace, "release_config.json");
             } else {
-                defaultOutputPath = path.join(process.cwd(), 'ios', `${airborneConfig.namespace}.bundle`, "release_config.json");
+                defaultOutputPath = path.join(process.cwd(), 'ios', "release_config.json");
             }
 
             // Create directories if they don't exist
@@ -190,6 +190,20 @@ async function buildAirborne(platform, options) {
             fs.writeFileSync(defaultOutputPath, jsonOutput);
             console.log('\n📄 Build Result:');
             console.log(jsonOutput);
+
+            if (platform === "ios") {
+
+                console.log(` Before executing ruby command:`);
+                const rubyScriptPath = path.join(__dirname, 'bundleRC.rb');
+                const rubyCommand = `ruby "${rubyScriptPath}"`;
+                
+                try {
+                    execSync(rubyCommand, { stdio: 'inherit' });
+                    console.log('✅ Ruby script executed successfully');
+                } catch (error) {
+                    console.error('❌ Ruby script execution failed:', error.message);
+                }
+            }
         }
     } catch (error) {
         console.error('❌ Airborne build failed:', error.message);

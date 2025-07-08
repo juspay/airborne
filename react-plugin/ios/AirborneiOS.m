@@ -21,7 +21,13 @@
 }
 
 - (NSString *)namespace{
-    return self.ns;
+    if(_delegate == nil) return @"default";
+    return [_delegate getNamespace];
+}
+
+- (NSBundle *)bundle{
+    if(_delegate == nil) return NSBundle.mainBundle;
+    return [_delegate getBundle];
 }
 
 - (NSDictionary *)dimensions{

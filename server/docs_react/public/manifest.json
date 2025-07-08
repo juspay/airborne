@@ -51,6 +51,7 @@
           "content.json",
           "doc.md",
           "getDimensions.kt",
+          "getNamespace.kt",
           "onBootComplete.kt",
           "onEvent.kt"
         ]
@@ -81,6 +82,7 @@
           "delegate.h",
           "doc.md",
           "getDimensions",
+          "getNamespace",
           "onBootComplete",
           "onEvent"
         ]

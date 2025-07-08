@@ -61,7 +61,7 @@ class MainApplication : Application(), ReactApplication {
         try {
             airborneInstance = Airborne(
                 this.applicationContext,
-                "https://airborne.sandbox.juspay.in/release/airborne-react-example/ios",
+                "https://airborne.sandbox.juspay.in/release/airborne-react-example/android",
                 object : AirborneInterface() {
 
                     override fun getDimensions(): HashMap<String, String> {

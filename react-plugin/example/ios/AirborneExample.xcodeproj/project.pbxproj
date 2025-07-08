@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		95E47D579382B4CC141FD285 /* Pods_AirborneExample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 025A197B971943FA60EAAF6C /* Pods_AirborneExample.framework */; };
+		9B8C6889D0F7CAAE5D210963 /* release_config.json in Resources */ = {isa = PBXBuildFile; fileRef = 48230D568EBDE0F24E702A52 /* release_config.json */; };
 		D12EC9AB2E12B14000EE39A2 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D12EC9A62E12B14000EE39A2 /* Images.xcassets */; };
 		D12EC9AC2E12B14000EE39A2 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D12EC9A82E12B14000EE39A2 /* LaunchScreen.storyboard */; };
 		D12EC9AD2E12B14000EE39A2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = D12EC9A92E12B14000EE39A2 /* PrivacyInfo.xcprivacy */; };
@@ -18,6 +19,7 @@
 		025A197B971943FA60EAAF6C /* Pods_AirborneExample.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_AirborneExample.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07F961A680F5B00A75B9A /* AirborneExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirborneExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		45A9F2CD828E5D8DF9FBEDE3 /* Pods-AirborneExample.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AirborneExample.release.xcconfig"; path = "Target Support Files/Pods-AirborneExample/Pods-AirborneExample.release.xcconfig"; sourceTree = "<group>"; };
+		48230D568EBDE0F24E702A52 /* release_config.json */ = {isa = PBXFileReference; includeInIndex = 1; path = release_config.json; sourceTree = "<group>"; };
 		A993245705CC3DF5E7BE5C39 /* Pods-AirborneExample.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AirborneExample.debug.xcconfig"; path = "Target Support Files/Pods-AirborneExample/Pods-AirborneExample.debug.xcconfig"; sourceTree = "<group>"; };
 		D12EC9A52E12B14000EE39A2 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		D12EC9A62E12B14000EE39A2 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
@@ -63,6 +65,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				48230D568EBDE0F24E702A52 /* release_config.json */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -161,6 +164,7 @@
 				D12EC9AB2E12B14000EE39A2 /* Images.xcassets in Resources */,
 				D12EC9AC2E12B14000EE39A2 /* LaunchScreen.storyboard in Resources */,
 				D12EC9AD2E12B14000EE39A2 /* PrivacyInfo.xcprivacy in Resources */,
+				9B8C6889D0F7CAAE5D210963 /* release_config.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -393,7 +397,7 @@
 					"$(inherited)",
 					" ",
 				);
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				USE_HERMES = true;
@@ -476,7 +480,7 @@
 					"$(inherited)",
 					" ",
 				);
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;

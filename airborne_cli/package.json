@@ -28,9 +28,9 @@
     "react-scripts": "^5.0.0"
   },
   "devDependencies": {
+    "@release-it/conventional-changelog": "^9.0.2",
     "commander": "^14.0.0",
-    "release-it": "^17.10.0",
-    "@release-it/conventional-changelog": "^9.0.2"
+    "release-it": "^17.10.0"
   },
   "release-it": {
     "git": {

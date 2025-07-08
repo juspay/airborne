@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "config": {
+    "version": "1.0.0",
+    "release_config_timeout": 1000,
+    "boot_timeout": 1000,
+    "properties": {}
+  },
+  "package": {
+    "name": "airborneexample",
+    "version": "2",
+    "properties": {},
+    "index": {
+      "url": "dummy url",
+      "filePath": "main.jsbundle"
+    },
+    "important": [],
+    "lazy": []
+  },
+  "resources": []
+}

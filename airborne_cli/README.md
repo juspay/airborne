@@ -39,10 +39,10 @@ Airborne CLI is a React Native build tool that generates custom bundle configura
 ### CLI Usage
 ```bash
 # Build for Android
-build-airborne android
+npx build-airborne android
 
 # Build for iOS  
-build-airborne ios
+npx build-airborne ios
 ```
 
 ## Architecture
@@ -60,7 +60,7 @@ build-airborne ios
 
 If you want the release_config to be generated in any other path yo can specify the path shown below.
 ```bash
-build-airborne <platform> --output custom-output.json
+npx build-airborne <platform> --output custom-output.json
 ```
 
 ## Build Output

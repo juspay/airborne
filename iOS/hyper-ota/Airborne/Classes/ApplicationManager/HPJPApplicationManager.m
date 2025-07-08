@@ -183,6 +183,17 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     [self handleTempResourcesInstallation];
     
     self.config = [self readApplicationConfig];
+    
+    if (self.package.isDefaultInit && self.config.isDefaultInit && self.resources.isDefaultInit) {
+        NSData *data = [self.fileUtil getFileFromBundle:@"release_config.json"];
+        NSError* error = nil;
+        HPJPApplicationManifest* manifest = [[HPJPApplicationManifest alloc] initWithData:data error:&error];
+        self.config = manifest.config;
+        self.package = manifest.package;
+        self.resources = manifest.resources;
+        [self.tracker trackInfo:@"bundled_release_config" value:[@{@"release_config":@"Read bundled release_config.json"} mutableCopy]];
+    }
+    
     [self initializeLazyResourcesDownloadStatus];
     _availableLazySplits = [self dictionaryFromResources:self.package.lazy];
     _availableResources = [NSMutableDictionary dictionaryWithDictionary:self.resources.resources];
@@ -893,7 +904,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
         }
 
         if (data) {
-            HPJPApplicationManifest* manifest = [[HPJPApplicationManifest alloc] initWithData:data error:&error]; //
+            HPJPApplicationManifest* manifest = [[HPJPApplicationManifest alloc] initWithData:data error:&error]; // //
             logData[@"is_success"] = @YES;
             if(error != nil) {
                 logData[@"is_success"] = @NO;

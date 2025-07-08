@@ -45,6 +45,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate {
 
         }
     }
+    
+    func getNamespace() -> String {
+        return "AirborneExample"
+    }
+    
+    func getBundle() -> Bundle {
+        return Bundle.main
+    }
 
     func getDimensions() -> [String : String] {
     return [:]

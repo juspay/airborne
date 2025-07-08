@@ -28,7 +28,7 @@ import Foundation
     @objc optional func namespace() -> String
     
     /**
-     * Returns the custom bundle path for loading local assets and fallback files.
+     * Returns the custom bundle for loading local assets and fallback files.
      *
      * This path is used when OTA-downloaded files are not available
      *
@@ -36,9 +36,9 @@ import Foundation
      *         If not implemented, defaults to the main bundle path.
      *
      * @note The path should point to a directory containing the default
-     *       release config, packages, resources and other assets bundled with the app.
+     *       release config and other assets(including index file) bundled with the app.
      */
-    @objc optional func bundlePath() -> String
+    @objc optional func bundle() -> Bundle
     
     /**
      * Returns custom dimensions/metadata to include with release configuration requests.
@@ -68,7 +68,7 @@ import Foundation
      * @note Boot completion occurs even if some downloads failed or timed out.
      *       Check the release configuration for actual status.
      */
-    @objc optional func onBootComplete(indexBundlePath: String) -> Void
+    @objc optional func onBootComplete(indexBundleURL: URL?) -> Void
     
     /**
      * Called when significant events occur during the OTA update process.
@@ -120,13 +120,13 @@ import Foundation
     private let releaseConfigURL: String
     private lazy var namespace: String = {
         // TODO: Default namespace needs to be confirmed
-        delegate?.namespace?() ?? "juspay"
+        delegate?.namespace?() ?? "default"
     }()
     private lazy var dimensions: [String: String] = {
         delegate?.dimensions?() ?? [:]
     }()
-    private lazy var bundlePath: String = {
-        delegate?.bundlePath?() ?? Bundle.main.bundlePath
+    private lazy var bundlePath: Bundle = {
+        delegate?.bundle?() ?? Bundle.main
     }()
     
     private weak var delegate: AirborneDelegate?
@@ -153,13 +153,17 @@ import Foundation
         self.startApplicationManager()
     }
     
+    public func getBaseBundle() -> Bundle {
+        return bundlePath
+    }
+    
     // MARK: - Private Methods
     
     private func startApplicationManager() {
         self.applicationManager = HPJPApplicationManager.getSharedInstance(withWorkspace: self.namespace, delegate: self, logger: self)
         self.applicationManager?.waitForPackagesAndResources { [weak self] _ in
             if let indexBundlePath = self?.getIndexBundlePath() {
-                self?.delegate?.onBootComplete?(indexBundlePath: indexBundlePath)
+                self?.delegate?.onBootComplete?(indexBundleURL: indexBundlePath)
             }
         }
     }
@@ -178,22 +182,44 @@ extension AirborneServices {
      * @note The path is guaranteed to be valid, falling back to bundled assets if needed.
      * @note Call this method after `onBootComplete` for the most up-to-date bundle.
      */
-    @objc public func getIndexBundlePath() -> String {
+    @objc public func getIndexBundlePath() -> URL {
         guard
             let indexFilePath = self.applicationManager?.getCurrentApplicationManifest().package.index.filePath,
             !indexFilePath.isEmpty
         else {
-            return self.bundlePath
+            return bundlePath.url(forResource: "main", withExtension: "jsBundle") ?? bundlePath.bundleURL.appendingPathComponent("main.jsBundle")
         }
             
         guard
             let filePath = self.applicationManager?.getPathForPackageFile(indexFilePath),
             FileManager.default.fileExists(atPath: filePath)
         else {
-            return self.bundlePath.appendPathComponent(indexFilePath)
+            let filePath = filePathInBundleForFileName(indexFilePath)
+            if let filePath = filePath {
+                return URL(fileURLWithPath: filePath)
+            } else {
+                return bundlePath.bundleURL.appendingPathComponent(indexFilePath)
+            }
         }
         
-        return filePath
+        return URL(fileURLWithPath: filePath)
+    }
+    
+    private func filePathInBundleForFileName(_ fileName: String) -> String? {
+        let fileNameComponents = fileName.components(separatedBy: ".")
+        
+        guard fileNameComponents.count > 1 else {
+            return nil
+        }
+
+        let fileNameString = fileNameComponents.dropLast().joined(separator: ".")
+        let fileExtension = fileNameComponents.last!
+
+        if let filePathInBundle = self.bundlePath.path(forResource: fileNameString, ofType: fileExtension) {
+            return filePathInBundle
+        }
+
+        return nil
     }
     
     /**

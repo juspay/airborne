@@ -93,6 +93,9 @@
 - (instancetype)initWithFileUtil:(HPJPFileUtil*)fileUtil error:(NSError **)error {
     self = [super init];
     NSData *data = [fileUtil getFileFromBundle:APP_PACKAGE_FILE_NAME];
+    if (data == nil) {
+        self.isDefaultInit = YES;
+    }
     NSDictionary *jsonObject = data ? [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:error] : [NSDictionary new];
     if (jsonObject && [jsonObject isKindOfClass:[NSDictionary class]]) {
         [self defaultInitWithDictionary:jsonObject error:error];
