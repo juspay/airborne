@@ -89,6 +89,22 @@ import Foundation
      * @note Use this for logging, analytics, debugging, and monitoring OTA performance.
      */
     @objc optional func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String) -> Void
+    
+    /**
+     * Called when an individual lazy package download completes (either successfully or with failure).
+     *
+     * @param downloadSuccess Whether the lazy package download was successful
+     * @param url The URL of the lazy package that was downloaded
+     * @param filePath The file path where the package was stored
+     */
+    @objc optional func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String) -> Void
+    
+    /**
+     * Called when all lazy package downloads have completed.
+     *
+     * @note To get individual package results, use `onLazyPackageDownloadComplete` callback.
+     */
+    @objc optional func onAllLazyPackageDownloadsComplete() -> Void
 }
 
 // MARK: - AirborneServices Class
@@ -131,6 +147,7 @@ import Foundation
     
     private weak var delegate: AirborneDelegate?
     private var applicationManager: HPJPApplicationManager?
+    private var lazyPackageObserver: NSObjectProtocol?
     
     // MARK: - Initialization
     
@@ -150,11 +167,18 @@ import Foundation
         self.releaseConfigURL = releaseConfigURL
         self.delegate = delegate
         super.init()
+        self.setupLazyPackageNotifications()
         self.startApplicationManager()
     }
     
     public func getBaseBundle() -> Bundle {
         return bundlePath
+    }
+    
+    deinit {
+        if let observer = lazyPackageObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     // MARK: - Private Methods
@@ -165,6 +189,51 @@ import Foundation
             if let indexBundlePath = self?.getIndexBundlePath() {
                 self?.delegate?.onBootComplete?(indexBundleURL: indexBundlePath)
             }
+        }
+    }
+    
+    private func setupLazyPackageNotifications() {
+        // Only set up if at least one delegate method is implemented
+        guard delegate?.onLazyPackageDownloadComplete != nil ||
+              delegate?.onAllLazyPackageDownloadsComplete != nil else {
+            return
+        }
+        lazyPackageObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("HPJPLazyPackageNotification"),
+            object: nil,
+            queue: OperationQueue()
+        ) { [weak self] notification in
+            self?.handleLazyPackageNotification(notification)
+        }
+    }
+    
+    private func handleLazyPackageNotification(_ notification: Notification) {
+        guard let userInfo = notification.userInfo else { return }
+        
+        let lazyDownloadsComplete = userInfo["lazyDownloadsComplete"] as? Bool ?? false
+        
+        if lazyDownloadsComplete {
+            // All lazy downloads are complete
+            delegate?.onAllLazyPackageDownloadsComplete?()
+        } else {
+            
+            if delegate?.onLazyPackageDownloadComplete == nil {
+                return
+            }
+            
+            // Individual lazy package download completed
+            let downloadStatus = userInfo["downloadStatus"] as? Bool ?? false
+            let packageURL = userInfo["url"] as? URL
+            let filePath = userInfo["filePath"] as? String
+            
+            let urlString = packageURL?.absoluteString ?? ""
+            let filePathString = filePath ?? ""
+            
+            delegate?.onLazyPackageDownloadComplete?(
+                downloadSuccess: downloadStatus,
+                url: urlString,
+                filePath: filePathString
+            )
         }
     }
 }
