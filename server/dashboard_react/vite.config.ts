@@ -60,8 +60,8 @@ export default defineConfig(({ command }) => {
             changeOrigin: false,
           },
           '/analytics': {
-            target: 'http://backend:9000',
-            changeOrigin: true,
+            target: 'http://host.docker.internal:6400',
+            changeOrigin: false,
           }
         },
       }

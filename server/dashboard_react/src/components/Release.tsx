@@ -947,7 +947,7 @@ const Release: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <div className="bg-white/5 rounded-xl p-4 border border-white/10">
               <h4 className="text-sm font-semibold text-white/80 mb-2">Index</h4>
-              <p className="text-white font-mono text-sm break-all">{releaseData.package.index}</p>
+              <p className="text-white font-mono text-sm break-all">{JSON.stringify(releaseData.package.index)}</p>
             </div>
             <div className="bg-white/5 rounded-xl p-4 border border-white/10">
               <h4 className="text-sm font-semibold text-white/80 mb-2">Important Files Count</h4>
