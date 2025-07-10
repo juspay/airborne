@@ -1,0 +1,12 @@
+{
+    "config_timeout": 1000,
+    "boot_timeout": 1000,
+    "js_entry_file": "index.js",
+    "namespace": "examplesplitbundle",
+    "android": {
+        "index_file_path": "index.android.bundle"
+    },
+    "ios": {
+        "index_file_path": "main.jsbundle"
+    }
+}
