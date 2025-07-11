@@ -63,8 +63,8 @@ pub enum ABError {
     #[error("{0}")]
     NotFound(String),
 
-    #[error("Database error")]
-    DbError,
+    #[error("Database error: {0}")]
+    DbError(String),
 
     #[error("{0}")]
     InternalServerError(String),
@@ -79,24 +79,11 @@ pub enum ABError {
     Forbidden(String),
 }
 
-// impl ABError {
-//     fn code(&self) -> &'static str {
-//         match self {
-//             ABError::NotFound(_) => "USER_NOT_FOUND",
-//             ABError::DbError         => "DB_ERROR",
-//             ABError::InternalServerError(_) => "INTERNAL_SERVER_ERROR",
-//             ABError::Unauthorized(_) => "UNAUTHORIZED",
-//             ABError::BadRequest(_) => "BAD_REQUEST",
-//             ABError::Forbidden(_) => "FORBIDDEN",
-//         }
-//     }
-// }
-
 impl AppError for ABError {
     fn code(&self) -> &'static str {
         match self {
             ABError::NotFound(_) => "USER_NOT_FOUND",
-            ABError::DbError         => "DB_ERROR",
+            ABError::DbError(_)         => "DB_ERROR",
             ABError::InternalServerError(_) => "INTERNAL_SERVER_ERROR",
             ABError::Unauthorized(_) => "UNAUTHORIZED",
             ABError::BadRequest(_) => "BAD_REQUEST",
@@ -107,7 +94,7 @@ impl AppError for ABError {
     fn status_code(&self) -> StatusCode {
         match *self {
             ABError::NotFound(_) => StatusCode::NOT_FOUND,
-            ABError::DbError         => StatusCode::INTERNAL_SERVER_ERROR,
+            ABError::DbError(_)         => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
@@ -115,27 +102,6 @@ impl AppError for ABError {
         }
     }
 }
-
-// impl ResponseError for ABError {
-//     fn status_code(&self) -> StatusCode {
-//         match *self {
-//             ABError::NotFound(_) => StatusCode::NOT_FOUND,
-//             ABError::DbError         => StatusCode::INTERNAL_SERVER_ERROR,
-//             ABError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-//             ABError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
-//             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
-//             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
-//         }
-//     }
-
-//     fn error_response(&self) -> HttpResponse {
-//         let body = ErrorBody {
-//             code: self.code().to_string(),
-//             error: self.to_string(),
-//         };
-//         HttpResponse::build(self.status_code()).json(body)
-//     }
-// }
 
 impl ResponseError for ABError {
     fn status_code(&self) -> StatusCode {
