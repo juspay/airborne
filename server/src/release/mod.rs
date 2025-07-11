@@ -12,28 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, io, path::{Path, PathBuf}};
 
 use actix_web::{
     error::{self},
     get,
+    post,
     web::{self, Json},
     Result, Scope,
 };
 use aws_smithy_types::Document;
 use rand::Rng;
+use futures::future::try_join_all;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use superposition_rust_sdk::operation::get_resolved_config::GetResolvedConfigOutput;
 
-use crate::utils::{
+use actix_web::rt::spawn;
+use tokio::{fs as async_fs, time::sleep};
+use std::time::Duration;
+use walkdir::WalkDir;
+use zip::write::FileOptions;
+use zip::CompressionMethod;
+use zip::ZipWriter;
+use std::io::Write;
+
+use crate::{utils::{
     db::schema::hyperotaserver::configs::dsl::{
         app_id as config_app_id, configs as configs_table, org_id as config_org_id,
         version as config_version,
     },
     document::document_to_json_value,
     workspace::get_workspace_name_for_application,
-};
+}};
 use crate::{
     types::AppState,
     utils::db::models::{ConfigEntry, PackageEntryRead},
@@ -47,11 +59,12 @@ use diesel::QueryDsl;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
+        .service(Scope::new("/build").service(serve_build_aar))
         .service(serve_release)
         .service(Scope::new("/v2").service(serve_release))
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ReleaseConfig {
     version: String,
     config: Config,
@@ -59,7 +72,7 @@ struct ReleaseConfig {
     resources: serde_json::Value,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Config {
     version: String,
     release_config_timeout: u32,
@@ -67,7 +80,7 @@ struct Config {
     properties: ConfigProperties,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ConfigProperties {
     tenant_info: serde_json::Value,
 }
@@ -297,4 +310,175 @@ async fn serve_release(
         },
         resources: package_data.resources,
     }))
+}
+
+#[post("aar")]
+async fn serve_build_aar(
+    release_config: Json<ReleaseConfig>,
+) -> actix_web::Result<actix_web::HttpResponse> {
+    println!("Received request to build AAR");
+    let release_config = release_config.into_inner();
+    match generate_aar(&release_config).await {
+        Ok(aar_file_path) => {
+            let data = fs::read(&aar_file_path)
+                .map_err(|e| error::ErrorInternalServerError(format!("Failed to read AAR file: {}", e)))?;
+            Ok(actix_web::HttpResponse::Ok()
+                .content_type("application/zip")
+                .body(data))
+        }
+        Err(e) => Err(error::ErrorInternalServerError(format!("Failed to generate AAR: {}", e))),
+    }
+}
+
+async fn generate_aar(release_config: &ReleaseConfig) -> Result<String> {
+    let req_id = uuid::Uuid::new_v4().to_string();
+    let dir = format!("/var/airborne/tmp/{}", req_id);
+    let directory_base = Path::new(&dir);
+
+    let start_time = std::time::Instant::now();
+
+    // Download important block
+    let important_futures = release_config.package.important.iter()
+        .map(|file| {
+            let target_path = directory_base.join(file.file_path.as_str());
+            download_file(&file.url, target_path)
+        });
+
+    let _ = try_join_all(important_futures).await.map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to download important files: {}", e))
+    })?;
+
+    // Download lazy block
+    let lazy_futures = release_config.package.lazy.iter()
+        .map(|file| {
+            let target_path = directory_base.join(file.file_path.as_str());
+            download_file(&file.url, target_path)
+        });
+
+    let _ = try_join_all(lazy_futures).await.map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to download lazy files: {}", e))
+    })?;
+
+    create_android_specific_files(&directory_base.to_path_buf())
+        .map_err(|e| error::ErrorInternalServerError(format!("Failed to create Android specific files: {}", e)))?;
+
+    // Create the zip
+    let aar_file_path = directory_base.parent().unwrap().join(format!("{}.aar", req_id));
+    zip_directory(&directory_base, &aar_file_path)
+        .map_err(|e| error::ErrorInternalServerError(format!("Failed to zip directory: {}", e)))?;
+
+    let elaped_time = start_time.elapsed();
+    println!("AAR file generated at: {}, in: {:?}", aar_file_path.to_string_lossy(), elaped_time);
+
+    // Cleanup schedule
+    let cleanup_file = aar_file_path.clone();
+    let cleanup_dir  = directory_base.to_path_buf();
+    spawn(async move {
+        println!("Scheduling cleanup for AAR file: {}", cleanup_file.display());
+        sleep(Duration::from_secs(10)).await;
+        println!("Cleaning up AAR file and temp directory...");
+
+        match async_fs::remove_file(&cleanup_file).await {
+            Ok(_)  => println!("Deleted AAR file: {}", cleanup_file.display()),
+            Err(e) => println!("Could not delete AAR {}: {}", cleanup_file.display(), e),
+        }
+
+        match async_fs::remove_dir_all(&cleanup_dir).await {
+            Ok(_)  => println!("Deleted temp directory: {}", cleanup_dir.display()),
+            Err(e) => println!("Could not delete temp dir {}: {}", cleanup_dir.display(), e),
+        }
+        println!("Cleanup completed.");
+    });
+
+    Ok(aar_file_path.to_string_lossy().to_string())
+
+}
+
+/// Asynchronous file downloader. Creates the target directory if it doesn't exist.
+async fn download_file(
+    url: &str,
+    file_path: PathBuf,
+) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+    // Ensure the target directory exists
+    let directory = file_path.parent().ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "Invalid file path")
+    })?;
+    if !directory.exists() {
+        tokio::fs::create_dir_all(&directory).await?;
+    }
+
+    // Download content
+    let resp = Client::new().get(url).send().await?;
+    if !resp.status().is_success() {
+        return Err(format!("Failed to download file: HTTP {}", resp.status()).into());
+    }
+
+    let bytes = resp.bytes().await?;
+
+    // Write to file
+    let mut file = tokio::fs::File::create(&file_path).await?;
+    use tokio::io::AsyncWriteExt;
+    file.write_all(&bytes).await?;
+
+    Ok(file_path)
+}
+
+fn zip_directory(
+    src_dir: &Path,
+    zip_file_path: &Path,
+) -> zip::result::ZipResult<()> {
+    // Create the output file
+    let file = fs::File::create(zip_file_path)?;
+    let mut zip = ZipWriter::new(file);
+    let options: FileOptions<'_, ()> = FileOptions::default().compression_method(CompressionMethod::Deflated);
+    let mut buffer = Vec::new();
+
+    for entry in WalkDir::new(src_dir) {
+        let entry = entry.map_err(|_| zip::result::ZipError::FileNotFound)?;
+        let path = entry.path();
+        let name = path.strip_prefix(src_dir).unwrap();
+
+        if path.is_file() {
+            zip.start_file::<_, ()>(name.to_string_lossy(), options)?;
+            let mut f = fs::File::open(path)?;
+            io::copy(&mut f, &mut buffer)?;
+            zip.write_all(&buffer)?;
+            buffer.clear();
+        } else if !name.as_os_str().is_empty() {
+            zip.add_directory::<_, ()>(name.to_string_lossy(), options)?;
+        }
+    }
+
+    zip.finish()?;
+    Ok(())
+}
+
+fn create_android_specific_files(
+    directory_base: &PathBuf,
+) -> Result<()> {
+    let manifest_content = 
+        r#"<?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="in.juspay.airborne.assets"></manifest>"#;
+    
+    let manifest_path = directory_base.join("AndroidManifest.xml");
+    fs::write(manifest_path, manifest_content).map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to write AndroidManifest.xml: {}", e))
+    })?;
+
+    let meta_inf_directory = directory_base.join("META-INF/com/android/build/gradle");
+    let meta_inf_aar_props = 
+        r#"aarFormatVersion=1.0
+        aarMetadataVersion=1.0
+        minCompileSdk=1
+        minCompileSdkExtension=0
+        minAndroidGradlePluginVersion=1.0.0
+        coreLibraryDesugaringEnabled=false"#;
+    let meta_inf_aar_props_path = meta_inf_directory.join("aar-metadata.properties");
+    fs::create_dir_all(&meta_inf_directory).map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to create META-INF directory: {}", e))
+    })?;
+    fs::write(meta_inf_aar_props_path, meta_inf_aar_props).map_err(|e| {
+        error::ErrorInternalServerError(format!("Failed to write aar-metadata.properties: {}", e))
+    })?;
+    Ok(())
 }
