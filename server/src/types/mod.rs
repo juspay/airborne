@@ -22,6 +22,7 @@ pub struct AppState {
     pub env: Environment,
     pub db_pool: db::DbPool,
     pub s3_client: aws_sdk_s3::Client,
+    pub cf_client: aws_sdk_cloudfront::Client,
     pub superposition_client: Client,
     pub sheets_hub: Option<Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>>
 }
@@ -40,4 +41,5 @@ pub struct Environment {
     pub enable_google_signin: bool,
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
+    pub cloudfront_distribution_id: String,
 }

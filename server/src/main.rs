@@ -82,6 +82,9 @@ async fn main() -> std::io::Result<()> {
         } else {
             "".to_string()
         };
+    let cf_distribution_id = 
+        std::env::var("CLOUDFRONT_DISTRIBUTION_ID")
+            .unwrap_or_default();
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -93,6 +96,7 @@ async fn main() -> std::io::Result<()> {
     let shared_config = aws_config::from_env().load().await;
 
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
+    let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
     let mut conn = db::establish_connection(&aws_kms_client).await;
     conn.run_pending_migrations(MIGRATIONS)
@@ -117,6 +121,7 @@ async fn main() -> std::io::Result<()> {
         enable_google_signin: enable_google_signin,
         organisation_creation_disabled: organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
+        cloudfront_distribution_id: cf_distribution_id.clone()
     };
 
     // This is required for localStack
@@ -168,6 +173,7 @@ async fn main() -> std::io::Result<()> {
         env: env.clone(),
         db_pool: pool,
         s3_client: aws_s3_client,
+        cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
     });

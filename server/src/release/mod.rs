@@ -15,10 +15,7 @@
 use std::collections::HashMap;
 
 use actix_web::{
-    error::{self},
-    get,
-    web::{self, Json},
-    Result, Scope,
+    error::{self}, get, web::{self, Json}, HttpResponse, Result, Scope
 };
 use aws_smithy_types::Document;
 use rand::Rng;
@@ -140,7 +137,7 @@ async fn serve_release(
     query: web::Query<std::collections::HashMap<String, String>>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<Json<ReleaseConfig>> {
+) -> Result<HttpResponse, actix_web::Error> {
     let (organisation, application) = path.into_inner();
     println!(
         "Serving release for org: {}, app: {}",
@@ -277,7 +274,7 @@ async fn serve_release(
         serde_json::from_value(package_data.lazy.clone()).unwrap_or_default();
     let index_file: File = serde_json::from_value(package_data.index.clone()).unwrap_or_default();
 
-    Ok(Json(ReleaseConfig {
+    let release_config = ReleaseConfig {
         version: config_data.version.to_string(),
         config: Config {
             version: config_data.config_version,
@@ -296,5 +293,16 @@ async fn serve_release(
             lazy: lazy_files,
         },
         resources: package_data.resources,
-    }))
+    };
+    let response = actix_web::HttpResponse::Ok()
+        .insert_header((
+            actix_web::http::header::CACHE_CONTROL,
+            "Cache-Control: public, max-age=86400, stale-while-revalidate=60",
+        ))
+        .insert_header((
+            actix_web::http::header::CONTENT_TYPE,
+            "application/json",
+        ))
+        .json(release_config);
+    Ok(response)
 }
