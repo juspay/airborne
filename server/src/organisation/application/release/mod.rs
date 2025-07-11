@@ -328,8 +328,8 @@ async fn create(
 
     let new_release = ReleaseEntry {
         id: release_id,
-        org_id: organisation,
-        app_id: application,
+        org_id: organisation.clone(),
+        app_id: application.clone(),
         package_version: pkg_version,
         config_version: config.config_version.clone(),
         created_at: now,
@@ -341,6 +341,17 @@ async fn create(
         .values(&new_release)
         .execute(&mut conn)
         .map_err(error::ErrorInternalServerError)?;
+
+    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
+
+    // Invalidate all variants in CloudFront
+    if let Err(e) = invalidate_cf(
+        &state.cf_client,
+        path,
+        &state.env.cloudfront_distribution_id,
+    ).await {
+        eprintln!("Failed to invalidate CloudFront cache: {:?}", e);
+    }
 
     Ok(Json(CreateResponse {
         id: release_id.to_string(),
@@ -650,3 +661,37 @@ async fn get_experiment_details(
     }))
 }
 
+async fn invalidate_cf(
+    client: &aws_sdk_cloudfront::Client,
+    path: String,
+    distribution_id: &str) -> Result<(), aws_sdk_cloudfront::Error> {
+    // Make this unique on each call
+    let caller_reference = format!("invalidate-{}", Utc::now().timestamp_nanos_opt().unwrap_or(rand::random::<i64>()));
+
+    let paths = aws_sdk_cloudfront::types::Paths::builder()
+        .items(path)
+        .quantity(1) 
+        .build()?;
+
+    let batch = aws_sdk_cloudfront::types::InvalidationBatch::builder()
+        .caller_reference(caller_reference)
+        .paths(paths)
+        .build()?;
+
+    let resp = client
+        .create_invalidation()
+        .distribution_id(distribution_id)
+        .invalidation_batch(batch)
+        .send()
+        .await?;
+    
+    resp.invalidation()
+        .map(|inv| {
+            println!("Invalidation created: {:?}", inv.id);
+        })
+        .unwrap_or_else(|| {
+            println!("Invalidation created but no ID returned");
+        });
+
+    Ok(())
+}
