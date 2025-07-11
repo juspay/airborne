@@ -65,10 +65,11 @@ async fn main() -> std::io::Result<()> {
         .unwrap_or_else(|_| "false".to_string())
         .parse::<bool>()
         .unwrap_or(false);
-    let organisation_creation_disabled = std::env::var("ORGANISATION_CREATION_DISABLED")
-        .unwrap_or_else(|_| "false".to_string())
-        .parse::<bool>()
-        .unwrap_or(false);
+    // let organisation_creation_disabled = std::env::var("ORGANISATION_CREATION_DISABLED")
+    //     .unwrap_or_else(|_| "false".to_string())
+    //     .parse::<bool>()
+    //     .unwrap_or(false);
+    let organisation_creation_disabled = false;
     let gcp_service_account_json_path = 
         if organisation_creation_disabled {
             std::env::var("GCP_SERVICE_ACCOUNT_PATH").expect("GCP_SERVICE_ACCOUNT_PATH must be set if ORGANISATION_CREATION_DISABLED=true")

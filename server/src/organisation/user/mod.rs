@@ -20,6 +20,7 @@ use actix_web::{
     web::{self, Json},
     HttpMessage, HttpRequest, Scope,
 };
+use hyper::StatusCode;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -28,7 +29,7 @@ use crate::{
     middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
     },
-    types::AppState,
+    types::{ABError, AppState, AppError},
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
 };
 
@@ -65,16 +66,55 @@ pub enum OrgError {
     LastOwner(String),
 }
 
-impl From<OrgError> for actix_web::Error {
+// impl From<OrgError> for actix_web::Error {
+//     fn from(err: OrgError) -> Self {
+//         match err {
+//             OrgError::UserNotFound(_) => error::ErrorBadRequest(err.to_string()),
+//             OrgError::OrgNotFound(_) => error::ErrorBadRequest(err.to_string()),
+//             OrgError::InvalidAccessLevel(_) => error::ErrorBadRequest(err.to_string()),
+//             OrgError::Internal(_) => error::ErrorInternalServerError(err.to_string()),
+//             OrgError::Unauthorized(_) => error::ErrorUnauthorized(err.to_string()),
+//             OrgError::PermissionDenied(_) => error::ErrorForbidden(err.to_string()),
+//             OrgError::LastOwner(_) => error::ErrorBadRequest(err.to_string()),
+//         }
+//     }
+// }
+
+impl AppError for OrgError {
+  fn code(&self) -> &'static str {
+    match self {
+      OrgError::UserNotFound(_)        => "USER_NOT_FOUND",
+      OrgError::OrgNotFound(_)         => "ORG_NOT_FOUND",
+      OrgError::InvalidAccessLevel(_)  => "INVALID_ACCESS_LEVEL",
+      OrgError::Internal(_)            => "INTERNAL_ERROR",
+      OrgError::Unauthorized(_)        => "UNAUTHORIZED",
+      OrgError::PermissionDenied(_)    => "PERMISSION_DENIED",
+      OrgError::LastOwner(_)           => "LAST_OWNER_ERROR",
+    }
+  }
+  fn status_code(&self) -> StatusCode {
+    match self {
+      OrgError::UserNotFound(_)       => StatusCode::NOT_FOUND,
+      OrgError::OrgNotFound(_)        => StatusCode::NOT_FOUND,
+      OrgError::InvalidAccessLevel(_) |
+      OrgError::LastOwner(_)          => StatusCode::BAD_REQUEST,
+      OrgError::Unauthorized(_)       => StatusCode::UNAUTHORIZED,
+      OrgError::PermissionDenied(_)   => StatusCode::FORBIDDEN,
+      OrgError::Internal(_)           => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+  }
+}
+
+impl From<OrgError> for ABError {
     fn from(err: OrgError) -> Self {
         match err {
-            OrgError::UserNotFound(_) => error::ErrorBadRequest(err.to_string()),
-            OrgError::OrgNotFound(_) => error::ErrorBadRequest(err.to_string()),
-            OrgError::InvalidAccessLevel(_) => error::ErrorBadRequest(err.to_string()),
-            OrgError::Internal(_) => error::ErrorInternalServerError(err.to_string()),
-            OrgError::Unauthorized(_) => error::ErrorUnauthorized(err.to_string()),
-            OrgError::PermissionDenied(_) => error::ErrorForbidden(err.to_string()),
-            OrgError::LastOwner(_) => error::ErrorBadRequest(err.to_string()),
+            OrgError::UserNotFound(msg)       => ABError::NotFound(msg),
+            OrgError::OrgNotFound(msg)        => ABError::NotFound(msg),
+            OrgError::InvalidAccessLevel(msg) => ABError::BadRequest(msg),
+            OrgError::Internal(msg)           => ABError::InternalServerError(msg),
+            OrgError::Unauthorized(msg)       => ABError::Unauthorized(msg),
+            OrgError::PermissionDenied(msg)   => ABError::Unauthorized(msg),
+            OrgError::LastOwner(msg)          => ABError::BadRequest(msg),
         }
     }
 }
@@ -148,7 +188,7 @@ async fn get_org_context(
         .map_err(OrgError::Unauthorized)?;
 
     let org_name =
-        validate_user(auth.organisation.clone(), required_level).map_err(OrgError::Unauthorized)?;
+        validate_user(auth.organisation.clone(), required_level).map_err(|e: ABError| OrgError::Unauthorized(e.to_string()))?;
 
     Ok((org_name, auth))
 }
@@ -233,7 +273,7 @@ async fn organisation_add_user(
     req: HttpRequest,
     body: Json<UserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, actix_web::Error> {
+) -> Result<Json<UserOperationResponse>, ABError> {
     let body = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -306,7 +346,7 @@ async fn organisation_update_user(
     req: HttpRequest,
     body: Json<UserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, actix_web::Error> {
+) -> Result<Json<UserOperationResponse>, ABError> {
     let request = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -378,7 +418,7 @@ async fn organisation_remove_user(
     req: HttpRequest,
     body: Json<RemoveUserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, actix_web::Error> {
+) -> Result<Json<UserOperationResponse>, ABError> {
     let request = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -449,7 +489,7 @@ async fn organisation_remove_user(
 async fn organisation_list_users(
     req: HttpRequest,
     state: web::Data<AppState>,
-) -> Result<Json<ListUsersResponse>, actix_web::Error> {
+) -> Result<Json<ListUsersResponse>, ABError> {
     // Get organization context and validate requester's permissions
     let (org_name, _) = get_org_context(&req, READ, "list users").await?;
 
