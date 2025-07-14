@@ -14,7 +14,7 @@
 
 use actix_multipart::form::{text::Text, MultipartForm};
 use actix_web::{
-    error, post,
+    post,
     web::{self, Json, ReqData},
     Result, Scope,
 };
@@ -26,7 +26,7 @@ use serde_json::json;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE},
-    types::AppState,
+    types::{ABError, AppState},
     utils::db::{
         models::ConfigEntry, schema::hyperotaserver::configs::dsl::configs as configs_table,
     },
@@ -71,17 +71,17 @@ async fn create_config_json_v1(
     req: Json<ConfigJsonV1Request>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Response>, actix_web::Error> {
+) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
     let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
     let application =
-        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
         .get()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     // Find the package version to associate with the config
     let latest_version = crate::utils::db::schema::hyperotaserver::packages::dsl::packages
@@ -97,7 +97,7 @@ async fn create_config_json_v1(
             crate::utils::db::schema::hyperotaserver::packages::dsl::version,
         ))
         .first::<Option<i32>>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     let ver = latest_version.unwrap_or(0);
 
@@ -130,7 +130,7 @@ async fn create_config_json_v1(
             properties,
         })
         .execute(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     Ok(Json(Response {
         version: ver,
@@ -143,21 +143,21 @@ async fn create_config_json_v1_multipart(
     MultipartForm(form): MultipartForm<ConfigJsonV1MultipartRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Response>, actix_web::Error> {
+) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
     let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
     let application =
-        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     // Parse the JSON request
     let req: ConfigJsonV1Request = serde_json::from_str(&form.json.into_inner())
-        .map_err(|e| error::ErrorBadRequest(format!("Invalid JSON: {}", e)))?;
+        .map_err(|e| ABError::BadRequest(format!("Invalid JSON: {}", e)))?;
 
     let mut conn = state
         .db_pool
         .get()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     // Find the package version to associate with the config
     let latest_version = crate::utils::db::schema::hyperotaserver::packages::dsl::packages
@@ -173,7 +173,7 @@ async fn create_config_json_v1_multipart(
             crate::utils::db::schema::hyperotaserver::packages::dsl::version,
         ))
         .first::<Option<i32>>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     let ver = latest_version.unwrap_or(0);
 
@@ -206,7 +206,7 @@ async fn create_config_json_v1_multipart(
             properties,
         })
         .execute(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     Ok(Json(Response {
         version: ver,

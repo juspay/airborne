@@ -22,13 +22,12 @@ use aws_smithy_types::Document;
 use keycloak::types::GroupRepresentation;
 use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use superposition_rust_sdk::operation::create_default_config::CreateDefaultConfigOutput;
 use superposition_rust_sdk::types::WorkspaceStatus;
 use superposition_rust_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, WRITE};
-use crate::types::AppState;
+use crate::types::{ABError, AppState};
 use diesel::RunQueryDsl;
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
@@ -128,7 +127,7 @@ async fn add_application(
     body: Json<ApplicationCreateRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Application>> {
+) -> actix_web::Result<Json<Application>, ABError> {
     // Get organisation and application names
     let body = body.into_inner();
     let application = body.application;
@@ -142,7 +141,7 @@ async fn add_application(
     println!("Validating organisation: {:?}", organisation);
     let organisation = validate_user(organisation, WRITE).map_err(|e| {
         println!("Error validating organisation: {:?}", e);
-        error::ErrorUnauthorized(e)
+        ABError::Unauthorized(format!("User does not have WRITE access to organisation: {}", e))
     })?;
     println!("Organisation validated successfully.");
 
@@ -151,14 +150,14 @@ async fn add_application(
 
     // Get DB connection
     let mut conn = state.db_pool.get().map_err(|e| {
-        error::ErrorInternalServerError(format!("Failed to get database connection: {}", e))
+        ABError::DbError(format!("Failed to get database connection: {}", e))
     })?;
 
     // Get Keycloak Admin Token
     let client = reqwest::Client::new();
     let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
         println!("Error retrieving Keycloak admin token: {:?}", e);
-        error::ErrorInternalServerError(e)
+        ABError::Unauthorized(format!("Error retrieving Keycloak admin token: {}", e))
     })?;
     println!("Admin token retrieved successfully.");
     let client = reqwest::Client::new();
@@ -177,11 +176,12 @@ async fn add_application(
             Some(organisation.clone()),
         )
         .await
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
     if groups.is_empty() {
-        Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation not found"}),
+        Err(ABError::NotFound(format!(
+            "Organisation '{}' not found in Keycloak",
+            organisation
         )))
     }
     // It is possible that application group comes up in this query; Change to path
@@ -197,7 +197,10 @@ async fn add_application(
             .iter()
             .any(|g| g.name == Some(application.clone()))
         {
-            return Err(error::ErrorConflict("Application already exists"));
+            return Err(ABError::BadRequest(format!(
+                "Application '{}' already exists in organisation '{}'",
+                application, organisation
+            )));
         }
 
         // Step 1: Create application group in Keycloak
@@ -221,7 +224,7 @@ async fn add_application(
             }
             Err(e) => {
                 // No rollback needed yet - this is the first operation
-                return Err(error::ErrorInternalServerError(format!(
+                return Err(ABError::InternalServerError(format!(
                     "Failed to create application group: {}",
                     e
                 )));
@@ -274,9 +277,9 @@ async fn add_application(
                                 println!("Rollback failed: {}", rollback_err);
                             }
 
-                            return Err(error::ErrorInternalServerError(format!(
-                                "Failed to add user to role group: {}",
-                                e
+                            return Err(ABError::InternalServerError(format!(
+                                "Failed to add user to role group {}: {}",
+                                role, e
                             )));
                         }
                     }
@@ -290,9 +293,9 @@ async fn add_application(
                         println!("Rollback failed: {}", rollback_err);
                     }
 
-                    return Err(error::ErrorInternalServerError(format!(
-                        "Failed to create role group: {}",
-                        e
+                    return Err(ABError::InternalServerError(format!(
+                        "Failed to create role group {}: {}",
+                        role, e
                     )));
                 }
             }
@@ -314,7 +317,7 @@ async fn add_application(
             .values(&new_workspace_name)
             .get_result(&mut conn)
             .map_err(|e| {
-                error::ErrorInternalServerError(format!("Failed to store workspace name: {}", e))
+                ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
             })?;
 
         let generated_id = inserted_workspace.id;
@@ -325,7 +328,7 @@ async fn add_application(
             .set(workspace_names::workspace_name.eq(&generated_workspace_name))
             .execute(&mut conn)
             .map_err(|e| {
-                error::ErrorInternalServerError(format!("Failed to update workspace name: {}", e))
+                ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
             })?;
 
         // Step 4: Create workspace in Superposition
@@ -357,7 +360,7 @@ async fn add_application(
                     println!("Rollback failed: {}", rollback_err);
                 }
 
-                return Err(error::ErrorInternalServerError(format!(
+                return Err(ABError::InternalServerError(format!(
                     "Failed to create workspace in Superposition: {}",
                     e
                 )));
@@ -423,7 +426,8 @@ async fn add_application(
             &realm,
             &state,
         )
-        .await?;
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
         create_config_with_tx(
             create_default_config_int(
@@ -437,7 +441,8 @@ async fn add_application(
             &realm,
             &state,
         )
-        .await?;
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
         create_config_with_tx(
             create_default_config_int(
@@ -451,7 +456,8 @@ async fn add_application(
             &realm,
             &state,
         )
-        .await?;
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
         println!(
             "Creating default configuration (string): key=package.name, value={}",
@@ -469,7 +475,8 @@ async fn add_application(
             &realm,
             &state,
         )
-        .await?;
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
         create_config_with_tx(
             create_default_config_int(
@@ -483,7 +490,8 @@ async fn add_application(
             &realm,
             &state,
         )
-        .await?;
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();
