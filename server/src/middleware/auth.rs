@@ -19,7 +19,7 @@ use std::{
 
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    error, Error, HttpMessage,
+    Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
@@ -29,6 +29,8 @@ use crate::{
     types::Environment,
     utils::keycloak::{decode_jwt_token, get_token},
 };
+
+use crate::types::ABError;
 
 // There are two steps in middleware processing.
 // 1. Middleware initialization, middleware factory gets called with
@@ -90,15 +92,15 @@ pub const WRITE: Access = Access { access: 2 };
 pub const READ: Access = Access { access: 1 };
 pub const ROLES: [&str; 4] = ["owner", "admin", "write", "read"];
 
-pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> Result<String, String> {
+pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> Result<String, ABError> {
     if let Some(access_level) = access_level {
         if access_level.level >= access.access {
             Ok(access_level.name)
         } else {
-            Err("Access Level too low".to_string())
+            Err(ABError::Unauthorized("Access Level too low".to_string()))
         }
     } else {
-        Err("Missing header".to_string())
+        Err(ABError::Unauthorized("Missing header".to_string()))
     }
 }
 
@@ -122,7 +124,7 @@ where
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, self::Error>>;
 
     forward_ready!(service);
 
@@ -171,7 +173,7 @@ where
                                                 None,
                                             )
                                             .await
-                                            .map_err(error::ErrorUnauthorized)?;
+                                            .map_err(|e| ABError::Unauthorized(e.to_string()))?;
 
                                     let user_groups: Vec<String> = user_groups
                                         .iter()
@@ -190,9 +192,9 @@ where
                                                 });
                                             }
                                             None => {
-                                                return Err(error::ErrorUnauthorized(
-                                                    "No Access to Application",
-                                                ))
+                                                return Err(ABError::Unauthorized(
+                                                    "No Access to Application".to_string(),
+                                                ).into())
                                             }
                                         };
                                     }
@@ -205,9 +207,9 @@ where
                                             });
                                         }
                                         None => {
-                                            return Err(error::ErrorUnauthorized(
-                                                "No Access to Application",
-                                            ))
+                                            return Err(ABError::Unauthorized(
+                                                "No Access to Application".to_string()
+                                            ).into());
                                         }
                                     };
                                 }
@@ -217,14 +219,20 @@ where
                                     organisation,
                                     application,
                                 });
-                                service.call(req).await
+                                return service.call(req).await.map_err(Into::into);
                             }
-                            Err(e) => Err(error::ErrorUnauthorized(e)),
+                            Err(e) => {
+                                return Err(ABError::Unauthorized(format!("Invalid token: {:?}", e)).into());
+                            }
                         }
                     }
-                    None => Err(error::ErrorUnauthorized("No AdminToken")),
+                    None => {
+                        return Err(ABError::Unauthorized("No AdminToken".to_string()).into());
+                    }
                 },
-                Err(e) => Err(error::ErrorUnauthorized(e)),
+                Err(e) => {
+                    return Err(ABError::Unauthorized(format!("{:?}", e)).into());
+                }
             }
         })
     }
