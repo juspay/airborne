@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::types::ABError;
 use crate::utils::workspace::get_workspace_name_for_application;
 use crate::{
     middleware::auth::{validate_user, AuthResponse, READ, WRITE},
@@ -26,7 +27,6 @@ use crate::{
 };
 use actix_multipart::form::{tempfile::TempFile, text::Text, MultipartForm};
 use actix_web::{
-    error::{self},
     get, post,
     web::{self, Json, ReqData},
     Result, Scope,
@@ -68,22 +68,22 @@ struct Package {
 async fn list(
     state: web::Data<AppState>,
     auth_response: ReqData<AuthResponse>,
-) -> Result<Json<PackageList>> {
+) -> Result<Json<PackageList>, ABError> {
     let auth_response = auth_response.into_inner();
     let organisation =
-        validate_user(auth_response.organisation, READ).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.organisation, READ).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
     let application =
-        validate_user(auth_response.application, READ).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.application, READ).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
         .get()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     let entries = packages
         .filter(org_id.eq(organisation).and(app_id.eq(application)))
         .load::<PackageEntryRead>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
     let entries = entries
         .iter()
@@ -164,23 +164,23 @@ async fn create_package_json_v1(
     req: Json<PackageJsonV1Request>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Response>, actix_web::Error> {
+) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
     let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
     let application =
-        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
         .get()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     let latest_version = packages
         .filter(org_id.eq(&organisation).and(app_id.eq(&application)))
         .select(max(version))
         .first::<Option<i32>>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     let ver = latest_version.unwrap_or(0) + 1;
 
@@ -193,7 +193,8 @@ async fn create_package_json_v1(
 
     // Get workspace name for this application
     let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
+        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+        .map_err(|_| ABError::InternalServerError("Could not get workspace".to_string()))?;
     println!(
         "Using workspace name for create_package_json_v1: {}",
         workspace_name
@@ -206,18 +207,18 @@ async fn create_package_json_v1(
             app_id: application.clone(),
             org_id: organisation.clone(),
             index: serde_json::to_value(&req.package.index)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON error".to_string()))?,
             important: serde_json::to_value(&req.package.important)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON error".to_string()))?,
             lazy: serde_json::to_value(&req.package.lazy)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON error".to_string()))?,
             properties: serde_json::to_value(&req.package.properties)
                 .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
             resources: serde_json::to_value(&req.resources)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON error".to_string()))?,
         })
         .execute(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     Ok(Json(Response { version: ver }))
 }
@@ -227,27 +228,27 @@ async fn create_json_v1_multipart(
     MultipartForm(form): MultipartForm<PackageJsonV1MultipartRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Response>, actix_web::Error> {
+) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
     let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
     let application =
-        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
 
     // Parse the JSON request
     let mut req: PackageJsonV1Request = serde_json::from_str(&form.json.into_inner())
-        .map_err(|e| error::ErrorBadRequest(format!("Invalid JSON: {}", e)))?;
+        .map_err(|e| ABError::BadRequest(format!("Invalid JSON: {}", e)))?;
 
     let mut conn = state
         .db_pool
         .get()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::InternalServerError("Connection failure".to_string()))?;
 
     let latest_version = packages
         .filter(org_id.eq(&organisation).and(app_id.eq(&application)))
         .select(max(version))
         .first::<Option<i32>>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     let ver = latest_version.unwrap_or(0) + 1;
 
@@ -255,7 +256,7 @@ async fn create_json_v1_multipart(
     if let Some(index_file) = form.index {
         let index_name = index_file.file_name.clone().unwrap_or_default();
         if index_name.is_empty() {
-            return Err(error::ErrorBadRequest("Index file name cannot be empty"));
+            return Err(ABError::BadRequest("Index file name cannot be empty".to_string()));
         }
 
         let s3_client = &state.s3_client;
@@ -287,8 +288,8 @@ async fn create_json_v1_multipart(
                 println!("Bucket: {}", state.env.bucket_name);
                 println!("Path: {}", s3_path);
                 println!("Error: {:?}", e);
-                return Err(error::ErrorInternalServerError(
-                    "Failed to upload index file",
+                return Err(ABError::InternalServerError(
+                    "Failed to upload index file".to_string(),
                 ));
             }
         }
@@ -303,7 +304,8 @@ async fn create_json_v1_multipart(
 
     // Get workspace name for this application
     let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await?;
+        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
     println!(
         "Using workspace name for create_json_v1_multipart: {}",
         workspace_name
@@ -316,18 +318,18 @@ async fn create_json_v1_multipart(
             app_id: application.clone(),
             org_id: organisation.clone(),
             index: serde_json::to_value(&req.package.index)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON Error".to_string()))?,
             important: serde_json::to_value(&req.package.important)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON Error".to_string()))?,
             lazy: serde_json::to_value(&req.package.lazy)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON Error".to_string()))?,
             properties: serde_json::to_value(&req.package.properties)
                 .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
             resources: serde_json::to_value(&req.resources)
-                .map_err(error::ErrorInternalServerError)?,
+                .map_err(|_| ABError::InternalServerError("JSON Error".to_string()))?,
         })
         .execute(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     Ok(Json(Response { version: ver }))
 }

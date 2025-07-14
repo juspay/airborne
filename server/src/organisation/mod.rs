@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::middleware::auth::AuthResponse;
+use crate::{middleware::auth::AuthResponse, types::ABError};
 use crate::types::AppState;
 use actix_web::{
-    delete, error, get, post,
+    delete, get, post,
     web::{self, Json, Path},
     HttpMessage, HttpRequest, Scope,
 };
@@ -78,7 +78,7 @@ async fn request_organisation(
     req: HttpRequest,
     body: Json<OrganisationRequest>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<OrganisationRequestResponse>> {
+) -> actix_web::Result<Json<OrganisationRequestResponse>, ABError> {
     let organisation_name = body.organisation_name.clone();
     let name = body.name.clone();
     let email = body.email.clone();
@@ -94,7 +94,7 @@ async fn request_organisation(
         .extensions()
         .get::<AuthResponse>()
         .cloned()
-        .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
+        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
     let admin_token = auth_response.admin_token.clone();
     let client = reqwest::Client::new();
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
@@ -114,13 +114,13 @@ async fn request_organisation(
         )
         .await
         .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to check existing groups: {}", e))
+            ABError::Unauthorized(format!("Failed to check existing groups: {}", e))
         })?;
 
     if !groups.is_empty() {
-        return Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation name is taken"}),
-        )));
+        return Err(ABError::BadRequest(
+            "Organisation name is taken".to_string(),
+        ));
     }
 
     // Push the organization to Google Sheets
@@ -145,20 +145,20 @@ async fn request_organisation(
                 .value_input_option("USER_ENTERED")
                 .doit()
                 .await
-                .map_err(|e| error::ErrorInternalServerError(format!("Failed to append to Google Sheets: {}", e)))?;
+                .map_err(|e| ABError::InternalServerError(format!(" Google Sheet error: {:?}", e)))?;
         }
         None => {
-            return Err(error::ErrorInternalServerError(
-                "Google Sheets hub is not initialized",
+            return Err(ABError::InternalServerError(
+                "Google Sheets hub is not configured".to_string(),
             ));
         }
     }
     
 
     Ok(Json(OrganisationRequestResponse {
-            organisation_name,
-            message: "Organisation request submitted successfully".to_string(),
-        }))
+        organisation_name,
+        message: "Organisation request submitted successfully".to_string(),
+    }))
 }
 
 #[post("/create")]
@@ -166,7 +166,7 @@ async fn create_organisation(
     req: HttpRequest,
     body: Json<OrganisationCreatedRequest>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Organisation>> {
+) -> actix_web::Result<Json<Organisation>, ABError> {
     let organisation = body.name.clone();
 
     // Validate organization name
@@ -177,7 +177,7 @@ async fn create_organisation(
         .extensions()
         .get::<AuthResponse>()
         .cloned()
-        .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
+        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
     let admin_token = auth_response.admin_token.clone();
     let sub = &auth_response.sub;
     let client = reqwest::Client::new();
@@ -188,9 +188,7 @@ async fn create_organisation(
     let group_representations = admin
         .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
         .await
-        .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to fetch user groups: {}", e))
-        })?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch user groups: {:?}", e)))?;
 
     // Extract group paths
     let group_paths: Vec<String> = group_representations.iter().filter_map(|g| g.path.clone()).collect();
@@ -199,9 +197,9 @@ async fn create_organisation(
     let organizations = parse_user_organizations(group_paths);
 
     if organizations.len() == 0 && state.env.organisation_creation_disabled {
-        return Err(error::ErrorForbidden(Json(
-            json!({"Error" : "You do not have permission to create an organisation"}),
-        )));
+        return Err(ABError::BadRequest(
+            "You do not have permission to create new organisation".to_string(),
+        ));
     }
 
     // Check if organization already exists
@@ -218,13 +216,13 @@ async fn create_organisation(
         )
         .await
         .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to check existing groups: {}", e))
+            ABError::InternalServerError(format!("Failed to check existing groups: {}", e))
         })?;
 
     if !groups.is_empty() {
-        return Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation name is taken"}),
-        )));
+        return Err(ABError::BadRequest(
+            "Organisation name is taken".to_string(),
+        ));
     }
 
     // Create the organization using the transaction manager
@@ -235,7 +233,8 @@ async fn create_organisation(
         sub,
         &state,
     )
-    .await?;
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Error occurred while creating org: {:?}", e)))?;
 
     Ok(Json(org))
 }
@@ -245,7 +244,7 @@ async fn delete_organisation(
     req: HttpRequest,
     path: Path<String>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<serde_json::Value>> {
+) -> actix_web::Result<Json<serde_json::Value>, ABError> {
     let organisation = path.into_inner();
 
     // Validate organization name
@@ -256,7 +255,7 @@ async fn delete_organisation(
         .extensions()
         .get::<AuthResponse>()
         .cloned()
-        .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
+        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
     let admin_token = auth_response.admin_token.clone();
     let client = reqwest::Client::new();
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
@@ -276,13 +275,11 @@ async fn delete_organisation(
         )
         .await
         .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to check existing groups: {}", e))
+            ABError::InternalServerError(format!("Failed to check existing groups: {}", e))
         })?;
 
     if groups.is_empty() {
-        return Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation does not exist"}),
-        )));
+        return Err(ABError::BadRequest("Organisation does not exist".to_string()));
     }
 
     // Check if user has permissions to delete organization
@@ -293,15 +290,15 @@ async fn delete_organisation(
     {
         // Delete the organization using the transaction manager
         transaction::delete_organisation_with_transaction(&organisation, &admin, &realm, &state)
-            .await?;
+            .await.map_err(|_| ABError::InternalServerError("Could not delete organisation".to_string()))?;
 
         Ok(Json(
             json!({"Success" : "Organisation deleted successfully"}),
         ))
     } else {
-        Err(error::ErrorForbidden(Json(
-            json!({"Error" : "You do not have permission to delete this organisation"}),
-        )))
+        Err(ABError::Forbidden(
+            "You do not have permission to delete this organisation".to_string(),
+        ))
     }
 }
 
@@ -309,13 +306,13 @@ async fn delete_organisation(
 async fn list_organisations(
     req: HttpRequest,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Vec<Organisation>>> {
+) -> actix_web::Result<Json<Vec<Organisation>>, ABError> {
     // Get Keycloak Admin Token
     let auth_response = req
         .extensions()
         .get::<AuthResponse>()
         .cloned()
-        .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
+        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
     let admin_token = auth_response.admin_token.clone();
     let sub = &auth_response.sub;
     let client = reqwest::Client::new();
@@ -327,7 +324,7 @@ async fn list_organisations(
         .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
         .await
         .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to fetch user groups: {}", e))
+            ABError::InternalServerError(format!("Failed to fetch user groups: {}", e))
         })?;
 
     // Extract group paths
@@ -409,19 +406,15 @@ fn parse_user_organizations(groups: Vec<String>) -> Vec<Organisation> {
 }
 
 /// Validate organization name for security and usability
-pub fn validate_organisation_name(name: &str) -> actix_web::Result<()> {
+pub fn validate_organisation_name(name: &str) -> actix_web::Result<(), ABError> {
     let trimmed = name.trim();
 
     if trimmed.is_empty() {
-        return Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation name cannot be empty"}),
-        )));
+        return Err(ABError::BadRequest("Organisation name cannot be empty".to_string()));
     }
 
     if trimmed.len() > MAX_ORG_NAME_LENGTH {
-        return Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation name is too long"}),
-        )));
+        return Err(ABError::BadRequest("Organisation name is too long".to_string()));
     }
 
     // Basic pattern matching for valid organization name
@@ -429,9 +422,9 @@ pub fn validate_organisation_name(name: &str) -> actix_web::Result<()> {
         .chars()
         .all(|c| c.is_alphanumeric() || c == ' ' || c == '-' || c == '_')
     {
-        return Err(error::ErrorBadRequest(Json(
-            json!({"Error" : "Organisation name can only contain alphanumeric characters, spaces, hyphens, and underscores"}),
-        )));
+        return Err(ABError::BadRequest(
+            "Organisation name can only contain alphanumeric characters, spaces, hyphens, and underscores".to_string(),
+        ));
     }
 
     Ok(())
