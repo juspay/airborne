@@ -1,0 +1,27 @@
+[
+    {
+        "key": "config.version",
+        "default": "0.0.0",
+        "description": "Value indicating the version of the release config"
+    },
+    {
+        "key": "config.release_config_timeout",
+        "default": 1000,
+        "description": "Value indicating the version of the release config"
+    },
+    {
+        "key": "config.package_timeout",
+        "default": 1000,
+        "description": "Indicating the timeout for downloading the package block"
+    },
+    {
+        "key": "package.name",
+        "default": "",
+        "description": "Value indicating the version of the release config"
+    },
+    {
+        "key": "package.version",
+        "default": 0,
+        "description": "Value indicating the version of package"
+    }
+]
