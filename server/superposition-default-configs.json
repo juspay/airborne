@@ -1,0 +1,57 @@
+[
+    {
+        "key": "config.version",
+        "default": "0.0.0",
+        "description": "Value indicating the version of the release config"
+    },
+    {
+        "key": "config.release_config_timeout",
+        "default": 1000,
+        "description": "Value indicating the version of the release config"
+    },
+    {
+        "key": "config.boot_timeout",
+        "default": 1000,
+        "description": "Indicating the timeout for booting the application"
+    },
+    {
+        "key": "config.properties",
+        "default": {},
+        "description": "Indicating the properties for the rc"
+    },
+    {
+        "key": "package.name",
+        "default": "",
+        "description": "Value indicating the name of the package"
+    },
+    {
+        "key": "package.version",
+        "default": 0,
+        "description": "Value indicating the version of package"
+    },
+    {
+        "key": "package.properties",
+        "default": {},
+        "description": "Indicating the properties for the package"
+    },
+    {
+        "key": "package.index",
+        "default": "",
+        "description": "Indicating the index for the package"
+    },
+    {
+        "key": "package.important",
+        "default": [],
+        "description": "Indicates the files in package that are important"
+    },
+    {
+        "key": "package.lazy",
+        "default": [],
+        "description": "Indicating the lazy files for the package"
+    },
+    {
+        "key": "resources",
+        "default": [],
+        "description": "Indicating the resources for the package"
+    }
+]
