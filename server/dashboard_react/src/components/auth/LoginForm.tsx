@@ -370,7 +370,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ setIsAuthenticated, setUse
           href="/dashboard/signup"
           className="font-medium text-blue-500 hover:text-blue-400"
         >
-          Request access
+          Sign up for free
         </a>
       </div>
     </>
