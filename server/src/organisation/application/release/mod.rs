@@ -28,7 +28,7 @@ use uuid::Uuid;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, READ, WRITE},
-    types::AppState,
+    types::{ABError, AppState},
     utils::{
         db::{
             models::{PackageEntryRead, ReleaseEntry},
@@ -40,7 +40,12 @@ use crate::{
 };
 
 pub fn add_routes() -> Scope {
-    Scope::new("").service(create).service(list_releases).service(ramp_release).service(conclude_release).service(get_experiment_details)
+    Scope::new("")
+        .service(create)
+        .service(list_releases)
+        .service(ramp_release)
+        .service(conclude_release)
+        .service(get_experiment_details)
 }
 
 #[derive(Debug, Deserialize)]
@@ -127,21 +132,21 @@ async fn create(
     req: Json<CreateRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<CreateResponse>> {
+) -> Result<Json<CreateResponse>, ABError> {
     let auth_response = auth_response.into_inner();
     let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
     let application =
-        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
         .get()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     let pkg_version = if let Some(version_str) = req.version_id.clone() {
         version_str.parse::<i32>().map_err(|_| {
-            error::ErrorBadRequest(format!("Invalid version ID format: {}", version_str))
+            ABError::BadRequest(format!("Invalid version ID format: {}", version_str))
         })?
     } else {
         crate::utils::db::schema::hyperotaserver::packages::dsl::packages
@@ -157,8 +162,8 @@ async fn create(
                 crate::utils::db::schema::hyperotaserver::packages::dsl::version,
             ))
             .first::<Option<i32>>(&mut conn)
-            .map_err(error::ErrorInternalServerError)?
-            .ok_or_else(|| error::ErrorNotFound("No packages found for this application"))?
+            .map_err(|_| ABError::InternalServerError("".to_string()))?
+            .ok_or_else(|| ABError::NotFound("No packages found for this application".to_string()))?
     };
 
     // Verify package exists
@@ -176,7 +181,7 @@ async fn create(
                 ),
         )
         .first::<PackageEntryRead>(&mut conn)
-        .map_err(|_| error::ErrorNotFound(format!("Package version {} not found", pkg_version)))?;
+        .map_err(|_| ABError::NotFound(format!("Package version {} not found", pkg_version)))?;
 
     let config = crate::utils::db::schema::hyperotaserver::configs::dsl::configs
         .filter(
@@ -192,7 +197,7 @@ async fn create(
         .select(crate::utils::db::models::ConfigEntry::as_select())
         .first(&mut conn)
         .map_err(|_| {
-            error::ErrorNotFound(format!(
+            ABError::NotFound(format!(
                 "Config for package version {} not found",
                 pkg_version
             ))
@@ -213,7 +218,7 @@ async fn create(
     let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
         .await
         .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
     println!(
         "Using workspace name for create release: {}",
@@ -235,7 +240,7 @@ async fn create(
         .variant_type(superposition_rust_sdk::types::VariantType::Control)
         .overrides(Document::from(control_overrides))
         .build()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
     let experimental_variant_id = format!("experimental_{}", pkg_version);
     
@@ -244,7 +249,7 @@ async fn create(
         .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
         .overrides(Document::from(experimental_overrides))
         .build()
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
     let context = if let Some(ctx) = &req.context {
         // Convert JsonLogic context to Document
@@ -277,7 +282,7 @@ async fn create(
     };
     let created_experiment_response = created_experiment_response.send().await.map_err(|e| {
         eprintln!("Failed to create experiment: {:?}", e); // Log the detailed error
-        error::ErrorInternalServerError("Failed to create experiment in Superposition".to_string())
+        ABError::InternalServerError("Failed to create experiment in Superposition".to_string())
     })?;
 
     // Assuming 'id' is the field in CreateExperimentResponseContent and it has to_string()
@@ -340,7 +345,7 @@ async fn create(
     diesel::insert_into(releases)
         .values(&new_release)
         .execute(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| ABError::DbError("".to_string()))?;
 
     Ok(Json(CreateResponse {
         id: release_id.to_string(),
