@@ -135,11 +135,11 @@ pub async fn find_org_group(
 pub async fn find_role_subgroup(
     admin: &KeycloakAdmin,
     realm: &str,
-    org_group_id: &str,
+    group_id: &str,
     role: &str,
 ) -> Result<Option<GroupRepresentation>, actix_web::Error> {
     let subgroups = admin
-        .realm_groups_with_group_id_children_get(realm, org_group_id, None, None, None, None, None)
+        .realm_groups_with_group_id_children_get(realm, group_id, None, None, None, None, None)
         .await
         .map_err(error::ErrorInternalServerError)?;
 

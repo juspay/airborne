@@ -9,41 +9,7 @@ import smallLogoImage from '../assets/airborne-cube-logo.png';
 import axios from "../api/axios";
 import Sidebar from "./layouts/Sidebar";
 import RequestAccess from "./organization/RequestAccess";
-import { Configuration } from "../types";
-
-// Types
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  organisations: Organisation[];
-}
-
-interface OrganisationUser {
-  id: string;
-  username: string;
-  email: string;
-  role: string[];
-}
-
-interface Organisation {
-  id: string;
-  name: string;
-  applications: Application[];
-  users?: OrganisationUser[];
-}
-
-interface Application {
-  id: string;
-  application: string;
-  versions: string[];
-}
-
-type HomeResponse =
-  | { type: "CREATE_ORGANISATION"; name: string }
-  | { type: "CREATE_APPLICATION"; organisation: string; name: string }
-  | { type: "INVITE_USER"; organisation: string; email: string; role: string }
-  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void };
+import { Application, Configuration, HomeResponse, Organisation, User } from "../types";
 
 interface HomeProps {
   user: User;
@@ -65,7 +31,7 @@ export default function Home({
   const [newAppName, setNewAppName] = useState("");
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [isCreatingApp, setIsCreatingApp] = useState(false);
-  const [activeTab, setActiveTab] = useState<"applications" | "users">("applications");
+  const [activeTab, setActiveTab] = useState<"applications" | "users" | "app-details" | "manage-access">("applications");
   const [organisations, setOrganisations] = useState<Organisation[]>(user.organisations || []);
   const [isDeletingOrg, setIsDeletingOrg] = useState<string | null>(null);
   const [_, setIsDeletingApp] = useState<string | null>(null);
@@ -118,6 +84,12 @@ export default function Home({
   const handleAppSelect = (app: Application | null) => {
     setSelectedApp(app);
     setIsCreatingApp(false);
+    // When an app is selected, switch to the app-details tab
+    if (app) {
+      setActiveTab("app-details");
+    } else {
+      setActiveTab("applications");
+    }
   };
 
   const handleCreateOrgSubmit = () => {
@@ -197,7 +169,17 @@ export default function Home({
     }
   };
 
-  const handleTabChange = (tab: "applications" | "users") => {
+  const handleRemoveUser = (username: string) => {
+    if (selectedOrg) {
+      onResponse({
+        type: "REMOVE_USER",
+        organisation: selectedOrg.name,
+        user: username,
+      });
+    }
+  };
+
+  const handleTabChange = (tab: "applications" | "users" | "app-details" | "manage-access") => {
     setActiveTab(tab);
     if (tab === "applications") {
       setSelectedApp(null);
@@ -315,6 +297,7 @@ export default function Home({
       
       <div className="flex h-[calc(100vh-4rem)] relative z-10">
         <Sidebar
+          user={user}
           organisations={organisations}
           selectedOrg={selectedOrg}
           isDeletingOrg={isDeletingOrg}
@@ -372,6 +355,7 @@ export default function Home({
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 onInviteUser={handleInviteUser}
+                onRemoveUser={handleRemoveUser}
                 onAppSelect={handleAppSelect}
                 onCreateApp={() => setIsCreatingApp(true)}
               />

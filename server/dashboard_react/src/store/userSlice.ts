@@ -17,6 +17,7 @@ interface Application {
   id: string;
   application: string;
   versions: string[];
+  access: string[];
 }
 
 interface UserState {

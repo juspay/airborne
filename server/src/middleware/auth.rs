@@ -80,6 +80,7 @@ pub struct AuthResponse {
     pub application: Option<AccessLevel>,
 }
 
+#[derive(Copy, Clone)]
 pub struct Access {
     pub access: u8,
 }

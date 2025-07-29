@@ -26,34 +26,7 @@ import Release from "./components/Release";
 import Analytics from "./components/Analytics";
 import axios from "./api/axios";
 import Toast from "./components/Toast";
-import { Configuration } from "./types";
-
-// Types
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  organisations: Organisation[];
-}
-
-interface Organisation {
-  id: string;
-  name: string;
-  applications: Application[];
-}
-
-interface Application {
-  id: string;
-  application: string;
-  versions: string[];
-}
-
-// Response types
-type HomeResponse =
-  | { type: "CREATE_ORGANISATION"; name: string }
-  | { type: "CREATE_APPLICATION"; organisation: string; name: string }
-  | { type: "INVITE_USER"; organisation: string; email: string; role: string }
-  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void };
+import { Configuration, HomeResponse, Organisation, User } from "./types";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -131,6 +104,12 @@ const App: React.FC = () => {
         payload = {
           user: response.email,
           access: response.role,
+        };
+        headers["x-organisation"] = response.organisation;
+      } else if (response.type === "REMOVE_USER") {
+        endpoint = "/organisations/user/remove";
+        payload = {
+          user: response.user
         };
         headers["x-organisation"] = response.organisation;
       } else if (response.type === "REQUEST_ORGANISATION") {
