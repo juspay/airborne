@@ -74,13 +74,15 @@ export default function UserManagement({
                   Manage organization access and permissions
                 </p>
               </div>
-              <button
-                onClick={() => setActiveTab("invite")}
-                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
-              >
-                <Plus size={18} className="mr-2" />
-                Invite User
-              </button>
+              {(organization.access.includes("admin") || organization.access.includes("owner")) && (
+                <button
+                  onClick={() => setActiveTab("invite")}
+                  className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
+                >
+                  <Plus size={18} className="mr-2" />
+                  Invite User
+                </button>
+              )}
             </div>
 
             {/* Search */}
@@ -128,11 +130,19 @@ export default function UserManagement({
                       <div className="flex items-center">
                         <div
                           className={`px-3 py-1 rounded-full text-sm font-medium border flex items-center ${getRoleColor(
-                            orgUser?.role?.[0] || "Member"
+                            orgUser?.roles?.[0] || "Member"
                           )}`}
                         >
-                          {getRoleIcon(orgUser?.role?.[0] || "Member")}
-                          {orgUser.role || "Member"}
+                          {getRoleIcon(orgUser?.roles?.[0] || "Member")}
+                          {((roles) => {
+                            if (roles.includes("owner")) {
+                              return "Owner";
+                            }
+                            if (roles.includes("admin")) {
+                              return "Admin";
+                            }
+                            return "Member";
+                          })(orgUser.roles) || "Member"}
                         </div>
                       </div>
                     </div>

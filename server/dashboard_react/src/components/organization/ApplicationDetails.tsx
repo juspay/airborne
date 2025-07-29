@@ -1,4 +1,4 @@
-import { Application, Organisation } from "../../types";
+import { Application, Organisation, ReleaseInfo } from "../../types";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReleaseWorkflow from "../release/ReleaseWorkflow";
@@ -8,37 +8,6 @@ import axios from "../../api/axios";
 import CreateDimension from '../dimension/CreateDimension';
 import DimensionPriority from '../dimension/DimensionPriority';
 import ReleaseHistory from '../release/ReleaseHistory';
-
-interface ReleaseInfo {
-  config: {
-    version: string;
-    release_config_timeout: number;
-    package_timeout: number;
-    properties: {
-      tenant_info: {
-        assets_domain: string;
-        default_client_id: string;
-      };
-    };
-  };
-  package: {
-    name: string;
-    version: string;
-    properties: {
-      manifest: Record<string, any>;
-      manifest_hash: Record<string, any>;
-    };
-    index: string;
-    important: Array<{
-      url: string;
-      file_path: string;
-    }>;
-    lazy: Array<{
-      url: string;
-      file_path: string;
-    }>;
-  };
-}
 
 interface ApplicationDetailsProps {
   application: Application | null;
@@ -112,13 +81,15 @@ export default function ApplicationDetails({
             <h3 className="text-xl font-semibold text-white mb-1">Applications</h3>
             <p className="text-white/60 text-sm">Manage your application deployments</p>
           </div>
-          <button
-            onClick={onCreateApp}
-            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
-          >
-            <Plus size={18} className="mr-2" />
-            Add Application
-          </button>
+          {(organization.access.includes("admin") || organization.access.includes("owner")) &&
+            <button
+              onClick={onCreateApp}
+              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
+            >
+              <Plus size={18} className="mr-2" />
+              Add Application
+            </button>
+          }
         </div>
       </div>
       
@@ -163,14 +134,17 @@ export default function ApplicationDetails({
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">No Applications Yet</h3>
             <p className="text-white/60 mb-6 max-w-md mx-auto">
-              Create your first application to start deploying over-the-air updates
+              {(organization.access.includes("admin") || organization.access.includes("owner")) ?
+                "Create your first application to start deploying over-the-air updates." : "Ask your organization admin or owner to create an application."}
             </p>
-            <button
-              onClick={onCreateApp}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20"
-            >
-              Create First Application
-            </button>
+            {(organization.access.includes("admin") || organization.access.includes("owner")) &&
+              <button
+                onClick={onCreateApp}
+                className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20"
+              >
+                Create First Application
+              </button>
+            }
           </div>
         )}
       </div>
@@ -410,6 +384,31 @@ export default function ApplicationDetails({
 
   return (
     <div className="flex flex-col h-full">
+      {/* two tabs for Applications and Users */}
+      <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => _onTabChange("applications")}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              activeTab === "applications"
+                ? "bg-white/10 text-white font-semibold"
+                : "text-white/60 hover:bg-white/10"
+            }`}
+          >
+            Applications
+          </button>
+          <button
+            onClick={() => _onTabChange("users")}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              activeTab === "users"
+                ? "bg-white/10 text-white font-semibold"
+                : "text-white/60 hover:bg-white/10"
+            }`}
+          >
+            Users
+          </button>
+        </div>
+      </div>
       {/* Content */}
       <div className="flex-1">
         {activeTab === "applications" ? (

@@ -9,41 +9,7 @@ import smallLogoImage from '../assets/airborne-cube-logo.png';
 import axios from "../api/axios";
 import Sidebar from "./layouts/Sidebar";
 import RequestAccess from "./organization/RequestAccess";
-import { Configuration } from "../types";
-
-// Types
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  organisations: Organisation[];
-}
-
-interface OrganisationUser {
-  id: string;
-  username: string;
-  email: string;
-  role: string[];
-}
-
-interface Organisation {
-  id: string;
-  name: string;
-  applications: Application[];
-  users?: OrganisationUser[];
-}
-
-interface Application {
-  id: string;
-  application: string;
-  versions: string[];
-}
-
-type HomeResponse =
-  | { type: "CREATE_ORGANISATION"; name: string }
-  | { type: "CREATE_APPLICATION"; organisation: string; name: string }
-  | { type: "INVITE_USER"; organisation: string; email: string; role: string }
-  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void };
+import { Application, Configuration, HomeResponse, Organisation, User } from "../types";
 
 interface HomeProps {
   user: User;
@@ -315,6 +281,7 @@ export default function Home({
       
       <div className="flex h-[calc(100vh-4rem)] relative z-10">
         <Sidebar
+          user={user}
           organisations={organisations}
           selectedOrg={selectedOrg}
           isDeletingOrg={isDeletingOrg}

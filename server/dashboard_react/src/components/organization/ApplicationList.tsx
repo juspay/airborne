@@ -1,8 +1,9 @@
 import { AppWindow, Plus, ChevronRight } from "lucide-react";
-import { Application, Organisation } from "../../types";
+import { Application, Organisation, User } from "../../types";
 
 interface ApplicationListProps {
   organization: Organisation;
+  user: User;
   selectedApp: Application | null;
   onAppSelect: (app: Application) => void;
   onCreateApp: () => void;
@@ -12,6 +13,7 @@ interface ApplicationListProps {
 
 export default function ApplicationList({
   organization,
+  user,
   selectedApp,
   onAppSelect,
   onCreateApp,
@@ -65,13 +67,13 @@ export default function ApplicationList({
             ))}
           </div>
 
-          <button
+          {<button
             onClick={onCreateApp}
             className="p-3 flex items-center hover:bg-indigo-500 transition-colors border-t border-indigo-500"
           >
             <Plus size={18} className="mr-2" />
             <span>Add application</span>
-          </button>
+          </button>}
         </>
       )}
     </div>
