@@ -21,7 +21,7 @@ use crate::{
     organisation::user::OrgError,
     types::AppState,
     utils::{
-        keycloak::find_role_subgroup,
+        keycloak::{find_org_group, find_role_subgroup},
         transaction_manager::{record_failed_cleanup, TransactionManager},
     },
 };
@@ -53,8 +53,113 @@ pub async fn add_user_with_transaction(
         target_user.username, org_context.org_id, role_name
     );
 
+    let org_group = find_org_group(admin, realm, &org_context.org_id)
+        .await
+        .map_err(|e| OrgError::Internal(format!("Failed to find organization group: {}", e)))?
+        .ok_or_else(|| OrgError::Internal(format!("Organization group {} not found", org_context.org_id)))?;
+
+    let mut roles = get_additional_roles(role_name)
+        .await
+        .map_err(|e| OrgError::Internal(format!("Failed to get additional roles: {}", e)))?;
+
+    roles.push(role_name.to_string());
+
+    for role_name in roles.clone() {
+        add_user_to_group(admin, realm, &target_user.user_id, &org_context.group_id, &role_name, &transaction)
+            .await
+            .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;        
+    }
+
+    println!("Let's update the subgroups");
+    match admin
+        .realm_groups_with_group_id_children_get(
+            realm,
+            &org_context.group_id,
+            None,
+            None,
+            None,
+            org_group.sub_group_count.map(|v| v as i32),
+            None
+        )
+    .await
+    {
+        Ok(groups) => {
+            // Record the user groups in the transaction
+            let child_roles = roles.clone().iter().filter(|role| **role != "owner").cloned().collect::<Vec<_>>();
+            // remove groups that are roles
+            let groups: Vec<_> = groups.into_iter().filter(|g| {
+                if let Some(name) = &g.name {
+                    let roles = vec!["admin", "write", "read", "owner"];
+                    !roles.contains(&name.as_str())
+                } else {
+                    true
+                }
+            }).collect();
+            for group in groups {
+                for role_name in child_roles.iter() {
+                    match group.id {
+                        Some(ref group_id) => {
+                            add_user_to_group(&admin, &realm, &target_user.user_id, group_id, role_name, &transaction)
+                                .await
+                                .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;     
+                        }
+                        None => warn!("Group has no ID, skipping"),
+                    }
+                       
+                }
+            }
+        }
+        Err(e) => {
+            warn!(
+                "Failed to get user groups after adding user: {}. This may not be critical.",
+                e
+            );
+        }
+    }
+
+    // Mark the transaction as complete since there are no database or Superposition resources involved
+    transaction.set_database_inserted();
+
+    info!(
+        "Successfully completed transaction to add user {} to org {} with role {}",
+        target_user.username, org_context.org_id, role_name
+    );
+
+    Ok(())
+}
+
+/// Roles come with additional roles like Owner has Admin, Write, Read
+/// This function retrieves those additional roles for a given role name
+async fn get_additional_roles(
+    role_name: &str
+) -> Result<Vec<String>, OrgError> {
+    let additional_roles = match role_name {
+        "owner" => vec!["admin".to_string(), "write".to_string(), "read".to_string()],
+        "admin" => vec!["write".to_string(), "read".to_string()],
+        "write" => vec!["read".to_string()],
+        _ => vec![],
+    };
+
+    if additional_roles.is_empty() {
+        return Err(OrgError::Internal(format!(
+            "No additional roles found for role {}",
+            role_name
+        )));
+    }
+
+    Ok(additional_roles)
+}
+
+async fn add_user_to_group(
+    admin: &KeycloakAdmin,
+    realm: &str,
+    user_id: &str,
+    group_id: &str,
+    role_name: &str,
+    transaction: &TransactionManager,
+) -> Result<(), OrgError> {
     // Find the role group
-    let role_group = find_role_subgroup(admin, realm, &org_context.group_id, role_name)
+    let role_group = find_role_subgroup(admin, realm, group_id, role_name)
         .await
         .map_err(|e| OrgError::Internal(format!("Failed to find role group: {}", e)))?
         .ok_or_else(|| OrgError::Internal(format!("Role group {} not found", role_name)))?;
@@ -69,7 +174,7 @@ pub async fn add_user_with_transaction(
     match admin
         .realm_users_with_user_id_groups_with_group_id_put(
             realm,
-            &target_user.user_id,
+            &user_id,
             &role_group_id,
         )
         .await
@@ -78,11 +183,11 @@ pub async fn add_user_with_transaction(
             // Record this resource in the transaction
             transaction.add_keycloak_resource(
                 "user_group_membership",
-                &format!("{}:{}", target_user.user_id, role_group_id),
+                &format!("{}:{}", user_id, role_group_id),
             );
             debug!(
                 "Added user {} to role group {}",
-                target_user.username, role_name
+                user_id, role_name
             );
         }
         Err(e) => {
@@ -93,15 +198,6 @@ pub async fn add_user_with_transaction(
             )));
         }
     }
-
-    // Mark the transaction as complete since there are no database or Superposition resources involved
-    transaction.set_database_inserted();
-
-    info!(
-        "Successfully completed transaction to add user {} to org {} with role {}",
-        target_user.username, org_context.org_id, role_name
-    );
-
     Ok(())
 }
 
