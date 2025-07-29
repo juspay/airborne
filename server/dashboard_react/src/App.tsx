@@ -106,6 +106,12 @@ const App: React.FC = () => {
           access: response.role,
         };
         headers["x-organisation"] = response.organisation;
+      } else if (response.type === "REMOVE_USER") {
+        endpoint = "/organisations/user/remove";
+        payload = {
+          user: response.user
+        };
+        headers["x-organisation"] = response.organisation;
       } else if (response.type === "REQUEST_ORGANISATION") {
         endpoint = "/organisations/request";
         payload = {

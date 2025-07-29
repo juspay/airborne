@@ -163,6 +163,16 @@ export default function Home({
     }
   };
 
+  const handleRemoveUser = (username: string) => {
+    if (selectedOrg) {
+      onResponse({
+        type: "REMOVE_USER",
+        organisation: selectedOrg.name,
+        user: username,
+      });
+    }
+  };
+
   const handleTabChange = (tab: "applications" | "users") => {
     setActiveTab(tab);
     if (tab === "applications") {
@@ -339,6 +349,7 @@ export default function Home({
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 onInviteUser={handleInviteUser}
+                onRemoveUser={handleRemoveUser}
                 onAppSelect={handleAppSelect}
                 onCreateApp={() => setIsCreatingApp(true)}
               />

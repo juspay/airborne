@@ -31,8 +31,8 @@ export type HomeResponse =
   | { type: "CREATE_ORGANISATION"; name: string }
   | { type: "CREATE_APPLICATION"; organisation: string; name: string }
   | { type: "INVITE_USER"; organisation: string; email: string; role: string }
-  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void };
-
+  | { type: "REQUEST_ORGANISATION"; orgName: string; name: string; email: string; phoneNumber?: string; appStoreLink?: string; playStoreLink?: string; errorCb?: (message: string) => void; successCb?: () => void }
+  | { type: "REMOVE_USER"; organisation: string; user: string }
 
 export type Configuration = {
   enableGoogleSignIn: boolean;

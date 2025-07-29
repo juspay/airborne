@@ -83,7 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Add Application Button */}
-        {(selectedOrg.access.includes("admin") || selectedOrg.access.includes("owner")) &&
+        {(selectedOrg.access.includes("admin") || selectedOrg.access.includes("owner") || selectedOrg.access.includes("write")) &&
           <div className="p-4 border-t border-white/10">
             <button
               onClick={onCreateApp}

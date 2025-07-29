@@ -15,6 +15,7 @@ interface ApplicationDetailsProps {
   activeTab: "applications" | "users";
   onTabChange: (tab: "applications" | "users") => void;
   onInviteUser: (email: string, role: string) => void;
+  onRemoveUser: (username: string) => void;
   onAppSelect: (app: Application) => void;
   onCreateApp: () => void;
 }
@@ -25,6 +26,7 @@ export default function ApplicationDetails({
   activeTab,
   onTabChange: _onTabChange, // eslint-disable-line @typescript-eslint/no-unused-vars
   onInviteUser,
+  onRemoveUser,
   onAppSelect,
   onCreateApp,
 }: ApplicationDetailsProps) {
@@ -81,7 +83,7 @@ export default function ApplicationDetails({
             <h3 className="text-xl font-semibold text-white mb-1">Applications</h3>
             <p className="text-white/60 text-sm">Manage your application deployments</p>
           </div>
-          {(organization.access.includes("admin") || organization.access.includes("owner")) &&
+          {(organization.access.includes("admin") || organization.access.includes("owner") || organization.access.includes("write")) &&
             <button
               onClick={onCreateApp}
               className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
@@ -134,10 +136,10 @@ export default function ApplicationDetails({
             </div>
             <h3 className="text-xl font-semibold text-white mb-2">No Applications Yet</h3>
             <p className="text-white/60 mb-6 max-w-md mx-auto">
-              {(organization.access.includes("admin") || organization.access.includes("owner")) ?
+              {(organization.access.includes("admin") || organization.access.includes("owner") || organization.access.includes("write")) ?
                 "Create your first application to start deploying over-the-air updates." : "Ask your organization admin or owner to create an application."}
             </p>
-            {(organization.access.includes("admin") || organization.access.includes("owner")) &&
+            {(organization.access.includes("admin") || organization.access.includes("owner") || organization.access.includes("write")) &&
               <button
                 onClick={onCreateApp}
                 className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20"
@@ -488,6 +490,7 @@ export default function ApplicationDetails({
           <UserManagement
             organization={organization}
             onInviteUser={onInviteUser}
+            onRemoveUser={onRemoveUser}
           />
         )}
       </div>

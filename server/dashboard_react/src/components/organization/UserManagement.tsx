@@ -8,22 +8,28 @@ import {
   Crown,
   Shield,
   ArrowLeft,
+  UserRoundX,
+  Cat,
+  PencilLineIcon,
+  BookLockIcon,
 } from "lucide-react";
 import { Organisation } from "../../types";
 
 interface UserManagementProps {
   organization: Organisation;
   onInviteUser: (email: string, role: string) => void;
+  onRemoveUser: (username: string) => void;
 }
 
 export default function UserManagement({
   organization,
   onInviteUser,
+  onRemoveUser,
 }: UserManagementProps) {
   const [activeTab, setActiveTab] = useState<"members" | "invite">("members");
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"ADMIN" | "READ" | "WRITE">(
+  const [selectedRole, setSelectedRole] = useState<"ADMIN" | "READ" | "WRITE" | "OWNER">(
     "READ"
   );
 
@@ -35,8 +41,19 @@ export default function UserManagement({
     }
   };
 
+  const handleRemoveUser = (username: string) => {
+    if (
+      prompt(
+        `Are you sure you want to remove ${username} from ${organization.name}? This action cannot be undone. Type "remove" to confirm.`,
+        ""
+      ).toLowerCase() === "remove"
+    ) {
+      onRemoveUser(username);
+    }
+  };
+
   const getRoleColor = (role: string) => {
-    if (role?.toLowerCase().includes("admin")) {
+    if (role?.toLowerCase().includes("admin") || role?.toLowerCase().includes("owner")) {
       return "bg-purple-500/20 text-purple-400 border-purple-500/30";
     }
     return "bg-green-500/20 text-green-400 border-green-500/30";
@@ -45,6 +62,8 @@ export default function UserManagement({
   const getRoleIcon = (role: string) => {
     if (role?.toLowerCase().includes("admin")) {
       return <Crown size={14} className="mr-1" />;
+    }else if (role?.toLowerCase().includes("owner")) {
+      return <Cat size={14} className="mr-1" />;
     }
     return <Shield size={14} className="mr-1" />;
   };
@@ -57,6 +76,14 @@ export default function UserManagement({
             u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
         )
       : organization.users;
+
+  const isLastOwner = (org: Organisation) => {
+    if(!org.access.includes("owner")) return false;
+    const ownerCount = org.users?.filter((user) =>
+      user.roles.includes("owner")
+    ).length;
+    return ownerCount === 1;
+  };
 
   return (
     <div>
@@ -144,6 +171,15 @@ export default function UserManagement({
                             return "Member";
                           })(orgUser.roles) || "Member"}
                         </div>
+                        {/* Remove user button */}
+                        {((organization.access.includes("admin") && !orgUser?.roles?.includes("owner")) || organization.access.includes("owner")) && !isLastOwner(organization) && (
+                          <button
+                            onClick={() => handleRemoveUser(orgUser.username)}
+                            className="ml-4 text-red-500 hover:text-red-600 transition-colors duration-200"
+                          >
+                            <UserRoundX size={18} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -202,7 +238,7 @@ export default function UserManagement({
             {/* Email Input */}
             <div>
               <label className="block text-sm font-semibold text-white mb-3">
-                Email Address
+                Username
               </label>
               <div className="relative">
                 <Mail
@@ -210,8 +246,8 @@ export default function UserManagement({
                   className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50"
                 />
                 <input
-                  type="email"
-                  placeholder="user@example.com"
+                  type="text"
+                  placeholder="Enter username"
                   className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all duration-200"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
@@ -242,16 +278,41 @@ export default function UserManagement({
                           : "bg-white/10"
                       }`}
                     >
-                      <Shield size={20} className="text-white" />
+                      <BookLockIcon size={20} className="text-white" />
                     </div>
-                    <h4 className="font-semibold text-white">Member</h4>
+                    <h4 className="font-semibold text-white">Read</h4>
                   </div>
                   <p className="text-white/60 text-sm">
                     Can view and use applications but cannot modify organization
                     settings.
                   </p>
                 </button>
-
+                <button
+                  type="button"
+                  className={`p-6 rounded-xl border transition-all duration-300 text-left ${
+                    selectedRole === "WRITE"
+                      ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 shadow-lg shadow-blue-500/10"
+                      : "bg-white/5 border-white/20 hover:bg-white/10"
+                  }`}
+                  onClick={() => setSelectedRole("WRITE")}
+                >
+                  <div className="flex items-center mb-3">
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                        selectedRole === "WRITE"
+                          ? "bg-gradient-to-r from-blue-400 to-purple-500"
+                          : "bg-white/10"
+                      }`}
+                    >
+                      <PencilLineIcon size={20} className="text-white" />
+                    </div>
+                    <h4 className="font-semibold text-white">Write</h4>
+                  </div>
+                  <p className="text-white/60 text-sm">
+                    Can view and change applications and create new applications,
+                    settings.
+                  </p>
+                </button>
                 <button
                   type="button"
                   className={`p-6 rounded-xl border transition-all duration-300 text-left ${
@@ -278,6 +339,34 @@ export default function UserManagement({
                     settings.
                   </p>
                 </button>
+                {organization.access.includes("owner") && (
+                  <button
+                    type="button"
+                    className={`p-6 rounded-xl border transition-all duration-300 text-left ${
+                      selectedRole === "OWNER"
+                        ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 shadow-lg shadow-blue-500/10"
+                        : "bg-white/5 border-white/20 hover:bg-white/10"
+                    }`}
+                    onClick={() => setSelectedRole("OWNER")}
+                  >
+                    <div className="flex items-center mb-3">
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+                          selectedRole === "OWNER"
+                            ? "bg-gradient-to-r from-blue-400 to-purple-500"
+                            : "bg-white/10"
+                        }`}
+                      >
+                        <Cat size={20} className="text-white" />
+                      </div>
+                      <h4 className="font-semibold text-white">Owner</h4>
+                    </div>
+                    <p className="text-white/60 text-sm">
+                      Full control over the organization, including billing and
+                      deletion controls.
+                    </p>
+                  </button>
+                )}
               </div>
             </div>
 
