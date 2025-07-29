@@ -172,7 +172,7 @@ export default function UserManagement({
                           })(orgUser.roles) || "Member"}
                         </div>
                         {/* Remove user button */}
-                        {((organization.access.includes("admin") && !orgUser?.roles?.includes("owner")) || organization.access.includes("owner")) && !isLastOwner(organization) && (
+                        {((organization.access.includes("admin") && !orgUser?.roles?.includes("owner")) || organization.access.includes("owner")) && !(orgUser?.roles?.includes("owner") && isLastOwner(organization)) && (
                           <button
                             onClick={() => handleRemoveUser(orgUser.username)}
                             className="ml-4 text-red-500 hover:text-red-600 transition-colors duration-200"
