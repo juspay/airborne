@@ -30,7 +30,7 @@
         _url = [NSURL URLWithString:urlString];
         
         // Parse filePath
-        NSString *filePath = dictionary[@"filePath"];
+        NSString *filePath = dictionary[@"file_path"];
         if (![filePath isKindOfClass:[NSString class]]) {
             if (error) {
                 *error = [NSError errorWithDomain:@"ResourceError" code:402 userInfo:@{NSLocalizedDescriptionKey: @"Invalid filePath"}];
@@ -45,7 +45,7 @@
 - (NSDictionary *)toDictionary {
     return @{
         @"url": [_url absoluteString],
-        @"filePath": _filePath
+        @"file_path": _filePath
     };
 }
 
@@ -68,14 +68,14 @@
         
         // For filePath, we expect a string
         NSSet *stringClasses = [NSSet setWithObjects:[NSString class], nil];
-        _filePath = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"filePath"];
+        _filePath = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"file_path"];
     }
     return self;
 }
 
 - (void)encodeWithCoder:(NSCoder *)aCoder {
     [aCoder encodeObject:_url forKey:@"url"];
-    [aCoder encodeObject:_filePath forKey:@"filePath"];
+    [aCoder encodeObject:_filePath forKey:@"file_path"];
 }
 
 @end
