@@ -37,7 +37,7 @@ use self::{
         add_user_with_transaction, get_user_current_role, remove_user_with_transaction,
         update_user_with_transaction,
     },
-    utils::{check_role_hierarchy, validate_access_level},
+    utils::{check_role_hierarchy, validate_access_level, is_last_admin_in_application},
 };
 
 /// Errors that can occur during application operations
@@ -354,6 +354,19 @@ async fn application_update_user(
     let current_role =
         get_user_current_role(&admin, &realm, &app_context, &target_user.user_id).await?;
 
+    // Check if this would demote the last admin (can't do that)
+    if current_role == "admin" && role_name != "admin" {
+        let is_last_admin = is_last_admin_in_application(&admin, &realm, &app_context.app_group_id, &target_user.user_id)
+            .await?;
+
+        if is_last_admin {
+            return Err(AppError::PermissionDenied(
+                "Cannot demote the last admin from the application. Applications must have at least one admin.".to_string(),
+            )
+            .into());
+        }
+    }
+
     // Use transaction function to update user
     update_user_with_transaction(
         &admin,
@@ -398,6 +411,17 @@ async fn application_remove_user(
     // Find target user and application
     let target_user = find_target_user(&admin, &realm, &request.user).await?;
     app_context = find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
+
+    // Check if this user is the last admin in the application (can't remove them)
+    let is_last_admin = is_last_admin_in_application(&admin, &realm, &app_context.app_group_id, &target_user.user_id)
+        .await?;
+
+    if is_last_admin {
+        return Err(AppError::PermissionDenied(
+            "Cannot remove the last admin from the application. Applications must have at least one admin.".to_string(),
+        )
+        .into());
+    }
 
     // Check if requester has permission to modify this user (hierarchy check)
     check_role_hierarchy(

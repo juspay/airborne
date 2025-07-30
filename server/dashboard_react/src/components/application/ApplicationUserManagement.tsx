@@ -74,9 +74,14 @@ export function ApplicationUserManagement({
         setInviteEmail("");
         setActiveTab("members");
         await loadUsers(); // Refresh the list
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to invite user:", err);
-        setError("Failed to invite user");
+        // Extract error message from response if available
+        const errorMessage = err?.response?.data?.message || 
+                            err?.response?.data || 
+                            err?.message || 
+                            "Failed to invite user";
+        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to invite user");
       }
     }
   };
@@ -92,9 +97,14 @@ export function ApplicationUserManagement({
         await applicationUserService.removeUser(organization.name, application.application, username);
         onRemoveUser(username);
         await loadUsers(); // Refresh the list
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to remove user:", err);
-        setError("Failed to remove user");
+        // Extract error message from response if available
+        const errorMessage = err?.response?.data?.message || 
+                            err?.response?.data || 
+                            err?.message || 
+                            "Failed to remove user";
+        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to remove user");
       }
     }
   };
@@ -108,9 +118,14 @@ export function ApplicationUserManagement({
         });
         onUpdateUser(username, newRole);
         await loadUsers(); // Refresh the list
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to update user role:", err);
-        setError("Failed to update user role");
+        // Extract error message from response if available
+        const errorMessage = err?.response?.data?.message || 
+                            err?.response?.data || 
+                            err?.message || 
+                            "Failed to update user role";
+        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to update user role");
       }
     }
   };
