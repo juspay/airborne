@@ -6,53 +6,54 @@ import {
   Users,
   UserPlus,
   Crown,
-  Shield,
   ArrowLeft,
   UserRoundX,
-  Cat,
   PencilLineIcon,
   BookLockIcon,
 } from "lucide-react";
-import { Organisation } from "../../types";
-import { organizationUserService } from "../../services/organizationUserService";
+import { Application } from "../../types";
+import { applicationUserService } from "../../services/applicationUserService";
 
-interface OrganizationUser {
+interface ApplicationUser {
+  id: string;
   username: string;
   email: string;
   roles: string[];
 }
 
-interface UserManagementProps {
-  organization: Organisation;
+interface ApplicationUserManagementProps {
+  application: Application;
+  organization: { name: string };
   onInviteUser: (email: string, role: string) => void;
   onRemoveUser: (username: string) => void;
+  onUpdateUser?: (username: string, role: string) => void;
 }
 
-export default function UserManagement({
+export function ApplicationUserManagement({
+  application,
   organization,
   onInviteUser,
   onRemoveUser,
-}: UserManagementProps) {
+  onUpdateUser,
+}: ApplicationUserManagementProps) {
   const [activeTab, setActiveTab] = useState<"members" | "invite">("members");
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [selectedRole, setSelectedRole] = useState<"ADMIN" | "READ" | "WRITE" | "OWNER">(
-    "READ"
-  );
-  const [users, setUsers] = useState<OrganizationUser[]>([]);
+  const [selectedRole, setSelectedRole] = useState<"ADMIN" | "READ" | "WRITE">("READ");
+  const [users, setUsers] = useState<ApplicationUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load users when component mounts
   useEffect(() => {
     loadUsers();
-  }, [organization.name]);
+  }, [organization.name, application.application]);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await organizationUserService.listUsers(organization.name);
+      const response = await applicationUserService.listUsers(organization.name, application.application);
       setUsers(response.users);
     } catch (err) {
       console.error("Failed to load users:", err);
@@ -65,7 +66,7 @@ export default function UserManagement({
   const handleInviteUser = async () => {
     if (inviteEmail.trim()) {
       try {
-        await organizationUserService.addUser(organization.name, {
+        await applicationUserService.addUser(organization.name, application.application, {
           user: inviteEmail.trim(),
           access: selectedRole.toLowerCase()
         });
@@ -88,12 +89,12 @@ export default function UserManagement({
   const handleRemoveUser = async (username: string) => {
     if (
       prompt(
-        `Are you sure you want to remove ${username} from ${organization.name}? This action cannot be undone. Type "remove" to confirm.`,
+        `Are you sure you want to remove ${username} from ${application.application}? This action cannot be undone. Type "remove" to confirm.`,
         ""
       )?.toLowerCase() === "remove"
     ) {
       try {
-        await organizationUserService.removeUser(organization.name, username);
+        await applicationUserService.removeUser(organization.name, application.application, username);
         onRemoveUser(username);
         await loadUsers(); // Refresh the list
       } catch (err: any) {
@@ -108,62 +109,105 @@ export default function UserManagement({
     }
   };
 
-  const getRoleColor = (role: string) => {
-    if (role?.toLowerCase().includes("admin") || role?.toLowerCase().includes("owner")) {
-      return "bg-purple-500/20 text-purple-400 border-purple-500/30";
+  const handleUpdateUserRole = async (username: string, newRole: string) => {
+    if (onUpdateUser) {
+      try {
+        await applicationUserService.updateUser(organization.name, application.application, {
+          user: username,
+          access: newRole
+        });
+        onUpdateUser(username, newRole);
+        await loadUsers(); // Refresh the list
+      } catch (err: any) {
+        console.error("Failed to update user role:", err);
+        // Extract error message from response if available
+        const errorMessage = err?.response?.data?.message || 
+                            err?.response?.data || 
+                            err?.message || 
+                            "Failed to update user role";
+        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to update user role");
+      }
     }
-    return "bg-green-500/20 text-green-400 border-green-500/30";
   };
+
+  // Check if current user has admin access in this application
+  const hasAdminAccess = application.access.includes("admin");
+
+  // Filter users based on search query
+  const filteredUsers = users.filter((user) =>
+    user.username.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    user.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+  );
 
   const getRoleIcon = (role: string) => {
-    if (role?.toLowerCase().includes("admin")) {
-      return <Crown size={14} className="mr-1" />;
-    }else if (role?.toLowerCase().includes("owner")) {
-      return <Cat size={14} className="mr-1" />;
+    switch (role.toLowerCase()) {
+      case "admin":
+        return <Crown size={16} className="text-yellow-400" />;
+      case "write":
+        return <PencilLineIcon size={16} className="text-green-400" />;
+      case "read":
+        return <BookLockIcon size={16} className="text-blue-400" />;
+      default:
+        return <Users size={16} className="text-gray-400" />;
     }
-    return <Shield size={14} className="mr-1" />;
   };
 
-  const filteredUsers =
-    users && userSearchQuery.length > 0
-      ? users.filter(
-          (u) =>
-            u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-            u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
-        )
-      : users;
-
-  const isLastOwner = (org: Organisation) => {
-    if(!org.access.includes("owner")) return false;
-    const ownerCount = users?.filter((user) =>
-      user.roles.includes("owner")
-    ).length;
-    return ownerCount === 1;
+  const getRoleBadgeColor = (role: string) => {
+    switch (role.toLowerCase()) {
+      case "admin":
+        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+      case "write":
+        return "bg-green-500/20 text-green-400 border-green-500/30";
+      case "read":
+        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+      default:
+        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
-    <div>
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl">
+          {error}
+          <button
+            onClick={() => setError(null)}
+            className="ml-4 text-red-300 hover:text-red-100"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Members Tab Content */}
       {activeTab === "members" && (
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
           {/* Header */}
           <div className="px-6 py-6 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-white mb-1">
-                  Team Members
+                  Application Members
                 </h3>
                 <p className="text-white/60 text-sm">
-                  Manage organization access and permissions
+                  Manage access to {application.application}
                 </p>
               </div>
-              {(organization.access.includes("admin") || organization.access.includes("owner")) && (
+              {hasAdminAccess && (
                 <button
                   onClick={() => setActiveTab("invite")}
                   className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
                 >
                   <Plus size={18} className="mr-2" />
-                  Invite User
+                  Add User
                 </button>
               )}
             </div>
@@ -177,7 +221,7 @@ export default function UserManagement({
                 />
                 <input
                   type="text"
-                  placeholder="Search members..."
+                  placeholder="Search application members..."
                   className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all duration-200"
                   value={userSearchQuery}
                   onChange={(e) => setUserSearchQuery(e.target.value)}
@@ -186,82 +230,71 @@ export default function UserManagement({
             </div>
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="px-6 py-4 border-b border-white/10">
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                <p className="text-red-400 text-sm">{error}</p>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-red-400 hover:text-red-300 text-xs mt-2 underline"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Members List */}
           <div className="p-6">
-            {loading ? (
-              <div className="text-center py-16">
-                <div className="w-20 h-20 bg-gradient-to-r from-gray-400/20 to-gray-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Users size={32} className="text-white/40 animate-pulse" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  Loading Members...
-                </h3>
-                <p className="text-white/60">
-                  Fetching team member information.
-                </p>
-              </div>
-            ) : filteredUsers && filteredUsers.length > 0 ? (
+            {filteredUsers && filteredUsers.length > 0 ? (
               <div className="space-y-4">
-                {filteredUsers.map((orgUser) => (
+                {filteredUsers.map((appUser) => (
                   <div
-                    key={orgUser.username}
+                    key={appUser.id}
                     className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className="w-12 h-12 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center mr-4 text-white font-bold text-lg">
-                          {orgUser?.username?.charAt(0).toUpperCase() || "U"}
+                          {appUser?.username?.charAt(0).toUpperCase() || "U"}
                         </div>
                         <div>
                           <h4 className="font-semibold text-white text-lg">
-                            {orgUser.username || "Unknown User"}
+                            {appUser.username || "Unknown User"}
                           </h4>
-                          <p className="text-white/60 text-sm">
-                            {orgUser.email}
-                          </p>
                         </div>
                       </div>
-
-                      <div className="flex items-center">
-                        <div
-                          className={`px-3 py-1 rounded-full text-sm font-medium border flex items-center ${getRoleColor(
-                            orgUser?.roles?.[0] || "Member"
-                          )}`}
-                        >
-                          {getRoleIcon(orgUser?.roles?.[0] || "Member")}
-                          {((roles) => {
-                            if (roles.includes("owner")) {
-                              return "Owner";
-                            }
-                            if (roles.includes("admin")) {
-                              return "Admin";
-                            }
-                            return "Member";
-                          })(orgUser.roles) || "Member"}
+                      <div className="flex items-center gap-3">
+                        {/* Role Badges */}
+                        <div className="flex flex-wrap gap-2">
+                          {appUser.roles.map((role) => (
+                            <span
+                              key={role}
+                              className={`px-3 py-1 rounded-full text-xs font-semibold border flex items-center gap-1 ${getRoleBadgeColor(
+                                role
+                              )}`}
+                            >
+                              {getRoleIcon(role)}
+                              {role.charAt(0).toUpperCase() + role.slice(1)}
+                            </span>
+                          ))}
                         </div>
-                        {/* Remove user button */}
-                        {((organization.access.includes("admin") && !orgUser?.roles?.includes("owner")) || organization.access.includes("owner")) && !(orgUser?.roles?.includes("owner") && isLastOwner(organization)) && (
-                          <button
-                            onClick={() => handleRemoveUser(orgUser.username)}
-                            className="ml-4 text-red-500 hover:text-red-600 transition-colors duration-200"
-                          >
-                            <UserRoundX size={18} />
-                          </button>
+                        {/* Action Buttons */}
+                        {hasAdminAccess && (
+                          <div className="flex gap-2">
+                            {/* {onUpdateUser && (
+                              <select
+                                value={appUser.roles[0] || "read"}
+                                onChange={(e) =>
+                                  handleUpdateUserRole(appUser.username, e.target.value)
+                                }
+                                className="px-3 py-1 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                              >
+                                <option value="read" className="bg-gray-800 text-white">
+                                  Read
+                                </option>
+                                <option value="write" className="bg-gray-800 text-white">
+                                  Write
+                                </option>
+                                <option value="admin" className="bg-gray-800 text-white">
+                                  Admin
+                                </option>
+                              </select>
+                            )} */}
+                            <button
+                              onClick={() => handleRemoveUser(appUser.username)}
+                              className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-all duration-200 border border-red-500/30"
+                              title="Remove user"
+                            >
+                              <UserRoundX size={16} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -274,19 +307,21 @@ export default function UserManagement({
                   <Users size={32} className="text-white/40" />
                 </div>
                 <h3 className="text-xl font-semibold text-white mb-2">
-                  No Team Members
+                  {userSearchQuery ? "No Members Found" : "No Members Yet"}
                 </h3>
                 <p className="text-white/60 mb-6 max-w-md mx-auto">
                   {userSearchQuery
-                    ? "No members found matching your search."
-                    : "Invite team members to collaborate on your applications."}
+                    ? `No members match "${userSearchQuery}"`
+                    : hasAdminAccess
+                    ? "Add the first member to this application."
+                    : "No members have been added to this application yet."}
                 </p>
-                {!userSearchQuery && (
+                {hasAdminAccess && !userSearchQuery && (
                   <button
                     onClick={() => setActiveTab("invite")}
                     className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20"
                   >
-                    Invite First Member
+                    Add First Member
                   </button>
                 )}
               </div>
@@ -308,28 +343,13 @@ export default function UserManagement({
             </button>
             <div>
               <h3 className="text-2xl font-bold text-white">
-                Invite Team Member
+                Add Application Member
               </h3>
               <p className="text-white/60">
-                Add new members to {organization.name}
+                Add new members to {application.application}
               </p>
             </div>
           </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="mb-6">
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                <p className="text-red-400 text-sm">{error}</p>
-                <button
-                  onClick={() => setError(null)}
-                  className="text-red-400 hover:text-red-300 text-xs mt-2 underline"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Invite Form */}
           <div className="space-y-6">
@@ -356,9 +376,9 @@ export default function UserManagement({
             {/* Role Selection */}
             <div>
               <label className="block text-sm font-semibold text-white mb-3">
-                Role & Permissions
+                Application Role & Permissions
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button
                   type="button"
                   className={`p-6 rounded-xl border transition-all duration-300 text-left ${
@@ -381,10 +401,10 @@ export default function UserManagement({
                     <h4 className="font-semibold text-white">Read</h4>
                   </div>
                   <p className="text-white/60 text-sm">
-                    Can view and use applications but cannot modify organization
-                    settings.
+                    Can view application releases and configurations but cannot make changes.
                   </p>
                 </button>
+                
                 <button
                   type="button"
                   className={`p-6 rounded-xl border transition-all duration-300 text-left ${
@@ -407,10 +427,10 @@ export default function UserManagement({
                     <h4 className="font-semibold text-white">Write</h4>
                   </div>
                   <p className="text-white/60 text-sm">
-                    Can view and change applications and create new applications,
-                    settings.
+                    Can create releases, manage configurations, and modify application settings.
                   </p>
                 </button>
+                
                 <button
                   type="button"
                   className={`p-6 rounded-xl border transition-all duration-300 text-left ${
@@ -433,38 +453,9 @@ export default function UserManagement({
                     <h4 className="font-semibold text-white">Admin</h4>
                   </div>
                   <p className="text-white/60 text-sm">
-                    Can manage applications, invite users, and modify organization
-                    settings.
+                    Full application control, including user management and all configurations.
                   </p>
                 </button>
-                {organization.access.includes("owner") && (
-                  <button
-                    type="button"
-                    className={`p-6 rounded-xl border transition-all duration-300 text-left ${
-                      selectedRole === "OWNER"
-                        ? "bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-blue-400/50 shadow-lg shadow-blue-500/10"
-                        : "bg-white/5 border-white/20 hover:bg-white/10"
-                    }`}
-                    onClick={() => setSelectedRole("OWNER")}
-                  >
-                    <div className="flex items-center mb-3">
-                      <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
-                          selectedRole === "OWNER"
-                            ? "bg-gradient-to-r from-blue-400 to-purple-500"
-                            : "bg-white/10"
-                        }`}
-                      >
-                        <Cat size={20} className="text-white" />
-                      </div>
-                      <h4 className="font-semibold text-white">Owner</h4>
-                    </div>
-                    <p className="text-white/60 text-sm">
-                      Full control over the organization, including billing and
-                      deletion controls.
-                    </p>
-                  </button>
-                )}
               </div>
             </div>
 
@@ -487,7 +478,7 @@ export default function UserManagement({
               >
                 <div className="flex items-center justify-center">
                   <UserPlus size={18} className="mr-2" />
-                  Send Invitation
+                  Add User
                 </div>
               </button>
             </div>
