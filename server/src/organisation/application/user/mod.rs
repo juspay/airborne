@@ -145,13 +145,33 @@ async fn get_app_context(
         .cloned()
         .ok_or_else(|| AppError::Unauthorized("Missing auth context".to_string()))?;
 
-    // Validate both organization and application access
-    let org_name = validate_user(auth.organisation.clone(), required_level)
+    // For application operations, we need to check:
+    // 1. User has some access to the organization (at least READ)
+    // 2. User has the required access level to the application
+    
+    // Ensure user has at least read access to the organization
+    let org_name = validate_user(auth.organisation.clone(), READ)
         .map_err(AppError::Unauthorized)?;
     
+    // Check if user has the required application-level access
     let app_name = validate_user(auth.application.clone(), required_level)
         .map_err(AppError::Unauthorized)?;
 
+    // For application admin operations, application-level permissions take precedence
+    // over organization-level permissions
+    if let Some(app_access) = &auth.application {
+        if app_access.level >= required_level.access {
+            // User has sufficient application-level access
+            return Ok((AppContext {
+                org_name: org_name.clone(),
+                app_name: app_name.clone(),
+                org_group_id: String::new(), // Will be filled by find_application
+                app_group_id: String::new(), // Will be filled by find_application
+            }, auth));
+        }
+    }
+
+    // Fallback: check organization-level permissions for the operation
     validate_required_access(&auth, required_level.access, operation)
         .await
         .map_err(AppError::Unauthorized)?;
