@@ -31,7 +31,7 @@ export default function Home({
   const [newAppName, setNewAppName] = useState("");
   const [isCreatingOrg, setIsCreatingOrg] = useState(false);
   const [isCreatingApp, setIsCreatingApp] = useState(false);
-  const [activeTab, setActiveTab] = useState<"applications" | "users">("applications");
+  const [activeTab, setActiveTab] = useState<"applications" | "users" | "app-details" | "manage-access">("applications");
   const [organisations, setOrganisations] = useState<Organisation[]>(user.organisations || []);
   const [isDeletingOrg, setIsDeletingOrg] = useState<string | null>(null);
   const [_, setIsDeletingApp] = useState<string | null>(null);
@@ -84,6 +84,12 @@ export default function Home({
   const handleAppSelect = (app: Application | null) => {
     setSelectedApp(app);
     setIsCreatingApp(false);
+    // When an app is selected, switch to the app-details tab
+    if (app) {
+      setActiveTab("app-details");
+    } else {
+      setActiveTab("applications");
+    }
   };
 
   const handleCreateOrgSubmit = () => {
@@ -173,7 +179,7 @@ export default function Home({
     }
   };
 
-  const handleTabChange = (tab: "applications" | "users") => {
+  const handleTabChange = (tab: "applications" | "users" | "app-details" | "manage-access") => {
     setActiveTab(tab);
     if (tab === "applications") {
       setSelectedApp(null);

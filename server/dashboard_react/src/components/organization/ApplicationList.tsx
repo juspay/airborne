@@ -1,9 +1,8 @@
 import { AppWindow, Plus, ChevronRight } from "lucide-react";
-import { Application, Organisation, User } from "../../types";
+import { Application, Organisation } from "../../types";
 
 interface ApplicationListProps {
   organization: Organisation;
-  user: User;
   selectedApp: Application | null;
   onAppSelect: (app: Application) => void;
   onCreateApp: () => void;
@@ -13,7 +12,6 @@ interface ApplicationListProps {
 
 export default function ApplicationList({
   organization,
-  user,
   selectedApp,
   onAppSelect,
   onCreateApp,

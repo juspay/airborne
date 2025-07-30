@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ReleaseWorkflow from "../release/ReleaseWorkflow";
 import UserManagement from "./UserManagement";
+import { ApplicationUserManagement } from "../application/ApplicationUserManagement";
 import { AppWindow, Plus, ArrowLeft, Activity, Clock, Globe, Package, ChevronDown, ChevronUp, Rocket, FileJson, ListRestart, Eye, History } from "lucide-react";
 import axios from "../../api/axios";
 import CreateDimension from '../dimension/CreateDimension';
@@ -12,8 +13,8 @@ import ReleaseHistory from '../release/ReleaseHistory';
 interface ApplicationDetailsProps {
   application: Application | null;
   organization: Organisation;
-  activeTab: "applications" | "users";
-  onTabChange: (tab: "applications" | "users") => void;
+  activeTab: "applications" | "users" | "app-details" | "manage-access";
+  onTabChange: (tab: "applications" | "users" | "app-details" | "manage-access") => void;
   onInviteUser: (email: string, role: string) => void;
   onRemoveUser: (username: string) => void;
   onAppSelect: (app: Application) => void;
@@ -24,7 +25,7 @@ export default function ApplicationDetails({
   application,
   organization,
   activeTab,
-  onTabChange: _onTabChange, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onTabChange,
   onInviteUser,
   onRemoveUser,
   onAppSelect,
@@ -389,109 +390,159 @@ export default function ApplicationDetails({
       {/* two tabs for Applications and Users */}
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={() => _onTabChange("applications")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeTab === "applications"
-                ? "bg-white/10 text-white font-semibold"
-                : "text-white/60 hover:bg-white/10"
-            }`}
-          >
-            Applications
-          </button>
-          <button
-            onClick={() => _onTabChange("users")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeTab === "users"
-                ? "bg-white/10 text-white font-semibold"
-                : "text-white/60 hover:bg-white/10"
-            }`}
-          >
-            Users
-          </button>
+          {!application ? (
+            // When no application is selected, show Applications and Users tabs
+            <>
+              <button
+                onClick={() => onTabChange("applications")}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === "applications"
+                    ? "bg-white/10 text-white font-semibold"
+                    : "text-white/60 hover:bg-white/10"
+                }`}
+              >
+                Applications
+              </button>
+              <button
+                onClick={() => onTabChange("users")}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === "users"
+                    ? "bg-white/10 text-white font-semibold"
+                    : "text-white/60 hover:bg-white/10"
+                }`}
+              >
+                Users
+              </button>
+            </>
+          ) : (
+            // When an application is selected, show app name and Manage Access tabs
+            <>
+              <button
+                onClick={() => onTabChange("app-details")}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === "app-details"
+                    ? "bg-white/10 text-white font-semibold"
+                    : "text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {application.application}
+              </button>
+              <button
+                onClick={() => onTabChange("manage-access")}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  activeTab === "manage-access"
+                    ? "bg-white/10 text-white font-semibold"
+                    : "text-white/60 hover:bg-white/10"
+                }`}
+              >
+                Manage Access
+              </button>
+            </>
+          )}
         </div>
       </div>
       {/* Content */}
       <div className="flex-1">
-        {activeTab === "applications" ? (
-          (() => {
+        {!application ? (
+          // When no application is selected
+          activeTab === "applications" ? (
+            renderApplicationList()
+          ) : (
+            <UserManagement
+              organization={organization}
+              onInviteUser={onInviteUser}
+              onRemoveUser={onRemoveUser}
+            />
+          )
+        ) : (
+          // When an application is selected
+          activeTab === "manage-access" ? (
+            <ApplicationUserManagement
+              application={application}
+              organization={organization}
+              onInviteUser={(email: string, role: string) => {
+                // TODO: Implement application-level user invitation
+                console.log("Inviting user to application:", { email, role, app: application.application });
+              }}
+              onRemoveUser={(username: string) => {
+                // TODO: Implement application-level user removal
+                console.log("Removing user from application:", { username, app: application.application });
+              }}
+              onUpdateUser={(username: string, role: string) => {
+                // TODO: Implement application-level user role update
+                console.log("Updating user role in application:", { username, role, app: application.application });
+              }}
+            />
+          ) : (
+            // Application details tab
+            (() => {
+              if (isReleaseModalOpen) {
+                return (
+                  <ReleaseWorkflow
+                    application={application}
+                    organization={organization}
+                    onClose={handleCloseRelease}
+                    onComplete={async () => {
+                      await fetchReleaseInfo();
+                      handleCloseRelease();
+                    }}
+                  />
+                );
+              }
 
-            if (isReleaseModalOpen) {
-              return (
-                <ReleaseWorkflow
-                  application={application}
-                  organization={organization}
-                  onClose={handleCloseRelease}
-                  onComplete={async () => {
-                    await fetchReleaseInfo();
-                    handleCloseRelease();
-                  }}
-                />
-              );
-            }
-
-            if (showReleaseHistory && application) {
-              return (
-                <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
-                  <div className="px-6 py-6 border-b border-white/10">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => setShowReleaseHistory(false)}
-                          className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all duration-200 mr-4"
-                        >
-                          <ArrowLeft size={20} />
-                        </button>
-                        <div>
-                          <h3 className="text-xl font-semibold text-white mb-1">Release History</h3>
-                          <p className="text-white/60 text-sm">Manage experiments and track releases</p>
+              if (showReleaseHistory) {
+                return (
+                  <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
+                    <div className="px-6 py-6 border-b border-white/10">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => setShowReleaseHistory(false)}
+                            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-all duration-200 mr-4"
+                          >
+                            <ArrowLeft size={20} />
+                          </button>
+                          <div>
+                            <h3 className="text-xl font-semibold text-white mb-1">Release History</h3>
+                            <p className="text-white/60 text-sm">Manage experiments and track releases</p>
+                          </div>
                         </div>
                       </div>
                     </div>
+                    <div className="p-6">
+                      <ReleaseHistory
+                        organisation={organization.name}
+                        application={application.application}
+                      />
+                    </div>
                   </div>
-                  <div className="p-6">
-                    <ReleaseHistory
-                      organisation={organization.name}
-                      application={application.application}
-                    />
-                  </div>
-                </div>
-              );
-            }
+                );
+              }
 
-            if (isDimensionModalOpen && application) {
-              return (
-                <CreateDimension
-                  application={application.application}
-                  organization={organization.name}
-                  onClose={() => setIsDimensionModalOpen(false)}
-                  onSuccess={handleDimensionSuccess}
-                />
-              );
-            }
+              if (isDimensionModalOpen) {
+                return (
+                  <CreateDimension
+                    application={application.application}
+                    organization={organization.name}
+                    onClose={() => setIsDimensionModalOpen(false)}
+                    onSuccess={handleDimensionSuccess}
+                  />
+                );
+              }
 
-            if (isDimensionPriorityOpen && application) {
-              return (
-                <DimensionPriority
-                  application={application.application}
-                  organization={organization.name}
-                  onClose={() => setIsDimensionPriorityOpen(false)}
-                />
-              );
-            }
+              if (isDimensionPriorityOpen) {
+                return (
+                  <DimensionPriority
+                    application={application.application}
+                    organization={organization.name}
+                    onClose={() => setIsDimensionPriorityOpen(false)}
+                  />
+                );
+              }
 
-            if (application) {
               return renderApplicationDetails();
-            }
-
-            return renderApplicationList();
-          })()
-        ) : (
-          <UserManagement
-            organization={organization}
-            onInviteUser={onInviteUser}
-            onRemoveUser={onRemoveUser}
-          />
+            })()
+          )
         )}
       </div>
     </div>

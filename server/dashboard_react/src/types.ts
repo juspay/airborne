@@ -12,6 +12,13 @@ export interface OrganisationUser {
   roles: string[];
 }
 
+export interface ApplicationUser {
+  id: string;
+  username: string;
+  email: string;
+  roles: string[];
+}
+
 export interface Organisation {
   id: string;
   name: string;
@@ -25,6 +32,7 @@ export interface Application {
   application: string;
   versions: string[];
   access: string[];
+  users?: ApplicationUser[];
 }
 
 export type HomeResponse =
