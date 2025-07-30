@@ -514,13 +514,20 @@ async fn organisation_list_users(
                     .as_ref()
                     .ok_or_else(|| OrgError::Internal("User has no username".to_string()))?;
 
-                // Extract roles from group paths
+                // Extract roles from group paths - only organization level roles
+                let org_path_prefix = format!("/{}/", org_name);
                 let roles = user_groups
                     .iter()
                     .filter_map(|group| {
                         if let Some(path) = &group.path {
-                            if path.starts_with(&format!("/{}/", org_name)) {
-                                return path.split('/').next_back().map(String::from);
+                            // Only consider direct organization-level roles
+                            // Path should be exactly "/{org_name}/{role}" with no further nesting
+                            if path.starts_with(&org_path_prefix) {
+                                let role_part = &path[org_path_prefix.len()..];
+                                // Check if this is a direct role (no further slashes)
+                                if !role_part.contains('/') && !role_part.is_empty() {
+                                    return Some(role_part.to_string());
+                                }
                             }
                         }
                         None
