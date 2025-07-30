@@ -1,3 +1,4 @@
+import { AxiosError } from "axios";
 import axios from "../api/axios";
 
 export interface ApplicationUserRequest {
@@ -19,8 +20,15 @@ export const applicationUserService = {
     const headers: Record<string, string> = {};
     headers["x-organisation"] = orgName;
     headers["x-application"] = appName;
-    const response = await axios.get(`/organisations/applications/user/list`, { headers });
-    return response.data;
+    try{
+        const response = await axios.get(`/organisations/applications/user/list`, { headers });
+        return response.data;
+    }catch(err: any){
+        if(err.status == 401){
+            document.location = "/dashboard/"
+        }
+        return null;
+    }
   },
 
   async addUser(orgName: string, appName: string, request: ApplicationUserRequest): Promise<void> {
