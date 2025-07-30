@@ -248,9 +248,6 @@ export function ApplicationUserManagement({
                           <h4 className="font-semibold text-white text-lg">
                             {appUser.username || "Unknown User"}
                           </h4>
-                          <p className="text-white/60 text-sm">
-                            {appUser.email || "No email provided"}
-                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -271,7 +268,7 @@ export function ApplicationUserManagement({
                         {/* Action Buttons */}
                         {hasAdminAccess && (
                           <div className="flex gap-2">
-                            {onUpdateUser && (
+                            {/* {onUpdateUser && (
                               <select
                                 value={appUser.roles[0] || "read"}
                                 onChange={(e) =>
@@ -289,7 +286,7 @@ export function ApplicationUserManagement({
                                   Admin
                                 </option>
                               </select>
-                            )}
+                            )} */}
                             <button
                               onClick={() => handleRemoveUser(appUser.username)}
                               className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-all duration-200 border border-red-500/30"

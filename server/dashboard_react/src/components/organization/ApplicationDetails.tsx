@@ -344,13 +344,15 @@ export default function ApplicationDetails({
           <BarChart3 size={18} className="mr-2" />
           View Analytics
         </button> */}
-        <button
-          onClick={handleRelease}
-          className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
-        >
-          <Rocket size={18} className="mr-2" />
-          Create Release
-        </button>
+        {application.access.includes("write") && (
+          <button
+            onClick={handleRelease}
+            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
+          >
+            <Rocket size={18} className="mr-2" />
+            Create Release
+          </button>
+        )}
 
         <button
           onClick={() => {
@@ -362,21 +364,25 @@ export default function ApplicationDetails({
           Release History
         </button>
 
-        <button
-          onClick={() => setIsDimensionModalOpen(true)}
-          className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-500/20 flex items-center"
-        >
-          <FileJson size={18} className="mr-2" />
-          Create Dimension
-        </button>
+        {application.access.includes("write") && (
+          <>
+            <button
+              onClick={() => setIsDimensionModalOpen(true)}
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-500/20 flex items-center"
+            >
+              <FileJson size={18} className="mr-2" />
+              Create Dimension
+            </button>
 
-        <button
-          onClick={() => setIsDimensionPriorityOpen(true)}
-          className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-orange-500/20 flex items-center"
-        >
-          <ListRestart size={18} className="mr-2" />
-          Manage Dimensions
-        </button>
+            <button
+              onClick={() => setIsDimensionPriorityOpen(true)}
+              className="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-orange-500/20 flex items-center"
+            >
+              <ListRestart size={18} className="mr-2" />
+              Manage Dimensions
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
