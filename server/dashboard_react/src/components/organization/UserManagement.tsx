@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -14,6 +14,13 @@ import {
   BookLockIcon,
 } from "lucide-react";
 import { Organisation } from "../../types";
+import { organizationUserService } from "../../services/organizationUserService";
+
+interface OrganizationUser {
+  username: string;
+  email: string;
+  roles: string[];
+}
 
 interface UserManagementProps {
   organization: Organisation;
@@ -32,23 +39,72 @@ export default function UserManagement({
   const [selectedRole, setSelectedRole] = useState<"ADMIN" | "READ" | "WRITE" | "OWNER">(
     "READ"
   );
+  const [users, setUsers] = useState<OrganizationUser[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleInviteUser = () => {
-    if (inviteEmail.trim()) {
-      onInviteUser(inviteEmail.trim(), selectedRole);
-      setInviteEmail("");
-      setActiveTab("members");
+  // Load users when component mounts
+  useEffect(() => {
+    loadUsers();
+  }, [organization.name]);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await organizationUserService.listUsers(organization.name);
+      setUsers(response.users);
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      setError("Failed to load users");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRemoveUser = (username: string) => {
+  const handleInviteUser = async () => {
+    if (inviteEmail.trim()) {
+      try {
+        await organizationUserService.addUser(organization.name, {
+          user: inviteEmail.trim(),
+          access: selectedRole.toLowerCase()
+        });
+        onInviteUser(inviteEmail.trim(), selectedRole.toLowerCase());
+        setInviteEmail("");
+        setActiveTab("members");
+        await loadUsers(); // Refresh the list
+      } catch (err: any) {
+        console.error("Failed to invite user:", err);
+        // Extract error message from response if available
+        const errorMessage = err?.response?.data?.message || 
+                            err?.response?.data || 
+                            err?.message || 
+                            "Failed to invite user";
+        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to invite user");
+      }
+    }
+  };
+
+  const handleRemoveUser = async (username: string) => {
     if (
       prompt(
         `Are you sure you want to remove ${username} from ${organization.name}? This action cannot be undone. Type "remove" to confirm.`,
         ""
-      ).toLowerCase() === "remove"
+      )?.toLowerCase() === "remove"
     ) {
-      onRemoveUser(username);
+      try {
+        await organizationUserService.removeUser(organization.name, username);
+        onRemoveUser(username);
+        await loadUsers(); // Refresh the list
+      } catch (err: any) {
+        console.error("Failed to remove user:", err);
+        // Extract error message from response if available
+        const errorMessage = err?.response?.data?.message || 
+                            err?.response?.data || 
+                            err?.message || 
+                            "Failed to remove user";
+        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to remove user");
+      }
     }
   };
 
@@ -69,17 +125,17 @@ export default function UserManagement({
   };
 
   const filteredUsers =
-    organization.users && userSearchQuery.length > 0
-      ? organization.users.filter(
+    users && userSearchQuery.length > 0
+      ? users.filter(
           (u) =>
             u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
             u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
         )
-      : organization.users;
+      : users;
 
   const isLastOwner = (org: Organisation) => {
     if(!org.access.includes("owner")) return false;
-    const ownerCount = org.users?.filter((user) =>
+    const ownerCount = users?.filter((user) =>
       user.roles.includes("owner")
     ).length;
     return ownerCount === 1;
@@ -130,13 +186,40 @@ export default function UserManagement({
             </div>
           </div>
 
+          {/* Error Display */}
+          {error && (
+            <div className="px-6 py-4 border-b border-white/10">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-red-400 text-sm">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-red-400 hover:text-red-300 text-xs mt-2 underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Members List */}
           <div className="p-6">
-            {filteredUsers && filteredUsers.length > 0 ? (
+            {loading ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-r from-gray-400/20 to-gray-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                  <Users size={32} className="text-white/40 animate-pulse" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Loading Members...
+                </h3>
+                <p className="text-white/60">
+                  Fetching team member information.
+                </p>
+              </div>
+            ) : filteredUsers && filteredUsers.length > 0 ? (
               <div className="space-y-4">
                 {filteredUsers.map((orgUser) => (
                   <div
-                    key={orgUser.id}
+                    key={orgUser.username}
                     className="bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-all duration-300"
                   >
                     <div className="flex items-center justify-between">
@@ -232,6 +315,21 @@ export default function UserManagement({
               </p>
             </div>
           </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-red-400 text-sm">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-red-400 hover:text-red-300 text-xs mt-2 underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Invite Form */}
           <div className="space-y-6">
