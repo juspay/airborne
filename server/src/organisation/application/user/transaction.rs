@@ -59,6 +59,11 @@ pub async fn add_user_with_transaction(
             .await
             .map_err(|e| AppError::Internal(format!("Failed to add user to group: {}", e)))?;        
     }
+    
+    // Add user to the organisation group as well with READ role
+    add_user_to_group(admin, realm, &target_user.user_id, &app_context.org_group_id, "read", &transaction)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to add user to organisation group: {}", e)))?;
 
     // Mark transaction as complete
     transaction.set_database_inserted();

@@ -15,7 +15,6 @@ export interface ApplicationUserResponse {
 }
 
 export const applicationUserService = {
-  // List users for a specific application
   async listUsers(orgName: string, appName: string): Promise<ApplicationUserResponse> {
     const headers: Record<string, string> = {};
     headers["x-organisation"] = orgName;
@@ -24,18 +23,24 @@ export const applicationUserService = {
     return response.data;
   },
 
-  // Add user to application
   async addUser(orgName: string, appName: string, request: ApplicationUserRequest): Promise<void> {
-    await axios.post(`/organisations/applications/user/add`, request);
+    const headers: Record<string, string> = {};
+    headers["x-organisation"] = orgName;
+    headers["x-application"] = appName;
+    await axios.post(`/organisations/applications/user/create`, request, { headers });
   },
 
-  // Update user role in application
   async updateUser(orgName: string, appName: string, request: ApplicationUserRequest): Promise<void> {
-    await axios.post(`/organisations/applications/user/update`, request);
+    const headers: Record<string, string> = {};
+    headers["x-organisation"] = orgName;
+    headers["x-application"] = appName;
+    await axios.post(`/organisations/applications/user/update`, request, { headers });
   },
 
-  // Remove user from application
   async removeUser(orgName: string, appName: string, username: string): Promise<void> {
-    await axios.post(`/organisations/applications/user/remove`, { user: username });
+    const headers: Record<string, string> = {};
+    headers["x-organisation"] = orgName;
+    headers["x-application"] = appName;
+    await axios.post(`/organisations/applications/user/remove`, { user: username }, { headers });
   },
 };
