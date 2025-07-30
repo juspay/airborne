@@ -1,4 +1,3 @@
-import { AxiosError } from "axios";
 import axios from "../api/axios";
 
 export interface ApplicationUserRequest {
