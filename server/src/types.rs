@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Serialize;
 use actix_web::{http::StatusCode};
 use thiserror::Error;
-use superposition_rust_sdk::Client;
+use serde::{Serialize};
+use superposition_sdk::Client;
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 
 use crate::utils::db;

@@ -1,0 +1,104 @@
+"use client"
+
+import type React from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
+
+type User = { name: string; user_id?: string } | null
+
+type AppContextType = {
+  loading: boolean
+  token: string | null
+  setToken: (t: string | null) => void
+  org: string | null
+  setOrg: (o: string | null) => void
+  app: string | null
+  setApp: (a: string | null) => void
+  user: User
+  setUser: (u: User) => void
+  logout: () => void
+  signOut: () => void // add alias for compatibility
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined)
+
+export const LS_TOKEN = "airborne:token"
+export const LS_ORG = "airborne:org"
+export const LS_APP = "airborne:app"
+export const LS_USER = "airborne:user"
+
+export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [token, setTokenState] = useState<string | null>(null)
+  const [org, setOrgState] = useState<string | null>(null)
+  const [app, setAppState] = useState<string | null>(null)
+  const [user, setUserState] = useState<User>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setTokenState(localStorage.getItem(LS_TOKEN))
+    setOrgState(localStorage.getItem(LS_ORG))
+    setAppState(localStorage.getItem(LS_APP))
+    const u = localStorage.getItem(LS_USER)
+    if (u) setUserState(JSON.parse(u))
+    
+    setLoading(false)
+  }, [])
+
+  const setToken = (t: string | null) => {
+    setTokenState(t)
+    if (t) localStorage.setItem(LS_TOKEN, t)
+    else localStorage.removeItem(LS_TOKEN)
+  }
+  const setOrg = (o: string | null) => {
+    setOrgState(o)
+    if (o) localStorage.setItem(LS_ORG, o)
+    else localStorage.removeItem(LS_ORG)
+  }
+  const setApp = (a: string | null) => {
+    setAppState(a)
+    if (a) localStorage.setItem(LS_APP, a)
+    else localStorage.removeItem(LS_APP)
+  }
+  const setUser = (u: User) => {
+    setUserState(u)
+    if (u) localStorage.setItem(LS_USER, JSON.stringify(u))
+    else localStorage.removeItem(LS_USER)
+  }
+
+  const logout = () => {
+    setToken(null)
+    setUser(null)
+    setOrg(null)
+    setApp(null)
+    // redirect to login after clearing state
+    if (typeof window !== "undefined") window.location.href = "/login"
+  }
+
+  const value = useMemo(
+    () => ({
+      loading,
+      token,
+      setToken,
+      org,
+      setOrg,
+      app,
+      setApp,
+      user,
+      setUser,
+      logout,
+      signOut: logout, // add alias for compatibility
+    }),
+    [token, org, app, user, loading],
+  )
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+}
+
+export function useAppContext() {
+  const ctx = useContext(AppContext)
+  if (!ctx) throw new Error("useAppContext must be used within AppProvider")
+  return ctx
+}
+
+export function useApp() {
+  return useAppContext()
+}

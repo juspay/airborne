@@ -21,12 +21,12 @@ services:
     shm_size: 256mb
 
   superposition:
-    image: ghcr.io/juspay/superposition-demo:${SUPERPOSITION_VERSION:-0.79.1}
+    image: ghcr.io/juspay/superposition-demo:${SUPERPOSITION_VERSION:-0.89.0}
     container_name: superposition
     ports:
       - "${SUPERPOSITION_PORT:-8080}:8080"
-    # volumes:
-    #   - init-data:/init-data # Shared volume to pass the env file
+    volumes:
+      - init-data:/init-data # Shared volume to pass the env file
     restart: unless-stopped
 
   keycloak-db:
