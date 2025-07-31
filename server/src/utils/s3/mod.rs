@@ -21,3 +21,21 @@ pub async fn push_file(
         .await
         .map_err(error::ErrorInternalServerError)
 }
+
+pub async fn push_file_byte_arr(
+    s3_client: &Client,
+    bucket_name: String,
+    byte_arr: Vec<u8>,
+    filename: String,
+) -> actix_web::Result<PutObjectOutput> {
+    let byte_stream = ByteStream::from(byte_arr);
+
+    s3_client
+        .put_object()
+        .bucket(bucket_name)
+        .key(filename.clone())
+        .body(byte_stream)
+        .send()
+        .await
+        .map_err(error::ErrorInternalServerError)
+}

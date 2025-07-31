@@ -19,6 +19,8 @@ pub mod dashboard;
 pub mod middleware;
 pub mod organisation;
 pub mod release;
+pub mod file;
+pub mod package;
 pub mod types;
 pub mod user;
 pub mod utils;
