@@ -22,5 +22,5 @@ async fn index() -> Result<NamedFile> {
 pub fn add_routes() -> Scope {
     Scope::new("/docs")
         .service(Scope::new("home").route("", web::get().to(index)))
-        .service(Files::new("/", "./docs_react/dist").index_file("index.html"))
+        .service(Files::new("", "./docs_react/dist").index_file("index.html"))
 }

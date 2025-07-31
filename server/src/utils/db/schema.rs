@@ -29,6 +29,22 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.files (id) {
+            id -> Uuid,
+            app_id -> Text,
+            org_id -> Text,
+            version -> Int4,
+            tag -> Text,
+            url -> Text,
+            file_path -> Text,
+            size -> Int8,
+            checksum -> Text,
+            metadata -> Jsonb,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.packages (id) {
             id -> Uuid,
             version -> Int4,
@@ -39,6 +55,19 @@ pub mod hyperotaserver {
             lazy -> Jsonb,
             properties -> Jsonb,
             resources -> Jsonb,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.packages_v2 (id) {
+            id -> Uuid,
+            version -> Int4,
+            app_id -> Text,
+            org_id -> Text,
+            index -> Text,
+            files -> Array<Nullable<Text>>,
+            tag -> Text,
+            created_at -> Timestamptz,
         }
     }
 
@@ -66,7 +95,9 @@ pub mod hyperotaserver {
     diesel::allow_tables_to_appear_in_same_query!(
         cleanup_outbox,
         configs,
+        files,
         packages,
+        packages_v2,
         releases,
         workspace_names,
     );

@@ -1,0 +1,23 @@
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Dependencies
+node_modules/
+
+# Generated files
+next-env.d.ts
+components.json
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Environment files
+.env*
+!.env.example
+
+# Cache directories
+.cache/

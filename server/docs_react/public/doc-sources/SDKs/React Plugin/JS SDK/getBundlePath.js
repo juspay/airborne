@@ -1,4 +1,4 @@
-import { getBundlePath } from 'airborne-react-native';
+import { getBundlePath } from "airborne-react-native";
 
 const handleGetBundlePath = async () => {
   try {

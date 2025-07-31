@@ -15,35 +15,10 @@
 # Build frontend
 FROM node:18 as frontend-builder
 WORKDIR /app
-COPY dashboard_react/package*.json ./dashboard_react/
-WORKDIR /app/dashboard_react
-RUN npm install
-COPY dashboard_react/ ./
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl jq && \
-    rm -rf /var/lib/apt/lists/*
-# Run the build
-RUN npm run build
-# Make sure the build succeeded
-RUN ls -la dist || echo "dist folder was not created!"
-
-WORKDIR /app
 COPY docs_react/package*.json ./docs_react/
 WORKDIR /app/docs_react
 RUN npm install
 COPY docs_react/ ./
-
-# Run the build
-RUN npm run build
-# Make sure the build succeeded
-RUN ls -la dist || echo "dist folder was not created!"
-
-WORKDIR /app
-COPY home_react/package*.json ./home_react/
-WORKDIR /app/home_react
-RUN npm install
-COPY home_react/ ./
 
 # Run the build
 RUN npm run build
@@ -69,7 +44,5 @@ RUN apt-get update && \
 WORKDIR /app
 COPY --from=builder /app/target/release/airborne-server /app/airborne-server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
-COPY --from=frontend-builder /app/dashboard_react/dist /app/dashboard_react/dist
 COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
-COPY --from=frontend-builder /app/home_react/dist /app/home_react/dist
 CMD ["/app/airborne-server"]

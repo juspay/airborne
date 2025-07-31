@@ -6,4 +6,5 @@ The SDK is currently available in the github repository (https://github.com/jusp
 And can be added as shown in the Getting the SDK section on the right
 
 ## Integration
+
 Since the SDK aims to boot ahead of loading the react module, the integration is done on the respective android modules of the app. The next section explain how this can be done for android

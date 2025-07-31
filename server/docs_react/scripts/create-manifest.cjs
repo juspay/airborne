@@ -1,8 +1,8 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
-const docSourcesPath = path.join(__dirname, '..', 'public', 'doc-sources');
-const manifestPath = path.join(__dirname, '..', 'public', 'manifest.json');
+const docSourcesPath = path.join(__dirname, "..", "public", "doc-sources");
+const manifestPath = path.join(__dirname, "..", "public", "manifest.json");
 
 function getFileTree(dir) {
   const dirents = fs.readdirSync(dir, { withFileTypes: true });
@@ -24,7 +24,7 @@ function getFileTree(dir) {
 try {
   const fileTree = getFileTree(docSourcesPath);
   fs.writeFileSync(manifestPath, JSON.stringify(fileTree, null, 2));
-  console.log('manifest.json created successfully.');
+  console.log("manifest.json created successfully.");
 } catch (error) {
-  console.error('Error creating manifest.json:', error);
+  console.error("Error creating manifest.json:", error);
 }

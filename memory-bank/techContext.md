@@ -6,7 +6,7 @@
 *   **Frameworks & Libraries:**
     *   Backend: Actix Web, Diesel (ORM), Serde (serialization/deserialization), Tokio (async runtime).
     *   Frontend: React (via Vite).
-    *   Superposition SDK: `superposition_rust_sdk`.
+    *   Superposition SDK: `superposition_sdk`.
     *   Keycloak Client: `keycloak` crate.
     *   AWS SDKs: `aws-sdk-s3`, `aws-sdk-kms`, `aws-config`.
     *   Scripting: `curl`, `jq` (for init scripts).

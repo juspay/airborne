@@ -79,7 +79,7 @@ CLICKHOUSE_UP = $(shell $(call check-container,$(CLICKHOUSE_CONTAINER_NAME)))
 KAFKA_UI_CONTAINER_NAME = $(shell $(call read-container-name,analytics,kafka-ui))
 KAFKA_UI_UP = $(shell $(call check-container,$(KAFKA_UI_CONTAINER_NAME)))
 
-.PHONY: help env-file analytics-env-file db localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs home analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics
+.PHONY: help env-file analytics-env-file db localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics frontend-check frontend-lint frontend-lint-fix frontend-format frontend-format-check
 
 default: help
 
@@ -137,10 +137,15 @@ help:
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "kill" "Kill running airborne-server processes"
 	@echo ""
 	@echo "$(YELLOW)Code Quality Commands:$(NC)"
-	@printf "  $(GREEN)%-20s$(NC) %s\n" "check" "Run format check and linting (CI mode)"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "check" "Run format check and linting (CI mode) for all projects"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "fmt" "Format Rust code using rustfmt"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "lint" "Run Clippy linter on Rust code"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "lint-fix" "Run Clippy with automatic fixes"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-check" "Run frontend type-check, lint, and format checks"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-lint" "Run ESLint on frontend projects"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-lint-fix" "Run ESLint with automatic fixes on frontend"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-format" "Format frontend code using Prettier"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-format-check" "Check frontend code formatting with Prettier"
 	@echo ""
 	@echo "$(YELLOW)Git Integration Commands:$(NC)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "commit" "Run quality checks and commit changes"
@@ -385,18 +390,14 @@ endif
 	@echo "$(GREEN) ✅ Kafka UI ready$(NC)"
 
 node-dependencies:
-	cd server/dashboard_react && npm ci
+	cd server/dashboard_nextjs && npm ci
 	cd server/docs_react && npm ci
-	cd server/home_react && npm ci
 
 dashboard:
-	cd server/dashboard_react && npm run build:dev
+	cd server/dashboard_nextjs && npm run dev
 
 docs:
 	cd server/docs_react && npm run build:dev
-
-home:
-	cd server/home_react && npm run build:dev
 
 SETUP_DEPS = env-file db superposition keycloak-db keycloak localstack node-dependencies
 # ifdef CI
@@ -449,7 +450,6 @@ run: kill db superposition superposition-init keycloak-db keycloak keycloak-init
 	@trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \
-	$(MAKE) home & \
 	cargo watch -w server/src -w server/Cargo.toml -w Cargo.toml -w Cargo.lock -s 'make airborne-server && cd server && ../target/debug/airborne-server' & \
 	wait
 
@@ -492,15 +492,45 @@ status:
 lint-fix: LINT_FLAGS += --fix --allow-dirty --allow-staged
 lint-fix: lint
 
+frontend-check:
+	@echo "$(YELLOW)🔍 Checking frontend code quality...$(NC)"
+	@cd server/dashboard_nextjs && npm run check
+	@cd server/docs_react && npm run check
+	@echo "$(GREEN)Frontend checks completed$(NC)"
+
+frontend-lint:
+	@echo "$(YELLOW)🔍 Linting frontend code...$(NC)"
+	@cd server/dashboard_nextjs && npm run lint
+	@cd server/docs_react && npm run lint
+	@echo "$(GREEN)Frontend linting completed$(NC)"
+
+frontend-lint-fix:
+	@echo "$(YELLOW)🔧 Fixing frontend lint issues...$(NC)"
+	@cd server/dashboard_nextjs && npm run lint:fix
+	@cd server/docs_react && npm run lint:fix
+	@echo "$(GREEN)Frontend lint fixes completed$(NC)"
+
+frontend-format:
+	@echo "$(YELLOW)✨ Formatting frontend code...$(NC)"
+	@cd server/dashboard_nextjs && npm run format
+	@cd server/docs_react && npm run format
+	@echo "$(GREEN)Frontend formatting completed$(NC)"
+
+frontend-format-check:
+	@echo "$(YELLOW)🔍 Checking frontend code formatting...$(NC)"
+	@cd server/dashboard_nextjs && npm run format:check
+	@cd server/docs_react && npm run format:check
+	@echo "$(GREEN)Frontend format checks completed$(NC)"
+
 check: FMT_FLAGS += --check
 check: LINT_FLAGS += -- -Dwarnings
-check: fmt lint
+check: fmt lint frontend-check
 
 fmt:
-	cargo fmt $(FMT_FLAGS)
+	cargo fmt $(FMT_FLAGS) && make frontend-format
 
 lint:
-	cargo clippy $(LINT_FLAGS)
+	cargo clippy $(LINT_FLAGS) && make frontend-lint-fix
 
 commit: check
 	git commit $(COMMIT_FLAGS)

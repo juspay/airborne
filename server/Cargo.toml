@@ -25,17 +25,21 @@ diesel = { version = "2.2", features = [
 diesel_migrations = "2.2"
 dotenv = { workspace = true }
 futures = { workspace = true }
-google-sheets4 = "*"
+futures-util = "0.3"
+google-sheets4 = "=6.0.0"
+hex = "0.4"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
 log = "0.4.27"
 rand = "0.8"
-reqwest = { workspace = true, features = ["blocking"] }
+reqwest = { version = "^0.12.5", features = ["blocking", "stream"] }
 rustls = { version = "0.23.5" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-superposition-rust-sdk = { git = "https://github.com/juspay/superposition", subdir = "clients/generated/smithy/rust", rev = "dfad18c8e2c096ea1f265cbb4bbad7d46c5600c6" }
-thiserror = { workspace = true }
-tokio = { workspace = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+superposition_sdk = "0.89.0"
+thiserror = "2.0.12"
+tokio = { version = "1", features = ["full"] }
 urlencoding = "2.1.2"
-uuid = { workspace = true }
+uuid = { version = "1.16.0", features = ["serde", "v7", "v4"] }
+zip = "4.6.1"

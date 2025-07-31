@@ -30,7 +30,7 @@ struct Configuration {
     organisation_creation_disabled: bool,
 }
 
-#[get("/")]
+#[get("")]
 async fn get_global_configurations(
     _: HttpRequest,
     state: web::Data<AppState>,
