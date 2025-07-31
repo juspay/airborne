@@ -25,4 +25,5 @@ This method is a callback for events from the Airborne SDK.
 This method is called when the Airborne bundle is ready. You should use this to set the bundle path for React Native.
 
 ## 3. Bundling Release Config (For non CLI users)
+
 If you are not using Airborne CLI for bundling release_config.json, then you have to make sure that the bundled `release_config` is right inside the `namespace` folder of the assets. If the namespace is `example` then the release_config should be in the `example/release_config.json` path in the assets.

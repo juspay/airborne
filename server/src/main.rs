@@ -14,17 +14,17 @@
 #![deny(unused_crate_dependencies)]
 mod dashboard;
 mod docs;
-mod home;
+mod file;
 mod middleware;
 mod organisation;
+mod package;
 mod release;
-mod types;
 mod user;
+
+mod types;
 mod utils;
 
-use std::sync::Arc;
-
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use aws_sdk_s3::config::Builder;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
@@ -34,10 +34,12 @@ use google_sheets4::{
     Sheets,
 };
 use middleware::auth::Auth;
-use superposition_rust_sdk::config::Config as SrsConfig;
+use serde_json::json;
+use std::sync::Arc;
+use superposition_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::home::index;
+use crate::dashboard::configuration;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -80,6 +82,9 @@ async fn main() -> std::io::Result<()> {
         "".to_string()
     };
     let cf_distribution_id = std::env::var("CLOUDFRONT_DISTRIBUTION_ID").unwrap_or_default();
+
+    let server_path_prefix =
+        std::env::var("SERVER_PATH_PREFIX").unwrap_or_else(|_| "api".to_string());
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -156,7 +161,7 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Create a shared state for the application
-    let superposition_client = superposition_rust_sdk::Client::from_conf(
+    let superposition_client = superposition_sdk::Client::from_conf(
         SrsConfig::builder()
             .endpoint_url(cac_url.clone())
             .behavior_version_latest()
@@ -177,50 +182,64 @@ async fn main() -> std::io::Result<()> {
     let app_state_data = web::Data::from(app_state.clone());
     let _cleanup_handle = start_cleanup_job(app_state_data.clone());
     println!("Started transaction cleanup background job");
+    println!("Using server prefix {}", server_path_prefix);
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(app_state.clone()))
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::Compress::default())
-            .service(
-                // APIs specific to the dashboard
-                // These will be all public (or with token as cookie) endpoints which serve dashboard JS code
-                // Can eventually be migrated to some server side rendering
-                web::scope("/dashboard").service(dashboard::add_routes()),
-            )
-            .route("/", web::get().to(index))
-            .route("", web::get().to(index))
-            .route("/privacy-policy", web::get().to(index))
-            .route("/terms-of-use", web::get().to(index))
             .service(docs::add_routes())
-            .service(home::add_routes())
             .service(
-                web::scope("/organisations")
-                    .wrap(Auth { env: env.clone() })
-                    .service(organisation::add_routes()),
-            )
-            .service(
-                web::scope("/organisation/user")
-                    .wrap(Auth { env: env.clone() })
-                    .service(organisation::user::add_routes()),
-            )
-            .service(
-                web::scope("/user")
-                    .wrap(Auth { env: env.clone() })
-                    .service(user::get_user),
-            )
-            .service(web::scope("/users").service(user::add_routes()))
-            .service(
-                web::scope("/release").service(release::add_routes()),
+                web::scope("/release").service(release::add_public_routes()),
                 // Decide if this needs auth; Ideally this only needs signature verfication
+            )
+            .service(
+                web::scope(&server_path_prefix)
+                    .service(
+                        web::resource("/health").route(
+                            web::get().to(|| async {
+                                HttpResponse::Ok().json(json!({ "status": "ok" }))
+                            }),
+                        ),
+                    )
+                    .service(
+                        web::scope("/dashboard/configuration").service(configuration::add_routes()),
+                    )
+                    .service(
+                        web::scope("/organisations")
+                            .wrap(Auth { env: env.clone() })
+                            .service(organisation::add_routes()),
+                    )
+                    .service(
+                        web::scope("/organisation/user")
+                            .wrap(Auth { env: env.clone() })
+                            .service(organisation::user::add_routes()),
+                    )
+                    .service(
+                        web::scope("/user")
+                            .wrap(Auth { env: env.clone() })
+                            .service(user::get_user),
+                    )
+                    .service(web::scope("/users").service(user::add_routes()))
+                    .service(
+                        web::scope("/file")
+                            .wrap(Auth { env: env.clone() })
+                            .service(file::add_routes()),
+                    )
+                    .service(
+                        web::scope("/packages")
+                            .wrap(Auth { env: env.clone() })
+                            .service(package::add_routes()),
+                    )
+                    .service(
+                        web::scope("/releases")
+                            .wrap(Auth { env: env.clone() })
+                            .service(release::add_routes()),
+                    ),
             )
     })
     .bind(("0.0.0.0", port))? // Listen on all interfaces
     .run()
     .await
 }
-
-// Create Workspace
-// Update Worspace
-// Middleware for authentication via CAC key cloak

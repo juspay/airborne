@@ -13,19 +13,3 @@
 // limitations under the License.
 
 pub mod configuration;
-
-use actix_files::Files;
-use actix_web::web;
-use actix_web::Scope;
-
-pub fn add_routes() -> Scope {
-    Scope::new("")
-        .service(web::scope("/configuration").service(configuration::add_routes()))
-        .service(
-            Files::new("/", "./dashboard_react/dist")
-                .index_file("index.html")
-                .default_handler(web::to(|| async {
-                    actix_files::NamedFile::open_async("./dashboard_react/dist/index.html").await
-                })),
-        )
-}

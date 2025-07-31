@@ -1,4 +1,4 @@
-import { readReleaseConfig } from 'airborne-react-native';
+import { readReleaseConfig } from "airborne-react-native";
 
 const handleReadReleaseConfig = async () => {
   try {

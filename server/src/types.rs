@@ -15,7 +15,7 @@
 use actix_web::http::StatusCode;
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use serde::Serialize;
-use superposition_rust_sdk::Client;
+use superposition_sdk::Client;
 use thiserror::Error;
 
 use crate::utils::db;

@@ -1,0 +1,21 @@
+# Build outputs
+dist/
+build/
+.vite/
+
+# Dependencies
+node_modules/
+
+# Generated files
+.d.ts
+
+# Lock files
+package-lock.json
+yarn.lock
+
+# Environment files
+.env*
+!.env.example
+
+# Cache directories
+.cache/
