@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    cleanup_outbox, configs, packages, releases, workspace_names,
+    cleanup_outbox, configs, packages, releases, workspace_names, resources,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -102,4 +102,36 @@ pub struct WorkspaceName {
 pub struct NewWorkspaceName<'a> {
     pub organization_id: &'a str,
     pub workspace_name: &'a str,
+}
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = resources)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct Resource {
+    pub id: uuid::Uuid,
+    pub app_id: String,
+    pub org_id: String,
+    pub version: i32,
+    pub url: String,
+    pub file_path: String,
+    pub size: i64,
+    pub checksum: String,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = resources)]
+pub struct NewResource {
+    pub app_id: String,
+    pub org_id: String,
+    pub version: i32,
+    pub url: String,
+    pub file_path: String,
+    pub size: i64,
+    pub checksum: String,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
 }

@@ -22,18 +22,20 @@ use actix_web::{
 };
 use aws_smithy_types::Document;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use superposition_rust_sdk::operation::get_resolved_config::GetResolvedConfigOutput;
 
-use crate::utils::{
+use crate::{
+    types::{
+        Config, ConfigProperties, InnerPackage, PackageMeta, ReleaseConfig, Resource, Package
+    }, utils::{
     db::schema::hyperotaserver::configs::dsl::{
         app_id as config_app_id, configs as configs_table, org_id as config_org_id,
         version as config_version,
     },
     document::document_to_json_value,
     workspace::get_workspace_name_for_application,
-};
+}};
 use crate::{
     types::AppState,
     utils::db::models::{ConfigEntry, PackageEntryRead},
@@ -49,54 +51,6 @@ pub fn add_routes() -> Scope {
     Scope::new("")
         .service(serve_release)
         .service(Scope::new("/v2").service(serve_release))
-}
-
-#[derive(Serialize, Debug)]
-struct ReleaseConfig {
-    version: String,
-    config: Config,
-    package: Package,
-    resources: serde_json::Value,
-}
-
-#[derive(Serialize, Debug)]
-struct Config {
-    version: String,
-    release_config_timeout: u32,
-    boot_timeout: u32,
-    properties: ConfigProperties,
-}
-
-#[derive(Serialize, Debug)]
-struct ConfigProperties {
-    tenant_info: serde_json::Value,
-}
-
-#[derive(Debug)]
-struct PackageMeta {
-    package: InnerPackage,
-}
-
-#[derive(Deserialize, Debug)]
-struct InnerPackage {
-    version: i32,
-}
-
-#[derive(Debug, Deserialize, Serialize, Default)]
-struct File {
-    url: String,
-    #[serde(rename = "filePath")]
-    file_path: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Package {
-    name: String,
-    version: String,
-    properties: serde_json::Value,
-    index: File,
-    important: Vec<File>,
-    lazy: Vec<File>,
 }
 
 fn decode_to_config_v2(value: GetResolvedConfigOutput) -> Result<PackageMeta> {
@@ -271,11 +225,11 @@ async fn serve_release(
         .map_err(|_| error::ErrorNotFound("Config not found"))?;
 
     // Convert important and lazy files from JSON back to Vec<File>
-    let important_files: Vec<File> =
+    let important_files: Vec<Resource> =
         serde_json::from_value(package_data.important.clone()).unwrap_or_default();
-    let lazy_files: Vec<File> =
+    let lazy_files: Vec<Resource> =
         serde_json::from_value(package_data.lazy.clone()).unwrap_or_default();
-    let index_file: File = serde_json::from_value(package_data.index.clone()).unwrap_or_default();
+    let index_file: Resource = serde_json::from_value(package_data.index.clone()).unwrap_or_default();
 
     Ok(Json(ReleaseConfig {
         version: config_data.version.to_string(),
@@ -295,6 +249,7 @@ async fn serve_release(
             important: important_files,
             lazy: lazy_files,
         },
-        resources: package_data.resources,
+        resources: serde_json::from_value(package_data.resources)
+            .unwrap_or_else(|_| vec![]),
     }))
 }
