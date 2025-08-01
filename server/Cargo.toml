@@ -40,6 +40,7 @@ tracing = "0.1.41"
 diesel_migrations = "2.2"
 rand = "0.8"
 aws-smithy-types = "1.2.5"
+sha2 = "0.10"
 
 google-sheets4 = "*"
 hyper = "^0.14"
