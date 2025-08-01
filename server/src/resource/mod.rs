@@ -1,18 +1,23 @@
 use actix_web::{
     delete, error, get, patch, post, web::{self, Json, Path, Query, ReqData}, Result, Scope
 };
+use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 use chrono::Utc;
+use sha2::{Sha256, Digest};
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE, READ},
     types::AppState,
-    utils::db::{
-        models::{Resource as DbResource, NewResource},
-        schema::hyperotaserver::resources::dsl::*,
+    utils::{
+        db::{
+            models::{Resource as DbResource, NewResource},
+            schema::hyperotaserver::resources::dsl::*,
+        },
+        s3::push_file,
     },
 };
 
@@ -73,6 +78,13 @@ struct ResourceListQuery {
     search: Option<String>,
 }
 
+#[derive(MultipartForm)]
+struct UploadResourceRequest {
+    file: TempFile,
+    file_path: actix_multipart::form::text::Text<String>,
+    version: actix_multipart::form::text::Text<i32>,
+}
+
 #[derive(Serialize)]
 struct SuccessResponse {
     message: String,
@@ -83,8 +95,9 @@ pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_resource)
         .service(bulk_create_resources)
-        .service(get_resource)
+        .service(upload_resource)
         .service(list_resources)
+        .service(get_resource)
         .service(update_resource)
         .service(delete_resource)
 }
@@ -124,6 +137,7 @@ async fn create_resource(
         .filter(org_id.eq(&organisation))
         .filter(app_id.eq(&application))
         .filter(file_path.eq(&req.file_path))
+        .filter(version.eq(req.version.unwrap_or(0)))
         .select(DbResource::as_select())
         .first::<DbResource>(&mut conn)
         .optional()
@@ -229,6 +243,117 @@ async fn bulk_create_resources(
     };
 
     Ok(Json(response))
+}
+
+#[post("/upload")]
+async fn upload_resource(
+    MultipartForm(form): MultipartForm<UploadResourceRequest>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<ResourceResponse>, actix_web::Error> {
+    let auth_response = auth_response.into_inner();
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(error::ErrorUnauthorized)?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let file_path_str = form.file_path.into_inner();
+    let uploaded_file = form.file;
+
+    // Validate file path
+    if file_path_str.is_empty() {
+        return Err(error::ErrorBadRequest("File path cannot be empty"));
+    }
+
+    // Check for duplicate file_path
+    let existing_resource = resources
+        .filter(org_id.eq(&organisation))
+        .filter(app_id.eq(&application))
+        .filter(file_path.eq(&file_path_str))
+        .filter(version.eq(form.version.clone()))
+        .select(DbResource::as_select())
+        .first::<DbResource>(&mut conn)
+        .optional()
+        .map_err(error::ErrorInternalServerError)?;
+
+    if existing_resource.is_some() {
+        return Err(error::ErrorConflict(format!(
+            "Resource with file_path '{}' already exists",
+            file_path_str
+        )));
+    }
+
+    // Read file data for checksum calculation and size
+    let file_data = tokio::fs::read(uploaded_file.file.path()).await
+        .map_err(error::ErrorInternalServerError)?;
+    
+    let file_size = file_data.len() as i64;
+
+    // Calculate SHA-256 checksum
+    let mut hasher = Sha256::new();
+    hasher.update(&file_data);
+    let calculated_checksum = format!("{:x}", hasher.finalize());
+
+    // Generate S3 path
+    let file_name = std::path::Path::new(&file_path_str)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(&file_path_str);
+    
+    let s3_path = format!(
+        "assets/{}/{}/resources/{}/{}/{}",
+        organisation, application, file_name, form.version.clone(), file_name
+    );
+
+    // Upload to S3
+    let s3_client = &state.s3_client;
+    
+    match push_file(
+        s3_client,
+        state.env.bucket_name.clone(),
+        uploaded_file,
+        s3_path.clone(),
+    ).await {
+        Ok(obj) => {
+            println!("File uploaded successfully: {:?}", obj);
+            // Create the URL for the uploaded file
+            let file_url = format!(
+                "{}/{}/{}",
+                "http://localhost:7566", state.env.bucket_name, s3_path
+            );
+
+            // Create new resource in database
+            let new_resource = NewResource {
+                app_id: application,
+                org_id: organisation,
+                url: file_url,
+                file_path: file_path_str,
+                version: form.version.into_inner(),
+                size: file_size,
+                checksum: calculated_checksum,
+                metadata: json!({}),
+                created_at: Utc::now(),
+            };
+
+            let created_resource = diesel::insert_into(resources)
+                .values(&new_resource)
+                .returning(DbResource::as_returning())
+                .get_result::<DbResource>(&mut conn)
+                .map_err(error::ErrorInternalServerError)?;
+
+            Ok(Json(db_resource_to_response(created_resource)))
+        }
+        Err(e) => {
+            return Err(error::ErrorInternalServerError(format!(
+                "Failed to upload file to S3: {:?}", e
+            )));
+        }
+    }
 }
 
 #[get("/{resource_id}")]

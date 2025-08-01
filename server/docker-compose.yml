@@ -200,6 +200,8 @@ services:
       - DEBUG=1
       - PERSISTENCE=1 # Enable persistence
       - DATA_DIR=/var/lib/localstack/data
+    ports:
+      - "7566:4566" # LocalStack Gateway
     healthcheck:
       # Check specific services that we need (kms and s3)
       test: >-
