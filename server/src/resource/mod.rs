@@ -1,13 +1,15 @@
 use actix_web::{
-    delete, error, get, patch, post, web::{self, Json, Path, Query, ReqData}, Result, Scope
+    delete, error, get, patch, post, web::{self, Json, Path, Query, ReqData}, HttpResponse, Result, Scope
 };
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tokio::task;
 use uuid::Uuid;
 use chrono::Utc;
 use sha2::{Sha256, Digest};
+use futures_util::StreamExt;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE, READ},
@@ -26,8 +28,6 @@ struct ResourceRequest {
     file_path: String,
     url: String,
     version: Option<i32>,
-    size: Option<i64>,
-    checksum: Option<String>,
     metadata: Option<Value>,
 }
 
@@ -46,6 +46,21 @@ struct UpdateResourceRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+enum FileStatus {
+    Pending,
+    Ready,
+}
+
+impl ToString for FileStatus {
+    fn to_string(&self) -> String {
+        match self {
+            FileStatus::Pending => "pending".to_string(),
+            FileStatus::Ready => "ready".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
 struct ResourceResponse {
     pub id: String,
     pub file_path: String,
@@ -54,6 +69,7 @@ struct ResourceResponse {
     pub size: i64,
     pub checksum: String,
     pub metadata: Value,
+    pub status: FileStatus,
     pub created_at: String,
 }
 
@@ -85,6 +101,11 @@ struct UploadResourceRequest {
     version: actix_multipart::form::text::Text<i32>,
 }
 
+#[derive(MultipartForm)]
+struct UploadBulkResourcesRequest {
+    file: TempFile
+}
+
 #[derive(Serialize)]
 struct SuccessResponse {
     message: String,
@@ -111,6 +132,11 @@ fn db_resource_to_response(resource: DbResource) -> ResourceResponse {
         size: resource.size,
         checksum: resource.checksum,
         metadata: resource.metadata,
+        status: if resource.size > 0 {
+            FileStatus::Ready
+        } else {
+            FileStatus::Pending
+        },
         created_at: resource.created_at.to_rfc3339(),
     }
 }
@@ -150,6 +176,8 @@ async fn create_resource(
         )));
     }
 
+    let (file_size, file_checksum) = download_and_checksum(&req.url.clone()).await?;
+
     // Create new resource
     let new_resource = NewResource {
         app_id: application,
@@ -157,8 +185,8 @@ async fn create_resource(
         url: req.url.clone(),
         file_path: req.file_path.clone(),
         version: req.version.unwrap_or(1),
-        size: req.size.unwrap_or(0),
-        checksum: req.checksum.clone().unwrap_or_default(),
+        size: file_size as i64,
+        checksum: file_checksum,
         metadata: req.metadata.clone().unwrap_or_else(|| json!({})),
         created_at: Utc::now(),
     };
@@ -177,7 +205,7 @@ async fn bulk_create_resources(
     req: Json<BulkResourceRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<BulkResourceResponse>, actix_web::Error> {
+) -> Result<HttpResponse, actix_web::Error> {
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
         .map_err(error::ErrorUnauthorized)?;
@@ -214,8 +242,8 @@ async fn bulk_create_resources(
             url: resource_req.url.clone(),
             file_path: resource_req.file_path.clone(),
             version: resource_req.version.unwrap_or(1),
-            size: resource_req.size.unwrap_or(0),
-            checksum: resource_req.checksum.clone().unwrap_or_default(),
+            size: 0,
+            checksum: "".to_string(),
             metadata: resource_req.metadata.clone().unwrap_or_else(|| json!({})),
             created_at: Utc::now(),
         };
@@ -232,9 +260,28 @@ async fn bulk_create_resources(
             .map_err(error::ErrorInternalServerError)?;
 
         created_resources = inserted_resources
+            .clone()
             .into_iter()
             .map(db_resource_to_response)
             .collect();
+
+        for res in inserted_resources.iter() {
+            let pool = state.db_pool.clone();
+            let file_url = res.url.clone();
+            let res_id = res.id;
+            task::spawn(async move {
+                if let Ok((file_size, file_checksum)) = download_and_checksum(&file_url).await {
+                    if let Ok(mut conn) = pool.get() {
+                        let _ = diesel::update(resources.find(res_id))
+                            .set((
+                                size.eq(file_size as i64),
+                                checksum.eq(file_checksum),
+                            ))
+                            .execute(&mut conn);
+                    }
+                }
+            });
+        }
     }
 
     let response = BulkResourceResponse {
@@ -242,7 +289,7 @@ async fn bulk_create_resources(
         created_resources,
     };
 
-    Ok(Json(response))
+    Ok(HttpResponse::Accepted().json(response))
 }
 
 #[post("/upload")]
@@ -595,4 +642,22 @@ async fn delete_resource(
         message: format!("Resource with ID '{}' deleted successfully", resource_id),
         success: true,
     }))
+}
+
+async fn download_and_checksum(file_url: &str) -> Result<(u64, String), Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let resp = client.get(file_url).send().await?;
+    let mut stream = resp.bytes_stream();
+
+    let mut hasher = Sha256::new();
+    let mut total_bytes = 0u64;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        total_bytes += chunk.len() as u64;
+        hasher.update(&chunk);
+    }
+
+    let file_checksum = hasher.finalize();
+    Ok((total_bytes, hex::encode(file_checksum)))
 }

@@ -104,7 +104,7 @@ pub struct NewWorkspaceName<'a> {
     pub workspace_name: &'a str,
 }
 
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize)]
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]
 #[diesel(table_name = resources)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Resource {
