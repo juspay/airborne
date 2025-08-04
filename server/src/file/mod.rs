@@ -177,7 +177,6 @@ async fn create_file(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    // Check for duplicate file_path
     let existing_file = files
         .filter(org_id.eq(&organisation))
         .filter(app_id.eq(&application))
@@ -239,9 +238,7 @@ async fn bulk_create_files(
     let mut created_files = Vec::new();
     let mut new_files = Vec::new();
 
-    // Prepare new files for bulk insert
     for file_req in &req.files {
-        // Check for duplicate file_path
         let existing_file = files
             .filter(org_id.eq(&organisation))
             .filter(app_id.eq(&application))
@@ -277,7 +274,6 @@ async fn bulk_create_files(
         new_files.push(new_file);
     }
 
-    // Bulk insert
     if !new_files.is_empty() {
         let inserted_files = diesel::insert_into(files)
             .values(&new_files)
@@ -336,11 +332,9 @@ async fn get_file(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    // Parse UUID
     let file_uuid = Uuid::parse_str(&file_id)
         .map_err(|_| error::ErrorBadRequest("Invalid file ID format"))?;
 
-    // Get the file
     let file = files
         .filter(id.eq(file_uuid))
         .filter(org_id.eq(&organisation))
@@ -369,12 +363,10 @@ async fn list_files(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    // Build base query with filters
     let base_query = files
         .filter(org_id.eq(&organisation))
         .filter(app_id.eq(&application));
 
-    // Apply search filter if provided
     let search_filter = if let Some(search_term) = &query.search {
         let search_pattern = format!("%{}%", search_term);
         Some((search_pattern.clone(), search_pattern))
@@ -382,7 +374,6 @@ async fn list_files(
         None
     };
 
-    // Get total count
     let total = if let Some((ref pattern1, ref pattern2)) = search_filter {
         base_query
             .filter(
@@ -399,12 +390,10 @@ async fn list_files(
             .map_err(error::ErrorInternalServerError)? as usize
     };
 
-    // Apply pagination
     let page = query.page.unwrap_or(1);
-    let per_page = query.per_page.unwrap_or(50).min(200); // Max 200 per page
+    let per_page = query.per_page.unwrap_or(50).min(200);
     let offset = ((page - 1) * per_page) as i64;
 
-    // Build the final query for data
     let file_list = if let Some((ref pattern1, ref pattern2)) = search_filter {
         base_query
             .filter(
@@ -459,12 +448,10 @@ async fn update_file(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    // Parse UUID
     let file_uuid = Uuid::parse_str(&file_id)
         .map_err(|_| error::ErrorBadRequest("Invalid file ID format"))?;
 
-    // Check if file exists and belongs to the user
-    let _existing_file = files
+    let _ = files
         .filter(id.eq(file_uuid))
         .filter(org_id.eq(&organisation))
         .filter(app_id.eq(&application))
@@ -494,7 +481,6 @@ async fn update_file(
         }
     }
 
-    // Get updated file
     let updated_file = files
         .filter(id.eq(file_uuid))
         .select(DbFile::as_select())
@@ -522,11 +508,9 @@ async fn delete_file(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    // Parse UUID
     let file_uuid = Uuid::parse_str(&file_id)
         .map_err(|_| error::ErrorBadRequest("Invalid file ID format"))?;
 
-    // Delete the file
     let deleted_rows = diesel::delete(
         files
             .filter(id.eq(file_uuid))
