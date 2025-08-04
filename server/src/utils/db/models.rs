@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    cleanup_outbox, configs, packages, releases, workspace_names, resources,
+    cleanup_outbox, configs, packages, releases, workspace_names, files,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -105,9 +105,9 @@ pub struct NewWorkspaceName<'a> {
 }
 
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]
-#[diesel(table_name = resources)]
+#[diesel(table_name = files)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct Resource {
+pub struct FileEntry {
     pub id: uuid::Uuid,
     pub app_id: String,
     pub org_id: String,
@@ -122,8 +122,8 @@ pub struct Resource {
 }
 
 #[derive(Insertable)]
-#[diesel(table_name = resources)]
-pub struct NewResource {
+#[diesel(table_name = files)]
+pub struct NewFileEntry {
     pub app_id: String,
     pub org_id: String,
     pub version: i32,

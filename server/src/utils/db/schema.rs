@@ -29,6 +29,21 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.files (id) {
+            id -> Uuid,
+            app_id -> Text,
+            org_id -> Text,
+            version -> Int4,
+            url -> Text,
+            file_path -> Text,
+            size -> Int8,
+            checksum -> Text,
+            metadata -> Jsonb,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.packages (id) {
             id -> Uuid,
             version -> Int4,
@@ -56,21 +71,6 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
-        hyperotaserver.resources (id) {
-            id -> Uuid,
-            app_id -> Text,
-            org_id -> Text,
-            version -> Int4,
-            url -> Text,
-            file_path -> Text,
-            size -> Int8,
-            checksum -> Text,
-            metadata -> Jsonb,
-            created_at -> Timestamptz,
-        }
-    }
-
-    diesel::table! {
         hyperotaserver.workspace_names (id) {
             id -> Int4,
             organization_id -> Text,
@@ -81,9 +81,9 @@ pub mod hyperotaserver {
     diesel::allow_tables_to_appear_in_same_query!(
         cleanup_outbox,
         configs,
+        files,
         packages,
         releases,
-        resources,
         workspace_names,
     );
 }

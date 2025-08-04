@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE hyperotaserver.resources (
+CREATE TABLE hyperotaserver.files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     app_id TEXT NOT NULL,
     org_id TEXT NOT NULL,
