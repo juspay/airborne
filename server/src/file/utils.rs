@@ -47,3 +47,17 @@ pub fn create_s3_file_path(
         org_id, app_id, file_id, version, file_name
     )
 }
+
+pub fn parse_file_key(spec: &str) -> (String, Option<i32>, Option<String>) {
+    if let Some(at_idx) = spec.rfind('@') {
+        let (path, suffix_with_at) = spec.split_at(at_idx);
+        let suffix = &suffix_with_at[1..];
+        match suffix.splitn(2, ':').collect::<Vec<_>>().as_slice() {
+            ["version", ver] => (path.to_string(), ver.parse().ok(), None),
+            ["tag", tag]     => (path.to_string(), None, Some(tag.to_string())),
+            _                       => (spec.to_string(), None, None),
+        }
+    } else {
+        (spec.to_string(), None, None)
+    }
+}

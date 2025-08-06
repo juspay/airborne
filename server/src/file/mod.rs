@@ -1,7 +1,7 @@
 use std::{fs::File, io::Read};
 
 use actix_web::{
-    delete, error, get, patch, post, web::{self, Json, Path, Query, ReqData}, HttpResponse, Result, Scope
+    error, get, patch, post, web::{self, Json, Path, Query, ReqData}, HttpResponse, Result, Scope
 };
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use diesel::prelude::*;
@@ -29,7 +29,7 @@ use crate::{
 struct FileRequest {
     file_path: String,
     url: String,
-    version: i32,
+    tag: String,
     metadata: Option<Value>,
 }
 
@@ -41,11 +41,7 @@ struct BulkFileRequest {
 
 #[derive(Serialize, Deserialize)]
 struct UpdateFileRequest {
-    url: Option<String>,
-    version: Option<i32>,
-    size: Option<i64>,
-    checksum: Option<String>,
-    metadata: Option<Value>,
+    tag: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -69,6 +65,7 @@ struct FileResponse {
     pub file_path: String,
     pub url: String,
     pub version: i32,
+    pub tag: String,
     pub size: i64,
     pub checksum: String,
     pub metadata: Value,
@@ -124,12 +121,6 @@ struct BulkFileUploadResponse {
     skipped: Vec<String>,
 }
 
-#[derive(Serialize)]
-struct SuccessResponse {
-    message: String,
-    success: bool,
-}
-
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_file)
@@ -139,18 +130,18 @@ pub fn add_routes() -> Scope {
         .service(list_files)
         .service(get_file)
         .service(update_file)
-        .service(delete_file)
 }
 
-fn db_file_to_response(file: DbFile) -> FileResponse {
+fn db_file_to_response(file: &DbFile) -> FileResponse {
     FileResponse {
-        id: file.id.to_string(),
-        file_path: file.file_path,
-        url: file.url,
+        id: format!("{}@version:{}", file.file_path, file.version),
+        file_path: file.file_path.clone(),
+        url: file.url.clone(),
         version: file.version,
+        tag: file.tag.clone(),
         size: file.size,
-        checksum: file.checksum,
-        metadata: file.metadata,
+        checksum: file.checksum.clone(),
+        metadata: file.metadata.clone(),
         status: if file.size > 0 {
             FileStatus::Ready
         } else {
@@ -181,7 +172,7 @@ async fn create_file(
         .filter(org_id.eq(&organisation))
         .filter(app_id.eq(&application))
         .filter(file_path.eq(&req.file_path))
-        .filter(version.eq(req.version))
+        .filter(tag.eq(&req.tag))
         .select(DbFile::as_select())
         .first::<DbFile>(&mut conn)
         .optional()
@@ -195,6 +186,12 @@ async fn create_file(
     }
 
     let (file_size, file_checksum) = utils::download_and_checksum(&req.url.clone()).await?;
+    let latest_file = get_lastest_version_file(
+        &req.file_path,
+        &organisation,
+        &application,
+        &mut conn
+    ).await?;
 
     // Create new file
     let new_file = NewFileEntry {
@@ -202,7 +199,8 @@ async fn create_file(
         org_id: organisation,
         url: req.url.clone(),
         file_path: req.file_path.clone(),
-        version: req.version,
+        version: latest_file.version + 1,
+        tag: req.tag.clone(),
         size: file_size as i64,
         checksum: file_checksum,
         metadata: req.metadata.clone().unwrap_or_else(|| json!({})),
@@ -215,7 +213,7 @@ async fn create_file(
         .get_result::<DbFile>(&mut conn)
         .map_err(error::ErrorInternalServerError)?;
 
-    Ok(Json(db_file_to_response(created_file)))
+    Ok(Json(db_file_to_response(&created_file)))
 }
 
 #[post("/bulk")]
@@ -239,11 +237,18 @@ async fn bulk_create_files(
     let mut new_files = Vec::new();
 
     for file_req in &req.files {
+        let latest_file = get_lastest_version_file(
+            &file_req.file_path,
+            &organisation,
+            &application,
+            &mut conn
+        ).await?;
+
         let existing_file = files
             .filter(org_id.eq(&organisation))
             .filter(app_id.eq(&application))
             .filter(file_path.eq(&file_req.file_path))
-            .filter(version.eq(file_req.version))
+            .filter(tag.eq(&file_req.tag))
             .select(DbFile::as_select())
             .first::<DbFile>(&mut conn)
             .optional()
@@ -254,8 +259,8 @@ async fn bulk_create_files(
                 continue;
             }
             return Err(error::ErrorConflict(format!(
-                "A file with file_path '{}' already exists with same version '{}'",
-                file_req.file_path, file_req.version
+                "A file with file_path '{}' already exists with same tag '{}'",
+                file_req.file_path, file_req.tag
             )));
         }
 
@@ -264,7 +269,8 @@ async fn bulk_create_files(
             org_id: organisation.clone(),
             url: file_req.url.clone(),
             file_path: file_req.file_path.clone(),
-            version: file_req.version,
+            version: latest_file.version + 1,
+            tag: file_req.tag.clone(),
             size: 0,
             checksum: "".to_string(),
             metadata: file_req.metadata.clone().unwrap_or_else(|| json!({})),
@@ -284,7 +290,7 @@ async fn bulk_create_files(
         created_files = inserted_files
             .clone()
             .into_iter()
-            .map(db_file_to_response)
+            .map(|f| db_file_to_response(&f))
             .collect();
 
         for res in inserted_files.iter() {
@@ -314,13 +320,22 @@ async fn bulk_create_files(
     Ok(HttpResponse::Accepted().json(response))
 }
 
-#[get("/{file_id}")]
+/// Retrieves a file by its Key.
+/// The Key is expected to be in the format "$file_path@version:$version_number" or "$file_path@tag:$tag".
+#[get("/{file_key}")]
 async fn get_file(
     path: Path<String>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, actix_web::Error> {
     let file_id = path.into_inner();
+    
+    let (input_file_path, file_version, file_tag) = utils::parse_file_key(&file_id);
+
+    if input_file_path.is_empty() {
+        return Err(error::ErrorBadRequest("File path cannot be empty"));
+    }
+
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, READ)
         .map_err(error::ErrorUnauthorized)?;
@@ -332,18 +347,45 @@ async fn get_file(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    let file_uuid = Uuid::parse_str(&file_id)
-        .map_err(|_| error::ErrorBadRequest("Invalid file ID format"))?;
+    let file = if let Some(f_version) = file_version {
+        files
+            .filter(file_path.eq(&input_file_path))
+            .filter(org_id.eq(&organisation))
+            .filter(app_id.eq(&application))
+            .filter(version.eq(f_version))
+            .select(DbFile::as_select())
+            .first::<DbFile>(&mut conn)
+            .map_err(|_| error::ErrorNotFound(format!("File with ID '{}' not found", file_id)))?
+    } else if let Some(f_tag) = file_tag {
+        files
+            .filter(file_path.eq(&input_file_path))
+            .filter(org_id.eq(&organisation))
+            .filter(app_id.eq(&application))
+            .filter(tag.eq(f_tag))
+            .select(DbFile::as_select())
+            .first::<DbFile>(&mut conn)
+            .map_err(|_| error::ErrorNotFound(format!("File with ID '{}' not found", file_id)))?
+    } else {
+        return Err(error::ErrorBadRequest("File key must contain a version or tag"));
+    };
 
-    let file = files
-        .filter(id.eq(file_uuid))
-        .filter(org_id.eq(&organisation))
-        .filter(app_id.eq(&application))
+    Ok(Json(db_file_to_response(&file)))
+}
+
+async fn get_lastest_version_file(
+    file_path_: &str,
+    organisation: &str,
+    application: &str,
+    conn: &mut PgConnection,
+) -> Result<DbFile, actix_web::Error> {
+    files
+        .filter(file_path.eq(file_path))
+        .filter(org_id.eq(organisation))
+        .filter(app_id.eq(application))
+        .order(version.desc())
         .select(DbFile::as_select())
-        .first::<DbFile>(&mut conn)
-        .map_err(|_| error::ErrorNotFound(format!("File with ID '{}' not found", file_id)))?;
-
-    Ok(Json(db_file_to_response(file)))
+        .first::<DbFile>(conn)
+        .map_err(|_| error::ErrorNotFound(format!("No file found for path '{}'", file_path_)))
 }
 
 #[get("/list")]
@@ -418,7 +460,7 @@ async fn list_files(
 
     let files_response = file_list
         .into_iter()
-        .map(db_file_to_response)
+        .map(|f| db_file_to_response(&f))
         .collect();
 
     Ok(Json(FileListResponse {
@@ -429,7 +471,9 @@ async fn list_files(
     }))
 }
 
-#[patch("/{file_id}")]
+/// Updates a file's tag
+/// File Key is expected to be in the format "$file_path@version:$version_number" or "$file_path@tag:$tag".
+#[patch("/{file_key}")]
 async fn update_file(
     path: Path<String>,
     req: Json<UpdateFileRequest>,
@@ -437,66 +481,12 @@ async fn update_file(
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, actix_web::Error> {
     let file_id = path.into_inner();
-    let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(error::ErrorUnauthorized)?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(error::ErrorUnauthorized)?;
+    let (input_file_path, file_version, file_tag) = utils::parse_file_key(&file_id);
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(error::ErrorInternalServerError)?;
-
-    let file_uuid = Uuid::parse_str(&file_id)
-        .map_err(|_| error::ErrorBadRequest("Invalid file ID format"))?;
-
-    let _ = files
-        .filter(id.eq(file_uuid))
-        .filter(org_id.eq(&organisation))
-        .filter(app_id.eq(&application))
-        .select(DbFile::as_select())
-        .first::<DbFile>(&mut conn)
-        .map_err(|_| error::ErrorNotFound(format!("File with ID '{}' not found", file_id)))?;
-
-    if req.url.is_some() || req.version.is_some() || req.size.is_some() || req.checksum.is_some() || req.metadata.is_some() {
-        if let Some(new_url) = &req.url {
-            let (file_size, file_checksum) = utils::download_and_checksum(new_url).await?;
-
-            diesel::update(files.filter(id.eq(file_uuid)))
-                .set((
-                    url.eq(new_url),
-                    size.eq(file_size as i64),
-                    checksum.eq(file_checksum),
-                ))
-                .execute(&mut conn)
-                .map_err(error::ErrorInternalServerError)?;
-        }
-        
-        if let Some(new_metadata) = &req.metadata {
-            diesel::update(files.filter(id.eq(file_uuid)))
-                .set(metadata.eq(new_metadata))
-                .execute(&mut conn)
-                .map_err(error::ErrorInternalServerError)?;
-        }
+    if input_file_path.is_empty() {
+        return Err(error::ErrorBadRequest("File path cannot be empty"));
     }
 
-    let updated_file = files
-        .filter(id.eq(file_uuid))
-        .select(DbFile::as_select())
-        .first::<DbFile>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
-
-    Ok(Json(db_file_to_response(updated_file)))
-}
-
-#[delete("/{file_id}")]
-async fn delete_file(
-    path: Path<String>,
-    auth_response: ReqData<AuthResponse>,
-    state: web::Data<AppState>,
-) -> Result<Json<SuccessResponse>, actix_web::Error> {
-    let file_id = path.into_inner();
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
         .map_err(error::ErrorUnauthorized)?;
@@ -508,26 +498,38 @@ async fn delete_file(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    let file_uuid = Uuid::parse_str(&file_id)
-        .map_err(|_| error::ErrorBadRequest("Invalid file ID format"))?;
+    let file = (&mut conn).transaction::<DbFile, diesel::result::Error, _>(|conn| {
+        let file_in_db = if let Some(f_version) = file_version {
+            files
+                .filter(file_path.eq(&input_file_path))
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(version.eq(f_version))
+                .select(DbFile::as_select())
+                .first::<DbFile>(conn)?
+        } else if let Some(f_tag) = file_tag {
+            files
+                .filter(file_path.eq(&input_file_path))
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(tag.eq(f_tag))
+                .select(DbFile::as_select())
+                .first::<DbFile>(conn)?
+        } else {
+            return Err(diesel::result::Error::NotFound);
+        };
 
-    let deleted_rows = diesel::delete(
+        diesel::update(files.filter(id.eq(file_in_db.id)))
+            .set(tag.eq(&req.tag))
+            .execute(conn)?;
+
         files
-            .filter(id.eq(file_uuid))
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application))
-    )
-    .execute(&mut conn)
-    .map_err(error::ErrorInternalServerError)?;
+            .filter(id.eq(file_in_db.id))
+            .select(DbFile::as_select())
+            .first::<DbFile>(conn)
+    }).map_err(error::ErrorInternalServerError)?;
 
-    if deleted_rows == 0 {
-        return Err(error::ErrorNotFound(format!("File with ID '{}' not found", file_id)));
-    }
-
-    Ok(Json(SuccessResponse {
-        message: format!("File with ID '{}' deleted successfully", file_id),
-        success: true,
-    }))
+    Ok(Json(db_file_to_response(&file)))
 }
 
 #[post("/upload")]
@@ -576,6 +578,7 @@ async fn upload_file(
         org_id: organisation.clone(),
         url: "".to_string(),
         file_path: file_path_str.clone(),
+        tag: "".to_string(),
         version: form.version.clone(),
         size: 0,
         checksum: "".to_string(),
@@ -633,7 +636,7 @@ async fn upload_file(
                 .execute(&mut conn)
                 .map_err(error::ErrorInternalServerError)?;
 
-            Ok(Json(db_file_to_response(created_file)))
+            Ok(Json(db_file_to_response(&created_file)))
         }
         Err(e) => {
             diesel::delete(files.filter(id.eq(created_file.id)))
@@ -719,6 +722,7 @@ async fn upload_bulk_files(
             file_path: m.file_path.clone(),
             version: m.version.clone(),
             size: 0,
+            tag: "".to_string(),
             checksum: "".to_string(),
             metadata: m.metadata.clone().unwrap_or_else(|| json!({})),
             created_at: Utc::now(),
@@ -786,7 +790,7 @@ async fn upload_bulk_files(
                         .execute(&mut conn)
                         .map_err(error::ErrorInternalServerError)?;
 
-                    uploaded.push(db_file_to_response(created_file.clone()));
+                    uploaded.push(db_file_to_response(&created_file));
                 }
                 Err(e) => {
                     diesel::delete(files.filter(id.eq(created_file.id)))
