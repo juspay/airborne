@@ -84,7 +84,9 @@ struct FileListResponse {
 #[derive(Serialize, Deserialize)]
 struct BulkFileResponse {
     created_files: Vec<FileResponse>,
+    skipped_files: Vec<String>,
     total_created: usize,
+    total_skipped: usize,
 }
 
 #[derive(Deserialize)]
@@ -186,32 +188,38 @@ async fn create_file(
     }
 
     let (file_size, file_checksum) = utils::download_and_checksum(&req.url.clone()).await?;
-    let latest_file = get_lastest_version_file(
-        &req.file_path,
-        &organisation,
-        &application,
-        &mut conn
-    ).await?;
 
-    // Create new file
-    let new_file = NewFileEntry {
-        app_id: application,
-        org_id: organisation,
-        url: req.url.clone(),
-        file_path: req.file_path.clone(),
-        version: latest_file.version + 1,
-        tag: req.tag.clone(),
-        size: file_size as i64,
-        checksum: file_checksum,
-        metadata: req.metadata.clone().unwrap_or_else(|| json!({})),
-        created_at: Utc::now(),
-    };
+    let created_file = (&mut conn).transaction::<DbFile, diesel::result::Error, _>(|conn| {
+        let latest_file = files
+            .filter(file_path.eq(&req.file_path))
+            .filter(org_id.eq(&organisation))
+            .filter(app_id.eq(&application))
+            .order(version.desc())
+            .select(DbFile::as_select())
+            .for_update()
+            .first::<DbFile>(conn)
+            .optional()?;
 
-    let created_file = diesel::insert_into(files)
-        .values(&new_file)
-        .returning(DbFile::as_returning())
-        .get_result::<DbFile>(&mut conn)
-        .map_err(error::ErrorInternalServerError)?;
+        let latest_version = latest_file.map_or(0, |f| f.version);
+
+        let new_file = NewFileEntry {
+            app_id: application.clone(),
+            org_id: organisation.clone(),
+            url: req.url.clone(),
+            file_path: req.file_path.clone(),
+            version: latest_version + 1,
+            tag: req.tag.clone(),
+            size: file_size as i64,
+            checksum: file_checksum,
+            metadata: req.metadata.clone().unwrap_or_else(|| json!({})),
+            created_at: Utc::now(),
+        };
+
+        diesel::insert_into(files)
+            .values(&new_file)
+            .returning(DbFile::as_returning())
+            .get_result::<DbFile>(conn)
+    }).map_err(error::ErrorInternalServerError)?;
 
     Ok(Json(db_file_to_response(&created_file)))
 }
@@ -233,88 +241,106 @@ async fn bulk_create_files(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
-    let mut created_files = Vec::new();
     let mut new_files = Vec::new();
+    let mut skipped_files = Vec::new();
 
-    for file_req in &req.files {
-        let latest_file = get_lastest_version_file(
-            &file_req.file_path,
-            &organisation,
-            &application,
-            &mut conn
-        ).await?;
+    let inserted_files = (&mut conn).transaction::<Vec<DbFile>, diesel::result::Error, _>(|conn| {
+        for file_req in &req.files {
 
-        let existing_file = files
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application))
-            .filter(file_path.eq(&file_req.file_path))
-            .filter(tag.eq(&file_req.tag))
-            .select(DbFile::as_select())
-            .first::<DbFile>(&mut conn)
-            .optional()
-            .map_err(error::ErrorInternalServerError)?;
+            let existing_file = files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(file_path.eq(&file_req.file_path))
+                .filter(tag.eq(&file_req.tag))
+                .select(DbFile::as_select())
+                .first::<DbFile>(conn)
+                .optional()?;
 
-        if existing_file.is_some() {
-            if req.skip_duplicates {
-                continue;
+            if existing_file.is_some() {
+                if req.skip_duplicates {
+                    skipped_files.push(file_req.file_path.clone());
+                    continue;
+                }
+                return Err(diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UniqueViolation,
+                    Box::new(format!(
+                        "A file with file_path '{}' already exists with same tag '{}'",
+                        file_req.file_path, file_req.tag
+                    )),
+                ));
             }
-            return Err(error::ErrorConflict(format!(
-                "A file with file_path '{}' already exists with same tag '{}'",
-                file_req.file_path, file_req.tag
-            )));
+
+            let latest_file = files
+                .filter(file_path.eq(&file_req.file_path))
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .order(version.desc())
+                .select(DbFile::as_select())
+                .for_update()
+                .first::<DbFile>(conn)
+                .optional()?;
+
+            let latest_version = latest_file.map_or(0, |f| f.version);
+
+            let new_file = NewFileEntry {
+                app_id: application.clone(),
+                org_id: organisation.clone(),
+                url: file_req.url.clone(),
+                file_path: file_req.file_path.clone(),
+                version: latest_version + 1,
+                tag: file_req.tag.clone(),
+                size: 0,
+                checksum: "".to_string(),
+                metadata: file_req.metadata.clone().unwrap_or_else(|| json!({})),
+                created_at: Utc::now(),
+            };
+
+            new_files.push(new_file);
         }
 
-        let new_file = NewFileEntry {
-            app_id: application.clone(),
-            org_id: organisation.clone(),
-            url: file_req.url.clone(),
-            file_path: file_req.file_path.clone(),
-            version: latest_file.version + 1,
-            tag: file_req.tag.clone(),
-            size: 0,
-            checksum: "".to_string(),
-            metadata: file_req.metadata.clone().unwrap_or_else(|| json!({})),
-            created_at: Utc::now(),
-        };
-
-        new_files.push(new_file);
-    }
-
-    if !new_files.is_empty() {
-        let inserted_files = diesel::insert_into(files)
+        diesel::insert_into(files)
             .values(&new_files)
             .returning(DbFile::as_returning())
-            .get_results::<DbFile>(&mut conn)
-            .map_err(error::ErrorInternalServerError)?;
-
-        created_files = inserted_files
-            .clone()
-            .into_iter()
-            .map(|f| db_file_to_response(&f))
-            .collect();
-
-        for res in inserted_files.iter() {
-            let pool = state.db_pool.clone();
-            let file_url = res.url.clone();
-            let res_id = res.id;
-            task::spawn(async move {
-                if let Ok((file_size, file_checksum)) = utils::download_and_checksum(&file_url).await {
-                    if let Ok(mut conn) = pool.get() {
-                        let _ = diesel::update(files.find(res_id))
-                            .set((
-                                size.eq(file_size as i64),
-                                checksum.eq(file_checksum),
-                            ))
-                            .execute(&mut conn);
-                    }
-                }
-            });
+            .get_results::<DbFile>(conn)
+    }).map_err(|e| {
+        match e {
+            diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::UniqueViolation, info) => {
+                error::ErrorConflict(info.message().to_string())
+            }
+            _ => error::ErrorInternalServerError(e)
         }
+    })?;
+
+    let created_files: Vec<FileResponse> = inserted_files
+        .clone()
+        .into_iter()
+        .map(|f| db_file_to_response(&f))
+        .collect();
+
+    for res in inserted_files.iter() {
+        let pool = state.db_pool.clone();
+        let file_url = res.url.clone();
+        let res_id = res.id;
+        task::spawn(async move {
+            if let Ok((file_size, file_checksum)) = utils::download_and_checksum(&file_url).await {
+                if let Ok(mut conn) = pool.get() {
+                    let _ = diesel::update(files.find(res_id))
+                        .set((
+                            size.eq(file_size as i64),
+                            checksum.eq(file_checksum),
+                        ))
+                        .execute(&mut conn);
+                }
+            }
+        });
     }
+    
 
     let response = BulkFileResponse {
+        total_skipped: skipped_files.len(),
         total_created: created_files.len(),
         created_files,
+        skipped_files,
     };
 
     Ok(HttpResponse::Accepted().json(response))
@@ -370,22 +396,6 @@ async fn get_file(
     };
 
     Ok(Json(db_file_to_response(&file)))
-}
-
-async fn get_lastest_version_file(
-    file_path_: &str,
-    organisation: &str,
-    application: &str,
-    conn: &mut PgConnection,
-) -> Result<DbFile, actix_web::Error> {
-    files
-        .filter(file_path.eq(file_path))
-        .filter(org_id.eq(organisation))
-        .filter(app_id.eq(application))
-        .order(version.desc())
-        .select(DbFile::as_select())
-        .first::<DbFile>(conn)
-        .map_err(|_| error::ErrorNotFound(format!("No file found for path '{}'", file_path_)))
 }
 
 #[get("/list")]

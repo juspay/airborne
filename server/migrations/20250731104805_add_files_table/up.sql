@@ -4,6 +4,7 @@ CREATE TABLE hyperotaserver.files (
     app_id TEXT NOT NULL,
     org_id TEXT NOT NULL,
     version INTEGER NOT NULL,
+    tag TEXT NOT NULL,
     url TEXT NOT NULL,
     file_path TEXT NOT NULL,
     size BIGINT NOT NULL,

@@ -1,2 +1,2 @@
 -- This file should undo anything in `up.sql`
-DROP TABLE IF EXISTS hyperotaserver.resources CASCADE;
+DROP TABLE IF EXISTS hyperotaserver.files CASCADE;

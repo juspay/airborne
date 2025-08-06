@@ -34,6 +34,7 @@ pub mod hyperotaserver {
             app_id -> Text,
             org_id -> Text,
             version -> Int4,
+            tag -> Text,
             url -> Text,
             file_path -> Text,
             size -> Int8,
