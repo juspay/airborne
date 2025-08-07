@@ -11,7 +11,7 @@ use tokio::task;
 use uuid::Uuid;
 use chrono::Utc;
 use zip::ZipArchive;
-mod utils;
+pub mod utils;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, READ, WRITE},

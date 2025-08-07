@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    cleanup_outbox, configs, packages, releases, workspace_names, files,
+    cleanup_outbox, configs, files, packages, packages_v2, releases, workspace_names
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -136,4 +136,29 @@ pub struct NewFileEntry {
     #[diesel(sql_type = diesel::sql_types::Jsonb)]
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]
+#[diesel(table_name = packages_v2)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct PackageV2Entry {
+    pub id: uuid::Uuid,
+    pub index: String,
+    pub app_id: String,
+    pub org_id: String,
+    pub version: i32,
+    pub tag: String,
+    pub files: Vec<Option<String>>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = packages_v2)]
+pub struct NewPackageV2Entry {
+    pub index: String,
+    pub app_id: String,
+    pub org_id: String,
+    pub version: i32,
+    pub tag: String,
+    pub files: Vec<Option<String>>,
 }

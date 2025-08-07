@@ -59,6 +59,19 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.packages_v2 (id) {
+            id -> Uuid,
+            version -> Int4,
+            app_id -> Text,
+            org_id -> Text,
+            index -> Text,
+            files -> Array<Nullable<Text>>,
+            tag -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.releases (id) {
             id -> Uuid,
             org_id -> Text,
@@ -84,6 +97,7 @@ pub mod hyperotaserver {
         configs,
         files,
         packages,
+        packages_v2,
         releases,
         workspace_names,
     );
