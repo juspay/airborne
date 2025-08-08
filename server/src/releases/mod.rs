@@ -1,25 +1,27 @@
 use actix_web::{get, post, web::{self, Json, Query}, HttpResponse, Scope, error};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-use diesel::prelude::*;
+use diesel::{pg::Pg, prelude::*, sql_types::Bool};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use superposition_rust_sdk::types::builders::VariantBuilder;
 use aws_smithy_types::Document;
 
 use crate::{
-    middleware::auth::{AuthResponse, validate_user, WRITE},
-    types::AppState,
-    utils::{
+    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, WRITE}, types::AppState, utils::{
         db::{
-            models::PackageV2Entry,
+            models::{FileEntry, PackageV2Entry},
             schema::hyperotaserver::{
-                packages_v2::{dsl as packages_dsl},
+                files::{
+                    app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id, table as files_table, tag as file_dsl_tag, version as file_dsl_version
+                },
+                packages_v2::dsl as packages_dsl
             },
         },
         document::value_to_document,
         workspace::get_workspace_name_for_application,
-    },
+    }
 };
 
 #[derive(Deserialize)]
@@ -30,17 +32,46 @@ pub struct GetReleaseQuery {
 #[derive(Debug, Deserialize)]
 pub struct CreateReleaseRequest {
     package_id: String,
-    important: Vec<String>,
-    lazy: Vec<String>,
+    package: PackageRequest,
     dimensions: Option<HashMap<String, serde_json::Value>>,
     metadata: Option<serde_json::Value>,
+    resources: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PackageRequest {
+    version: String,
+    properties: Option<serde_json::Value>,
+    important: Vec<String>,
+    lazy: Vec<String>,
 }
 
 #[derive(Serialize)]
-pub struct CreateReleaseResponse {
+struct File {
+    file_path: String,
+    url: String,
+    checksum: String,
+}
+
+#[derive(Serialize)]
+struct Package {
+    properties: Value,
+    important: Vec<File>,
+    lazy: Vec<File>,
+}
+
+#[derive(Serialize)]
+struct Config {
+    boot_timeout: u64,
+    package_timeout: u64,
+}
+
+#[derive(Serialize)]
+struct CreateReleaseResponse {
     id: String,
     created_at: DateTime<Utc>,
-    package_version: i32,
+    config: Config,
+    package: Package,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -97,8 +128,8 @@ async fn create_release(
     })?;
 
     // Check if intersection of important and lazy files is empty
-    let important_set: HashSet<&String> = req.important.iter().collect();
-    let lazy_set: HashSet<&String> = req.lazy.iter().collect();
+    let important_set: HashSet<&String> = req.package.important.iter().collect();
+    let lazy_set: HashSet<&String> = req.package.lazy.iter().collect();
     let overlap: Vec<&String> = important_set.intersection(&lazy_set).cloned().collect();
     if !overlap.is_empty() {
         return Err(error::ErrorBadRequest(format!(
@@ -119,7 +150,7 @@ async fn create_release(
         .map_err(|_| error::ErrorNotFound(format!("Package version {} not found", pkg_version)))?;
 
     // Validate that all provided important files exist in the package
-    for file_path in &req.important {
+    for file_path in &req.package.important {
         if !package_data.files.contains(&Some(file_path.clone())) {
             return Err(error::ErrorBadRequest(format!(
                 "Important file '{}' not found in package {}",
@@ -129,7 +160,7 @@ async fn create_release(
     }
 
     // Validate that all provided lazy files exist in the package
-    for file_path in &req.lazy {
+    for file_path in &req.package.lazy {
         if !package_data.files.contains(&Some(file_path.clone())) {
             return Err(error::ErrorBadRequest(format!(
                 "Lazy file '{}' not found in package {}",
@@ -140,7 +171,6 @@ async fn create_release(
 
     let release_id = Uuid::new_v4();
     let now = Utc::now();
-    let user_id = auth_response.sub.clone();
 
     // Use superposition_org_id from environment
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
@@ -164,8 +194,8 @@ async fn create_release(
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert("package.version".to_string(), Document::from(pkg_version));
     // Add custom important and lazy splits to the variant
-    let important_docs: Vec<Document> = req.important.iter().map(|s| Document::from(s.as_str())).collect();
-    let lazy_docs: Vec<Document> = req.lazy.iter().map(|s| Document::from(s.as_str())).collect();
+    let important_docs: Vec<Document> = req.package.important.iter().map(|s| Document::from(s.as_str())).collect();
+    let lazy_docs: Vec<Document> = req.package.lazy.iter().map(|s| Document::from(s.as_str())).collect();
     control_overrides.insert("package.important".to_string(), Document::from(important_docs));
     control_overrides.insert("package.lazy".to_string(), Document::from(lazy_docs));
 
@@ -239,10 +269,66 @@ async fn create_release(
         experiment_id_for_ramping, release_id, pkg_version
     );
 
+    let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+
+    for file_id in &package_data.files {
+        let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone().unwrap_or("".to_string()));
+
+        if let Some(v) = ver_opt {
+            file_conds.push(Box::new(
+                file_dsl_path
+                    .eq(fp.clone())
+                    .and(file_dsl_version.eq(v))
+            ));
+        } else if let Some(t) = tag_opt {
+            file_conds.push(Box::new(
+                file_dsl_path
+                    .eq(fp.clone())
+                    .and(file_dsl_tag.eq(t.clone()))
+            ));
+        } else {
+            return Err(actix_web::error::ErrorBadRequest("Invalid file key format"));
+        }
+    }
+
+    let combined = file_conds
+        .into_iter()
+        .reduce(|a, b| Box::new(a.or(b)))
+        .expect("we already returned on empty req.files");
+
+    let files: Vec<FileEntry> = files_table
+        .into_boxed::<Pg>()
+        .filter(file_dsl_org_id.eq(&organisation))
+        .filter(file_dsl_app_id.eq(&application))
+        .filter(combined)
+        .load(&mut conn)
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping,
         created_at: now,
-        package_version: pkg_version
+        // TODO: Replace with actual config values
+        config: Config {
+            boot_timeout: 4000,
+            package_timeout: 4000
+        },
+        package: Package {
+            properties: req.package.properties.clone().unwrap_or_default(),
+            important: req.package.important.iter().filter_map(|file_path| {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                })
+            }).collect(),
+            lazy: req.package.lazy.iter().filter_map(|file_path| {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                })
+            }).collect(),
+        },
     }))
 }
 
