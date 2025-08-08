@@ -2,6 +2,7 @@ $version: "2"
 
 namespace in.juspay.airborne
 
+use aws.protocols#restJson1
 use smithy.api#http
 use smithy.api#httpLabel
 use smithy.api#httpHeader
@@ -9,6 +10,7 @@ use smithy.api#httpQuery
 use smithy.api#required
 
 @httpBearerAuth
+@restJson1
 service PackageService {
     version: "1.0.0",
     operations: [CreatePackage, ReadPackage, ListPackages]
@@ -62,6 +64,7 @@ structure ReadPackageInput {
     @httpHeader("x-application")
     x_application: String,
     @required
+    @httpQuery("package_key")
     package_key: String
 }
 
@@ -102,7 +105,7 @@ list PackageList {
     member: Package
 }
 
-@http(method: "GET", uri: "/packages", code: 200)
+@http(method: "GET", uri: "/packages/list", code: 200)
 @readonly
 operation ListPackages {
     input: ListPackagesInput,

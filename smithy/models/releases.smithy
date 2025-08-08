@@ -2,6 +2,7 @@ $version: "2"
 
 namespace in.juspay.airborne
 
+use aws.protocols#restJson1
 use smithy.api#http
 use smithy.api#httpLabel
 use smithy.api#httpHeader
@@ -45,12 +46,14 @@ list Dimensions {
     member: Dimension
 }
 
+@restJson1
 service PublicReleaseService {
     version: "1.0.0",
     operations: [ReadReleaseConfig]
 }
 
 @httpBearerAuth
+@restJson1
 service AuthenticatedReleaseService {
     version: "1.0.0",
     operations: [CreateRelease]
