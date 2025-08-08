@@ -1,5 +1,5 @@
 pub mod utils;
-use actix_web::{get, post, web::{self, Path}, HttpResponse, Result, Scope};
+use actix_web::{get, post, web::{self, Query}, HttpResponse, Result, Scope};
 use crate::{middleware::auth::READ, package::utils::parse_package_key, utils::db::{
     models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
     schema::hyperotaserver::{
@@ -55,9 +55,16 @@ pub struct ListPackagesOutput {
     pub total_pages: i32,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetPackageQuery {
+    pub package_key: String,
+}
+
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_package)
+        .service(get_package)
+        .service(list_packages)
 }
 
 fn db_response_to_package(
@@ -163,13 +170,16 @@ async fn create_package(
     Ok(HttpResponse::Created().json(db_response_to_package(package)))
 }
 
-#[get("/{package_id}")]
+#[get("")]
 async fn get_package(
-    path: Path<String>,
+    query: Query<GetPackageQuery>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse> {
-    let package_id = path.into_inner();
+    let package_id = query.into_inner().package_key;
+    if package_id.is_empty() {
+        return Err(actix_web::error::ErrorBadRequest("Package Key cannot be empty"));
+    }
     let (opt_pkg_version, opt_pkg_tag) = parse_package_key(&package_id);
 
     let auth_response = auth_response.into_inner();
@@ -206,9 +216,9 @@ async fn get_package(
     Ok(HttpResponse::Ok().json(db_response_to_package(package)))
 }
 
-#[post("/list")]
+#[get("/list")]
 async fn list_packages(
-    input: web::Json<ListPackagesInput>,
+    input: Query<ListPackagesInput>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse> {

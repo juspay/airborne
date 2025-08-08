@@ -62,11 +62,10 @@ structure ReadPackageInput {
     @httpHeader("x-application")
     x_application: String,
     @required
-    @httpLabel
-    id: String
+    package_key: String
 }
 
-@http(method: "GET", uri: "/packages/{id}", code: 200)
+@http(method: "GET", uri: "/packages", code: 200)
 @readonly
 operation ReadPackage {
     input: ReadPackageInput,

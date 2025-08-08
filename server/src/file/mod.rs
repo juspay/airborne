@@ -96,6 +96,11 @@ struct FileListQuery {
     search: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct GetFileQuery {
+    file_key: String,
+}
+
 #[derive(MultipartForm)]
 struct UploadFileRequest {
     file: TempFile,
@@ -348,13 +353,16 @@ async fn bulk_create_files(
 
 /// Retrieves a file by its Key.
 /// The Key is expected to be in the format "$file_path@version:$version_number" or "$file_path@tag:$tag".
-#[get("/{file_key}")]
+#[get("")]
 async fn get_file(
-    path: Path<String>,
+    query: Query<GetFileQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, actix_web::Error> {
-    let file_id = path.into_inner();
+    let file_id = query.file_key.clone();
+    if file_id.is_empty() {
+        return Err(error::ErrorBadRequest("File key cannot be empty"));
+    }
     
     let (input_file_path, file_version, file_tag) = utils::parse_file_key(&file_id);
 
