@@ -26,6 +26,16 @@ structure Config {
 }
 
 /// Package details within a release, including JSON properties.
+structure PackageReleaseInput {
+    @required
+    properties: Document,
+    @required
+    important: Files,
+    @required
+    lazy: Files
+}
+
+/// Package details within a release, including JSON properties.
 structure PackageRelease {
     @required
     version:Integer,
@@ -108,7 +118,7 @@ structure CreateReleaseInput {
     @required
     config: Config,
     @required
-    package: PackageRelease,
+    package: PackageReleaseInput,
     @required
     resources: FileIds,
     @required
