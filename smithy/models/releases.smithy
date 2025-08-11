@@ -94,16 +94,6 @@ operation ReadReleaseConfig {
     output: ReadReleaseConfigOutput
 }
 
-/// Authenticated endpoint: Create a new release.
-structure CreatePackageInfo {
-    @required
-    package_id: String,
-    @required
-    important: FileIds,
-    @required
-    properties: Document
-}
-
 structure CreateReleaseInput {
     @required
     @httpHeader("x-organisation")
@@ -116,7 +106,7 @@ structure CreateReleaseInput {
     @required
     config: Config,
     @required
-    package: CreatePackageInfo,
+    package: PackageRelease,
     @required
     resources: FileIds,
     @required
