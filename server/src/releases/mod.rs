@@ -9,7 +9,7 @@ use superposition_rust_sdk::types::builders::VariantBuilder;
 use aws_smithy_types::Document;
 
 use crate::{
-    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, WRITE}, types::AppState, utils::{
+    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, WRITE}, package::utils::parse_package_key, types::AppState, utils::{
         db::{
             models::{FileEntry, PackageV2Entry},
             schema::hyperotaserver::{
@@ -34,13 +34,11 @@ pub struct CreateReleaseRequest {
     package_id: String,
     package: PackageRequest,
     dimensions: Option<HashMap<String, serde_json::Value>>,
-    metadata: Option<serde_json::Value>,
     resources: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PackageRequest {
-    version: String,
     properties: Option<serde_json::Value>,
     important: Vec<String>,
     lazy: Vec<String>,
@@ -55,6 +53,8 @@ struct File {
 
 #[derive(Serialize)]
 struct Package {
+    version: i32,
+    index: String,
     properties: Value,
     important: Vec<File>,
     lazy: Vec<File>,
@@ -123,9 +123,14 @@ async fn create_release(
         .map_err(error::ErrorInternalServerError)?;
 
     // Parse package_id to extract version
-    let pkg_version = req.package_id.parse::<i32>().map_err(|_| {
-        error::ErrorBadRequest(format!("Invalid package_id format: {}", req.package_id))
-    })?;
+    let (pkg_version, _) = parse_package_key(&req.package_id);
+    if pkg_version.is_none() {
+        return Err(error::ErrorBadRequest(format!(
+            "Package ID should contain version: {}",
+            req.package_id
+        )));
+    }
+    let pkg_version = pkg_version.unwrap();
 
     // Check if intersection of important and lazy files is empty
     let important_set: HashSet<&String> = req.package.important.iter().collect();
@@ -196,8 +201,17 @@ async fn create_release(
     // Add custom important and lazy splits to the variant
     let important_docs: Vec<Document> = req.package.important.iter().map(|s| Document::from(s.as_str())).collect();
     let lazy_docs: Vec<Document> = req.package.lazy.iter().map(|s| Document::from(s.as_str())).collect();
+    let resources_docs: Vec<Document> = req.resources.iter().map(|s| Document::from(s.as_str())).collect();
+    let package_properties_docs = if let Some(props) = req.package.properties.clone() {
+        value_to_document(&props)
+    } else {
+        Document::default()
+    };
+    control_overrides.insert("package.properties".to_string(), package_properties_docs);
+    control_overrides.insert("package.version".to_string(), Document::from(pkg_version));
     control_overrides.insert("package.important".to_string(), Document::from(important_docs));
     control_overrides.insert("package.lazy".to_string(), Document::from(lazy_docs));
+    control_overrides.insert("resources".to_string(), Document::from(resources_docs));
 
     // Create experimental variant with same overrides
     let experimental_overrides = control_overrides.clone();
@@ -304,6 +318,13 @@ async fn create_release(
         .load(&mut conn)
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
+    println!(
+        "Found {} files for release {} with package version {}.",
+        files.len(),
+        release_id,
+        pkg_version
+    );
+
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping,
         created_at: now,
@@ -313,15 +334,19 @@ async fn create_release(
             package_timeout: 4000
         },
         package: Package {
+            version: pkg_version,
+            index: req.package_id.clone(),
             properties: req.package.properties.clone().unwrap_or_default(),
-            important: req.package.important.iter().filter_map(|file_path| {
+            important: req.package.important.iter().filter_map(|file_key| {
+                let (file_path, _, _) = parse_file_key(file_key);
                 files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),
                     checksum: file.checksum.clone()
                 })
             }).collect(),
-            lazy: req.package.lazy.iter().filter_map(|file_path| {
+            lazy: req.package.lazy.iter().filter_map(|file_key| {
+                let (file_path, _, _) = parse_file_key(file_key);
                 files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),

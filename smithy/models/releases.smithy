@@ -22,7 +22,9 @@ structure Config {
     @required
     boot_timeout: Integer,
     @required
-    package_timeout: Integer
+    package_timeout: Integer,
+    @required
+    properties: Document,
 }
 
 /// Package details within a release, including JSON properties.
