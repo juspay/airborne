@@ -30,6 +30,8 @@ structure PackageRelease {
     @required
     version:Integer,
     @required
+    index: String,
+    @required
     properties: Document,
     @required
     important: Files,
