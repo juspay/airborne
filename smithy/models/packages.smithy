@@ -55,7 +55,7 @@ operation CreatePackage {
 }
 
 /// Input for ReadPackage operation.
-/// The 'id' label should be formatted as "version:$version" or "tag:$tag".
+/// The 'package_key' label should be formatted as "version:$version" or "tag:$tag".
 structure ReadPackageInput {
     @required
     @httpHeader("x-organisation")
