@@ -18,6 +18,8 @@ list Files {
 /// Configuration settings for release workflows.
 structure Config {
     @required
+    version: Integer,
+    @required
     boot_timeout: Integer,
     @required
     package_timeout: Integer
@@ -25,6 +27,8 @@ structure Config {
 
 /// Package details within a release, including JSON properties.
 structure PackageRelease {
+    @required
+    version:Integer,
     @required
     properties: Document,
     @required
