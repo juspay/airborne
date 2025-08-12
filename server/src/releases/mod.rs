@@ -133,7 +133,7 @@ pub struct PackageRequest {
     lazy: Option<Vec<String>>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct File {
     file_path: String,
     url: String,
@@ -161,6 +161,17 @@ struct CreateReleaseResponse {
     created_at: DateTime<Utc>,
     config: Config,
     package: Package,
+    experiment: Option<ReleaseExperiment>
+}
+
+#[derive(Serialize, Debug)]
+struct ReleaseExperiment {
+    experiment_id: String,
+    package_version: i32,
+    config_version: String,
+    created_at: String,
+    traffic_percentage: u32,
+    status: String,
 }
 
 #[derive(Serialize)]
@@ -691,7 +702,7 @@ async fn create_release(
     let response_lazy = final_lazy.unwrap_or_default();
 
     Ok(Json(CreateReleaseResponse {
-        id: experiment_id_for_ramping,
+        id: experiment_id_for_ramping.clone(),
         created_at: now,
         config: Config {
             boot_timeout: 4000,
@@ -718,6 +729,14 @@ async fn create_release(
                 })
             }).collect(),
         },
+        experiment: Some(ReleaseExperiment {
+            experiment_id: experiment_id_for_ramping,
+            package_version: pkg_version,
+            config_version: format!("v{}", pkg_version),
+            created_at: now.to_string(),
+            traffic_percentage: 0, // Default to 100% for new releases
+            status: "CREATED".to_string()
+        })
     }))
 }
 
@@ -725,7 +744,7 @@ async fn create_release(
 async fn list_releases(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<HttpResponse> {
+) -> actix_web::Result<Json<ListReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let organisation =
         validate_user(auth_response.organisation, READ).map_err(error::ErrorUnauthorized)?;
@@ -764,6 +783,7 @@ async fn list_releases(
         .collect();
 
     let mut releases = Vec::new();
+    
     for experiment in release_experiments {
         let package_version = experiment.name
             .split('-')
@@ -805,6 +825,8 @@ async fn list_releases(
             })
             .unwrap_or_default();
 
+        println!("Package important files: {:?}", package_important);
+
         let package_lazy = experimental_variant
             .and_then(|v| v.overrides.as_object())
             .and_then(|obj| obj.get("package.lazy"))
@@ -822,76 +844,137 @@ async fn list_releases(
                 }
             })
             .unwrap_or_default();
+            
+        let (important_files, lazy_files) = {
+            // Build file conditions for querying
+            let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+            
+            let all_files = package_important.iter()
+                .chain(package_lazy.iter())
+                .cloned()
+                .collect::<Vec<String>>();
 
-        let resources = experimental_variant
-            .and_then(|v| v.overrides.as_object())
-            .and_then(|obj| obj.get("resources"))
-            .and_then(|doc| {
-                if let Document::Array(arr) = doc {
-                    Some(arr.iter().filter_map(|d| {
-                        if let Document::String(s) = d {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    }).collect::<Vec<String>>())
-                } else {
-                    None
+            for file_id in all_files {
+                let (fp, ver_opt, tag_opt) = parse_file_key(&file_id);
+                
+                if let Some(v) = ver_opt {
+                    file_conds.push(Box::new(
+                        file_dsl_path
+                            .eq(fp.clone())
+                            .and(file_dsl_version.eq(v))
+                    ));
+                } else if let Some(t) = tag_opt {
+                    file_conds.push(Box::new(
+                        file_dsl_path
+                            .eq(fp.clone())
+                            .and(file_dsl_tag.eq(t.clone()))
+                    ));
                 }
-            })
-            .unwrap_or_default();
-
-        let release_response = serde_json::json!({
-            "id": experiment.id.to_string(),
-            "experiment_id": experiment.id.to_string(),
-            "name": experiment.name,
-            "package_version": package_version,
-            "config_version": format!("v{}", package_version),
-            "created_at": dt(&experiment.created_at),
-            "traffic_percentage": experiment.traffic_percentage,
-            "status": match experiment.status {
-                superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
-                superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
-                superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
-                superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
-                _ => "UNKNOWN",
-            },
-            "variants": experiment.variants.iter().map(|variant| {
-                serde_json::json!({
-                    "id": variant.id,
-                    "name": if variant.variant_type == superposition_rust_sdk::types::VariantType::Control {
-                        "Control (Original)".to_string()
-                    } else {
-                        format!("Experimental ({})", variant.id)
-                    },
-                    "variant_type": match variant.variant_type {
-                        superposition_rust_sdk::types::VariantType::Control => "control",
-                        superposition_rust_sdk::types::VariantType::Experimental => "experimental",
-                        _ => "unknown",
-                    }
-                })
-            }).collect::<Vec<_>>(),
-            "configuration": {
-                "package": {
-                    "properties": package_properties,
-                    "important": package_important,
-                    "lazy": package_lazy
-                },
-                "resources": resources
             }
-        });
+
+            // println!("File conditions: {:?}", file_conds);
+            
+            if let Some(combined) = file_conds
+                .into_iter()
+                .reduce(|a, b| Box::new(a.or(b))) {
+                
+                let files_result: Result<Vec<FileEntry>, _> = files_table
+                    .into_boxed::<Pg>()
+                    .filter(file_dsl_org_id.eq(&organisation))
+                    .filter(file_dsl_app_id.eq(&application))
+                    .filter(combined)
+                    .load(&mut conn);
+
+                println!("Files result: {:?}", files_result);
+                
+                if let Ok(files) = files_result {
+                    let important_files: Vec<File> = package_important.iter().filter_map(|file_key| {
+                        let (file_path, _, _) = parse_file_key(file_key);
+                        files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                            file_path: file.file_path.clone(),
+                            url: file.url.clone(),
+                            checksum: file.checksum.clone()
+                        })
+                    }).collect();
+                    println!("Important files: {:?}", important_files);
+                    
+                    let lazy_files: Vec<File> = package_lazy.iter().filter_map(|file_key| {
+                        let (file_path, _, _) = parse_file_key(file_key);
+                        files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                            file_path: file.file_path.clone(),
+                            url: file.url.clone(),
+                            checksum: file.checksum.clone()
+                        })
+                    }).collect();
+
+                    println!("Lazy files: {:?}", lazy_files);
+                    
+                    (important_files, lazy_files)
+                } else {
+                    (Vec::new(), Vec::new())
+                }
+            } else {
+                (Vec::new(), Vec::new())
+            }
+        };
+
+        println!("Important 1files: {:?}", important_files);
+        println!("Lazy 1files: {:?}", lazy_files);
+        
+        // Parse created_at string to DateTime<Utc>
+        let created_at_str = dt(&experiment.created_at);
+        let created_at = DateTime::parse_from_rfc3339(&created_at_str)
+            .unwrap_or_else(|_| Utc::now().into())
+            .with_timezone(&Utc);
+
+        let release_response = CreateReleaseResponse {
+            id: experiment.id.to_string(),
+            created_at,
+            config: Config {
+                boot_timeout: 4000,
+                package_timeout: 4000
+            },
+            package: Package {
+                version: package_version,
+                index: format!("pkg@version:{}", package_version),
+                properties: package_properties,
+                important: important_files,
+                lazy: lazy_files,
+            },
+            experiment: Some(build_release_experiment_from_experiment(
+                &experiment,
+                package_version,
+            )),
+        };
 
         releases.push(release_response);
     }
 
     releases.sort_by(|a, b| {
-        let a_created = a.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
-        let b_created = b.get("created_at").and_then(|v| v.as_str()).unwrap_or("");
-        b_created.cmp(a_created)
+        b.created_at.cmp(&a.created_at)
     });
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "releases": releases,
-        "total": releases.len()
-    })))
+    Ok(Json(ListReleaseResponse {
+        releases,
+    }))
+}
+
+fn build_release_experiment_from_experiment(
+    experiment: &superposition_rust_sdk::types::ExperimentResponse,
+    package_version: i32,
+) -> ReleaseExperiment {
+    ReleaseExperiment {
+        experiment_id: experiment.id.to_string(),
+        package_version,
+        config_version: format!("v{}", package_version),
+        created_at: dt(&experiment.created_at),
+        traffic_percentage: experiment.traffic_percentage as u32,
+        status: match experiment.status {
+            superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
+            superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
+            superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
+            superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
+            _ => "UNKNOWN",
+        }.to_string(),
+    }
 }
