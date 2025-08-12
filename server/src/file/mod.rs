@@ -158,7 +158,7 @@ fn db_file_to_response(file: &DbFile) -> FileResponse {
     }
 }
 
-#[post("/create")]
+#[post("")]
 async fn create_file(
     req: Json<FileRequest>,
     auth_response: ReqData<AuthResponse>,
@@ -364,10 +364,14 @@ async fn get_file(
         return Err(error::ErrorBadRequest("File key cannot be empty"));
     }
     
-    let (input_file_path, file_version, file_tag) = utils::parse_file_key(&file_id);
+    let (input_file_path, file_version, mut file_tag) = utils::parse_file_key(&file_id);
 
     if input_file_path.is_empty() {
         return Err(error::ErrorBadRequest("File path cannot be empty"));
+    }
+
+    if file_tag.is_none() && file_version.is_none() {
+        file_tag = Some("latest".to_string());
     }
 
     let auth_response = auth_response.into_inner();

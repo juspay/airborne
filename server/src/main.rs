@@ -22,8 +22,10 @@ mod docs;
 mod home;
 mod middleware;
 mod organisation;
+mod package;
 mod release;
 mod user;
+mod file;
 
 mod types;
 mod utils;
@@ -38,7 +40,7 @@ use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
 use crate::home::index;
-
+mod releases;
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[actix_web::main]
@@ -115,7 +117,7 @@ async fn main() -> std::io::Result<()> {
         bucket_name,
         superposition_org_id: superposition_org_id_env,
         enable_google_signin: enable_google_signin,
-        organisation_creation_disabled: organisation_creation_disabled,
+        organisation_creation_disabled: false,
         google_spreadsheet_id: spreadsheet_id.clone(),
     };
 
@@ -209,8 +211,23 @@ async fn main() -> std::io::Result<()> {
             )
             .service(web::scope("/users").service(user::add_routes()))
             .service(
+                web::scope("/file")
+                    .wrap(Auth { env: env.clone() })
+                    .service(file::add_routes()),
+            )
+            .service(
                 web::scope("/release").service(release::add_routes()),
                 // Decide if this needs auth; Ideally this only needs signature verfication
+            )
+            .service(
+                web::scope("/packages")
+                    .wrap(Auth { env: env.clone() })
+                    .service(package::add_routes()),
+            )
+            .service(
+                web::scope("/releases")
+                    .wrap(Auth { env: env.clone() })
+                    .service(releases::add_routes()),
             )
     })
     .bind(("0.0.0.0", port))? // Listen on all interfaces

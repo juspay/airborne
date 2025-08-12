@@ -24,10 +24,7 @@ use diesel::sql_types::Bool;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Package {
-    pub id: String,
     pub index: String,
-    pub org_id: String,
-    pub app_id: String,
     pub tag: String,
     pub version: i32,
     pub files: Vec<String>,
@@ -71,17 +68,14 @@ fn db_response_to_package(
     db_pkg: PackageV2Entry
 ) -> Package {
     return Package {
-        id: format!("version:{}", db_pkg.version),
         index: db_pkg.index,
-        org_id: db_pkg.org_id,
-        app_id: db_pkg.app_id,
         tag: db_pkg.tag,
         version: db_pkg.version,
         files: db_pkg.files.into_iter().flatten().collect(),
     };
 }
 
-#[post("/create")]
+#[post("")]
 async fn create_package(
     req: web::Json<CreatePackageInput>,
     auth_response: web::ReqData<AuthResponse>,
@@ -177,10 +171,11 @@ async fn get_package(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse> {
     let package_id = query.into_inner().package_key;
-    if package_id.is_empty() {
-        return Err(actix_web::error::ErrorBadRequest("Package Key cannot be empty"));
+    let (opt_pkg_version, mut opt_pkg_tag) = parse_package_key(&package_id);
+
+    if opt_pkg_tag.is_none() && opt_pkg_version.is_none() {
+        opt_pkg_tag = Some("latest".to_string());
     }
-    let (opt_pkg_version, opt_pkg_tag) = parse_package_key(&package_id);
 
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, READ)
