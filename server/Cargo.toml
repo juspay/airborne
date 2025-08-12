@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 actix-web = "4"
 cac_client = { git = "https://github.com/juspay/superposition.git", tag = "cac_client-v0.16.1" }
-keycloak = "=26.1.0"
+keycloak = { git = "https://github.com/yuvrajjsingh0/keycloak-rust.git", tag = "26.1" }
 actix-files = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
