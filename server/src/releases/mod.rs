@@ -1,10 +1,9 @@
 use actix_web::{get, post, web::{self, Json, Query}, HttpResponse, Scope, error};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value};
 use std::collections::{HashMap, HashSet};
 use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
-use chrono::{DateTime, Utc, NaiveDateTime, TimeZone};
-use uuid::Uuid;
+use chrono::{DateTime, Utc};
 use superposition_rust_sdk::types::builders::VariantBuilder;
 use aws_smithy_types::{Document};
 
@@ -26,91 +25,6 @@ use crate::{
         workspace::get_workspace_name_for_application,
     }
 };
-
-fn dt(x: &aws_smithy_types::DateTime) -> String {
-    // Convert smithy datetime to milliseconds since epoch
-    let millis_since_epoch = x.to_millis().expect("Failed to convert DateTime to millis");
-
-    // Split into whole seconds and remaining milliseconds
-    let secs = millis_since_epoch / 1000;
-    let millis = (millis_since_epoch % 1000) as u32;
-
-    // Create NaiveDateTime from seconds + nanos
-    let naive = NaiveDateTime::from_timestamp(secs, millis * 1_000_000);
-
-    // Format in ISO 8601 with milliseconds
-    Utc.from_utc_datetime(&naive).format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
-}
-
-// Helper function to convert serde_json::Value to Document
-fn value_to_document(value: &serde_json::Value) -> Document {
-    match value {
-        serde_json::Value::Null => Document::Null,
-        serde_json::Value::Bool(b) => Document::Bool(*b),
-        serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                if i >= 0 {
-                    Document::Number(aws_smithy_types::Number::PosInt(i as u64))
-                } else {
-                    Document::Number(aws_smithy_types::Number::NegInt(i))
-                }
-            } else if let Some(f) = n.as_f64() {
-                Document::Number(aws_smithy_types::Number::Float(f))
-            } else {
-                Document::Null
-            }
-        },
-        serde_json::Value::String(s) => Document::String(s.clone()),
-        serde_json::Value::Array(arr) => {
-            let docs: Vec<Document> = arr.iter().map(value_to_document).collect();
-            Document::Array(docs)
-        },
-        serde_json::Value::Object(obj) => {
-            let map: std::collections::HashMap<String, Document> = obj.iter()
-                .map(|(k, v)| (k.clone(), value_to_document(v)))
-                .collect();
-            Document::Object(map)
-        }
-    }
-}
-
-// Helper function to convert Document to serde_json::Value
-fn document_to_value(doc: &Document) -> Option<serde_json::Value> {
-    match doc {
-        Document::Null => Some(serde_json::Value::Null),
-        Document::Bool(b) => Some(serde_json::Value::Bool(*b)),
-        Document::Number(n) => match n {
-            aws_smithy_types::Number::NegInt(i) => Some(serde_json::Value::Number(serde_json::Number::from(*i))),
-            aws_smithy_types::Number::PosInt(i) => {
-                if let Ok(i_as_i64) = i64::try_from(*i) {
-                    Some(serde_json::Value::Number(serde_json::Number::from(i_as_i64)))
-                } else {
-                    Some(serde_json::Value::Null)
-                }
-            },
-            aws_smithy_types::Number::Float(f) => {
-                if let Some(num) = serde_json::Number::from_f64(*f) {
-                    Some(serde_json::Value::Number(num))
-                } else {
-                    Some(serde_json::Value::Null)
-                }
-            },
-        },
-        Document::String(s) => Some(serde_json::Value::String(s.clone())),
-        Document::Array(arr) => {
-            let values: Option<Vec<serde_json::Value>> = arr.iter()
-                .map(document_to_value)
-                .collect();
-            values.map(serde_json::Value::Array)
-        },
-        Document::Object(obj) => {
-            let map: Option<serde_json::Map<String, serde_json::Value>> = obj.iter()
-                .map(|(k, v)| document_to_value(v).map(|val| (k.clone(), val)))
-                .collect();
-            map.map(serde_json::Value::Object)
-        }
-    }
-}
 
 #[derive(Deserialize)]
 pub struct GetReleaseQuery {
@@ -372,24 +286,37 @@ async fn create_release(
         })?;
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let experiments_list = state
-        .superposition_client
-        .list_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .send()
-        .await
-        .map_err(|e| {
-            eprintln!("Failed to list experiments: {:?}", e);
-            error::ErrorInternalServerError("Failed to list experiments from Superposition")
-        })?;
 
-    let experiments = experiments_list.data();
+    let dimensions = req.dimensions.clone().unwrap_or_default();
+    let dims1 = dimensions.clone();
+    println!("Dimensions: {:?}", serde_json::json!(dimensions));
 
-    let last_release = experiments
-        .into_iter()
-        .filter(|exp| exp.name.contains(&format!("{}-{}-release-exp", application, organisation)))
-        .max_by_key(|exp| exp.created_at.clone());
+    let resolved_config_builder = dims1.iter().fold(
+        state.superposition_client.get_resolved_config()
+            .workspace_id(workspace_name.clone())
+            .org_id(superposition_org_id_from_env.clone())
+            .context("variantIds", vec![].into()),
+        |builder, (key, value)| {
+            builder.context(
+                key.clone(),
+                Document::String(value.as_str().unwrap_or("").to_string()),
+            )
+        },
+    );
+
+    let resolved_config = resolved_config_builder.send().await;
+    println!("resolved config result: {:?}", resolved_config);
+    
+    let config_document = match resolved_config {
+        Ok(config) => {
+            println!("config from superposition: {:?}", config);
+            config.config
+        },
+        Err(e) => {
+            println!("Failed to get resolved config: {}", e);
+            None
+        }
+    };
 
     let pkg_version = if let Some(package_id) = &req.package_id {
         let (version_opt, _) = parse_package_key(package_id);
@@ -459,14 +386,16 @@ async fn create_release(
             package_req.properties.clone(),
         )
     } else if req.package_id.is_some() {
-        let default_properties = last_release
+        // Get defaults from resolved config
+        let default_properties = config_document
             .as_ref()
-            .and_then(|exp| {
-                exp.variants.iter()
-                    .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental)
-                    .and_then(|v| v.overrides.as_object())
-                    .and_then(|obj| obj.get("package.properties"))
-                    .and_then(document_to_value)
+            .and_then(|doc| {
+                if let Document::Object(obj) = doc {
+                    obj.get("package.properties")
+                        .and_then(document_to_value)
+                } else {
+                    None
+                }
             });
 
         let all_files_as_important: Vec<String> = package_data
@@ -481,13 +410,16 @@ async fn create_release(
             default_properties,
         )
     } else {
-        let last_exp_defaults = last_release.as_ref().and_then(|exp| {
-            exp.variants.iter()
-                .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental)
+        // Get defaults from resolved config
+        let config_defaults = config_document.as_ref().and_then(|doc| {
+            if let Document::Object(obj) = doc {
+                Some(obj)
+            } else {
+                None
+            }
         });
         
-        let default_important = last_exp_defaults
-            .and_then(|v| v.overrides.as_object())
+        let default_important = config_defaults
             .and_then(|obj| obj.get("package.important"))
             .and_then(|doc| {
                 if let Document::Array(arr) = doc {
@@ -503,8 +435,7 @@ async fn create_release(
                 }
             });
             
-        let default_lazy = last_exp_defaults
-            .and_then(|v| v.overrides.as_object())
+        let default_lazy = config_defaults
             .and_then(|obj| obj.get("package.lazy"))
             .and_then(|doc| {
                 if let Document::Array(arr) = doc {
@@ -520,8 +451,7 @@ async fn create_release(
                 }
             });
             
-        let default_properties = last_exp_defaults
-            .and_then(|v| v.overrides.as_object())
+        let default_properties = config_defaults
             .and_then(|obj| obj.get("package.properties"))
             .and_then(document_to_value);
         
@@ -532,42 +462,51 @@ async fn create_release(
         )
     };
 
-    let release_id = Uuid::new_v4();
     let now = Utc::now();
 
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
 
-    if let Some(last_exp) = &last_release {
-        if let Some(exp_variant) = last_exp.variants.iter()
-            .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental) {
-            if let Some(obj) = exp_variant.overrides.as_object() {
-                if let Some(props) = obj.get("package.properties") {
-                    control_overrides.insert("package.properties".to_string(), props.clone());
-                } else {
-                    control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
-                }
-                if let Some(important) = obj.get("package.important") {
-                    control_overrides.insert("package.important".to_string(), important.clone());
-                } else {
-                    let default_important_docs: Vec<Document> = package_data.files.iter()
-                        .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
-                        .collect();
-                    control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
-                }
-                if let Some(lazy) = obj.get("package.lazy") {
-                    control_overrides.insert("package.lazy".to_string(), lazy.clone());
-                } else {
-                    control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
-                }
-                if let Some(resources) = obj.get("resources") {
-                    control_overrides.insert("resources".to_string(), resources.clone());
-                } else {
-                    control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
-                }
+    // Determine if we should use config defaults or make control same as experimental
+    let use_config_defaults = config_document.is_some();
+    
+    if use_config_defaults {
+        if let Some(Document::Object(obj)) = &config_document {
+            if let Some(props) = obj.get("package.properties") {
+                control_overrides.insert("package.properties".to_string(), props.clone());
+            } else {
+                control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
             }
+            if let Some(important) = obj.get("package.important") {
+                control_overrides.insert("package.important".to_string(), important.clone());
+            } else {
+                let default_important_docs: Vec<Document> = package_data.files.iter()
+                    .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
+                    .collect();
+                control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
+            }
+            if let Some(lazy) = obj.get("package.lazy") {
+                control_overrides.insert("package.lazy".to_string(), lazy.clone());
+            } else {
+                control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
+            }
+            if let Some(resources) = obj.get("resources") {
+                control_overrides.insert("resources".to_string(), resources.clone());
+            } else {
+                control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
+            }
+        } else {
+            // Config is empty, use default values
+            control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
+            let default_important_docs: Vec<Document> = package_data.files.iter()
+                .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
+                .collect();
+            control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
+            control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
+            control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
         }
     } else {
+        // Config failed or is empty, will set control same as experimental later
         control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
         let default_important_docs: Vec<Document> = package_data.files.iter()
             .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
@@ -594,6 +533,12 @@ async fn create_release(
     if let Some(ref resources) = req.resources {
         let res_docs: Vec<Document> = resources.iter().cloned().map(Document::String).collect();
         experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
+    }
+
+    // If config failed or is empty, make control same as experimental
+    if !use_config_defaults {
+        control_overrides = experimental_overrides.clone();
+        control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
     }
 
     let control_variant = VariantBuilder::default()
@@ -976,5 +921,90 @@ fn build_release_experiment_from_experiment(
             superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
             _ => "UNKNOWN",
         }.to_string(),
+    }
+}
+
+fn dt(x: &aws_smithy_types::DateTime) -> String {
+    // Convert smithy datetime to milliseconds since epoch
+    let millis_since_epoch = x.to_millis().expect("Failed to convert DateTime to millis");
+
+    // Split into whole seconds and remaining milliseconds
+    let secs = millis_since_epoch / 1000;
+    let millis = (millis_since_epoch % 1000) as u32;
+
+    // Create DateTime from seconds + nanos
+    let datetime = DateTime::from_timestamp(secs, millis * 1_000_000);
+
+    // Format in ISO 8601 with milliseconds
+    datetime.unwrap_or_else(|| Utc::now()).format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
+}
+
+// Helper function to convert serde_json::Value to Document
+fn value_to_document(value: &serde_json::Value) -> Document {
+    match value {
+        serde_json::Value::Null => Document::Null,
+        serde_json::Value::Bool(b) => Document::Bool(*b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                if i >= 0 {
+                    Document::Number(aws_smithy_types::Number::PosInt(i as u64))
+                } else {
+                    Document::Number(aws_smithy_types::Number::NegInt(i))
+                }
+            } else if let Some(f) = n.as_f64() {
+                Document::Number(aws_smithy_types::Number::Float(f))
+            } else {
+                Document::Null
+            }
+        },
+        serde_json::Value::String(s) => Document::String(s.clone()),
+        serde_json::Value::Array(arr) => {
+            let docs: Vec<Document> = arr.iter().map(value_to_document).collect();
+            Document::Array(docs)
+        },
+        serde_json::Value::Object(obj) => {
+            let map: std::collections::HashMap<String, Document> = obj.iter()
+                .map(|(k, v)| (k.clone(), value_to_document(v)))
+                .collect();
+            Document::Object(map)
+        }
+    }
+}
+
+// Helper function to convert Document to serde_json::Value
+fn document_to_value(doc: &Document) -> Option<serde_json::Value> {
+    match doc {
+        Document::Null => Some(serde_json::Value::Null),
+        Document::Bool(b) => Some(serde_json::Value::Bool(*b)),
+        Document::Number(n) => match n {
+            aws_smithy_types::Number::NegInt(i) => Some(serde_json::Value::Number(serde_json::Number::from(*i))),
+            aws_smithy_types::Number::PosInt(i) => {
+                if let Ok(i_as_i64) = i64::try_from(*i) {
+                    Some(serde_json::Value::Number(serde_json::Number::from(i_as_i64)))
+                } else {
+                    Some(serde_json::Value::Null)
+                }
+            },
+            aws_smithy_types::Number::Float(f) => {
+                if let Some(num) = serde_json::Number::from_f64(*f) {
+                    Some(serde_json::Value::Number(num))
+                } else {
+                    Some(serde_json::Value::Null)
+                }
+            },
+        },
+        Document::String(s) => Some(serde_json::Value::String(s.clone())),
+        Document::Array(arr) => {
+            let values: Option<Vec<serde_json::Value>> = arr.iter()
+                .map(document_to_value)
+                .collect();
+            values.map(serde_json::Value::Array)
+        },
+        Document::Object(obj) => {
+            let map: Option<serde_json::Map<String, serde_json::Value>> = obj.iter()
+                .map(|(k, v)| document_to_value(v).map(|val| (k.clone(), val)))
+                .collect();
+            map.map(serde_json::Value::Object)
+        }
     }
 }
