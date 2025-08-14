@@ -1048,7 +1048,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
     
     // Set up download tracking variables
-    NSMutableSet *pendingDownloads = [NSMutableSet setWithArray:[toDownload valueForKey:@"filePath"]];
+    NSMutableSet *pendingDownloads = [NSMutableSet setWithArray:[toDownload valueForKey:@"file_path"]];
     NSMutableSet *failedDownloads = [NSMutableSet set];
     
     // Start downloads to temp directory
