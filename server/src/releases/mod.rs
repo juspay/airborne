@@ -1,4 +1,4 @@
-use actix_web::{get, post, web::{self, Json, Query}, HttpResponse, Scope, error};
+use actix_web::{get, post, patch, web::{self, Json, Query, Path}, HttpResponse, Scope, error};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value};
 use std::collections::{HashMap, HashSet};
@@ -100,11 +100,41 @@ pub struct FileResource {
     pub file_path: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct RampReleaseRequest {
+    traffic_percentage: u8,
+    change_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConcludeReleaseRequest {
+    chosen_variant: String,
+    change_reason: Option<String>,
+}
+
+#[derive(Serialize)]
+struct RampReleaseResponse {
+    success: bool,
+    message: String,
+    experiment_id: String,
+    traffic_percentage: u8,
+}
+
+#[derive(Serialize)]
+struct ConcludeReleaseResponse {
+    success: bool,
+    message: String,
+    experiment_id: String,
+    chosen_variant: String,
+}
+
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_release)
         .service(get_release)
         .service(list_releases)
+        .service(ramp_release)
+        .service(conclude_release)
 }
 
 #[get("")]
@@ -318,7 +348,49 @@ async fn create_release(
         }
     };
 
+    let extract_files_from_configs = |opt_obj: &Option<Document>, key: &str| -> Option<Vec<String>> {
+        opt_obj
+        .as_ref()
+        .and_then(|doc| {
+            if let Document::Object(obj) = doc {
+                let v: Option<Vec<String>> = obj.get(key)
+                    .and_then(document_to_value)
+                    .and_then(|v| v.as_array().map(|arr| {
+                        arr.iter()
+                            .filter_map(|val| val.as_str().map(|s| s.to_string()))
+                            .collect()
+                    }));
+                v
+            } else {
+                None
+            }
+        })
+    };
+
+    let imp_from_configs = extract_files_from_configs(&config_document, "package.important");
+    let lazy_from_configs = extract_files_from_configs(&config_document, "package.lazy");
+    let resources_from_configs = extract_files_from_configs(&config_document, "resources");
+
+    // If you give me package_id -> I'll expect you to provide me complete important and lazy splits
+    // If you just want to PATCH the important or lazy blocks -> DO NOT provide me the package_id
+    //
+    let mut package_update = false;
+    let mut is_first_release = false;
+    let opt_pkg_version_from_config = &config_document
+        .as_ref()
+        .and_then(|doc| {
+            if let Document::Object(obj) = doc {
+                obj.get("package.version")
+                    .and_then(document_to_value)
+            } else {
+                None
+            }
+        });
+    if let Some(pkg_version_from_config) = opt_pkg_version_from_config {
+        is_first_release = pkg_version_from_config == 0;
+    }
     let pkg_version = if let Some(package_id) = &req.package_id {
+        package_update = true;
         let (version_opt, _) = parse_package_key(package_id);
         version_opt.ok_or_else(|| {
             error::ErrorBadRequest(format!(
@@ -327,7 +399,11 @@ async fn create_release(
             ))
         })?
     } else {
-        packages_dsl::packages_v2
+        if is_first_release {
+            return Err(error::ErrorBadRequest("First release must provide package_id".to_string()));
+        }
+        if !opt_pkg_version_from_config.is_some() {
+            packages_dsl::packages_v2
             .filter(
                 packages_dsl::org_id.eq(&organisation)
                     .and(packages_dsl::app_id.eq(&application))
@@ -336,6 +412,14 @@ async fn create_release(
             .select(packages_dsl::version)
             .first::<i32>(&mut conn)
             .map_err(|_| error::ErrorNotFound("No packages found for this application".to_string()))?
+        }else{
+            let version = opt_pkg_version_from_config
+                .as_ref()
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32)
+                .ok_or_else(|| error::ErrorBadRequest("Could not extract package version from config"))?;
+            version
+        }
     };
 
     let package_data = packages_dsl::packages_v2
@@ -348,26 +432,52 @@ async fn create_release(
         .first::<PackageV2Entry>(&mut conn)
         .map_err(|_| error::ErrorNotFound(format!("Package version {} not found", pkg_version)))?;
 
-    let (final_important, final_lazy, final_properties) = if let Some(package_req) = &req.package {
-        if let Some(important) = &package_req.important {
-            for file_path in important {
-                if !package_data.files.contains(&Some(file_path.clone())) {
-                    return Err(error::ErrorBadRequest(format!(
-                        "Important file '{}' not found in package {}",
-                        file_path, pkg_version
-                    )));
-                }
+    // check any resources don't overlap with important or lazy
+    let check_resource_duplicacy = |resources: &Vec<String>| -> bool {
+        for resource in resources {
+            if package_data.files.contains(&Some(resource.clone())) {
+                return true
             }
         }
-        if let Some(lazy) = &package_req.lazy {
-            for file_path in lazy {
-                if !package_data.files.contains(&Some(file_path.clone())) {
-                    return Err(error::ErrorBadRequest(format!(
-                        "Lazy file '{}' not found in package {}",
-                        file_path, pkg_version
-                    )));
-                }
+        false
+    };
+
+    // check if a file group exists in package  -> returns (exists, file_that_does_not_exist)
+    let check_file_group_exists_in_package = |file_paths: &Vec<String>, | -> (bool, Option<String>) {
+        for file_path in file_paths {
+            if !package_data.files.contains(&Some(file_path.clone())) {
+                return (false, Some(file_path.clone()));
             }
+        }
+        (true, None)
+    };
+
+    let (final_important, final_lazy, final_resources, final_properties) = if let Some(package_req) = &req.package {
+        // case where package_id is provided -> Expect to get important and lazy : package_update is true
+        // case where package_id is not provided and package block is provided -> Use whatever is in request package and others from config : package_update is false
+        let mut f_imp: Option<Vec<String>> = if package_update { Some(vec![]) } else { imp_from_configs };
+        let mut f_lazy: Option<Vec<String>> = if package_update { Some(vec![]) } else { lazy_from_configs };
+
+        if let Some(req_imp) = &package_req.important {
+            let (exists, file_that_does_not_exist) = check_file_group_exists_in_package(&req_imp);
+            if !exists {
+                return Err(error::ErrorBadRequest(format!(
+                    "Important file '{}' not found in package {}",
+                    file_that_does_not_exist.unwrap_or_default(), pkg_version
+                )));
+            }
+            f_imp = Some(req_imp.clone());
+        }
+
+        if let Some(req_lazy) = &package_req.lazy {
+            let (exists, file_that_does_not_exist) = check_file_group_exists_in_package(&req_lazy);
+            if !exists {
+                return Err(error::ErrorBadRequest(format!(
+                    "Lazy file '{}' not found in package {}",
+                    file_that_does_not_exist.unwrap_or_default(), pkg_version
+                )));
+            }
+            f_lazy = Some(req_lazy.clone());
         }
         if let (Some(important), Some(lazy)) = (&package_req.important, &package_req.lazy) {
             let important_set: HashSet<&String> = important.iter().collect();
@@ -380,97 +490,166 @@ async fn create_release(
                 )));
             }
         }
-        (
-            package_req.important.clone(),
-            package_req.lazy.clone(),
-            package_req.properties.clone(),
-        )
-    } else if req.package_id.is_some() {
-        // Get defaults from resolved config
-        let default_properties = config_document
-            .as_ref()
-            .and_then(|doc| {
-                if let Document::Object(obj) = doc {
-                    obj.get("package.properties")
-                        .and_then(document_to_value)
-                } else {
-                    None
-                }
-            });
-
-        let all_files_as_important: Vec<String> = package_data
-            .files
-            .iter()
-            .filter_map(|f| f.as_ref().map(|s| s.clone()))
-            .collect();
-
-        (
-            Some(all_files_as_important),
-            Some(vec![]),
-            default_properties,
-        )
-    } else {
-        // Get defaults from resolved config
-        let config_defaults = config_document.as_ref().and_then(|doc| {
-            if let Document::Object(obj) = doc {
-                Some(obj)
-            } else {
-                None
+        
+        let f_resources = if let Some(resources) = &req.resources {
+            if check_resource_duplicacy(resources) {
+                return Err(error::ErrorBadRequest(format!(
+                    "Resource cannot be a file in package {}",
+                    pkg_version
+                )));
             }
-        });
-        
-        let default_important = config_defaults
-            .and_then(|obj| obj.get("package.important"))
-            .and_then(|doc| {
-                if let Document::Array(arr) = doc {
-                    Some(arr.iter().filter_map(|d| {
-                        if let Document::String(s) = d {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    }).collect())
-                } else {
-                    None
-                }
-            });
-            
-        let default_lazy = config_defaults
-            .and_then(|obj| obj.get("package.lazy"))
-            .and_then(|doc| {
-                if let Document::Array(arr) = doc {
-                    Some(arr.iter().filter_map(|d| {
-                        if let Document::String(s) = d {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    }).collect())
-                } else {
-                    None
-                }
-            });
-            
-        let default_properties = config_defaults
-            .and_then(|obj| obj.get("package.properties"))
-            .and_then(document_to_value);
-        
-        (
-            default_important,
-            default_lazy,
-            default_properties,
-        )
+            req.resources.clone()
+        } else {
+            if resources_from_configs.is_some() && check_resource_duplicacy(&resources_from_configs.clone().unwrap_or_default()) {
+                return Err(error::ErrorBadRequest(format!(
+                    "Resource cannot be a file in package {}",
+                    pkg_version
+                )));
+            }
+            resources_from_configs
+        };
+        (f_imp, f_lazy, f_resources, None)
+    } else {
+        // handle if package id is provided but package block was not provided
+        if req.package_id.is_some() {
+            return Err(error::ErrorBadRequest("Package ID provided but no package block in request".to_string()));
+        }
+
+        (imp_from_configs, lazy_from_configs, resources_from_configs, None)
     };
+
+    // let (final_important, final_lazy, final_resources, final_properties) = if req.package_id.is_some() {
+    //     if let Some(important) = &package_req.important {
+    //         for file_path in important {
+    //             if !package_data.files.contains(&Some(file_path.clone())) {
+    //                 return Err(error::ErrorBadRequest(format!(
+    //                     "Important file '{}' not found in package1 {}",
+    //                     file_path, pkg_version
+    //                 )));
+    //             }
+    //         }
+    //     }
+    //     if let Some(lazy) = &package_req.lazy {
+    //         for file_path in lazy {
+    //             if !package_data.files.contains(&Some(file_path.clone())) {
+    //                 return Err(error::ErrorBadRequest(format!(
+    //                     "Lazy file '{}' not found in package {}",
+    //                     file_path, pkg_version
+    //                 )));
+    //             }
+    //         }
+    //     }
+    //     if let (Some(important), Some(lazy)) = (&package_req.important, &package_req.lazy) {
+    //         let important_set: HashSet<&String> = important.iter().collect();
+    //         let lazy_set: HashSet<&String> = lazy.iter().collect();
+    //         let overlap: Vec<&String> = important_set.intersection(&lazy_set).cloned().collect();
+    //         if !overlap.is_empty() {
+    //             return Err(error::ErrorBadRequest(format!(
+    //                 "Files cannot be in both important and lazy splits: {:?}",
+    //                 overlap
+    //             )));
+    //         }
+    //     }
+    //     // check any resources doesn't overlap with important or lazy
+    //     if let Some(resources) = &req.resources {
+    //         for resource in resources {
+    //             if package_data.files.contains(&Some(resource.clone())) {
+    //                 return Err(error::ErrorBadRequest(format!(
+    //                     "Resource '{}' cannot be a file in package {}",
+    //                     resource, pkg_version
+    //                 )));
+    //             }
+    //         }
+    //     }
+    //     (
+    //         package_req.important.clone(),
+    //         package_req.lazy.clone(),
+    //         req.resources.clone(),
+    //         package_req.properties.clone(),
+    //     )
+    // } else if let Some(package_req) = &req.package {
+    //     // Get defaults from resolved config
+    //     let default_properties = config_document
+    //         .as_ref()
+    //         .and_then(|doc| {
+    //             if let Document::Object(obj) = doc {
+    //                 obj.get("package.properties")
+    //                     .and_then(document_to_value)
+    //             } else {
+    //                 None
+    //             }
+    //         });
+
+    //     let all_files_as_important: Vec<String> = package_data
+    //         .files
+    //         .iter()
+    //         .filter_map(|f| f.as_ref().map(|s| s.clone()))
+    //         .collect();
+
+    //     (
+    //         Some(all_files_as_important),
+    //         Some(vec![]),
+    //         default_properties,
+    //     )
+    // } else {
+    //     // Get defaults from resolved config
+    //     let config_defaults = config_document.as_ref().and_then(|doc| {
+    //         if let Document::Object(obj) = doc {
+    //             Some(obj)
+    //         } else {
+    //             None
+    //         }
+    //     });
+        
+    //     let default_important = config_defaults
+    //         .and_then(|obj| obj.get("package.important"))
+    //         .and_then(|doc| {
+    //             if let Document::Array(arr) = doc {
+    //                 Some(arr.iter().filter_map(|d| {
+    //                     if let Document::String(s) = d {
+    //                         Some(s.clone())
+    //                     } else {
+    //                         None
+    //                     }
+    //                 }).collect())
+    //             } else {
+    //                 None
+    //             }
+    //         });
+            
+    //     let default_lazy = config_defaults
+    //         .and_then(|obj| obj.get("package.lazy"))
+    //         .and_then(|doc| {
+    //             if let Document::Array(arr) = doc {
+    //                 Some(arr.iter().filter_map(|d| {
+    //                     if let Document::String(s) = d {
+    //                         Some(s.clone())
+    //                     } else {
+    //                         None
+    //                     }
+    //                 }).collect())
+    //             } else {
+    //                 None
+    //             }
+    //         });
+            
+    //     let default_properties = config_defaults
+    //         .and_then(|obj| obj.get("package.properties"))
+    //         .and_then(document_to_value);
+        
+    //     (
+    //         default_important,
+    //         default_lazy,
+    //         default_properties,
+    //     )
+    // };
 
     let now = Utc::now();
 
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
-
-    // Determine if we should use config defaults or make control same as experimental
-    let use_config_defaults = config_document.is_some();
     
-    if use_config_defaults {
+    if !is_first_release {
         if let Some(Document::Object(obj)) = &config_document {
             if let Some(props) = obj.get("package.properties") {
                 control_overrides.insert("package.properties".to_string(), props.clone());
@@ -496,24 +675,9 @@ async fn create_release(
                 control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
             }
         } else {
-            // Config is empty, use default values
-            control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
-            let default_important_docs: Vec<Document> = package_data.files.iter()
-                .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
-                .collect();
-            control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
-            control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
-            control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
+            // Config is empty, throw internal error
+            return Err(error::ErrorInternalServerError("Resolved config is not an object".to_string()));
         }
-    } else {
-        // Config failed or is empty, will set control same as experimental later
-        control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
-        let default_important_docs: Vec<Document> = package_data.files.iter()
-            .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
-            .collect();
-        control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
-        control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
-        control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
     }
 
     let mut experimental_overrides: std::collections::HashMap<String, Document> = std::collections::HashMap::new();
@@ -530,13 +694,13 @@ async fn create_release(
         let lazy_docs: Vec<Document> = lazy_vec.iter().cloned().map(Document::String).collect();
         experimental_overrides.insert("package.lazy".to_string(), Document::Array(lazy_docs));
     }
-    if let Some(ref resources) = req.resources {
+    if let Some(ref resources) = final_resources {
         let res_docs: Vec<Document> = resources.iter().cloned().map(Document::String).collect();
         experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
     }
 
-    // If config failed or is empty, make control same as experimental
-    if !use_config_defaults {
+    // If it's first release, make control same as experimental
+    if is_first_release {
         control_overrides = experimental_overrides.clone();
         control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
     }
@@ -901,6 +1065,158 @@ async fn list_releases(
 
     Ok(Json(ListReleaseResponse {
         releases,
+    }))
+}
+
+#[patch("/{release_id}/ramp")]
+async fn ramp_release(
+    release_id: Path<String>,
+    req: Json<RampReleaseRequest>,
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> actix_web::Result<Json<RampReleaseResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let experiment_id = release_id.to_string();
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+    println!(
+        "Ramping experiment {} to {}% traffic for release {} in workspace {} org {}",
+        experiment_id, req.traffic_percentage, release_id, workspace_name, superposition_org_id_from_env
+    );
+
+    state
+        .superposition_client
+        .ramp_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .id(experiment_id.to_string())
+        .traffic_percentage(req.traffic_percentage as i32)
+        .change_reason(
+            req.change_reason
+                .clone()
+                .unwrap_or_else(|| format!("Ramping release {} to {}% traffic", release_id, req.traffic_percentage))
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to ramp experiment: {:?}", e);
+            error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
+        })?;
+
+    println!("Successfully ramped experiment {}", experiment_id);
+
+    Ok(Json(RampReleaseResponse {
+        success: true,
+        message: format!("Release experiment ramped to {}% traffic", req.traffic_percentage),
+        experiment_id: experiment_id.to_string(),
+        traffic_percentage: req.traffic_percentage,
+    }))
+}
+
+#[patch("/{release_id}/conclude")]
+async fn conclude_release(
+    release_id: Path<String>,
+    req: Json<ConcludeReleaseRequest>,
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> actix_web::Result<Json<ConcludeReleaseResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, WRITE).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, WRITE).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let experiment_id = release_id.to_string();
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+    let experiment_details = state
+        .superposition_client
+        .get_experiment()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .id(experiment_id.to_string())
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to get experiment details: {:?}", e);
+            error::ErrorInternalServerError("Failed to get experiment details from Superposition")
+        })?;
+
+
+    let transformed_variant_id = experiment_details
+        .variants
+        .iter()
+        .find(|variant| {
+            let matches = variant.id.ends_with(&format!("-{}", req.chosen_variant));
+            matches
+        })
+        .map(|variant| variant.id.clone())
+        .ok_or_else(|| {
+            error::ErrorBadRequest(format!("Variant '{}' not found in experiment. Available variants: {:?}", 
+                req.chosen_variant, 
+                experiment_details.variants.iter().map(|v| &v.id).collect::<Vec<_>>()))
+        })?;
+
+    println!(
+        "Concluding experiment {} with transformed variant {} (original: {}) for release {}",
+        experiment_id, transformed_variant_id, req.chosen_variant, release_id
+    );
+
+    state
+        .superposition_client
+        .conclude_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .id(experiment_id.to_string())
+        .chosen_variant(transformed_variant_id.clone())
+        .change_reason(
+            req.change_reason
+                .clone()
+                .unwrap_or_else(|| format!("Concluding release {} with variant {}", release_id, req.chosen_variant))
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to conclude experiment: {:?}", e);
+            error::ErrorInternalServerError("Failed to conclude experiment in Superposition")
+        })?;
+
+    println!("Successfully concluded experiment {} with variant {}", experiment_id, transformed_variant_id);
+
+    Ok(Json(ConcludeReleaseResponse {
+        success: true,
+        message: format!("Release experiment concluded with variant {}", req.chosen_variant),
+        experiment_id: experiment_id.to_string(),
+        chosen_variant: req.chosen_variant.clone(),
     }))
 }
 

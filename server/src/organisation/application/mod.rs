@@ -22,13 +22,14 @@ use aws_smithy_types::Document;
 use keycloak::types::GroupRepresentation;
 use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use superposition_rust_sdk::operation::create_default_config::CreateDefaultConfigOutput;
+use serde_json::{json};
+use superposition_rust_sdk::operation::create_default_config::{CreateDefaultConfigOutput};
 use superposition_rust_sdk::types::WorkspaceStatus;
 use superposition_rust_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, WRITE};
 use crate::types::AppState;
+use crate::utils::document::value_to_document;
 use diesel::RunQueryDsl;
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
@@ -119,7 +120,11 @@ where
             map.insert("items".to_string(), Document::Object(submap));
             map
         }
-        _ => HashMap::new(),
+        _ => {
+            let mut map = HashMap::new();
+            map.insert("type".to_string(), Document::String(String::from("object")));
+            map
+        }
     })
 }
 
@@ -375,6 +380,16 @@ async fn add_application(
             generated_workspace_name.clone(),
             superposition_org_id_from_env.clone(), // Use ID from env
         );
+        let create_default_config_doc = default_config::<Document>(
+            state.superposition_client.clone(),
+            generated_workspace_name.clone(),
+            superposition_org_id_from_env.clone(), // Use ID from env
+        );
+        let create_default_config_array = default_config::<Vec<Document>>(
+            state.superposition_client.clone(),
+            generated_workspace_name.clone(),
+            superposition_org_id_from_env.clone(), // Use ID from env
+        );
 
         // Helper function to create default config with error handling
         async fn create_config_with_tx<T, E>(
@@ -453,6 +468,20 @@ async fn add_application(
         )
         .await?;
 
+        create_config_with_tx(
+            create_default_config_doc(
+                "config.properties".to_string(),
+                value_to_document(&serde_json::json!({})),
+                "Value indicating the properties of the config".to_string(),
+            ),
+            "config.properties",
+            &transaction,
+            &admin,
+            &realm,
+            &state,
+        )
+        .await?;
+
         println!(
             "Creating default configuration (string): key=package.name, value={}",
             generated_workspace_name
@@ -478,6 +507,62 @@ async fn add_application(
                 "Value indicating the version of the package".to_string(),
             ),
             "package.version",
+            &transaction,
+            &admin,
+            &realm,
+            &state,
+        )
+        .await?;
+
+        create_config_with_tx(
+            create_default_config_doc(
+                "package.properties".to_string(),
+                value_to_document(&serde_json::json!({})),
+                "Value indicating the properties of the package".to_string(),
+            ),
+            "package.properties",
+            &transaction,
+            &admin,
+            &realm,
+            &state,
+        )
+        .await?;
+
+        create_config_with_tx(
+            create_default_config_array(
+                "package.important".to_string(),
+                vec![],
+                "Value indicating the important block of the package".to_string(),
+            ),
+            "package.important",
+            &transaction,
+            &admin,
+            &realm,
+            &state,
+        )
+        .await?;
+
+        create_config_with_tx(
+            create_default_config_array(
+                "package.lazy".to_string(),
+                vec![],
+                "Value indicating the lazy block of the package".to_string(),
+            ),
+            "package.lazy",
+            &transaction,
+            &admin,
+            &realm,
+            &state,
+        )
+        .await?;
+
+        create_config_with_tx(
+            create_default_config_array(
+                "resources".to_string(),
+                vec![],
+                "Value indicating the resources block of the release config".to_string(),
+            ),
+            "resources",
             &transaction,
             &admin,
             &realm,
