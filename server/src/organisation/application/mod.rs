@@ -39,6 +39,7 @@ mod config;
 mod dimension;
 mod package;
 mod release;
+mod user;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -50,6 +51,7 @@ pub fn add_routes() -> Scope {
         .service(Scope::new("/release").service(release::add_routes()))
         .service(Scope::new("/config").service(config::add_routes()))
         .service(Scope::new("/dimension").service(dimension::add_routes()))
+        .service(Scope::new("/user").service(user::add_routes()))
 }
 
 #[derive(Serialize, Deserialize)]

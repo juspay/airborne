@@ -1,29 +1,10 @@
 import React from 'react';
 import { Plus, ChevronRight, Trash2, Building2, Zap, ArrowLeft } from "lucide-react";
-
-// Keep the same type definitions as in Home.tsx for now
-interface OrganisationUser {
-  id: string;
-  username: string;
-  email: string;
-  role: string[];
-}
-
-interface Application {
-  id: string;
-  application: string;
-  versions: string[];
-}
-
-interface Organisation {
-  id: string;
-  name: string;
-  applications: Application[];
-  users?: OrganisationUser[];
-}
+import { Application, Organisation, User } from '../../types';
 
 interface SidebarProps {
   organisations: Organisation[];
+  user: User;
   selectedOrg: Organisation | null;
   isDeletingOrg: string | null;
   onOrgSelect: (org: Organisation | null) => void;
@@ -45,7 +26,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   onDeleteOrg,
   onDeleteApp,
 }) => {
-  const isOrgAdmin = () => true; // Placeholder
 
   if (selectedOrg) {
     return (
@@ -89,29 +69,33 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <p className="text-xs text-white/60">{app.versions?.length || 0} versions</p>
                   </div>
                 </div>
-                <button
-                  onClick={(e) => onDeleteApp(app.application, e)}
-                  className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {app.access && app.access.includes("admin") && 
+                  <button
+                    onClick={(e) => onDeleteApp(app.application, e)}
+                    className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                }
               </div>
             </div>
           ))}
         </div>
 
         {/* Add Application Button */}
-        <div className="p-4 border-t border-white/10">
-          <button
-            onClick={onCreateApp}
-            className="w-full p-4 bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-green-500/20"
-          >
-            <div className="flex items-center justify-center space-x-2">
-              <Plus size={18} />
-              <span>New Application</span>
-            </div>
-          </button>
-        </div>
+        {(selectedOrg.access.includes("admin") || selectedOrg.access.includes("owner") || selectedOrg.access.includes("write")) &&
+          <div className="p-4 border-t border-white/10">
+            <button
+              onClick={onCreateApp}
+              className="w-full p-4 bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-green-500/20"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <Plus size={18} />
+                <span>New Application</span>
+              </div>
+            </button>
+          </div>
+        }
       </div>
     );
   }
@@ -153,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                {isOrgAdmin() && (
+                {org.access.includes("owner") && (
                   <button
                     onClick={(e) => onDeleteOrg(org.name, e)}
                     className={`p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors ${

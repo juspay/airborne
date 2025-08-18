@@ -26,10 +26,20 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear tokens on unauthorized
-      localStorage.removeItem("userToken");
-      sessionStorage.removeItem("userToken");
-      window.location.href = "/dashboard";
+      // Check if this request was configured to skip auto-logout
+      const skipAutoLogout = error.config?.skipAutoLogout;
+      
+      // Don't auto-logout for user management endpoints or when explicitly skipped
+      const isUserManagementEndpoint = error.config?.url?.includes('/users') || 
+                                       error.config?.url?.includes('/user') ||
+                                       error.config?.url?.includes('/admin');
+      
+      if (!skipAutoLogout && !isUserManagementEndpoint) {
+        // Clear tokens on unauthorized for authentication-related requests
+        localStorage.removeItem("userToken");
+        sessionStorage.removeItem("userToken");
+        window.location.href = "/dashboard";
+      }
     }
 
     // Handle all API errors with our error handler
@@ -38,5 +48,13 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Helper method to make requests without auto-logout on 401
+(axiosInstance as any).withoutAutoLogout = (config: any) => {
+  return axiosInstance({
+    ...config,
+    skipAutoLogout: true
+  });
+};
 
 export default axiosInstance;
