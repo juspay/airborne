@@ -29,6 +29,24 @@ buildscript {
     }
 }
 
+plugins {
+    id "com.gradleup.nmcp.aggregation" version "1.0.3"
+}
+
+nmcpAggregation {
+    centralPortal {
+        username = System.getenv("SONATYPE_MAVEN_USERNAME")
+        password = System.getenv("SONATYPE_MAVEN_PASSWORD")
+
+        publishingType = "AUTOMATIC"
+    }
+}
+
+dependencies {
+    nmcpAggregation(project(":hyper-ota"))
+    nmcpAggregation(project(":hyper-ota-react"))
+}
+
 allprojects {
     repositories {
         google()

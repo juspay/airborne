@@ -1,4 +1,6 @@
 # Airborne: Seamless Over-The-Air Updates for Your Applications
+[![Maven Central](https://img.shields.io/maven-central/v/io.juspay/airborne.svg?label=maven:airborne)](https://central.sonatype.com/artifact/io.juspay/airborne)
+[![Maven Central](https://img.shields.io/maven-central/v/io.juspay/airborne-react.svg?label=maven:airborne-react)](https://central.sonatype.com/artifact/io.juspay/airborne-react)
 
 Airborne empowers developers to effortlessly integrate Over-The-Air (OTA) update capabilities into their **Android, iOS, and React Native applications**. Our primary focus is to provide robust, easy-to-use SDKs and plugins that streamline the update process directly within your client applications.
 
