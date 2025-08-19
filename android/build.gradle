@@ -29,6 +29,23 @@ buildscript {
     }
 }
 
+plugins {
+    id "com.gradleup.nmcp.aggregation" version "1.0.3"
+}
+
+nmcpAggregation {
+    centralPortal {
+        username = System.getenv("SONATYPE_USERNAME")
+        password = System.getenv("SONATYPE_PASSWORD")
+
+        publishingType = "AUTOMATIC"
+    }
+}
+
+dependencies {
+    nmcpAggregation(project(":hyper-ota"))
+}
+
 allprojects {
     repositories {
         google()
