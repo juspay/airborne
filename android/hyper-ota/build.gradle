@@ -84,7 +84,7 @@ afterEvaluate {
 
                 groupId = 'io.juspay'
                 artifactId = 'airborne'
-                version = resolveVersion()
+                version = System.getenv("VERSION") ?: resolveVersion()
 
                 pom {
                     name = 'Airborne'

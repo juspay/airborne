@@ -38,15 +38,29 @@ jobs:
         working-directory: android
 
       # Fail fast if version resolves to SNAPSHOT (Central Portal only accepts releases)
-      - name: Ensure version is a release (not SNAPSHOT)
+      - name: Ensure run is a release tag (else skip)
         working-directory: android
         run: |
-          VER=$(GITHUB_REF_NAME=${GITHUB_REF_NAME} ./gradlew -q :hyper-ota:properties | grep "^version:" | awk '{print $2}')
-          echo "Resolved version: $VER"
-          if echo "$VER" | grep -qi SNAPSHOT; then
-            echo "Version is SNAPSHOT; skipping Central release."
-            exit 78   # neutral
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "Not a tag push; skipping Central release."
+            exit 78
           fi
+
+          TAG="${GITHUB_REF_NAME}"
+          echo "Detected tag: $TAG"
+
+          if ! echo "$TAG" | grep -Eq '^v[0-9]+(\.[0-9]+){1,2}([-.].+)?$'; then
+            echo "Tag '$TAG' does not look like a version."
+            exit 1
+          fi
+
+          if echo "$TAG" | grep -qi 'SNAPSHOT'; then
+            echo "Tag contains SNAPSHOT; skipping."
+            exit 78
+          fi
+
+          VERSION="${TAG#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Import GPG (in-memory)
         run: |
