@@ -10,7 +10,7 @@ use aws_smithy_types::{Document};
 use crate::{
     file::utils::parse_file_key, 
     middleware::auth::{validate_user, AuthResponse, READ, WRITE}, 
-    package::utils::parse_package_key, 
+    package::{self, utils::parse_package_key}, 
     types::AppState, 
     utils::{
         db::{
@@ -75,6 +75,7 @@ struct CreateReleaseResponse {
     created_at: DateTime<Utc>,
     config: Config,
     package: Package,
+    resources: Vec<File>,
     experiment: Option<ReleaseExperiment>
 }
 
@@ -508,7 +509,9 @@ async fn create_release(
             }
             resources_from_configs
         };
-        (f_imp, f_lazy, f_resources, None)
+
+
+        (f_imp, f_lazy, f_resources, package_req.properties.clone())
     } else {
         // handle if package id is provided but package block was not provided
         if req.package_id.is_some() {
@@ -520,6 +523,50 @@ async fn create_release(
 
     println!("Final: {:?}", (final_important.clone(), final_lazy.clone(), final_resources.clone()));
 
+    let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+
+    let combined_files = package_data.files.iter()
+        .filter_map(|f| f.as_ref().cloned())
+        .chain(final_resources.clone().unwrap_or_default())
+        .collect::<Vec<String>>();
+
+    for file_id in &combined_files {
+        let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
+
+        if let Some(v) = ver_opt {
+            file_conds.push(Box::new(
+                file_dsl_path
+                    .eq(fp.clone())
+                    .and(file_dsl_version.eq(v))
+            ));
+        } else if let Some(t) = tag_opt {
+            file_conds.push(Box::new(
+                file_dsl_path
+                    .eq(fp.clone())
+                    .and(file_dsl_tag.eq(t.clone()))
+            ));
+        } else {
+            return Err(actix_web::error::ErrorBadRequest("Invalid file key format"));
+        }
+    }
+
+    let combined = file_conds
+        .into_iter()
+        .reduce(|a, b| Box::new(a.or(b)))
+        .expect("Package should have files");
+
+    let files: Vec<FileEntry> = files_table
+        .into_boxed::<Pg>()
+        .filter(file_dsl_org_id.eq(&organisation))
+        .filter(file_dsl_app_id.eq(&application))
+        .filter(combined)
+        .load(&mut conn)
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    if files.len() != combined_files.len() {
+        return Err(actix_web::error::ErrorInternalServerError("Some files were missing in DB"));
+    }
+
     let now = Utc::now();
 
     let mut control_overrides = std::collections::HashMap::new();
@@ -528,6 +575,11 @@ async fn create_release(
     if !is_first_release {
         if let Some(Document::Object(obj)) = &config_document {
             control_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
+            if let Some(version) = obj.get("package.version") {
+                control_overrides.insert("package.version".to_string(), version.clone());
+            } else {
+                control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
+            }
             if let Some(props) = obj.get("package.properties") {
                 control_overrides.insert("package.properties".to_string(), props.clone());
             } else {
@@ -563,6 +615,8 @@ async fn create_release(
 
     if let Some(ref properties) = final_properties {
         experimental_overrides.insert("package.properties".to_string(), value_to_document(properties));
+    } else {
+        experimental_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
     }
     if let Some(ref imp_vec) = final_important {
         let imp_docs: Vec<Document> = imp_vec.iter().cloned().map(Document::String).collect();
@@ -582,6 +636,9 @@ async fn create_release(
         control_overrides = experimental_overrides.clone();
         control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
     }
+
+    println!("Control overrides: {:?}", control_overrides);
+    println!("Experimental overrides: {:?}", experimental_overrides);
 
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
@@ -645,41 +702,6 @@ async fn create_release(
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
 
-    let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
-
-    for file_id in &package_data.files {
-        let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone().unwrap_or("".to_string()));
-
-        if let Some(v) = ver_opt {
-            file_conds.push(Box::new(
-                file_dsl_path
-                    .eq(fp.clone())
-                    .and(file_dsl_version.eq(v))
-            ));
-        } else if let Some(t) = tag_opt {
-            file_conds.push(Box::new(
-                file_dsl_path
-                    .eq(fp.clone())
-                    .and(file_dsl_tag.eq(t.clone()))
-            ));
-        } else {
-            return Err(actix_web::error::ErrorBadRequest("Invalid file key format"));
-        }
-    }
-
-    let combined = file_conds
-        .into_iter()
-        .reduce(|a, b| Box::new(a.or(b)))
-        .expect("Package should have files");
-
-    let files: Vec<FileEntry> = files_table
-        .into_boxed::<Pg>()
-        .filter(file_dsl_org_id.eq(&organisation))
-        .filter(file_dsl_app_id.eq(&application))
-        .filter(combined)
-        .load(&mut conn)
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-
     let response_important = final_important.unwrap_or_else(|| {
         package_data.files.iter()
             .filter_map(|f| f.as_ref().cloned())
@@ -687,6 +709,8 @@ async fn create_release(
     });
 
     let response_lazy = final_lazy.unwrap_or_default();
+
+    let response_resources = final_resources.unwrap_or_default();
 
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
@@ -716,6 +740,14 @@ async fn create_release(
                 })
             }).collect(),
         },
+        resources: response_resources.iter().filter_map(|file_key| {
+            let (file_path, _, _) = parse_file_key(file_key);
+            files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                file_path: file.file_path.clone(),
+                url: file.url.clone(),
+                checksum: file.checksum.clone()
+            })
+        }).collect(),
         experiment: Some(ReleaseExperiment {
             experiment_id: experiment_id_for_ramping,
             package_version: pkg_version,
@@ -788,13 +820,13 @@ async fn list_releases(
         let experimental_variant = experiment.variants.iter()
             .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental);
 
-        let package_properties = experimental_variant
+        let rc_package_properties = experimental_variant
             .and_then(|v| v.overrides.as_object())
             .and_then(|obj| obj.get("package.properties"))
             .and_then(document_to_value)
             .unwrap_or_default();
 
-        let package_important = experimental_variant
+        let rc_package_important = experimental_variant
             .and_then(|v| v.overrides.as_object())
             .and_then(|obj| obj.get("package.important"))
             .and_then(|doc| {
@@ -812,9 +844,7 @@ async fn list_releases(
             })
             .unwrap_or_default();
 
-        println!("Package important files: {:?}", package_important);
-
-        let package_lazy = experimental_variant
+        let rc_package_lazy = experimental_variant
             .and_then(|v| v.overrides.as_object())
             .and_then(|obj| obj.get("package.lazy"))
             .and_then(|doc| {
@@ -831,13 +861,34 @@ async fn list_releases(
                 }
             })
             .unwrap_or_default();
-            
-        let (important_files, lazy_files) = {
+
+        let rc_resources = experimental_variant
+            .and_then(|v| v.overrides.as_object())
+            .and_then(|obj| obj.get("resources"))
+            .and_then(|doc| {
+                if let Document::Array(arr) = doc {
+                    Some(arr.iter().filter_map(|d| {
+                        if let Document::String(s) = d {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    }).collect::<Vec<String>>())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        println!("Resources files: {:?}", rc_resources);
+
+        let (important_files, lazy_files, resource_files) = {
             // Build file conditions for querying
             let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
-            
-            let all_files = package_important.iter()
-                .chain(package_lazy.iter())
+
+            let all_files = rc_package_important.iter()
+                .chain(rc_package_lazy.iter())
+                .chain(rc_resources.iter())
                 .cloned()
                 .collect::<Vec<String>>();
 
@@ -875,7 +926,7 @@ async fn list_releases(
                 println!("Files result: {:?}", files_result);
                 
                 if let Ok(files) = files_result {
-                    let important_files: Vec<File> = package_important.iter().filter_map(|file_key| {
+                    let important_files: Vec<File> = rc_package_important.iter().filter_map(|file_key| {
                         let (file_path, _, _) = parse_file_key(file_key);
                         files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
                             file_path: file.file_path.clone(),
@@ -885,7 +936,16 @@ async fn list_releases(
                     }).collect();
                     println!("Important files: {:?}", important_files);
                     
-                    let lazy_files: Vec<File> = package_lazy.iter().filter_map(|file_key| {
+                    let lazy_files: Vec<File> = rc_package_lazy.iter().filter_map(|file_key| {
+                        let (file_path, _, _) = parse_file_key(file_key);
+                        files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                            file_path: file.file_path.clone(),
+                            url: file.url.clone(),
+                            checksum: file.checksum.clone()
+                        })
+                    }).collect();
+
+                    let resource_files: Vec<File> = rc_resources.iter().filter_map(|file_key| {
                         let (file_path, _, _) = parse_file_key(file_key);
                         files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
                             file_path: file.file_path.clone(),
@@ -895,18 +955,18 @@ async fn list_releases(
                     }).collect();
 
                     println!("Lazy files: {:?}", lazy_files);
-                    
-                    (important_files, lazy_files)
+
+                    (important_files, lazy_files, resource_files)
                 } else {
-                    (Vec::new(), Vec::new())
+                    (Vec::new(), Vec::new(), Vec::new())
                 }
             } else {
-                (Vec::new(), Vec::new())
+                (Vec::new(), Vec::new(), Vec::new())
             }
         };
 
-        println!("Important 1files: {:?}", important_files);
-        println!("Lazy 1files: {:?}", lazy_files);
+        println!("Important files: {:?}", important_files);
+        println!("Lazy files: {:?}", lazy_files);
         
         // Parse created_at string to DateTime<Utc>
         let created_at_str = dt(&experiment.created_at);
@@ -924,10 +984,11 @@ async fn list_releases(
             package: Package {
                 version: package_version,
                 index: format!("pkg@version:{}", package_version),
-                properties: package_properties,
+                properties: rc_package_properties,
                 important: important_files,
                 lazy: lazy_files,
             },
+            resources: resource_files,
             experiment: Some(build_release_experiment_from_experiment(
                 &experiment,
                 package_version,
