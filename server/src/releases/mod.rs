@@ -518,6 +518,8 @@ async fn create_release(
         (imp_from_configs, lazy_from_configs, resources_from_configs, None)
     };
 
+    println!("Final: {:?}", (final_important.clone(), final_lazy.clone(), final_resources.clone()));
+
     let now = Utc::now();
 
     let mut control_overrides = std::collections::HashMap::new();
@@ -525,6 +527,7 @@ async fn create_release(
     
     if !is_first_release {
         if let Some(Document::Object(obj)) = &config_document {
+            control_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
             if let Some(props) = obj.get("package.properties") {
                 control_overrides.insert("package.properties".to_string(), props.clone());
             } else {
@@ -555,6 +558,7 @@ async fn create_release(
     }
 
     let mut experimental_overrides: std::collections::HashMap<String, Document> = std::collections::HashMap::new();
+    experimental_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
     experimental_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
 
     if let Some(ref properties) = final_properties {
