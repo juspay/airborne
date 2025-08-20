@@ -69,6 +69,17 @@ jobs:
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
 
+      - name: Decode signing key
+        run: |
+          echo "${SIGNING_KEY}" | base64 -d > /tmp/key.asc
+          gpg --batch --import /tmp/key.asc
+          # Export the decoded key for Gradle
+          echo "DECODED_SIGNING_KEY<<EOF" >> $GITHUB_ENV
+          echo "${SIGNING_KEY}" | base64 -d >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+
       # Publish aggregation (both modules). nmcp builds a single ZIP and uploads to Portal API
       - name: Publish to Maven Central (Central Portal)
         working-directory: android
@@ -79,5 +90,5 @@ jobs:
           SONATYPE_MAVEN_PASSWORD: ${{ secrets.SONATYPE_MAVEN_PASSWORD }}
 
           # Gradle signing properties (nmcp uses existing publications)
-          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ env.DECODED_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
