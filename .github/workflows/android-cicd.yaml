@@ -75,8 +75,8 @@ jobs:
         run: ./gradlew --no-daemon publishAggregationToCentralPortal
         env:
           # Central Portal token (username/password pair)
-          SONATYPE_CENTRAL_USERNAME: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
-          SONATYPE_CENTRAL_PASSWORD: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+          SONATYPE_MAVEN_USERNAME: ${{ secrets.SONATYPE_MAVEN_USERNAME }}
+          SONATYPE_MAVEN_PASSWORD: ${{ secrets.SONATYPE_MAVEN_PASSWORD }}
 
           # Gradle signing properties (nmcp uses existing publications)
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
