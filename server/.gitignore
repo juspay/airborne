@@ -7,6 +7,8 @@
 .vscode
 localstack-data/
 superposition/
-**/.env*
+**/.env
+**/.env.*
+.direnv
 
 airborne-gcp.json
