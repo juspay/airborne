@@ -34,6 +34,20 @@ pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Opti
     })
 }
 
+pub fn extract_file_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<String> {
+    opt_obj
+    .as_ref()
+    .and_then(|doc| {
+        if let Document::Object(obj) = doc {
+            obj.get(key)
+                .and_then(document_to_value)
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        } else {
+            None
+        }
+    })
+}
+
 pub fn extract_files_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> Vec<String> {
     experimental_variant
         .and_then(|v| v.overrides.as_object())
@@ -47,6 +61,20 @@ pub fn extract_files_from_experiment(experimental_variant: &Option<&Variant>, ke
                         None
                     }
                 }).collect::<Vec<String>>())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
+}
+
+pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> String {
+    experimental_variant
+        .and_then(|v| v.overrides.as_object())
+        .and_then(|obj| obj.get(key))
+        .and_then(|doc| {
+            if let Document::String(s) = doc {
+                Some(s.clone())
             } else {
                 None
             }

@@ -3,19 +3,20 @@ use std::{fs::File, io::Read};
 use actix_web::{
     error, get, patch, post, web::{self, Json, Path, Query, ReqData}, HttpResponse, Result, Scope
 };
-use actix_multipart::form::{tempfile::TempFile, MultipartForm};
+use actix_multipart::form::MultipartForm;
 use diesel::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use tokio::task;
 use uuid::Uuid;
 use chrono::Utc;
 use zip::ZipArchive;
 pub mod utils;
+pub mod models;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, READ, WRITE},
     types::AppState,
+    file::models::*,
     utils::{
         db::{
             models::{FileEntry as DbFile, NewFileEntry},
@@ -24,109 +25,6 @@ use crate::{
         s3::{push_file, push_file_byte_arr},
     },
 };
-
-#[derive(Serialize, Deserialize)]
-struct FileRequest {
-    file_path: String,
-    url: String,
-    tag: String,
-    metadata: Option<Value>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct BulkFileRequest {
-    files: Vec<FileRequest>,
-    skip_duplicates: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-struct UpdateFileRequest {
-    tag: String,
-}
-
-#[derive(Serialize, Deserialize)]
-enum FileStatus {
-    Pending,
-    Ready,
-}
-
-impl ToString for FileStatus {
-    fn to_string(&self) -> String {
-        match self {
-            FileStatus::Pending => "pending".to_string(),
-            FileStatus::Ready => "ready".to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct FileResponse {
-    pub id: String,
-    pub file_path: String,
-    pub url: String,
-    pub version: i32,
-    pub tag: String,
-    pub size: i64,
-    pub checksum: String,
-    pub metadata: Value,
-    pub status: FileStatus,
-    pub created_at: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct FileListResponse {
-    files: Vec<FileResponse>,
-    total: usize,
-    page: Option<u32>,
-    per_page: Option<u32>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct BulkFileResponse {
-    created_files: Vec<FileResponse>,
-    skipped_files: Vec<String>,
-    total_created: usize,
-    total_skipped: usize,
-}
-
-#[derive(Deserialize)]
-struct FileListQuery {
-    page: Option<u32>,
-    per_page: Option<u32>,
-    search: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct GetFileQuery {
-    file_key: String,
-}
-
-#[derive(MultipartForm)]
-struct UploadFileRequest {
-    file: TempFile,
-    file_path: actix_multipart::form::text::Text<String>,
-    version: actix_multipart::form::text::Text<i32>,
-}
-
-#[derive(MultipartForm)]
-struct UploadBulkFilesRequest {
-    file: TempFile,
-    skip_duplicates: actix_multipart::form::text::Text<bool>,
-}
-
-#[derive(Deserialize)]
-struct UploadBulkMapping {
-    file_name: String,
-    file_path: String,
-    version: i32,
-    metadata: Option<Value>,
-}
-
-#[derive(Serialize)]
-struct BulkFileUploadResponse {
-    uploaded: Vec<FileResponse>,
-    skipped: Vec<String>,
-}
 
 pub fn add_routes() -> Scope {
     Scope::new("")

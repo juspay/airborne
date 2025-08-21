@@ -356,6 +356,7 @@ async fn create_release(
     let combined_files = package_data.files.iter()
         .filter_map(|f| f.as_ref().cloned())
         .chain(final_resources.clone().unwrap_or_default())
+        .chain(vec![package_data.index.clone()])
         .collect::<Vec<String>>();
 
     let files = utils::get_files_by_file_keys(&mut conn, &organisation, &application, &combined_files)
@@ -375,6 +376,11 @@ async fn create_release(
     if !is_first_release {
         if let Some(Document::Object(obj)) = &config_document {
             control_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
+            if let Some(package_idx) = obj.get("package.index") {
+                control_overrides.insert("package.index".to_string(), package_idx.clone());
+            } else {
+                control_overrides.insert("package.index".to_string(), Document::String("".to_string()));
+            }
             if let Some(version) = obj.get("package.version") {
                 control_overrides.insert("package.version".to_string(), version.clone());
             } else {
@@ -412,6 +418,7 @@ async fn create_release(
     let mut experimental_overrides: std::collections::HashMap<String, Document> = std::collections::HashMap::new();
     experimental_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
     experimental_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
+    experimental_overrides.insert("package.index".to_string(), Document::String(package_data.index.clone()));
 
     if let Some(ref properties) = final_properties {
         experimental_overrides.insert("package.properties".to_string(), utils::value_to_document(properties));
@@ -519,13 +526,24 @@ async fn create_release(
             boot_timeout: 4000,
             package_timeout: 4000
         },
-        package: Package {
+        package: ServePackage {
             version: pkg_version,
-            index: req.package_id.clone().unwrap_or_else(|| format!("pkg@version:{}", pkg_version)),
+            index: {
+                let (file_path, _, _) = parse_file_key(&package_data.index);
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                }).unwrap_or_else(|| ServeFile {
+                    file_path: file_path.clone(),
+                    url: "".to_string(),
+                    checksum: "".to_string()
+                })
+            },
             properties: final_properties.unwrap_or_default(),
             important: response_important.iter().filter_map(|file_key| {
                 let (file_path, _, _) = parse_file_key(file_key);
-                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),
                     checksum: file.checksum.clone()
@@ -533,7 +551,7 @@ async fn create_release(
             }).collect(),
             lazy: response_lazy.iter().filter_map(|file_key| {
                 let (file_path, _, _) = parse_file_key(file_key);
-                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),
                     checksum: file.checksum.clone()
@@ -542,7 +560,7 @@ async fn create_release(
         },
         resources: response_resources.iter().filter_map(|file_key| {
             let (file_path, _, _) = parse_file_key(file_key);
-            files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+            files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                 file_path: file.file_path.clone(),
                 url: file.url.clone(),
                 checksum: file.checksum.clone()
@@ -629,23 +647,25 @@ async fn list_releases(
         let rc_package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
         let rc_package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
         let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
+        let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
 
         println!("Resources files: {:?}", rc_resources);
 
-        let (important_files, lazy_files, resource_files) = {
+        let (index_file, important_files, lazy_files, resource_files) = {
 
             let all_files = rc_package_important.iter()
                 .chain(rc_package_lazy.iter())
                 .chain(rc_resources.iter())
+                .chain(vec![rc_index.clone()].iter())
                 .cloned()
                 .collect::<Vec<String>>();
 
             let files_result = utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
 
             if let Ok(files) = files_result {
-                let important_files: Vec<File> = rc_package_important.iter().filter_map(|file_key| {
+                let important_files: Vec<ServeFile> = rc_package_important.iter().filter_map(|file_key| {
                     let (file_path, _, _) = parse_file_key(file_key);
-                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                         file_path: file.file_path.clone(),
                         url: file.url.clone(),
                         checksum: file.checksum.clone()
@@ -653,29 +673,46 @@ async fn list_releases(
                 }).collect();
                 println!("Important files: {:?}", important_files);
                 
-                let lazy_files: Vec<File> = rc_package_lazy.iter().filter_map(|file_key| {
+                let lazy_files: Vec<ServeFile> = rc_package_lazy.iter().filter_map(|file_key| {
                     let (file_path, _, _) = parse_file_key(file_key);
-                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                         file_path: file.file_path.clone(),
                         url: file.url.clone(),
                         checksum: file.checksum.clone()
                     })
                 }).collect();
 
-                let resource_files: Vec<File> = rc_resources.iter().filter_map(|file_key| {
+                let resource_files: Vec<ServeFile> = rc_resources.iter().filter_map(|file_key| {
                     let (file_path, _, _) = parse_file_key(file_key);
-                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                         file_path: file.file_path.clone(),
                         url: file.url.clone(),
                         checksum: file.checksum.clone()
                     })
                 }).collect();
+
+                let index_file: ServeFile = {
+                    let (file_path, _, _) = parse_file_key(&rc_index);
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                        file_path: file.file_path.clone(),
+                        url: file.url.clone(),
+                        checksum: file.checksum.clone()
+                    }).unwrap_or_else(|| ServeFile {
+                        file_path: file_path.clone(),
+                        url: String::new(),
+                        checksum: String::new()
+                    })
+                };
 
                 println!("Lazy files: {:?}", lazy_files);
 
-                (important_files, lazy_files, resource_files)
+                (index_file, important_files, lazy_files, resource_files)
             } else {
-                (Vec::new(), Vec::new(), Vec::new())
+                (ServeFile {
+                    file_path: String::new(),
+                    url: String::new(),
+                    checksum: String::new()
+                }, Vec::new(), Vec::new(), Vec::new())
             }
         };
 
@@ -695,9 +732,9 @@ async fn list_releases(
                 boot_timeout: 4000,
                 package_timeout: 4000
             },
-            package: Package {
+            package: ServePackage {
                 version: package_version,
-                index: format!("pkg@version:{}", package_version),
+                index: index_file,
                 properties: rc_package_properties,
                 important: important_files,
                 lazy: lazy_files,
@@ -985,21 +1022,23 @@ async fn serve_release(
     let rc_package_important = utils::extract_files_from_configs(&config_document, "package.important").unwrap_or_default();
     let rc_package_lazy = utils::extract_files_from_configs(&config_document, "package.lazy").unwrap_or_default();
     let rc_resources = utils::extract_files_from_configs(&config_document, "resources").unwrap_or_default();
+    let rc_index = utils::extract_file_from_configs(&config_document, "package.index").unwrap_or_default();
 
-    let (important_files, lazy_files, resource_files) = {
+    let (index_file, important_files, lazy_files, resource_files) = {
 
         let all_files = rc_package_important.iter()
             .chain(rc_package_lazy.iter())
             .chain(rc_resources.iter())
+            .chain(vec![rc_index.clone()].iter())
             .cloned()
             .collect::<Vec<String>>();
 
         let files_result = utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
 
         if let Ok(files) = files_result {
-            let important_files: Vec<File> = rc_package_important.iter().filter_map(|file_key| {
+            let important_files: Vec<ServeFile> = rc_package_important.iter().filter_map(|file_key| {
                 let (file_path, _, _) = parse_file_key(file_key);
-                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),
                     checksum: file.checksum.clone()
@@ -1007,29 +1046,46 @@ async fn serve_release(
             }).collect();
             println!("Important files: {:?}", important_files);
             
-            let lazy_files: Vec<File> = rc_package_lazy.iter().filter_map(|file_key| {
+            let lazy_files: Vec<ServeFile> = rc_package_lazy.iter().filter_map(|file_key| {
                 let (file_path, _, _) = parse_file_key(file_key);
-                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),
                     checksum: file.checksum.clone()
                 })
             }).collect();
 
-            let resource_files: Vec<File> = rc_resources.iter().filter_map(|file_key| {
+            let resource_files: Vec<ServeFile> = rc_resources.iter().filter_map(|file_key| {
                 let (file_path, _, _) = parse_file_key(file_key);
-                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
                     file_path: file.file_path.clone(),
                     url: file.url.clone(),
                     checksum: file.checksum.clone()
                 })
             }).collect();
+
+            let index_file: ServeFile = {
+                let (file_path, _, _) = parse_file_key(&rc_index);
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                }).unwrap_or_else(|| ServeFile {
+                    file_path: file_path.clone(),
+                    url: String::new(),
+                    checksum: String::new()
+                })
+            };
 
             println!("Lazy files: {:?}", lazy_files);
 
-            (important_files, lazy_files, resource_files)
+            (index_file, important_files, lazy_files, resource_files)
         } else {
-            (Vec::new(), Vec::new(), Vec::new())
+            (ServeFile {
+                file_path: String::new(),
+                url: String::new(),
+                checksum: String::new()
+            }, Vec::new(), Vec::new(), Vec::new())
         }
     };
 
@@ -1069,9 +1125,9 @@ async fn serve_release(
             boot_timeout: 4000,
             package_timeout: 4000
         },
-        package: Package {
+        package: ServePackage {
             version: version,
-            index: "".to_string(),
+            index: index_file,
             properties: opt_rc_package_properties.clone().unwrap_or(serde_json::Value::default()),
             important: important_files,
             lazy: lazy_files,

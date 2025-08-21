@@ -1,6 +1,6 @@
 pub mod utils;
 use actix_web::{get, post, web::{self, Query}, HttpResponse, Result, Scope};
-use crate::{middleware::auth::READ, package::utils::parse_package_key, utils::db::{
+use crate::{middleware::auth::READ, package::{models::*, utils::parse_package_key}, utils::db::{
     models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
     schema::hyperotaserver::{
         files::{
@@ -11,7 +11,7 @@ use crate::{middleware::auth::READ, package::utils::parse_package_key, utils::db
         },
     }
 }};
-use serde::{Deserialize, Serialize};
+
 use crate::{
     types::AppState, middleware::auth::{validate_user, AuthResponse, WRITE},
     file::utils::parse_file_key,
@@ -22,57 +22,13 @@ use diesel::pg::Pg;
 use diesel::expression::BoxableExpression;
 use diesel::sql_types::Bool;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Package {
-    pub index: String,
-    pub tag: String,
-    pub version: i32,
-    pub files: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreatePackageInput {
-    pub index: String,
-    pub tag: String,
-    pub files: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListPackagesInput {
-    pub offset: Option<i32>,
-    pub limit: Option<i32>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ListPackagesOutput {
-    pub packages: Vec<Package>,
-    pub page_number: i32,
-    pub next_offset: Option<i32>,
-    pub prev_offset: Option<i32>,
-    pub total_pages: i32,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct GetPackageQuery {
-    pub package_key: String,
-}
+pub mod models;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_package)
         .service(get_package)
         .service(list_packages)
-}
-
-fn db_response_to_package(
-    db_pkg: PackageV2Entry
-) -> Package {
-    return Package {
-        index: db_pkg.index,
-        tag: db_pkg.tag,
-        version: db_pkg.version,
-        files: db_pkg.files.into_iter().flatten().collect(),
-    };
 }
 
 #[post("")]
@@ -161,7 +117,7 @@ async fn create_package(
         .get_result::<PackageV2Entry>(&mut conn)
         .map_err(actix_web::error::ErrorInternalServerError)?;
 
-    Ok(HttpResponse::Created().json(db_response_to_package(package)))
+    Ok(HttpResponse::Created().json(utils::db_response_to_package(package)))
 }
 
 #[get("")]
@@ -208,7 +164,7 @@ async fn get_package(
         } else {
             return Err(actix_web::error::ErrorInternalServerError("Bad format for package id"));
         };
-    Ok(HttpResponse::Ok().json(db_response_to_package(package)))
+    Ok(HttpResponse::Ok().json(utils::db_response_to_package(package)))
 }
 
 #[get("/list")]
@@ -252,7 +208,7 @@ async fn list_packages(
 
     // 3) map to your public DTO
     let packages: Vec<Package> =
-        rows.into_iter().map(db_response_to_package).collect();
+        rows.into_iter().map(utils::db_response_to_package).collect();
 
     // 4) build pagination
     let total_pages = ((total_count + limit_val - 1) / limit_val) as i32;

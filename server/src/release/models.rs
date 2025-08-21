@@ -21,19 +21,19 @@ pub struct PackageRequest {
 }
 
 #[derive(Serialize, Debug)]
-pub struct File {
+pub struct ServeFile {
     pub file_path: String,
     pub url: String,
     pub checksum: String,
 }
 
 #[derive(Serialize)]
-pub struct Package {
+pub struct ServePackage {
     pub version: i32,
-    pub index: String,
+    pub index: ServeFile,
     pub properties: Value,
-    pub important: Vec<File>,
-    pub lazy: Vec<File>,
+    pub important: Vec<ServeFile>,
+    pub lazy: Vec<ServeFile>,
 }
 
 #[derive(Serialize)]
@@ -47,8 +47,8 @@ pub struct CreateReleaseResponse {
     pub id: String,
     pub created_at: DateTime<Utc>,
     pub config: Config,
-    pub package: Package,
-    pub resources: Vec<File>,
+    pub package: ServePackage,
+    pub resources: Vec<ServeFile>,
     pub experiment: Option<ReleaseExperiment>
 }
 
@@ -105,6 +105,6 @@ pub struct ConcludeReleaseResponse {
 #[derive(Serialize)]
 pub struct ServeReleaseResponse {
     pub config: Config,
-    pub package: Package,
-    pub resources: Vec<File>,
+    pub package: ServePackage,
+    pub resources: Vec<ServeFile>,
 }
