@@ -1,24 +1,15 @@
-use actix_web::{get, post, patch, web::{self, Json, Query, Path}, HttpResponse, Scope, error};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value};
-use std::collections::{HashMap, HashSet};
-use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
+use actix_web::{get, post, web::{self, Json, Path}, HttpResponse, Scope, error};
+use std::collections::{HashSet};
+use diesel::{prelude::*};
 use chrono::{DateTime, Utc};
 use superposition_rust_sdk::types::builders::VariantBuilder;
 use aws_smithy_types::{Document};
 
 use crate::{
-    file::utils::parse_file_key, 
-    middleware::auth::{validate_user, AuthResponse, READ, WRITE}, 
-    package::{self, utils::parse_package_key}, 
-    types::AppState, 
-    utils::{
+    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, package::utils::parse_package_key, releases::models::*, types::AppState, utils::{
         db::{
-            models::{FileEntry, PackageV2Entry},
+            models::{PackageV2Entry},
             schema::hyperotaserver::{
-                files::{
-                    app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id, table as files_table, tag as file_dsl_tag, version as file_dsl_version
-                },
                 packages_v2::dsl as packages_dsl
             },
         },
@@ -26,108 +17,8 @@ use crate::{
     }
 };
 
-#[derive(Deserialize)]
-pub struct GetReleaseQuery {
-    release_key: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateReleaseRequest {
-    package_id: Option<String>,
-    config: Option<HashMap<String, serde_json::Value>>,
-    package: Option<PackageRequest>,
-    dimensions: Option<HashMap<String, serde_json::Value>>,
-    resources: Option<Vec<String>>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PackageRequest {
-    properties: Option<serde_json::Value>,
-    important: Option<Vec<String>>,
-    lazy: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Debug)]
-struct File {
-    file_path: String,
-    url: String,
-    checksum: String,
-}
-
-#[derive(Serialize)]
-struct Package {
-    version: i32,
-    index: String,
-    properties: Value,
-    important: Vec<File>,
-    lazy: Vec<File>,
-}
-
-#[derive(Serialize)]
-struct Config {
-    boot_timeout: u64,
-    package_timeout: u64,
-}
-
-#[derive(Serialize)]
-struct CreateReleaseResponse {
-    id: String,
-    created_at: DateTime<Utc>,
-    config: Config,
-    package: Package,
-    resources: Vec<File>,
-    experiment: Option<ReleaseExperiment>
-}
-
-#[derive(Serialize, Debug)]
-struct ReleaseExperiment {
-    experiment_id: String,
-    package_version: i32,
-    config_version: String,
-    created_at: String,
-    traffic_percentage: u32,
-    status: String,
-}
-
-#[derive(Serialize)]
-struct ListReleaseResponse {
-    releases: Vec<CreateReleaseResponse>
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FileResource {
-    pub url: String,
-    #[serde(rename = "filePath")]
-    pub file_path: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct RampReleaseRequest {
-    traffic_percentage: u8,
-    change_reason: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ConcludeReleaseRequest {
-    chosen_variant: String,
-    change_reason: Option<String>,
-}
-
-#[derive(Serialize)]
-struct RampReleaseResponse {
-    success: bool,
-    message: String,
-    experiment_id: String,
-    traffic_percentage: u8,
-}
-
-#[derive(Serialize)]
-struct ConcludeReleaseResponse {
-    success: bool,
-    message: String,
-    experiment_id: String,
-    chosen_variant: String,
-}
+mod utils;
+mod models;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -138,13 +29,13 @@ pub fn add_routes() -> Scope {
         .service(conclude_release)
 }
 
-#[get("")]
+#[get("/{release_id}")]
 async fn get_release(
-    query: Query<GetReleaseQuery>,
+    release_id: Path<String>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<HttpResponse> {
-    let release_key = query.into_inner().release_key;
+    let release_key = release_id.into_inner();
     if release_key.is_empty() {
         return Err(actix_web::error::ErrorBadRequest("Release Key cannot be empty"));
     }
@@ -199,62 +90,12 @@ async fn get_release(
     let package_properties = experimental_variant
         .and_then(|v| v.overrides.as_object())
         .and_then(|obj| obj.get("package.properties"))
-        .and_then(document_to_value)
+        .and_then(utils::document_to_value)
         .unwrap_or_default();
 
-    let package_important = experimental_variant
-        .and_then(|v| v.overrides.as_object())
-        .and_then(|obj| obj.get("package.important"))
-        .and_then(|doc| {
-            if let Document::Array(arr) = doc {
-                Some(arr.iter().filter_map(|d| {
-                    if let Document::String(s) = d {
-                        Some(s.clone())
-                    } else {
-                        None
-                    }
-                }).collect::<Vec<String>>())
-            } else {
-                None
-            }
-        })
-        .unwrap_or_default();
-
-    let package_lazy = experimental_variant
-        .and_then(|v| v.overrides.as_object())
-        .and_then(|obj| obj.get("package.lazy"))
-        .and_then(|doc| {
-            if let Document::Array(arr) = doc {
-                Some(arr.iter().filter_map(|d| {
-                    if let Document::String(s) = d {
-                        Some(s.clone())
-                    } else {
-                        None
-                    }
-                }).collect::<Vec<String>>())
-            } else {
-                None
-            }
-        })
-        .unwrap_or_default();
-
-    let resources = experimental_variant
-        .and_then(|v| v.overrides.as_object())
-        .and_then(|obj| obj.get("resources"))
-        .and_then(|doc| {
-            if let Document::Array(arr) = doc {
-                Some(arr.iter().filter_map(|d| {
-                    if let Document::String(s) = d {
-                        Some(s.clone())
-                    } else {
-                        None
-                    }
-                }).collect::<Vec<String>>())
-            } else {
-                None
-            }
-        })
-        .unwrap_or_default();
+    let package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
+    let package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
+    let resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "id": release_key,
@@ -263,7 +104,7 @@ async fn get_release(
         "app_id": application,
         "package_version": package_version,
         "config_version": format!("v{}", package_version),
-        "created_at": dt(&exp_details.created_at),
+        "created_at": utils::dt(&exp_details.created_at),
         "traffic_percentage": exp_details.traffic_percentage,
         "status": match exp_details.status {
             superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
@@ -349,28 +190,9 @@ async fn create_release(
         }
     };
 
-    let extract_files_from_configs = |opt_obj: &Option<Document>, key: &str| -> Option<Vec<String>> {
-        opt_obj
-        .as_ref()
-        .and_then(|doc| {
-            if let Document::Object(obj) = doc {
-                let v: Option<Vec<String>> = obj.get(key)
-                    .and_then(document_to_value)
-                    .and_then(|v| v.as_array().map(|arr| {
-                        arr.iter()
-                            .filter_map(|val| val.as_str().map(|s| s.to_string()))
-                            .collect()
-                    }));
-                v
-            } else {
-                None
-            }
-        })
-    };
-
-    let imp_from_configs = extract_files_from_configs(&config_document, "package.important");
-    let lazy_from_configs = extract_files_from_configs(&config_document, "package.lazy");
-    let resources_from_configs = extract_files_from_configs(&config_document, "resources");
+    let imp_from_configs = utils::extract_files_from_configs(&config_document, "package.important");
+    let lazy_from_configs = utils::extract_files_from_configs(&config_document, "package.lazy");
+    let resources_from_configs = utils::extract_files_from_configs(&config_document, "resources");
 
     // If you give me package_id -> I'll expect you to provide me complete important and lazy splits
     // If you just want to PATCH the important or lazy blocks -> DO NOT provide me the package_id
@@ -382,7 +204,7 @@ async fn create_release(
         .and_then(|doc| {
             if let Document::Object(obj) = doc {
                 obj.get("package.version")
-                    .and_then(document_to_value)
+                    .and_then(utils::document_to_value)
             } else {
                 None
             }
@@ -523,45 +345,15 @@ async fn create_release(
 
     println!("Final: {:?}", (final_important.clone(), final_lazy.clone(), final_resources.clone()));
 
-    let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
-
     let combined_files = package_data.files.iter()
         .filter_map(|f| f.as_ref().cloned())
         .chain(final_resources.clone().unwrap_or_default())
         .collect::<Vec<String>>();
 
-    for file_id in &combined_files {
-        let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
-
-        if let Some(v) = ver_opt {
-            file_conds.push(Box::new(
-                file_dsl_path
-                    .eq(fp.clone())
-                    .and(file_dsl_version.eq(v))
-            ));
-        } else if let Some(t) = tag_opt {
-            file_conds.push(Box::new(
-                file_dsl_path
-                    .eq(fp.clone())
-                    .and(file_dsl_tag.eq(t.clone()))
-            ));
-        } else {
-            return Err(actix_web::error::ErrorBadRequest("Invalid file key format"));
-        }
-    }
-
-    let combined = file_conds
-        .into_iter()
-        .reduce(|a, b| Box::new(a.or(b)))
-        .expect("Package should have files");
-
-    let files: Vec<FileEntry> = files_table
-        .into_boxed::<Pg>()
-        .filter(file_dsl_org_id.eq(&organisation))
-        .filter(file_dsl_app_id.eq(&application))
-        .filter(combined)
-        .load(&mut conn)
-        .map_err(actix_web::error::ErrorInternalServerError)?;
+    let files = utils::get_files_by_file_keys(&mut conn, &organisation, &application, &combined_files)
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get files by keys: {}", e))
+        })?;
 
     if files.len() != combined_files.len() {
         return Err(actix_web::error::ErrorInternalServerError("Some files were missing in DB"));
@@ -614,7 +406,7 @@ async fn create_release(
     experimental_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
 
     if let Some(ref properties) = final_properties {
-        experimental_overrides.insert("package.properties".to_string(), value_to_document(properties));
+        experimental_overrides.insert("package.properties".to_string(), utils::value_to_document(properties));
     } else {
         experimental_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
     }
@@ -664,7 +456,7 @@ async fn create_release(
                     value
                 ]
             });
-            value_to_document(&condition)
+            utils::value_to_document(&condition)
         }).collect();
         conditions
     } else {
@@ -823,68 +615,16 @@ async fn list_releases(
         let rc_package_properties = experimental_variant
             .and_then(|v| v.overrides.as_object())
             .and_then(|obj| obj.get("package.properties"))
-            .and_then(document_to_value)
+            .and_then(utils::document_to_value)
             .unwrap_or_default();
 
-        let rc_package_important = experimental_variant
-            .and_then(|v| v.overrides.as_object())
-            .and_then(|obj| obj.get("package.important"))
-            .and_then(|doc| {
-                if let Document::Array(arr) = doc {
-                    Some(arr.iter().filter_map(|d| {
-                        if let Document::String(s) = d {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    }).collect::<Vec<String>>())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
-
-        let rc_package_lazy = experimental_variant
-            .and_then(|v| v.overrides.as_object())
-            .and_then(|obj| obj.get("package.lazy"))
-            .and_then(|doc| {
-                if let Document::Array(arr) = doc {
-                    Some(arr.iter().filter_map(|d| {
-                        if let Document::String(s) = d {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    }).collect::<Vec<String>>())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
-
-        let rc_resources = experimental_variant
-            .and_then(|v| v.overrides.as_object())
-            .and_then(|obj| obj.get("resources"))
-            .and_then(|doc| {
-                if let Document::Array(arr) = doc {
-                    Some(arr.iter().filter_map(|d| {
-                        if let Document::String(s) = d {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    }).collect::<Vec<String>>())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default();
+        let rc_package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
+        let rc_package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
+        let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
 
         println!("Resources files: {:?}", rc_resources);
 
         let (important_files, lazy_files, resource_files) = {
-            // Build file conditions for querying
-            let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
 
             let all_files = rc_package_important.iter()
                 .chain(rc_package_lazy.iter())
@@ -892,74 +632,40 @@ async fn list_releases(
                 .cloned()
                 .collect::<Vec<String>>();
 
-            for file_id in all_files {
-                let (fp, ver_opt, tag_opt) = parse_file_key(&file_id);
+            let files_result = utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
+
+            if let Ok(files) = files_result {
+                let important_files: Vec<File> = rc_package_important.iter().filter_map(|file_key| {
+                    let (file_path, _, _) = parse_file_key(file_key);
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                        file_path: file.file_path.clone(),
+                        url: file.url.clone(),
+                        checksum: file.checksum.clone()
+                    })
+                }).collect();
+                println!("Important files: {:?}", important_files);
                 
-                if let Some(v) = ver_opt {
-                    file_conds.push(Box::new(
-                        file_dsl_path
-                            .eq(fp.clone())
-                            .and(file_dsl_version.eq(v))
-                    ));
-                } else if let Some(t) = tag_opt {
-                    file_conds.push(Box::new(
-                        file_dsl_path
-                            .eq(fp.clone())
-                            .and(file_dsl_tag.eq(t.clone()))
-                    ));
-                }
-            }
+                let lazy_files: Vec<File> = rc_package_lazy.iter().filter_map(|file_key| {
+                    let (file_path, _, _) = parse_file_key(file_key);
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                        file_path: file.file_path.clone(),
+                        url: file.url.clone(),
+                        checksum: file.checksum.clone()
+                    })
+                }).collect();
 
-            // println!("File conditions: {:?}", file_conds);
-            
-            if let Some(combined) = file_conds
-                .into_iter()
-                .reduce(|a, b| Box::new(a.or(b))) {
-                
-                let files_result: Result<Vec<FileEntry>, _> = files_table
-                    .into_boxed::<Pg>()
-                    .filter(file_dsl_org_id.eq(&organisation))
-                    .filter(file_dsl_app_id.eq(&application))
-                    .filter(combined)
-                    .load(&mut conn);
+                let resource_files: Vec<File> = rc_resources.iter().filter_map(|file_key| {
+                    let (file_path, _, _) = parse_file_key(file_key);
+                    files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
+                        file_path: file.file_path.clone(),
+                        url: file.url.clone(),
+                        checksum: file.checksum.clone()
+                    })
+                }).collect();
 
-                println!("Files result: {:?}", files_result);
-                
-                if let Ok(files) = files_result {
-                    let important_files: Vec<File> = rc_package_important.iter().filter_map(|file_key| {
-                        let (file_path, _, _) = parse_file_key(file_key);
-                        files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
-                            file_path: file.file_path.clone(),
-                            url: file.url.clone(),
-                            checksum: file.checksum.clone()
-                        })
-                    }).collect();
-                    println!("Important files: {:?}", important_files);
-                    
-                    let lazy_files: Vec<File> = rc_package_lazy.iter().filter_map(|file_key| {
-                        let (file_path, _, _) = parse_file_key(file_key);
-                        files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
-                            file_path: file.file_path.clone(),
-                            url: file.url.clone(),
-                            checksum: file.checksum.clone()
-                        })
-                    }).collect();
+                println!("Lazy files: {:?}", lazy_files);
 
-                    let resource_files: Vec<File> = rc_resources.iter().filter_map(|file_key| {
-                        let (file_path, _, _) = parse_file_key(file_key);
-                        files.iter().find(|file| file.file_path == file_path.clone()).map(|file| File {
-                            file_path: file.file_path.clone(),
-                            url: file.url.clone(),
-                            checksum: file.checksum.clone()
-                        })
-                    }).collect();
-
-                    println!("Lazy files: {:?}", lazy_files);
-
-                    (important_files, lazy_files, resource_files)
-                } else {
-                    (Vec::new(), Vec::new(), Vec::new())
-                }
+                (important_files, lazy_files, resource_files)
             } else {
                 (Vec::new(), Vec::new(), Vec::new())
             }
@@ -969,7 +675,7 @@ async fn list_releases(
         println!("Lazy files: {:?}", lazy_files);
         
         // Parse created_at string to DateTime<Utc>
-        let created_at_str = dt(&experiment.created_at);
+        let created_at_str = utils::dt(&experiment.created_at);
         let created_at = DateTime::parse_from_rfc3339(&created_at_str)
             .unwrap_or_else(|_| Utc::now().into())
             .with_timezone(&Utc);
@@ -989,7 +695,7 @@ async fn list_releases(
                 lazy: lazy_files,
             },
             resources: resource_files,
-            experiment: Some(build_release_experiment_from_experiment(
+            experiment: Some(utils::build_release_experiment_from_experiment(
                 &experiment,
                 package_version,
             )),
@@ -1007,7 +713,7 @@ async fn list_releases(
     }))
 }
 
-#[patch("/{release_id}/ramp")]
+#[post("/{release_id}/ramp")]
 async fn ramp_release(
     release_id: Path<String>,
     req: Json<RampReleaseRequest>,
@@ -1040,24 +746,7 @@ async fn ramp_release(
         experiment_id, req.traffic_percentage, release_id, workspace_name, superposition_org_id_from_env
     );
 
-    state
-        .superposition_client
-        .ramp_experiment()
-        .org_id(superposition_org_id_from_env)
-        .workspace_id(workspace_name)
-        .id(experiment_id.to_string())
-        .traffic_percentage(req.traffic_percentage as i32)
-        .change_reason(
-            req.change_reason
-                .clone()
-                .unwrap_or_else(|| format!("Ramping release {} to {}% traffic", release_id, req.traffic_percentage))
-        )
-        .send()
-        .await
-        .map_err(|e| {
-            eprintln!("Failed to ramp experiment: {:?}", e);
-            error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
-        })?;
+    let _ = ramp_experiment(&state, &workspace_name, &experiment_id, req.traffic_percentage as i32, &req.change_reason).await?;
 
     println!("Successfully ramped experiment {}", experiment_id);
 
@@ -1069,7 +758,35 @@ async fn ramp_release(
     }))
 }
 
-#[patch("/{release_id}/conclude")]
+async fn ramp_experiment(
+    state: &AppState,
+    workspace_name: &String,
+    experiment_id: &String,
+    traffic_percentage: i32, 
+    change_reason: &Option<String>
+) -> Result<(), actix_web::Error> {
+    state
+        .superposition_client
+        .ramp_experiment()
+        .org_id(state.env.superposition_org_id.clone())
+        .workspace_id(workspace_name)
+        .id(experiment_id.to_string())
+        .traffic_percentage(traffic_percentage as i32)
+        .change_reason(
+            change_reason
+                .clone()
+                .unwrap_or_else(|| format!("Ramping release {} to {}% traffic", experiment_id, traffic_percentage))
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to ramp experiment: {:?}", e);
+            error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
+        })?;
+    Ok(())
+}
+
+#[post("/{release_id}/conclude")]
 async fn conclude_release(
     release_id: Path<String>,
     req: Json<ConcludeReleaseRequest>,
@@ -1115,7 +832,7 @@ async fn conclude_release(
         .variants
         .iter()
         .find(|variant| {
-            let matches = variant.id.ends_with(&format!("-{}", req.chosen_variant));
+            let matches = variant.id == req.chosen_variant;
             matches
         })
         .map(|variant| variant.id.clone())
@@ -1157,109 +874,4 @@ async fn conclude_release(
         experiment_id: experiment_id.to_string(),
         chosen_variant: req.chosen_variant.clone(),
     }))
-}
-
-fn build_release_experiment_from_experiment(
-    experiment: &superposition_rust_sdk::types::ExperimentResponse,
-    package_version: i32,
-) -> ReleaseExperiment {
-    ReleaseExperiment {
-        experiment_id: experiment.id.to_string(),
-        package_version,
-        config_version: format!("v{}", package_version),
-        created_at: dt(&experiment.created_at),
-        traffic_percentage: experiment.traffic_percentage as u32,
-        status: match experiment.status {
-            superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
-            superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
-            superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
-            superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
-            _ => "UNKNOWN",
-        }.to_string(),
-    }
-}
-
-fn dt(x: &aws_smithy_types::DateTime) -> String {
-    // Convert smithy datetime to milliseconds since epoch
-    let millis_since_epoch = x.to_millis().expect("Failed to convert DateTime to millis");
-
-    // Split into whole seconds and remaining milliseconds
-    let secs = millis_since_epoch / 1000;
-    let millis = (millis_since_epoch % 1000) as u32;
-
-    // Create DateTime from seconds + nanos
-    let datetime = DateTime::from_timestamp(secs, millis * 1_000_000);
-
-    // Format in ISO 8601 with milliseconds
-    datetime.unwrap_or_else(|| Utc::now()).format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
-}
-
-// Helper function to convert serde_json::Value to Document
-fn value_to_document(value: &serde_json::Value) -> Document {
-    match value {
-        serde_json::Value::Null => Document::Null,
-        serde_json::Value::Bool(b) => Document::Bool(*b),
-        serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                if i >= 0 {
-                    Document::Number(aws_smithy_types::Number::PosInt(i as u64))
-                } else {
-                    Document::Number(aws_smithy_types::Number::NegInt(i))
-                }
-            } else if let Some(f) = n.as_f64() {
-                Document::Number(aws_smithy_types::Number::Float(f))
-            } else {
-                Document::Null
-            }
-        },
-        serde_json::Value::String(s) => Document::String(s.clone()),
-        serde_json::Value::Array(arr) => {
-            let docs: Vec<Document> = arr.iter().map(value_to_document).collect();
-            Document::Array(docs)
-        },
-        serde_json::Value::Object(obj) => {
-            let map: std::collections::HashMap<String, Document> = obj.iter()
-                .map(|(k, v)| (k.clone(), value_to_document(v)))
-                .collect();
-            Document::Object(map)
-        }
-    }
-}
-
-// Helper function to convert Document to serde_json::Value
-fn document_to_value(doc: &Document) -> Option<serde_json::Value> {
-    match doc {
-        Document::Null => Some(serde_json::Value::Null),
-        Document::Bool(b) => Some(serde_json::Value::Bool(*b)),
-        Document::Number(n) => match n {
-            aws_smithy_types::Number::NegInt(i) => Some(serde_json::Value::Number(serde_json::Number::from(*i))),
-            aws_smithy_types::Number::PosInt(i) => {
-                if let Ok(i_as_i64) = i64::try_from(*i) {
-                    Some(serde_json::Value::Number(serde_json::Number::from(i_as_i64)))
-                } else {
-                    Some(serde_json::Value::Null)
-                }
-            },
-            aws_smithy_types::Number::Float(f) => {
-                if let Some(num) = serde_json::Number::from_f64(*f) {
-                    Some(serde_json::Value::Number(num))
-                } else {
-                    Some(serde_json::Value::Null)
-                }
-            },
-        },
-        Document::String(s) => Some(serde_json::Value::String(s.clone())),
-        Document::Array(arr) => {
-            let values: Option<Vec<serde_json::Value>> = arr.iter()
-                .map(document_to_value)
-                .collect();
-            values.map(serde_json::Value::Array)
-        },
-        Document::Object(obj) => {
-            let map: Option<serde_json::Map<String, serde_json::Value>> = obj.iter()
-                .map(|(k, v)| document_to_value(v).map(|val| (k.clone(), val)))
-                .collect();
-            map.map(serde_json::Value::Object)
-        }
-    }
 }
