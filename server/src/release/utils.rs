@@ -1,10 +1,13 @@
+use std::collections::HashMap;
+
 use diesel::{pg::Pg, pg::PgConnection, prelude::*, r2d2::{ConnectionManager, PooledConnection}, sql_types::Bool, BoxableExpression};
 use chrono::{DateTime, Utc};
 use aws_smithy_types::{Document};
+use serde_json::Value;
 use superposition_rust_sdk::types::Variant;
 
 use crate::{
-    file::utils::parse_file_key, releases::models::*, utils::db::{
+    file::utils::parse_file_key, release::models::*, utils::db::{
             models::FileEntry,
             schema::hyperotaserver::files::{
                     app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id, table as files_table, tag as file_dsl_tag, version as file_dsl_version
@@ -192,4 +195,17 @@ pub fn document_to_value(doc: &Document) -> Option<serde_json::Value> {
             map.map(serde_json::Value::Object)
         }
     }
+}
+
+pub fn parse_kv_string(input: &str) -> HashMap<String, Value> {
+    input
+        .split(';')
+        .filter(|pair| !pair.is_empty())
+        .filter_map(|pair| {
+            let mut parts = pair.splitn(2, '=');
+            let key = parts.next()?.trim();
+            let value = parts.next()?.trim();
+            Some((key.to_string(), Value::String(value.to_string())))
+        })
+        .collect()
 }

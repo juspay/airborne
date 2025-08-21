@@ -39,8 +39,6 @@ use crate::utils::transaction_manager::TransactionManager;
 
 mod config;
 mod dimension;
-mod package;
-mod release;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -48,8 +46,6 @@ use diesel::QueryDsl;
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(add_application)
-        .service(Scope::new("/package").service(package::add_routes()))
-        .service(Scope::new("/release").service(release::add_routes()))
         .service(Scope::new("/config").service(config::add_routes()))
         .service(Scope::new("/dimension").service(dimension::add_routes()))
 }

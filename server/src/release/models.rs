@@ -101,3 +101,10 @@ pub struct ConcludeReleaseResponse {
     pub experiment_id: String,
     pub chosen_variant: String,
 }
+
+#[derive(Serialize)]
+pub struct ServeReleaseResponse {
+    pub config: Config,
+    pub package: Package,
+    pub resources: Vec<File>,
+}
