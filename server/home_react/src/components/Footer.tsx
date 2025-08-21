@@ -60,7 +60,16 @@ export function Footer() {
         
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-white/50 text-sm">
-            © 2024 Airborne. All rights reserved.
+            © {new Date().getFullYear()} Airborne. All rights reserved.
+          </p>
+
+          <p className="text-white/50 text-sm">
+            <span className="mr-4">
+              <a target="_blank" className="hover:text-white transition-colors" href="https://juspay.io/privacy-policy">Privacy Policy</a>
+            </span>
+            <span>
+              <a target="_blank" className="hover:text-white transition-colors" href="https://juspay.io/terms">Terms of Use</a>
+            </span>
           </p>
         </div>
       </div>
