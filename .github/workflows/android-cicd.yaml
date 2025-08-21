@@ -62,14 +62,7 @@ jobs:
           VERSION="${TAG#v}"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Import GPG (in-memory)
-        run: |
-          echo "${SIGNING_KEY}" | base64 -d > /tmp/key.asc
-          gpg --batch --import /tmp/key.asc
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-
-      - name: Decode signing key
+      - name: Import GPG
         run: |
           echo "${SIGNING_KEY}" | base64 -d > /tmp/key.asc
           gpg --batch --import /tmp/key.asc
