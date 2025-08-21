@@ -15,6 +15,9 @@
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
+    id 'maven-publish'
+    id 'signing'
+    id 'com.gradleup.nmcp'
 }
 
 android {
@@ -65,6 +68,64 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+}
+
+def resolveVersion() {
+    def tag = System.getenv("GITHUB_REF_NAME")
+    if (tag != null && tag.startsWith("v")) return tag.substring(1)
+    return "SNAPSHOT"
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+
+                groupId = 'io.juspay'
+                artifactId = 'airborne'
+                version = System.getenv("VERSION") ?: resolveVersion()
+
+                pom {
+                    name = 'Airborne'
+                    description = 'Airborne empowers developers to effortlessly integrate Over-The-Air (OTA) update capabilities into their Android, iOS, and React Native applications. Our primary focus is to provide robust, easy-to-use SDKs and plugins that streamline the update process directly within your client applications.'
+                    url = 'https://github.com/juspay/airborne'
+                    licenses {
+                        license {
+                            name = 'The Apache License, Version 2.0'
+                            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'juspay'
+                            name = 'Juspay'
+                            email = 'pp-sdk@juspay.in'
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git:github.com/juspay/airborne.git'
+                        developerConnection = 'scm:git:ssh://github.com/juspay/airborne.git'
+                        url = 'https://github.com/juspay/airborne/tree/main/android/hyper-ota'
+                    }
+                }
+            }
+        }
+    }
+
+    signing {
+        def key = findProperty("signingKey") ?: System.getenv("SIGNING_KEY")
+        def pass = findProperty("signingPassword") ?: System.getenv("SIGNING_PASSWORD")
+        if (key && pass) {
+            useInMemoryPgpKeys(key, pass)
+            sign publishing.publications.release
+        }
+    }
+
+}
+
+nmcp {
+    // nothing required here for defaults
 }
 
 dependencies {
