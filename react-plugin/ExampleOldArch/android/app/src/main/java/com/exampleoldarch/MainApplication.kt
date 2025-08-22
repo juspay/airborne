@@ -75,8 +75,8 @@ class MainApplication : Application(), ReactApplication {
                 }
             }
 
-            override fun onBootComplete(indexFilePath: String) {
-                super.onBootComplete(indexFilePath)
+            override fun startApp(indexFilePath: String) {
+                super.startApp(indexFilePath)
             }
 
             override fun onEvent(

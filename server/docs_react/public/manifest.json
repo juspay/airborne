@@ -52,7 +52,7 @@
           "doc.md",
           "getDimensions.kt",
           "getNamespace.kt",
-          "onBootComplete.kt",
+          "startApp.kt",
           "onEvent.kt"
         ]
       },
@@ -83,7 +83,7 @@
           "doc.md",
           "getDimensions",
           "getNamespace",
-          "onBootComplete",
+          "startApp",
           "onEvent"
         ]
       }
