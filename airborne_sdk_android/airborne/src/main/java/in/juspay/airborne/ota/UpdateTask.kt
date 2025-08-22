@@ -39,6 +39,7 @@ import `in`.juspay.airborne.utils.OTAUtils
 import `in`.juspay.airborne.constants.LogCategory
 import `in`.juspay.airborne.constants.LogLevel
 import `in`.juspay.airborne.constants.LogSubCategory
+import `in`.juspay.airborne.ota.Constants.BACKUPS_DIR
 import okhttp3.Response
 import okhttp3.ResponseBody
 import org.json.JSONException
@@ -67,10 +68,10 @@ internal typealias OnFinishCallback = (UpdateResult, JSONObject) -> Unit
 private typealias FetchResult = UpdateTask.Result<Pair<Response, ResponseBody>>
 
 internal class UpdateTask(
-    private val applicationManager: ApplicationManager,
     private val releaseConfigUrl: String,
     private val fileProviderService: FileProviderService,
     private var localReleaseConfig: ReleaseConfig?,
+    private val blacklistedReleases: Set<String> = emptySet(),
     private val fileLock: Any,
     private val tracker: TrackerCallback,
     private val netUtils: NetUtils,
@@ -187,7 +188,7 @@ internal class UpdateTask(
 
     private fun runInternal() {
         val fetched = fetchReleaseConfig()
-        var shouldDownloadCurLazySplits = false
+        var shouldDownloadCurLazySplits = true
         if (fetched == null) {
             // Unable to fetch so exiting.
             currentResult = UpdateResult.Error.RCFetchError
@@ -390,8 +391,14 @@ internal class UpdateTask(
                 val serialized = String(body.bytes(), StandardCharsets.UTF_8)
                 try {
                     val releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
+                    if (blacklistedReleases.contains(releaseConfig.pkg.version)) {
+                        Log.d(TAG, "Release config version ${releaseConfig.version} is blacklisted, skipping update")
+                        trackInfo("release_config_blacklisted", JSONObject().put("version", releaseConfig.version))
+                        trackReleaseConfigFetchResult(fr, startTime)
+                        return null
+                    }
                     trackReleaseConfigFetchResult(fr, startTime)
-                    checkAndCreateDefaultRestorePoint()
+//                    checkAndCreateDefaultRestorePoint()
                     releaseConfig
                 } catch (e: Exception) {
                     Log.e(
@@ -850,11 +857,11 @@ internal class UpdateTask(
     }
 
     // ------ ROLLBACK -----
-    private fun checkAndCreateDefaultRestorePoint() {
-        if (!fileProviderService.getFileFromInternalStorage("$packageBackupDir/default/.keep").exists()) {
-            applicationManager.backupPackage("default")
-        }
-    }
+//    private fun checkAndCreateDefaultRestorePoint() {
+//        if (!fileProviderService.getFileFromInternalStorage("$packageBackupDir/default/.keep").exists()) {
+//            applicationManager.backupPackage("default")
+//        }
+//    }
 
     // ----- NETWORK-UTILS -----
     private fun downloadFile(
