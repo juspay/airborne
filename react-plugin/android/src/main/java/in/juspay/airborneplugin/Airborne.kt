@@ -61,7 +61,7 @@ class Airborne (
     }
 
     private fun bootComplete(filePath: String) {
-        airborneInterface.onBootComplete(filePath.ifEmpty { "assets://${applicationManager.getBundledIndexPath().ifEmpty { "index.android.bundle" }}" })
+        airborneInterface.startApp(filePath.ifEmpty { "assets://${applicationManager.getBundledIndexPath().ifEmpty { "index.android.bundle" }}" })
     }
 
     /**

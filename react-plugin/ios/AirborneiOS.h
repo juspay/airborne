@@ -43,7 +43,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @note Boot completion occurs even if some downloads failed or timed out.
  *       Check the release configuration for actual status.
  */
-- (void)onBootComplete:(NSString *) bundlePath;
+- (void)startApp:(NSString *) bundlePath;
 
 /**
  * Called when significant events occur during the OTA update process.

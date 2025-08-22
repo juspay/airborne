@@ -88,8 +88,8 @@ class MainApplication : Application(), ReactApplication {
                         }
                     }
 
-                    override fun onBootComplete() {
-                        super.onBootComplete()
+                    override fun startApp() {
+                        super.startApp()
                     }
 
                     override fun onEvent(
