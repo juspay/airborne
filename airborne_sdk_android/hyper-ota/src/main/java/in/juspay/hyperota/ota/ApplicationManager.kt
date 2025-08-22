@@ -40,6 +40,7 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Future
+import androidx.core.content.edit
 
 class ApplicationManager(
     private val ctx: Context,
@@ -109,8 +110,10 @@ class ApplicationManager(
     private fun tryUpdate(clientId: String, initialized: Boolean, fileLock: Any, lazyDownloadCallback: LazyDownloadCallback? = null): ReleaseConfig? {
         val startTime = System.currentTimeMillis()
         val url = releaseConfigTemplateUrl
+        val prefs = ctx.getSharedPreferences("hyper_ota_prefs", Context.MODE_PRIVATE)
+        val rolledBackVersions = prefs.getStringSet("rolled_back_versions", setOf()) ?: setOf()
         val newTask =
-            UpdateTask(this, url, otaServices.fileProviderService, releaseConfig, fileLock, tracker, OTANetUtils(ctx, clientId, otaServices.cleanUpValue), rcHeaders, lazyDownloadCallback)
+            UpdateTask(this, url, otaServices.fileProviderService, releaseConfig, rolledBackVersions, fileLock, tracker, OTANetUtils(ctx, clientId, otaServices.cleanUpValue), rcHeaders, lazyDownloadCallback)
         val runningTask = RUNNING_UPDATE_TASKS.putIfAbsent(clientId, newTask) ?: newTask
         if (runningTask == newTask) {
             Log.d(TAG, "No running update tasks for '$clientId', starting new task.")
@@ -402,6 +405,20 @@ class ApplicationManager(
         backupPackage(restorePoint)
     }
 
+    private fun addToRolledBackVersions(version: String) {
+        val prefs = ctx.getSharedPreferences("hyper_ota_prefs", Context.MODE_PRIVATE)
+        val rolledBackVersions = prefs.getStringSet("rolled_back_versions", mutableSetOf()) ?: mutableSetOf()
+        rolledBackVersions.add(version)
+        prefs.edit { putStringSet("rolled_back_versions", rolledBackVersions) }
+        Log.d(TAG, "Added version $version to rolled-back versions list")
+    }
+
+    private fun isVersionRolledBack(version: String): Boolean {
+        val prefs = ctx.getSharedPreferences("hyper_ota_prefs", Context.MODE_PRIVATE)
+        val rolledBackVersions = prefs.getStringSet("rolled_back_versions", emptySet()) ?: emptySet()
+        return rolledBackVersions.contains(version)
+    }
+
     /**
      * Rolls back the package update to the specified restore point.
      * If the restore point does not exist, it returns false.
@@ -410,7 +427,8 @@ class ApplicationManager(
      * @return true if rollback was successful, false otherwise.
      */
     fun rollbackPackage(
-        restorePoint: String = "default"
+        restorePoint: String = "default",
+        allowReapplicationOfRolledBackVersion: Boolean = false
     ): Boolean {
         Log.d(UpdateTask.TAG, "Rolling back package update to $restorePoint.")
         cancelAllUpdateTasks()
@@ -424,6 +442,12 @@ class ApplicationManager(
             otaServices.fileProviderService.deleteFileFromInternalStorage("$packageBackupDir/$restorePoint/.keep")
             Log.d(UpdateTask.TAG, "Rollback successful at $restorePoint.")
             trackInfo("rollback_success", JSONObject().put("restore_point", restorePoint))
+            if(!allowReapplicationOfRolledBackVersion) {
+                releaseConfig?.let { rc ->
+                    addToRolledBackVersions(rc.pkg.version)
+                    trackInfo("release_blacklisted", JSONObject().put("version", rc.pkg.version))
+                }
+            }
             return true
         } else {
             Log.e(UpdateTask.TAG, "No backup found for rollback at restore point = $restorePoint.")
