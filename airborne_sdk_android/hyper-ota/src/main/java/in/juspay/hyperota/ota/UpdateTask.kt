@@ -72,6 +72,7 @@ internal class UpdateTask(
     private val releaseConfigUrl: String,
     private val fileProviderService: FileProviderService,
     private var localReleaseConfig: ReleaseConfig?,
+    private val blacklistedReleases: Set<String> = emptySet(),
     private val fileLock: Any,
     tracker: TrackerCallback,
     private val netUtils: NetUtils,
@@ -373,6 +374,12 @@ internal class UpdateTask(
                 val serialized = String(body.bytes(), StandardCharsets.UTF_8)
                 try {
                     val releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
+                    if (blacklistedReleases.contains(releaseConfig.version)) {
+                        Log.d(TAG, "Release config version ${releaseConfig.version} is blacklisted, skipping update")
+                        trackInfo("release_config_blacklisted", JSONObject().put("version", releaseConfig.version))
+                        trackReleaseConfigFetchResult(fr, startTime)
+                        return null
+                    }
                     trackReleaseConfigFetchResult(fr, startTime)
                     checkAndCreateDefaultRestorePoint()
                     releaseConfig
