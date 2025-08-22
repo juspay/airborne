@@ -27,7 +27,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, AirborneReactDelegate {
     return true
   }
 
-    @objc func onBootComplete(_ bundlePath: String) {
+    @objc func startApp(_ bundlePath: String) {
         DispatchQueue.main.async { [self] in
 
             let delegate = ReactNativeDelegate(customPath: bundlePath)

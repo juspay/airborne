@@ -89,7 +89,7 @@ class MainApplication : Application(), ReactApplication {
                         return "index.bundle.android"
                     }
 
-                    override fun onBootComplete(indexPath: String) {
+                    override fun startApp(indexPath: String) {
                         isBootComplete = true
                         bundlePath = indexPath
                         Log.d("Airborne", "Boot complete with bundle path: $indexPath")
