@@ -65,10 +65,10 @@ export function Footer() {
 
           <p className="text-white/50 text-sm">
             <span className="mr-4">
-              <a target="_blank" className="hover:text-white transition-colors" href="https://juspay.io/privacy-policy">Privacy Policy</a>
+              <a target="_blank" className="hover:text-white transition-colors" href="/privacy-policy">Privacy Policy</a>
             </span>
             <span>
-              <a target="_blank" className="hover:text-white transition-colors" href="https://juspay.io/terms">Terms of Use</a>
+              <a target="_blank" className="hover:text-white transition-colors" href="/terms-of-use">Terms of Use</a>
             </span>
           </p>
         </div>
