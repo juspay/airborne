@@ -9,6 +9,7 @@ pub async fn index() -> Result<actix_files::NamedFile, std::io::Error> {
 
 pub fn add_routes() -> Scope {
     web::scope("home")
-
         .service(Files::new("/", "home_react/dist"))
+        .service(Files::new("/privacy-policy", "home_react/dist"))
+        .service(Files::new("/terms-of-use", "home_react/dist"))
 }

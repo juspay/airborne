@@ -51,7 +51,7 @@ RUN npm run build
 RUN ls -la dist || echo "dist folder was not created!"
 
 # Development stage
-FROM rust:latest as dev
+FROM rust:1.89-bookworm as dev
 WORKDIR /app
 # Install cargo-watch for development
 RUN cargo install cargo-watch
@@ -66,7 +66,7 @@ EXPOSE 8081
 CMD ["cargo", "watch", "-x", "run"]
 
 # Production build stage
-FROM rust:latest as builder
+FROM rust:1.89-bookworm as builder
 WORKDIR /app
 COPY . .
 # Make sure Cargo.toml exists
