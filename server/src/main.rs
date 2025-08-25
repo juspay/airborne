@@ -196,6 +196,8 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(index))
             .route("", web::get().to(index))
+            .route("/privacy-policy", web::get().to(index))
+            .route("/terms-of-use", web::get().to(index))
             .service(docs::add_routes())
             .service(home::add_routes())
             .service(
