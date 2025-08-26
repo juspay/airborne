@@ -13,15 +13,18 @@ export interface OrganisationUser {
 }
 
 export interface Organisation {
-  id: string;
   name: string;
   applications: Application[];
+  access?: string[];
   users?: OrganisationUser[];
+
 }
 
 export interface Application {
   id: string;
   application: string;
+  organisation?: string;
+  access?: string[];
   versions: string[];
 }
 
@@ -34,3 +37,14 @@ export type Configuration = {
   enableGoogleSignIn: boolean;
   organisationCreationDisabled: boolean;
 }
+
+export type View = {
+  id: string;
+  name: string;
+  dimensions: {
+   key:string;
+   value:string;
+  }[]
+  created_at: Date;
+};
+

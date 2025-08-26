@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams} from "react-router-dom";
 import ReactJson from "@uiw/react-json-view";
 import axios from "../api/axios";
 import ReleaseHistory from "./release/ReleaseHistory";
@@ -11,7 +11,7 @@ import {
   RollbackChart
 } from "./analytics/Charts";
 import { analyticsService } from "../services/analyticsService";
-import { Package, Settings, Calendar, Eye, EyeOff, Loader2, AlertCircle, RefreshCw, BarChart3, Download, CheckCircle, RotateCcw, Clock, TrendingUp, Smartphone } from "lucide-react";
+import { Package, Settings, Calendar, Loader2, AlertCircle, RefreshCw, BarChart3, Download, CheckCircle, RotateCcw, Clock, TrendingUp, Smartphone, EyeOff, Eye } from "lucide-react";
 import { vscodeTheme } from '@uiw/react-json-view/vscode';
 import Datepicker from "react-tailwindcss-datepicker";
 
@@ -84,12 +84,12 @@ interface PerformanceData {
 }
 
 const Release: React.FC = () => {
-  const { org, app } = useParams<{ org: string; app: string }>();
+  const { org, app, releaseId } = useParams<{ org: string; app: string; releaseId: string }>();
+  
   const [loading, setLoading] = useState(true);
   const [releaseData, setReleaseData] = useState<ReleaseConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   
   // Analytics state
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -305,22 +305,34 @@ const Release: React.FC = () => {
     }
   };
 
-  const fetchReleaseData = useCallback(async (version?: number) => {
+  const fetchReleaseData = useCallback(async (releaseId?: string) => {
     try {
       setLoading(true);
+      if (releaseId) {
+        const { data } = await axios.get(`organisations/applications/release/${releaseId}`,{
+          headers:{
+            'x-application': app,
+            'x-organisation': org
+          }
+        });
+        setReleaseData(data);
+        setError(null);
+      } else {
       let url = `/release/v2/${org}/${app}`;
-      if (version) {
-        url += `?version=${version}`;
-      }
       const { data } = await axios.get(url);
       setReleaseData(data);
       setError(null);
+      }
+
+      
+     
     } catch (error: any) {
       setError(error.response?.data?.message || "Failed to fetch release data");
     } finally {
       setLoading(false);
     }
   }, [org, app]);
+
 
   const fetchAnalyticsData = useCallback(async () => {
     if (!releaseData?.package?.version || !org || !app) return;
@@ -490,8 +502,10 @@ const Release: React.FC = () => {
   }, [org, app, releaseData?.package?.version, dateRange, userTimezone, customDateRange]);
 
   useEffect(() => {
-    fetchReleaseData(selectedVersion || undefined);
-  }, [fetchReleaseData, selectedVersion]);
+    fetchReleaseData(releaseId || undefined);
+  }, [fetchReleaseData, releaseId]);
+
+
 
   useEffect(() => {
     if (releaseData && showAnalytics) {
@@ -499,10 +513,6 @@ const Release: React.FC = () => {
     }
   }, [fetchAnalyticsData, releaseData, showAnalytics]);
 
-  const handleSelectRelease = (version: number) => {
-    setSelectedVersion(version);
-    setShowHistory(false);
-  };
 
   if (loading) {
     return (
@@ -529,7 +539,7 @@ const Release: React.FC = () => {
             <h4 className="text-xl font-semibold text-white mb-4">Error Loading Release</h4>
             <p className="text-white/70 mb-6">{error}</p>
             <button
-              onClick={() => fetchReleaseData(selectedVersion || undefined)}
+              onClick={() => fetchReleaseData(releaseId || undefined)}
               className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20"
             >
               <RefreshCw size={18} className="mr-2" />
@@ -593,21 +603,8 @@ const Release: React.FC = () => {
 
         {/* Release History */}
         {showHistory && org && app && (
-          <div className="mb-6 sm:mb-8">
-            <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-4 sm:p-6 shadow-xl">
-              <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 flex items-center">
-                <Calendar size={20} className="mr-2" />
-                Release History
-              </h3>
-              <div className="overflow-hidden">
-                <ReleaseHistory
-                  organisation={org}
-                  application={app}
-                  onSelectRelease={handleSelectRelease}
-                />
-              </div>
-            </div>
-          </div>
+
+                <ReleaseHistory />
         )}
 
         {/* Analytics Section */}

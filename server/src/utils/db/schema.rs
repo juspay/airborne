@@ -43,6 +43,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.release_views (id) {
+            id -> Uuid,
+            app_id -> Text,
+            org_id -> Text,
+            name -> Text,
+            dimensions -> Jsonb,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.releases (id) {
             id -> Uuid,
             org_id -> Text,
@@ -67,6 +78,7 @@ pub mod hyperotaserver {
         cleanup_outbox,
         configs,
         packages,
+        release_views,
         releases,
         workspace_names,
     );

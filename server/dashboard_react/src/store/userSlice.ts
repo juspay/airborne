@@ -1,22 +1,11 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { Organisation } from "../types";
 
 export interface User {
   id: string;
   name: string;
   email: string;
   organisations: Organisation[];
-}
-
-interface Organisation {
-  id: string;
-  name: string;
-  applications: Application[];
-}
-
-interface Application {
-  id: string;
-  application: string;
-  versions: string[];
 }
 
 interface UserState {
@@ -70,6 +59,14 @@ export const userSlice = createSlice({
       state.user = action.payload;
       state.isAuthenticated = true;
     },
+    setIsAuthenticated: (state, action) => {
+      state.isAuthenticated = action.payload;
+      if (!action.payload) {
+        state.user = null;
+        localStorage.removeItem("userToken");
+        sessionStorage.removeItem("userToken");
+      }
+    },
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
@@ -97,5 +94,5 @@ export const userSlice = createSlice({
   },
 });
 
-export const { setUser, logout } = userSlice.actions;
+export const { setUser, logout, setIsAuthenticated } = userSlice.actions;
 export default userSlice.reducer;

@@ -124,7 +124,7 @@ export default function UploadPackage({
   "config": {
     "version": "1.0.0",
     "release_config_timeout": 1000,
-    "package_timeout": 1000,
+    "boot_timeout": 1000,
     "properties": {
       "tenant_info": {
 
@@ -292,7 +292,7 @@ export default function UploadPackage({
                       "config": {
                         "version": "1.0.0",
                         "release_config_timeout": 1000,
-                        "package_timeout": 1000,
+                        "boot_timeout": 1000,
                         "properties": {
                           "tenant_info": {
 

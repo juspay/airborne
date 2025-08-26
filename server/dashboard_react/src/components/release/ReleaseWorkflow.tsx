@@ -3,12 +3,15 @@ import { Application, Organisation } from "../../types";
 import UploadPackage from "./UploadPackage";
 import CreateRelease from "./CreateRelease";
 import { CheckCircle } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface ReleaseWorkflowProps {
   application: Application;
   organization: Organisation;
   onClose: () => void;
   onComplete: (releaseInfo: any) => void;
+  dimensions?: Array<{key: string; value: string}>;
+  onReleaseCreated?: () => void;
 }
 
 type WorkflowStep = "package" | "release";
@@ -18,6 +21,8 @@ export default function ReleaseWorkflow({
   organization,
   onClose,
   onComplete,
+  dimensions,
+  onReleaseCreated,
 }: ReleaseWorkflowProps) {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("package");
   const [packageVersion, setPackageVersion] = useState<number | null>(null);
@@ -33,7 +38,7 @@ export default function ReleaseWorkflow({
     onComplete(releaseInfo);
   };
 
-  return (
+  return createPortal(
     <div>
       {/* Stepper UI */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
@@ -108,9 +113,12 @@ export default function ReleaseWorkflow({
               onClose={onClose}
               onBack={() => setCurrentStep("package")}
               onSuccess={handleReleaseCreated}
+              preFillDimensions={dimensions}
+              onReleaseCreated={onReleaseCreated}
             />
           )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

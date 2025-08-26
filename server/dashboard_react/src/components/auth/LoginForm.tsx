@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader, AlertCircle, User as UserIcon, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Configuration, User } from "../../types"; // Adjusted path
+import { Configuration } from "../../types"; // Adjusted path
 import axios from "../../api/axios"; // Adjusted path
 import { IconEyeClosed } from "../icons/IconEyeClosed"; // Adjusted path
 import { IconEyeOpen } from "../icons/IconEyeOpen"; // Adjusted path
 import logoImage from "../../assets/airborne-cube-logo.png"; // Adjusted path
+import { useUser } from "../../hooks/useUser";
 
 interface LoginFormProps {
-  setIsAuthenticated: (isAuthenticated: boolean) => void;
-  setUser: (user: User) => void;
   configuration: Configuration
 }
 
@@ -23,7 +22,8 @@ interface ErrorState {
   message: string;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ setIsAuthenticated, setUser, configuration }) => {
+export const LoginForm: React.FC<LoginFormProps> = ({ configuration }) => {
+  const {setUser,setIsAuthenticated} = useUser();
   const [formData, setFormData] = useState<LoginFormData>({
     name: "",
     password: "",

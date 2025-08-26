@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Package, ArrowLeft, Clock, Globe, Activity, Rocket, ChevronDown, ChevronUp, Eye } from "lucide-react";
 import axios from "../../api/axios";
 
-interface ReleaseInfo {
+export interface ReleaseInfo {
   config: {
     version: string;
     release_config_timeout: number;

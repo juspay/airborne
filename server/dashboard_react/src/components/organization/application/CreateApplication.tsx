@@ -1,29 +1,67 @@
-import { Organisation } from "../../types";
+import { useState } from "react";
 import { X, Plus, Building2 } from "lucide-react";
-
+import { useUser } from "../../../hooks/useUser";
+import { useParams } from "react-router-dom";
+import { createPortal } from "react-dom";
+import useToast from "../../../utils/useToast";
+import axios from "../../../api/axios";
 interface CreateApplicationProps {
-  organization: Organisation;
-  newAppName: string;
-  onAppNameChange: (name: string) => void;
-  onCreateApp: () => void;
-  setIsCreatingApp: (isCreatingApp: boolean) => void;
+  text: string;
 }
 
-export default function CreateApplication({
-  organization,
-  newAppName,
-  onAppNameChange,
-  onCreateApp,
-  setIsCreatingApp,
-}: CreateApplicationProps) {
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newAppName.trim()) {
-      onCreateApp();
-    }
+export default function CreateApplication({ text }: CreateApplicationProps) {
+  const { user,setUser } = useUser();
+  const { org: encodedOrg } = useParams();
+  const org = decodeURIComponent(encodedOrg || '');
+  const {showSuccess, showError} = useToast();
+  const [name, setName] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try{
+      const res = await axios.post("/organisations/applications/create",{
+        organisation: org,
+        application: name.trim()
+      },{
+        headers: { "x-organisation": org }
+      })
+
+      setUser({
+        ...user,
+        organisations: user.organisations.map(o => 
+          o.name === org
+            ? { 
+                ...o, 
+                applications: [...o.applications, res.data] 
+              } 
+            : o
+        )
+      })
+      setIsModalOpen(false);
+      showSuccess("Application created successfully");
+    } catch (error) {
+      showError("Failed to create application");
+    } finally {
+      setIsSubmitting(false);
+    }   
   };
 
-  return (
+
+  if (!isModalOpen) {
+    return (
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-blue-500/20 flex items-center"
+      >
+        <Plus size={18} className="mr-2" />
+        {text}
+      </button>
+    );
+  }
+
+  return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl max-w-lg w-full relative overflow-hidden">
         {/* Background gradient overlay */}
@@ -31,7 +69,7 @@ export default function CreateApplication({
 
         {/* Close button */}
         <button
-          onClick={() => setIsCreatingApp(false)}
+          onClick={() => setIsModalOpen(false)}
           className="absolute top-6 right-6 p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-all duration-200 z-10"
         >
           <X size={20} />
@@ -59,7 +97,9 @@ export default function CreateApplication({
               </div>
               <div>
                 <p className="text-white/60 text-sm">Organization</p>
-                <p className="text-white font-semibold">{organization.name}</p>
+                <p className="text-white font-semibold">
+                  {org}
+                </p>
               </div>
             </div>
           </div>
@@ -76,8 +116,8 @@ export default function CreateApplication({
               <input
                 id="applicationName"
                 type="text"
-                value={newAppName}
-                onChange={(e) => onAppNameChange(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Enter application name"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all duration-200"
                 autoFocus
@@ -88,23 +128,23 @@ export default function CreateApplication({
             <div className="flex gap-4 pt-4">
               <button
                 type="button"
-                onClick={() => setIsCreatingApp(false)}
+                onClick={() => setIsModalOpen(false)}
                 className="flex-1 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold transition-all duration-300 border border-white/20"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={!newAppName.trim()}
+                disabled={!name.trim() || isSubmitting}
                 className={`flex-1 px-6 py-3 rounded-xl font-semibold transition-all duration-300 transform ${
-                  newAppName.trim()
+                  name.trim()
                     ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white hover:scale-105 shadow-lg shadow-blue-500/20"
                     : "bg-white/5 text-white/40 cursor-not-allowed border border-white/10"
                 }`}
               >
                 <div className="flex items-center justify-center">
                   <Plus size={18} className="mr-2" />
-                  Create Application
+                  {isSubmitting ? "Creating Application..." : "Create Application"}
                 </div>
               </button>
             </div>
@@ -112,5 +152,7 @@ export default function CreateApplication({
         </div>
       </div>
     </div>
+  ,
+  document.body
   );
 }

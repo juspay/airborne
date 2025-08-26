@@ -25,7 +25,6 @@ import axios from '../api/axios';
 
 interface AnalyticsProps {
   user: any;
-  setIsAuthenticated: (auth: boolean) => void;
 }
 
 interface AdoptionData {

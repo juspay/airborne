@@ -31,8 +31,16 @@ use crate::{
     types::AppState,
     utils::{
         db::{
-            models::{PackageEntryRead, ReleaseEntry},
-            schema::hyperotaserver::releases::dsl::*,
+            models::{PackageEntryRead, ReleaseEntry, ConfigEntry},
+            schema::hyperotaserver::{
+                releases::dsl::*,
+                packages::dsl::{
+                    packages, org_id as pkg_org_id, app_id as pkg_app_id, version as pkg_version_col
+                },
+                configs::dsl::{
+                    configs as configs_table, org_id as config_org_id, app_id as config_app_id, version as config_version_col
+                }
+            },
         },
         document::value_to_document,
         workspace::get_workspace_name_for_application,
@@ -40,7 +48,14 @@ use crate::{
 };
 
 pub fn add_routes() -> Scope {
-    Scope::new("").service(create).service(list_releases).service(ramp_release).service(conclude_release).service(get_experiment_details)
+    Scope::new("")
+        .service(create)
+        .service(list_releases)
+        .service(ramp_release)
+        .service(conclude_release)
+        .service(get_experiment_details)
+        .service(current_list_releases)
+        .service(get_release_by_id)
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,9 +78,17 @@ struct CreateResponse {
     config_version: String,
 }
 
+#[derive(Deserialize)]
+struct ReleaseHistoryQuery {
+    page: Option<i64>,
+    count: Option<i64>,
+}
+
 #[derive(Serialize)]
 struct ReleaseHistoryResponse {
     releases: Vec<ReleaseHistoryEntry>,
+    total_items: Option<i64>,
+    total_pages: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -121,6 +144,50 @@ struct ExperimentVariant {
     variant_type: String,
 }
 
+
+
+#[derive(Serialize, Debug)]
+struct ReleaseConfig {
+    version: String,
+    config: Config,
+    package: Package,
+    resources: serde_json::Value,
+}
+
+#[derive(Serialize, Debug)]
+struct Config {
+    version: String,
+    release_config_timeout: u32,
+    boot_timeout: u32,
+    properties: ConfigProperties,
+}
+
+#[derive(Serialize, Debug)]
+struct ConfigProperties {
+    tenant_info: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize, Serialize, Default)]
+struct File {
+    url: String,
+    #[serde(rename = "filePath")]
+    file_path: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Package {
+    name: String,
+    version: String,
+    properties: serde_json::Value,
+    index: File,
+    important: Vec<File>,
+    lazy: Vec<File>,
+}
+
+#[derive(Serialize)]
+struct ReleaseListResponse{
+    releases: Vec<ReleaseHistoryEntry>,
+}
 
 #[post("/create")]
 async fn create(
@@ -353,6 +420,7 @@ async fn create(
 #[get("/history")]
 async fn list_releases(
     state: web::Data<AppState>,
+    query: web::Query<ReleaseHistoryQuery>,
     auth_response: ReqData<AuthResponse>,
 ) -> Result<Json<ReleaseHistoryResponse>> {
     let auth_response = auth_response.into_inner();
@@ -366,9 +434,23 @@ async fn list_releases(
         .get()
         .map_err(error::ErrorInternalServerError)?;
 
+    let page = query.page.unwrap_or(1).max(1);
+    let count = query.count.unwrap_or(20);
+    let offset = (page - 1) * count;
+
+    let total_items = releases
+        .filter(org_id.eq(&organisation).and(app_id.eq(&application)))
+        .count()
+        .get_result::<i64>(&mut conn)
+        .map_err(error::ErrorInternalServerError)?;
+
+    let total_pages = (total_items as f64 / count as f64).ceil() as i64;
+
     let release_entries = releases
         .filter(org_id.eq(&organisation).and(app_id.eq(&application)))
         .order_by(created_at.desc())
+        .offset(offset.into())
+        .limit(count.into())
         .load::<ReleaseEntry>(&mut conn)
         .map_err(error::ErrorInternalServerError)?;
 
@@ -386,6 +468,8 @@ async fn list_releases(
 
     Ok(Json(ReleaseHistoryResponse {
         releases: release_history,
+        total_items: Some(total_items),
+        total_pages: Some(total_pages)
     }))
 }
 
@@ -649,4 +733,154 @@ async fn get_experiment_details(
         variants,
     }))
 }
+
+
+#[get("/list")]
+async fn current_list_releases(
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<ReleaseListResponse>, actix_web::Error> {
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, READ).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, READ).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+    let experiments_list = state
+        .superposition_client
+        .list_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("Failed to list experiments: {:?}", e);
+            error::ErrorInternalServerError("Failed to list experiments from Superposition")
+        })?;
+
+    let experiments = experiments_list.data();
+
+    let experiment_ids: Vec<String> = experiments.iter().map(|exp| exp.id.to_string()).collect();
+    
+    let filter_expr = diesel::dsl::sql::<diesel::sql_types::Bool>("metadata->>'experiment_id' = ANY(")
+        .bind::<diesel::sql_types::Array<diesel::sql_types::Text>, _>(&experiment_ids)
+        .sql(")");
+
+    let release_entries: Vec<ReleaseEntry> = releases
+        .filter(filter_expr)
+        .filter(org_id.eq(&organisation).and(app_id.eq(&application)))
+        .order(created_at.desc())
+        .load::<ReleaseEntry>(&mut conn)
+        .map_err(error::ErrorInternalServerError)?;
+
+    let matched_releases: Vec<ReleaseHistoryEntry> = release_entries
+        .into_iter()
+        .map(|entry| ReleaseHistoryEntry {
+            id: entry.id.to_string(),
+            package_version: entry.package_version,
+            config_version: entry.config_version,
+            created_at: entry.created_at,
+            created_by: entry.created_by,
+            metadata: entry.metadata,
+        })
+        .collect();
+
+    Ok(Json(ReleaseListResponse { releases: matched_releases }))
+}
+
+
+
+
+#[get("/{release_id}")]
+async fn get_release_by_id(
+    path: Path<String>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<ReleaseConfig>> {
+    let release_id_str = path.into_inner();
+    let auth_response = auth_response.into_inner();
+    let organisation =
+        validate_user(auth_response.organisation, READ).map_err(error::ErrorUnauthorized)?;
+    let application =
+        validate_user(auth_response.application, READ).map_err(error::ErrorUnauthorized)?;
+
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let release_uuid = Uuid::parse_str(&release_id_str)
+        .map_err(|_| error::ErrorBadRequest("Invalid release ID format"))?;
+
+    // Get the release entry
+    let release = releases
+        .filter(id.eq(release_uuid))
+        .first::<ReleaseEntry>(&mut conn)
+        .map_err(|_| error::ErrorNotFound("Release not found"))?;
+
+    let package_version_val = release.package_version;
+
+    // Get both package and config data
+    let package_data = packages
+        .filter(
+            pkg_org_id
+                .eq(&organisation)
+                .and(pkg_app_id.eq(&application))
+                .and(pkg_version_col.eq(package_version_val)),
+        )
+        .first::<PackageEntryRead>(&mut conn)
+        .map_err(|_| error::ErrorNotFound("Package not found"))?;
+
+    let config_data = configs_table
+        .filter(
+            config_org_id
+                .eq(&organisation)
+                .and(config_app_id.eq(&application))
+                .and(config_version_col.eq(package_version_val)),
+        )
+        .select(ConfigEntry::as_select())
+        .first::<ConfigEntry>(&mut conn)
+        .map_err(|_| error::ErrorNotFound("Config not found"))?;
+
+    // Convert important and lazy files from JSON back to Vec<File>
+    let important_files: Vec<File> =
+        serde_json::from_value(package_data.important.clone()).unwrap_or_default();
+    let lazy_files: Vec<File> =
+        serde_json::from_value(package_data.lazy.clone()).unwrap_or_default();
+    let index_file: File = serde_json::from_value(package_data.index.clone()).unwrap_or_default();
+
+    Ok(Json(ReleaseConfig {
+        version: config_data.version.to_string(),
+        config: Config {
+            version: config_data.config_version,
+            release_config_timeout: config_data.release_config_timeout as u32,
+            boot_timeout: config_data.package_timeout as u32,
+            properties: ConfigProperties {
+                tenant_info: config_data.tenant_info,
+            },
+        },
+        package: Package {
+            name: package_data.app_id,
+            version: config_data.version.to_string(),
+            properties: package_data.properties.clone(),
+            index: index_file,
+            important: important_files,
+            lazy: lazy_files,
+        },
+        resources: package_data.resources,
+    }))
+}
+
 

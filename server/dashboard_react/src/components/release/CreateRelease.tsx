@@ -23,6 +23,8 @@ interface CreateReleaseProps {
   onClose: () => void;
   onBack: () => void;
   onSuccess: (releaseInfo: any) => void;
+  preFillDimensions?: Array<{key: string; value: string}>;
+  onReleaseCreated?: () => void;
 }
 
 export default function CreateRelease({
@@ -32,6 +34,8 @@ export default function CreateRelease({
   onClose,
   onBack,
   onSuccess,
+  preFillDimensions,
+  onReleaseCreated,
 }: CreateReleaseProps) {
   const [metadata, setMetadata] = useState("");
   const [isValidJson, setIsValidJson] = useState(true);
@@ -75,6 +79,17 @@ export default function CreateRelease({
   useEffect(() => {
     fetchDimensions();
   }, [fetchDimensions]);
+
+  // Pre-fill dimension contexts if provided
+  useEffect(() => {
+    if (preFillDimensions && preFillDimensions.length > 0) {
+      const contexts = preFillDimensions.map(dim => ({
+        dimension: dim.key,
+        value: dim.value
+      }));
+      setDimensionContexts(contexts);
+    }
+  }, [preFillDimensions]);
 
   const handleAddContext = () => {
     setIsAddingContext(true);
@@ -137,6 +152,7 @@ export default function CreateRelease({
       );
 
       onSuccess?.(response.data);
+      onReleaseCreated?.(); // Notify parent to refresh release list
     } catch (err: any) {
       console.error('Error creating release:', err);
       setError(err.response?.data?.message || 'Failed to create release');
