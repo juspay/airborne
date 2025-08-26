@@ -51,6 +51,7 @@ import java.io.InterruptedIOException
 import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.Queue
 import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
@@ -113,6 +114,8 @@ internal class UpdateTask(
 
     // TODO Move to storing in main app dir & remove this var.
     private var resourceSaveFuture: Future<Unit>? = null
+
+    private val HEX_ARRAY = "0123456789abcdef".toCharArray()
 
     init {
         trackers.add(tracker)
@@ -627,7 +630,7 @@ internal class UpdateTask(
                         if (it.isDownloaded == true) {
                             Result.Ok(Unit)
                         } else {
-                            downloadFile(tw, it.url, it.filePath)
+                            downloadFile(tw, it.url, it.filePath, it.checksum)
                         }
                     }
                 }
@@ -713,7 +716,7 @@ internal class UpdateTask(
                         val result = if (it.isDownloaded == true) {
                             Result.Ok(Unit)
                         } else {
-                            downloadFile(tw, it.url, it.filePath)
+                            downloadFile(tw, it.url, it.filePath, it.checksum)
                         }
                         downloadCallback(tw, it.filePath, result is Result.Ok)
                         result
@@ -838,7 +841,8 @@ internal class UpdateTask(
     private fun downloadFile(
         tempWriter: TempWriter,
         url: URL,
-        filePathToSaveIn: String
+        filePathToSaveIn: String,
+        checksum: String
     ): Result<Unit> {
         Log.d(TAG, "downloadFile $url")
         val startTime = System.currentTimeMillis()
@@ -857,6 +861,16 @@ internal class UpdateTask(
                         } else {
                             bytes
                         }
+
+                    if (checksum.isNotEmpty()) {
+                        val calculatedChecksum = sha256Hex(extracted)
+
+                        if (!calculatedChecksum.equals(checksum, ignoreCase = true)) {
+                            Log.e(TAG, "Checksum mismatch for $filePathToSaveIn")
+                            return Result.Error()
+                        }
+                    }
+
                     if (tempWriter.write(filePathToSaveIn, extracted)) {
                         Log.d(TAG, "File $filePathToSaveIn written to disk")
                         Result.Ok(Unit)
@@ -1062,6 +1076,17 @@ internal class UpdateTask(
             }
         }
     }
+    private fun sha256Hex(bytes: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+
+        val hexChars = CharArray(digest.size * 2)
+        for (i in digest.indices) {
+            val v = digest[i].toInt() and 0xFF
+            hexChars[i * 2] = HEX_ARRAY[v ushr 4]
+            hexChars[i * 2 + 1] = HEX_ARRAY[v and 0x0F]
+        }
+        return String(hexChars)
+    }
 
     private inner class ResourceUpdateTask(
         val currentResourceManifest: Resources?,
@@ -1094,7 +1119,7 @@ internal class UpdateTask(
                         Result.Ok(Pair(resource, savedResourcesInfo.first))
                     } else {
                         Log.d(TAG, "Downloading resource: ${resource.filePath}")
-                        val result = downloadFile(tempWriter, resource.url, resource.filePath)
+                        val result = downloadFile(tempWriter, resource.url, resource.filePath, resource.checksum)
                         if (result is Result.Ok) {
                             Result.Ok(Pair(resource, tempWriter))
                         } else {
