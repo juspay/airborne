@@ -14,6 +14,7 @@
 		6003F5BA195388D20070C39A /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 6003F5B8195388D20070C39A /* InfoPlist.strings */; };
 		6003F5BC195388D20070C39A /* Tests.m in Sources */ = {isa = PBXBuildFile; fileRef = 6003F5BB195388D20070C39A /* Tests.m */; };
 		D17A3ACA2E1BBA1C00E7FC5C /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D17A3AC82E1BBA1C00E7FC5C /* Main.storyboard */; };
+		D1FC6D0D2E4B9AA300689397 /* release_config.json in Resources */ = {isa = PBXBuildFile; fileRef = D1FC6D0C2E4B9A9300689397 /* release_config.json */; };
 		DC9DB7DF2E0EA21D00149E81 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DB7CF2E0EA21D00149E81 /* AppDelegate.swift */; };
 		DC9DB7E22E0EA21D00149E81 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DB7D72E0EA21D00149E81 /* SceneDelegate.swift */; };
 		DC9DB7E32E0EA21D00149E81 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DB7D82E0EA21D00149E81 /* ViewController.swift */; };
@@ -38,6 +39,7 @@
 		A91BB3664DABDD2A3DA4A8A0 /* Pods-AirborneDemo.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-AirborneDemo.release.xcconfig"; path = "Target Support Files/Pods-AirborneDemo/Pods-AirborneDemo.release.xcconfig"; sourceTree = "<group>"; };
 		CB1BEA4F2BF6B1CAA1CEB300 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
 		D17A3AC92E1BBA1C00E7FC5C /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		D1FC6D0C2E4B9A9300689397 /* release_config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = release_config.json; sourceTree = "<group>"; };
 		DC9DB6AE2E0E93B600149E81 /* AirborneDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirborneDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC9DB7CF2E0EA21D00149E81 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		DC9DB7D02E0EA21D00149E81 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -142,9 +144,18 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
+		D1FC6D0B2E4B9A8500689397 /* airborne-demo.bundle */ = {
+			isa = PBXGroup;
+			children = (
+				D1FC6D0C2E4B9A9300689397 /* release_config.json */,
+			);
+			path = "airborne-demo.bundle";
+			sourceTree = "<group>";
+		};
 		DC9DB7D92E0EA21D00149E81 /* AirborneDemo */ = {
 			isa = PBXGroup;
 			children = (
+				D1FC6D0B2E4B9A8500689397 /* airborne-demo.bundle */,
 				DC9DB7CF2E0EA21D00149E81 /* AppDelegate.swift */,
 				DC9DB7D02E0EA21D00149E81 /* Assets.xcassets */,
 				DC9DB7D12E0EA21D00149E81 /* Info.plist */,
@@ -250,6 +261,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				DC9DB7E82E0EA21D00149E81 /* Assets.xcassets in Resources */,
+				D1FC6D0D2E4B9AA300689397 /* release_config.json in Resources */,
 				DC9DB7E92E0EA21D00149E81 /* LaunchScreen.storyboard in Resources */,
 				D17A3ACA2E1BBA1C00E7FC5C /* Main.storyboard in Resources */,
 			);

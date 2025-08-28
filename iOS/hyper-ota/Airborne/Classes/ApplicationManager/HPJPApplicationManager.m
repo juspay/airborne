@@ -77,6 +77,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 @property (nonatomic, strong) NSBundle* baseBundle;
 @property (nonatomic) Boolean isLocalAssets;
 @property (nonatomic) Boolean forceUpdate;
+@property (nonatomic) Boolean fromAirborne;
 
 @property (nonatomic, weak) id<HPJPApplicationManagerDelegate> delegate;
 
@@ -95,29 +96,33 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return self;
 }
 
-
-+ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger {
++ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger fromAirborne:(BOOL)fromAirborne {
     @synchronized ([HPJPApplicationManager class]) {
         if(managers == nil) {
             managers = [NSMutableDictionary dictionary];
         }
         HPJPApplicationManager* manager = managers[workspace];
         if (manager == nil || (manager.releaseConfigDownloadStatus == FAILED || manager.importantPackageDownloadStatus == FAILED || manager.importantPackageDownloadStatus == COMPLETED)) {
-            manager = [[HPJPApplicationManager alloc] initWithWorkspace:workspace delegate:delegate logger:logger];
+            manager = [[HPJPApplicationManager alloc] initWithWorkspace:workspace delegate:delegate logger:logger fromAirborne:fromAirborne];
             managers[workspace] = manager;
         } else {
             [manager.tracker addLogger:logger];
         }
-
+        
         return manager;
     }
 }
 
-- (instancetype)initWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nullable)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger {
++ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger {
+    return [self getSharedInstanceWithWorkspace:workspace delegate:delegate logger:logger fromAirborne:YES];
+}
+
+- (instancetype)initWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nullable)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger fromAirborne:(BOOL)fromAirborne {
     self = [super init];
     if (self) {
         self.workspace = workspace;
         self.delegate = delegate;
+        self.fromAirborne = fromAirborne;
         
         self.releaseConfigURL = [delegate getReleaseConfigURL];
         
@@ -158,6 +163,9 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
             self.importantPackageDownloadStatus = COMPLETED;
             self.lazyPackageDownloadStatus = COMPLETED;
             [self cleanUpUnwantedFiles];
+            [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_NOTIFICATION
+                                                                        object:nil
+                                                                      userInfo:@{}];
         } else {
             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
                 [self startDownload];
@@ -184,13 +192,58 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     
     self.config = [self readApplicationConfig];
     
-    if (self.package.isDefaultInit && self.config.isDefaultInit && self.resources.isDefaultInit) {
+    
+    if (self.package == nil || self.config == nil || self.resources == nil) {
         NSData *data = [self.fileUtil getFileFromBundle:@"release_config.json"];
         NSError* error = nil;
-        HPJPApplicationManifest* manifest = [[HPJPApplicationManifest alloc] initWithData:data error:&error];
-        self.config = manifest.config;
-        self.package = manifest.package;
-        self.resources = manifest.resources;
+        if (data != nil) {
+            HPJPApplicationManifest* manifest = [[HPJPApplicationManifest alloc] initWithData:data error:&error];
+            if (manifest != nil) {
+                if (self.config == nil && manifest.config != nil) {
+                        self.config = manifest.config;
+                }
+                if (self.package == nil && manifest.config != nil) {
+                    self.package = manifest.package;
+                }
+                if (self.resources == nil && manifest.resources != nil) {
+                    self.resources = manifest.resources;
+                }
+            }
+        }
+        
+        if (self.config == nil) {
+            NSError* newErr = nil;
+            self.config = [[HPJPApplicationConfig alloc] initWithError:&newErr fileUtil:self.fileUtil];
+            if(self.config == nil || newErr!=nil) {
+                NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
+                logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
+                logVal[@"file_name"] = @"config.json";
+                [self.tracker trackError:@"release_config_read_failed" value:logVal];
+            }
+        }
+        
+        if (self.package == nil) {
+                NSError* newErr = nil;
+                self.package = [[HPJPApplicationPackage alloc] initWithFileUtil:self.fileUtil error:&newErr];
+                if (self.package == nil || newErr != nil) {
+                    NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
+                    logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
+                    logVal[@"file_name"] = @"package.json";
+                    [self.tracker trackError:@"release_config_read_failed" value:logVal];
+                }
+        }
+        
+        if (self.resources == nil) {
+                NSError* newErr = nil;
+                self.resources = [[HPJPApplicationResources alloc] initWithFileUtil:self.fileUtil error:&newErr];
+                if(self.resources == nil || newErr != nil) {
+                    NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
+                    logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
+                    logVal[@"file_name"] = @"resources.json";
+                    [self.tracker trackError:@"release_config_read_failed" value:logVal];
+                }
+        }
+
         [self.tracker trackInfo:@"bundled_release_config" value:[@{@"release_config":@"Read bundled release_config.json"} mutableCopy]];
     }
     
@@ -448,13 +501,13 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     [self.collectionsLock unlock];
 }
 
-- (void)updateAvailableLazySplit:(NSString *)filePath withResource:(HPJPResource *)resource {
+- (void)updateAvailableLazySplit:(NSString *)filePath withResource:(HPJPResource *)resource { // TODO: not being used
     [self.collectionsLock lock];
     _availableLazySplits[filePath] = resource;
     [self.collectionsLock unlock];
 }
 
-- (HPJPResource *)availableLazySplit:(NSString *)filePath {
+- (HPJPResource *)availableLazySplit:(NSString *)filePath { // TODO: not being used
     [self.collectionsLock lock];
     HPJPResource *resource = _availableLazySplits[filePath];
     [self.collectionsLock unlock];
@@ -467,7 +520,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     [self.collectionsLock unlock];
 }
 
-- (HPJPResource *)availableResource:(NSString *)filePath {
+- (HPJPResource *)availableResource:(NSString *)filePath { // TODO: not being used
     [self.collectionsLock lock];
     HPJPResource *resource = _availableResources[filePath];
     [self.collectionsLock unlock];
@@ -481,7 +534,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return resources;
 }
 
-- (void)setAvailableResources:(MutableAppResources *)resources {
+- (void)setAvailableResources:(MutableAppResources *)resources { // TODO: not being used
     [self.collectionsLock lock];
     _availableResources = resources;
     [self.collectionsLock unlock];
@@ -561,7 +614,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     
     // Read from JuspayPackages/main (where available resources are stored)
     NSString *mainResourcePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:resourceFileName];
-    NSString *fileContent = [self.fileUtil loadFile:mainResourcePath folder:JUSPAY_PACKAGE_DIR withLocalAssets:self.isLocalAssets error:&fileLoadError];
+    NSString *fileContent = [self.fileUtil loadFile:mainResourcePath folder:(_fromAirborne ? JUSPAY_PACKAGE_DIR : JUSPAY_RESOURCE_DIR) withLocalAssets:self.isLocalAssets error:&fileLoadError];
     
     if (fileLoadError) {
         [self.tracker trackError:@"read_resource_file" value:[@{
@@ -598,7 +651,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return [self isDownloadCompleted:self.importantPackageDownloadStatus];
 }
 
-- (BOOL)isLazyPackageDownloadCompleted {
+- (BOOL)isLazyPackageDownloadCompleted { // TODO: not being used
     return [self isDownloadCompleted:self.lazyPackageDownloadStatus];
 }
 
@@ -782,12 +835,36 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
             }
         }
         
-        // Add files from current resources
-        NSDictionary<NSString*, HPJPResource*> *resourcesData = self.resources.resources;
-        for (NSString* resourceName in resourcesData) {
-            HPJPResource* resource = resourcesData[resourceName];
-            NSString* fileNameOnDisk = [self jsFileNameFor:resource.filePath];
-            [requiredFiles addObject:fileNameOnDisk];
+        if (_fromAirborne) {
+            // Add files from current resources
+            NSDictionary<NSString*, HPJPResource*> *resourcesData = self.resources.resources;
+            for (NSString* resourceName in resourcesData) {
+                HPJPResource* resource = resourcesData[resourceName];
+                NSString* fileNameOnDisk = [self jsFileNameFor:resource.filePath];
+                [requiredFiles addObject:fileNameOnDisk];
+            }
+        } else {
+            
+            NSArray *allResourceFiles = [self getAllFilesInDirectory:JUSPAY_RESOURCE_DIR subFolder:JUSPAY_MAIN_DIR includeSubfolders:YES];
+            NSMutableSet<NSString *> *requiredResourceFiles = [NSMutableSet set];
+            
+            NSDictionary<NSString*, HPJPResource*> *resourcesData = self.resources.resources;
+            for (NSString* resourceName in resourcesData) {
+                HPJPResource* resource = resourcesData[resourceName];
+                NSString* fileNameOnDisk = [self jsFileNameFor:resource.filePath];
+                [requiredResourceFiles addObject:fileNameOnDisk];
+            }
+
+            for (NSString *fileName in allResourceFiles) {
+                BOOL shouldKeep = [requiredResourceFiles containsObject:fileName];
+                
+                // Delete file if it doesn't belong to a required version
+                if (!shouldKeep) {
+                    [self.tracker trackInfo:@"cleaning_unused_file" value:[@{@"file": fileName} mutableCopy]];
+                    [self deleteFile:fileName subFolder:JUSPAY_MAIN_DIR inFolder:JUSPAY_RESOURCE_DIR];
+                }
+            }
+            
         }
         
         // Loop through the files and delete those not associated with required versions
@@ -800,11 +877,14 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
                 [self deleteFile:fileName subFolder:JUSPAY_MAIN_DIR inFolder:JUSPAY_PACKAGE_DIR];
             }
         }
-
-        // cleanup of temp resources
-        NSArray<NSString*> *resourceFileNames = [self getAllFilesInDirectory:JUSPAY_RESOURCE_DIR subFolder:@"" includeSubfolders:YES];
-        for (NSString* fileName in resourceFileNames) {
-            [self deleteFile:fileName subFolder:@"" inFolder:JUSPAY_RESOURCE_DIR];
+        
+        if (_fromAirborne) {
+            // cleanup of temp resources
+            // TODO: won't this delete the non moved files?
+            NSArray<NSString*> *resourceFileNames = [self getAllFilesInDirectory:JUSPAY_RESOURCE_DIR subFolder:@"" includeSubfolders:YES];
+            for (NSString* fileName in resourceFileNames) {
+                [self deleteFile:fileName subFolder:@"" inFolder:JUSPAY_RESOURCE_DIR];
+            }
         }
     }
 }
@@ -831,43 +911,6 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 
 # pragma mark - Manifest
 
-- (NSInteger)generateNewToss:(double) currentTime {
-    NSInteger tossValue = arc4random_uniform(100);
-    NSDictionary *newTimedToss = @{
-        @"ts": @(currentTime),
-        @"toss": @(tossValue)
-    };
-    NSError *error = nil;
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:newTimedToss options:0 error:&error];
-    if (jsonData != nil) {
-        NSString *newTossString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
-        [HPJPKeyValueStore setValue:newTossString forKey:PATCH_TOSS workspace:self.workspace];
-    }
-    return tossValue;
-}
-
-- (NSInteger)getTimedToss {
-    NSString *tossString = [HPJPKeyValueStore getValueForKey:PATCH_TOSS workspace:self.workspace];
-    double currentTime = round([[NSDate date] timeIntervalSince1970]);
-    if (tossString != nil) {
-        NSData *data = [tossString dataUsingEncoding:NSUTF8StringEncoding];
-        NSError *error = nil;
-        NSDictionary *tossHolder = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
-        if (error != nil) {
-            return [self generateNewToss:currentTime];
-        }
-        double tossedTime = [tossHolder[@"ts"] doubleValue];
-        // Check if the toss has expired
-        if (currentTime - tossedTime > TOSS_TIMEOUT) {
-            return [self generateNewToss:currentTime];
-        } else {
-            return [tossHolder[@"toss"] integerValue];
-        }
-    } else {
-        return [self generateNewToss:currentTime];
-    }
-}
-
 - (void)fetchReleaseConfigWithCompletionHandler:(HPJPReleaseConfigCompletionHandler)completionHandler {
         
     NSURL *manifestUrl = [NSURL URLWithString:self.releaseConfigURL];
@@ -877,10 +920,11 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     // Add headers
     NSDictionary *networkInfo = [HPJPHelpers connectedNetworkType];
     [request setValue:networkInfo[@"network_info"] forHTTPHeaderField: @"x-network-type"];
-    [request setValue:[[UIDevice currentDevice] systemVersion] forHTTPHeaderField: @"x-os-version"];
+    [request setValue:[[UIDevice currentDevice] systemVersion] forHTTPHeaderField: @"x-os-version"]; // TODO: Have to add airborne version as header
     [request setValue:self.package.version forHTTPHeaderField: @"x-package-version"];
     [request setValue:self.config.version forHTTPHeaderField: @"x-config-version"];
     
+    // TODO: hyper sdk version can also be added from the headers from SessionManager
     for (NSString *field in self.releaseConfigHeaders) {
         [request setValue:self.releaseConfigHeaders[field] forHTTPHeaderField:field];
     }
@@ -932,17 +976,6 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 - (HPJPApplicationConfig *)readApplicationConfig {
     NSError *err = nil;
     HPJPApplicationConfig* config = (HPJPApplicationConfig*)[self.fileUtil getDecodedInstanceForClass:[HPJPApplicationConfig class] withContentOfFileName:APP_CONFIG_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&err];
-    if (config != nil) {
-        return config;
-    }
-    NSError* newErr = nil;
-    config = [[HPJPApplicationConfig alloc] initWithError:&newErr fileUtil:self.fileUtil];
-    if(config == nil || newErr!=nil) {
-        NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
-        logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
-        logVal[@"file_name"] = @"config.json";
-        [self.tracker trackError:@"release_config_read_failed" value:logVal];
-    }
 
     return config;
 }
@@ -971,19 +1004,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 - (HPJPApplicationPackage *)readApplicationPackage {
     NSError* err = nil;
     HPJPApplicationPackage* package =  (HPJPApplicationPackage*)[self.fileUtil getDecodedInstanceForClass:[HPJPApplicationPackage class] withContentOfFileName:APP_PACKAGE_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&err];
-    if(package != nil) {
         return package;
-    }
-    NSError* newErr = nil;
-    package = [[HPJPApplicationPackage alloc] initWithFileUtil:self.fileUtil error:&newErr];
-    if (package == nil || newErr != nil) {
-        NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
-        logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
-        logVal[@"file_name"] = @"package.json";
-        [self.tracker trackError:@"release_config_read_failed" value:logVal];
-    }
-
-    return package;
 }
 
 - (void)downloadImportantPackagesWithNewManifest:(HPJPApplicationPackage *)newManifest
@@ -1048,7 +1069,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
     
     // Set up download tracking variables
-    NSMutableSet *pendingDownloads = [NSMutableSet setWithArray:[toDownload valueForKey:@"file_path"]];
+    NSMutableSet *pendingDownloads = [NSMutableSet setWithArray:[toDownload valueForKey:@"filePath"]];
     NSMutableSet *failedDownloads = [NSMutableSet set];
     
     // Start downloads to temp directory
@@ -1061,8 +1082,8 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
                 __strong HPJPApplicationManager* strongSelf = weakSelf;
                 
                 // Get filename without path for saving to temp
-                NSString *fileName = [[split.url pathExtension] isEqualToString:@"zip"] ? split.url.lastPathComponent : split.filePath;
-                NSString *tempPath = [JUSPAY_TEMP_DIR stringByAppendingPathComponent:fileName];
+                NSString *fileName = [[split.url pathExtension] isEqualToString:@"zip"] ? split.url.lastPathComponent : split.filePath; // TODO: why
+                NSString *tempPath = [JUSPAY_TEMP_DIR stringByAppendingPathComponent:fileName]; // TODO:
                 
                 [strongSelf downloadFileFromURL:split.url
                           andSaveInFilePath:tempPath
@@ -1413,19 +1434,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 - (HPJPApplicationResources *)readApplicationResources {
     NSError* error = nil;
     HPJPApplicationResources* resources = (HPJPApplicationResources*)[self.fileUtil getDecodedInstanceForClass:[HPJPApplicationResources class] withContentOfFileName:APP_RESOURCES_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&error];
-    if (resources!= nil && resources.resources != nil) {
         return resources;
-    }
-    NSError* newErr = nil;
-    resources = [[HPJPApplicationResources alloc] initWithFileUtil:self.fileUtil error:&newErr];
-    if(resources == nil || newErr != nil) {
-        NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
-        logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
-        logVal[@"file_name"] = @"resources.json";
-        [self.tracker trackError:@"release_config_read_failed" value:logVal];
-    }
-
-    return resources;
 }
 
 - (void)updateResources:(AppResources *)resources {
@@ -1504,9 +1513,11 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
                 dispatch_group_leave(group);
                 return;
             }
+
+            NSString *tempPath = [JUSPAY_TEMP_DIR stringByAppendingPathComponent:resource.filePath];
             
             [strongSelf downloadFileFromURL:resource.url
-                           andSaveInFilePath:resource.filePath
+                           andSaveInFilePath:tempPath
                                     inFolder:JUSPAY_RESOURCE_DIR
                            completionHandler:^(NSError* downloadError) {
                 if (downloadError != nil) {
@@ -1538,7 +1549,6 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 }
 
 - (void)moveResourceToMainAndUpdate:(HPJPResource *)resource singleDownloadHandler:(void (^)(NSString*,HPJPResource*))singleDownloadHandler {
-    
     // Move resource to main directory
     [self moveResourceToMain:resource];
     
@@ -1556,11 +1566,13 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *fileNameOnDisk = [self jsFileNameFor:resource.filePath];
     // Source path in JuspayResources (temp location)
-    NSString *sourcePath = [self.fileUtil fullPathInStorageForFilePath:fileNameOnDisk inFolder:JUSPAY_RESOURCE_DIR];
+    NSString *tempPath = [JUSPAY_TEMP_DIR stringByAppendingPathComponent:fileNameOnDisk];
+    
+    NSString *sourcePath = [self.fileUtil fullPathInStorageForFilePath:tempPath  inFolder:JUSPAY_RESOURCE_DIR];
     
     // Destination path in JuspayPackages/main
     NSString *destFilePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileNameOnDisk];
-    NSString *destPath = [self.fileUtil fullPathInStorageForFilePath:destFilePath inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *destPath = [self.fileUtil fullPathInStorageForFilePath:destFilePath inFolder:_fromAirborne? JUSPAY_PACKAGE_DIR: JUSPAY_RESOURCE_DIR];
     
     // Remove existing file at destination if it exists
     if ([fileManager fileExistsAtPath:destPath]) {
@@ -1760,7 +1772,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
 }
 
-- (NSArray<NSString*>*)getAllFilesInZip:(NSString *)zipFile inDirectory:(NSString *)directory {
+- (NSArray<NSString*>*)getAllFilesInZip:(NSString *)zipFile inDirectory:(NSString *)directory { // TODO: not being used
     NSString *zipFilePath = [self.fileUtil fullPathInStorageForFilePath:zipFile inFolder:directory];
     NSArray* filesInZip = [self.fileUtil filesInZipAtPath:zipFilePath];
     return filesInZip;
@@ -1812,7 +1824,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }
 }
 
-- (BOOL)moveFileWithSource:(NSString*)source sourceDir:(NSString*)sourceDir destination:(NSString*)destination destionationDir:(NSString*)destionationDir shouldOverwrite:(BOOL) shouldOverwrite error:(NSError**) error{
+- (BOOL)moveFileWithSource:(NSString*)source sourceDir:(NSString*)sourceDir destination:(NSString*)destination destionationDir:(NSString*)destionationDir shouldOverwrite:(BOOL) shouldOverwrite error:(NSError**) error{ // TODO: not being used
     NSURL* downloadDir = [NSURL fileURLWithPath:sourceDir isDirectory:YES];
     NSURL* sourceURL = [downloadDir URLByAppendingPathComponent:source];
     return [self.fileUtil moveFileToInternalStorage:sourceURL fileName:destination folderName:sourceDir error:error];
@@ -1853,7 +1865,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return [fileName stringByReplacingOccurrencesOfString:@".jsa" withString:@".js"];
 }
 
-- (NSMutableSet<NSString*>*)renameJSAToJSInSet:(NSMutableSet<NSString*>* )fileNames {
+- (NSMutableSet<NSString*>*)renameJSAToJSInSet:(NSMutableSet<NSString*>* )fileNames { // TODO: not being used
     NSMutableSet<NSString*>* renamedSet = [NSMutableSet setWithCapacity:fileNames.count];
     for (NSString * fileName in fileNames) {
         if ([fileName containsString:@".jsa"]) {
@@ -1865,28 +1877,8 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return renamedSet;
 }
 
-- (NSString *) getFileNameFromUrl:(NSURL*) url {
+- (NSString *) getFileNameFromUrl:(NSURL*) url { // TODO: not being used
     return [url lastPathComponent];
-}
-
-- (BOOL)isCug {
-    NSURL *appURL = [NSURL URLWithString:@"devtools://test"];
-    return [[UIApplication sharedApplication] canOpenURL:appURL] || [[self getDeviceName] isEqualToString:@"Whale999"];
-}
-
-- (NSString *)devqaDetails {
-    NSString* devqaDetails = [HPJPKeyValueStore getValueForKey:@"devqa" workspace:self.workspace];
-    if (devqaDetails == nil) {
-        devqaDetails = [self getDeviceName];
-    }
-    if ([devqaDetails containsString:@"DevQA"]) {
-        return [devqaDetails substringFromIndex:5];
-    }
-    return nil;
-}
-
-- (NSString *)getDeviceName {
-    return [[UIDevice currentDevice] name];
 }
 
 - (NSInteger)getResponseCodeFromNSURLResponse:(NSURLResponse *)response {
@@ -1934,21 +1926,21 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
                 logVal[@"url"] = [resourceURL absoluteString];
                 logVal[@"timeTaken"] = [NSNumber numberWithDouble:(([[NSDate date] timeIntervalSince1970] * 1000) - startTime)];
                 [strongSelf.tracker trackInfo:@"file_download" value:logVal];
-                if ([[resourceURL pathExtension] isEqualToString:@"zip"]) {
-                    NSString *downloadedZipFile = [strongSelf.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName];
-                    NSString *destinationPath = [downloadedZipFile stringByDeletingLastPathComponent];
-                    BOOL extractionSuccess = [strongSelf.fileUtil extractZipFileAtPath:downloadedZipFile toDestination:destinationPath shouldRemoveAfterExtraction:YES];
-                    if (!extractionSuccess) {
-                        // Extraction failed
-                        NSString *errorMessage = @"ZIP extraction failed";
-                        NSMutableDictionary<NSString*,id> *logData = [NSMutableDictionary dictionary];
-                        logData[@"url"] = [resourceURL absoluteString];
-                        logData[@"error"] = errorMessage;
-                        [strongSelf.tracker trackError:@"zip_extraction_failed" value:logData];
-                        completionHandler([NSError errorWithDomain:@"in.juspay.hypersdk" code:1 userInfo:@{@"error": errorMessage}]);
-                        return;
-                    }
-                }
+//                if ([[resourceURL pathExtension] isEqualToString:@"zip"]) { // TODO: this is not required now
+//                    NSString *downloadedZipFile = [strongSelf.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName];
+//                    NSString *destinationPath = [downloadedZipFile stringByDeletingLastPathComponent];
+//                    BOOL extractionSuccess = [strongSelf.fileUtil extractZipFileAtPath:downloadedZipFile toDestination:destinationPath shouldRemoveAfterExtraction:YES];
+//                    if (!extractionSuccess) {
+//                        // Extraction failed
+//                        NSString *errorMessage = @"ZIP extraction failed";
+//                        NSMutableDictionary<NSString*,id> *logData = [NSMutableDictionary dictionary];
+//                        logData[@"url"] = [resourceURL absoluteString];
+//                        logData[@"error"] = errorMessage;
+//                        [strongSelf.tracker trackError:@"zip_extraction_failed" value:logData];
+//                        completionHandler([NSError errorWithDomain:@"in.juspay.hypersdk" code:1 userInfo:@{@"error": errorMessage}]);
+//                        return;
+//                    }
+//                }
                 completionHandler(nil);
             } else {
                 NSString* err = error;

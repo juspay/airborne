@@ -23,6 +23,6 @@ Our primary focus is to provide robust, easy-to-use SDKs and plugins that stream
   s.public_header_files = 'iOS/hyper-ota/Airborne/Classes/**/*.h'
 
   s.platform     = :ios, "12.0"
-  s.dependency 'HyperCore', '0.1.3'
+  s.dependency 'HyperCore', '0.1.4'
   s.swift_versions = ['5.0']
 end

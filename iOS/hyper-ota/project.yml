@@ -1,0 +1,10 @@
+name: Airborne
+options:
+  bundleIdPrefix: in.juspay
+targets:
+  Airborne:
+    type: framework
+    platform: iOS
+    sources:
+      - path: .
+

@@ -53,6 +53,25 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger;
 
+
+/**
+ * Returns a shared instance of HPJPApplicationManager for the specified workspace.
+ * This method implements a singleton pattern per workspace, ensuring that only one manager
+ * exists for each unique workspace identifier.
+ *
+ * @param workspace The workspace identifier used to isolate manager instances
+ * @param delegate An object conforming to HPJPApplicationManagerDelegate
+ * @param logger Optional logger delegate for tracking download progress, errors, and analytics.
+ *
+ * @note If a manager already exists for the workspace and meets reuse criteria, the existing
+ *       instance is returned with the logger added to its tracker
+ * @note A new manager is created if none exists or if the existing manager has failed/completed states
+ */
++ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace
+                                      delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate
+                                        logger:(id<HPJPLoggerDelegate> _Nullable)logger
+                                  fromAirborne:(BOOL)fromAirborne;
+
 /**
  * Returns the current application manifest containing package, configuration, and resource information.
  * This method provides a snapshot of the current state of all managed components.
@@ -112,6 +131,15 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSString *)readResourceFile:(NSString *)resourceFileName;
 
+/**
+ * Returns the value of the current release config timeout
+ */
+- (NSNumber *)getReleaseConfigTimeout;
+
+/**
+ * Returns the value of the current package timeout
+ */
+-(NSNumber *)getPackageTimeout;
 
 /**
  * Returns whether the release configuration download has completed.
