@@ -6,3 +6,6 @@
 //
 
 #import <Airborne/HPJPApplicationManagerDelegate.h>
+#import <Airborne/HPJPApplicationManager.h>
+#import <Airborne/HPJPApplicationConstants.h>
+#import <Airborne/HPJPApplicationTracker.h>

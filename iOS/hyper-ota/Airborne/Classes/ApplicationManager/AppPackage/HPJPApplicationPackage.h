@@ -23,8 +23,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) HPJPResource *index;
 @property (nonatomic, strong) NSDictionary *properties;
 
-@property (nonatomic, assign) BOOL isDefaultInit;
-
 @property (nonatomic, strong) NSArray<HPJPResource*> *important;
 @property (nonatomic, strong) NSArray<HPJPLazyResource*> *lazy;
 

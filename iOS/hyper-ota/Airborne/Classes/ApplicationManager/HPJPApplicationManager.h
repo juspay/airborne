@@ -53,6 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 + (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<HPJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<HPJPLoggerDelegate> _Nullable)logger;
 
+
 /**
  * Returns the current application manifest containing package, configuration, and resource information.
  * This method provides a snapshot of the current state of all managed components.
@@ -112,6 +113,15 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSString *)readResourceFile:(NSString *)resourceFileName;
 
+/**
+ * Returns the value of the current release config timeout
+ */
+- (NSNumber *)getReleaseConfigTimeout;
+
+/**
+ * Returns the value of the current package timeout
+ */
+-(NSNumber *)getPackageTimeout;
 
 /**
  * Returns whether the release configuration download has completed.
