@@ -32,14 +32,6 @@ extern NSString *const APP_RESOURCES_DATA_FILE_NAME;
 extern NSString *const APP_OLD_RESOURCES_DATA_FILE_NAME;
 extern NSString *const APP_TEMP_RESOURCES_DATA_FILE_NAME;
 
-extern NSString *const RELEASE_CONFIG_URL;
-
-extern NSString *const RELEASE_PATH;
-extern NSString *const CUG_PATH;
-extern NSString *const DEVQA_PATH;
-extern int const TOSS_TIMEOUT;
-extern NSString *const PATCH_TOSS;
-
 extern NSString *const BOOT_TIMEOUT_NOTIFICATION;
 extern NSString *const PACKAGE_RESOURCE_NOTIFICATION;
 extern NSString *const RELEASE_CONFIG_NOTIFICATION;

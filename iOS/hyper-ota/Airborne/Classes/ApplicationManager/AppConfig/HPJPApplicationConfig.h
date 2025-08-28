@@ -17,8 +17,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSNumber* releaseConfigTimeout;
 @property (nonatomic, strong) NSDictionary *properties;
 
-@property (nonatomic, assign) BOOL isDefaultInit;
-
 - (instancetype _Nullable)initWithError:(NSError * _Nullable *) jsonError fileUtil:(HPJPFileUtil*)fileUtil;
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary error:(NSError * _Nullable *)error;
 - (NSDictionary *)toDictionary;
