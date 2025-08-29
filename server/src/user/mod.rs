@@ -387,38 +387,9 @@ struct OAuthState {
     redirect_uri: String,
 }
 
-fn get_base_url_from_request(req: &HttpRequest) -> String {
-    // Try to get the host from various headers (in order of preference)
-    let host = req
-        .headers()
-        .get("x-forwarded-host")
-        .and_then(|h| h.to_str().ok())
-        .or_else(|| req.headers().get("host").and_then(|h| h.to_str().ok()))
-        .unwrap_or("localhost:9000"); // fallback
-
-    // Check if we're behind a proxy with HTTPS
-    let scheme = if req
-        .headers()
-        .get("x-forwarded-proto")
-        .and_then(|h| h.to_str().ok())
-        == Some("https")
-    {
-        "https"
-    } else {
-        // Check if the connection itself is secure
-        if req.connection_info().scheme() == "https" {
-            "https"
-        } else {
-            "http"
-        }
-    };
-
-    format!("{}://{}", scheme, host)
-}
-
 #[get("oauth/url")]
 async fn get_oauth_url(
-    req: HttpRequest,
+    _req: HttpRequest,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<serde_json::Value>> {
     // Use external URL directly from config
@@ -429,7 +400,7 @@ async fn get_oauth_url(
     let realm = &state.env.realm;
     let client_id = &state.env.client_id;
 
-    let base_url = get_base_url_from_request(&req);
+    let base_url = state.env.public_url.clone();
     let redirect_uri = format!("{}/dashboard/login", base_url);
 
     let oauth_state = "oauth_login_state".to_string();
@@ -455,7 +426,7 @@ async fn get_oauth_url(
 
 async fn exchange_code_for_token(
     code: &str,
-    req: &HttpRequest,
+    _req: &HttpRequest,
     state: &web::Data<AppState>,
 ) -> actix_web::Result<TokenResponse> {
     // Use internal URL for backend-to-backend communication
@@ -466,7 +437,7 @@ async fn exchange_code_for_token(
     );
 
     // Get redirect URI from request
-    let base_url = get_base_url_from_request(req);
+    let base_url = state.env.public_url.clone();
     let redirect_uri = format!("{}/dashboard/login", base_url);
 
     let params = [
