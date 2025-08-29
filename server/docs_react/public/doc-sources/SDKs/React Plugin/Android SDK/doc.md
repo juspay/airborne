@@ -20,7 +20,7 @@ The unique identifier of your app. Make sure that this is the same given in the 
 
 This method is a callback for events from the Airborne SDK.
 
-### onBootComplete
+### startApp
 
 This method is called when the Airborne bundle is ready. You should use this to set the bundle path for React Native.
 

@@ -16,7 +16,7 @@ Initialize the Airborne SDK within the `application(_:didFinishLaunchingWithOpti
 
 You need to implement the required methods from the `AirborneReactDelegate` protocol.
 
-### onBootComplete
+### startApp
 
 This method is called when the Airborne bundle is ready. You should use this to start your React Native application.
 

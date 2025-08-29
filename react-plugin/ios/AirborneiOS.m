@@ -37,7 +37,7 @@
 
 - (void)onBootCompleteWithIndexBundlePath:(NSString *)indexBundlePath{
     if (_delegate == nil) return;
-    [_delegate onBootComplete:indexBundlePath];
+    [_delegate startApp:indexBundlePath];
 }
 
 -(void)onEventWithLevel:(NSString *)level label:(NSString *)label key:(NSString *)key value:(NSDictionary<NSString *,id> *)value category:(NSString *)category subcategory:(NSString *)subcategory{
