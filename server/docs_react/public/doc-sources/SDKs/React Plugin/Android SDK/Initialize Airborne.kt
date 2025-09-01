@@ -21,7 +21,7 @@ private fun initializeAirborne() {
                     // Log the event
                 }
 
-                override fun onBootComplete(indexPath: String) {
+                override fun startApp(indexPath: String) {
                     isBootComplete = true
                     bundlePath = indexPath
                     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {

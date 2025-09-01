@@ -6,7 +6,7 @@
    
   @objc optional func dimensions() -> [String: String]
    
-  @objc optional func onBootComplete() -> Void
+  @objc optional func startApp() -> Void
    
   @objc optional func onEvent() -> Void
 }

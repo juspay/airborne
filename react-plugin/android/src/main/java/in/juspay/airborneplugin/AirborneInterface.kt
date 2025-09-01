@@ -13,7 +13,7 @@ abstract class AirborneInterface {
         return hashMapOf()
     }
 
-    open fun onBootComplete(indexPath: String) {
+    open fun startApp(indexPath: String) {
     }
 
     open fun onEvent(level: String, label: String, key: String, value: JSONObject, category: String, subCategory: String) {

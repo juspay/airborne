@@ -17,6 +17,6 @@
   },
   {
     "type": "code",
-    "filename": "onBootComplete.kt"
+    "filename": "startApp.kt"
   }
 ]
