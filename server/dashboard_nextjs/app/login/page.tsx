@@ -24,7 +24,6 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    console.log("Login Page Token:", token)
     if (token) router.replace("/dashboard")
   }, [token, router])
 

@@ -9,8 +9,9 @@ export default function RootRedirect() {
   const router = useRouter()
 
   useEffect(() => {
-    if (token) router.replace("/dashboard")
-    else router.replace("/login")
+    // if (token) router.replace("/dashboard")
+    // else router.replace("/login")
+    router.replace("/landing")
   }, [token, router])
 
   return null

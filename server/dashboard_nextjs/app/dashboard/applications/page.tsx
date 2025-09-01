@@ -24,13 +24,13 @@ import { useAppContext } from "@/providers/app-context"
 type OrgResp = { name: string; applications: { application: string; organisation: string }[] }
 
 export default function ApplicationsPage() {
-  const { token, org } = useAppContext()
+  const { token, org, logout } = useAppContext()
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [formData, setFormData] = useState({ name: "", description: "" })
 
   const { data, isLoading, error } = useSWR<OrgResp[]>(token ? "/organisations" : null, (url) =>
-    apiFetch(url, {}, { token }),
+    apiFetch(url, {}, { token, logout }),
   )
 
   const apps = useMemo(
@@ -43,7 +43,7 @@ export default function ApplicationsPage() {
     await apiFetch(
       "/organisations/applications/create",
       { method: "POST", body: { application: formData.name } },
-      { token, org },
+      { token, org, logout },
     )
     setIsCreateModalOpen(false)
     setFormData({ name: "", description: "" })
