@@ -1,0 +1,23 @@
+framework module Airborne {
+    umbrella header "Airborne.h"
+
+    header "AJPApplicationManager.h"
+    header "AJPApplicationManagerDelegate.h"
+    header "AJPApplicationManifest.h"
+    header "AJPApplicationConfig.h"
+    header "AJPApplicationPackage.h"
+    header "AJPApplicationResources.h"
+    header "AJPResource.h"
+    header "AJPFileUtil.h"
+    header "AJPRemoteFileUtil.h"
+    header "AJPNetworkClient.h"
+    header "AJPLoggerDelegate.h"
+
+    exclude header "AJPApplicationConstants.h"
+    exclude header "AJPApplicationTracker.h"
+    exclude header "AJPNetworkTypeDetector.h"
+    exclude header "AJPHelpers.h"
+
+    export *
+    module * { export * }
+}

@@ -28,7 +28,7 @@ extension ViewController: AirborneDelegate {
         "airborne-demo"
     }
     
-    func startApp(indexBundleURL: URL?) {
+    func onBootComplete(indexBundleURL: URL?) {
         print("Index bundle path: \(String(describing: indexBundleURL))")
         let releaseConfig = airborne.getReleaseConfig()
         print("Release config: \(releaseConfig)")
