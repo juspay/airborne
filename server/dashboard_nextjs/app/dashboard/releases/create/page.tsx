@@ -17,6 +17,7 @@ import { apiFetch } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { parseFileRef } from "@/lib/utils"
 import { set } from "react-hook-form"
+import Link from "next/link"
 
 type Pkg = { index: string; tag: string; version: number; files: string[] }
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number }
@@ -31,9 +32,6 @@ export default function CreateReleasePage() {
   const totalSteps = 3
   const [currentStep, setCurrentStep] = useState(1)
 
-  const [releaseName, setReleaseName] = useState("")
-  const [version, setVersion] = useState("")
-  const [description, setDescription] = useState("")
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}")
 
   const [pkgSearch, setPkgSearch] = useState("")
@@ -112,7 +110,7 @@ export default function CreateReleasePage() {
   const canProceedToStep = (step: number) => {
     switch (step) {
       case 1:
-        return releaseName.trim().length > 0
+        return selectedPackage !== null
       case 2:
         return true
       case 3:
@@ -203,44 +201,6 @@ export default function CreateReleasePage() {
         <div className="space-y-6 mt-6">
           {currentStep === 1 && (
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Information</CardTitle>
-                  <CardDescription>Basic information about your release</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Release Name *</Label>
-                      <Input
-                        id="name"
-                        placeholder="Holiday Features"
-                        value={releaseName}
-                        onChange={(e) => setReleaseName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="version">Version (label)</Label>
-                      <Input
-                        id="version"
-                        placeholder="2.1.4"
-                        value={version}
-                        onChange={(e) => setVersion(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package</CardTitle>
@@ -490,7 +450,7 @@ export default function CreateReleasePage() {
         <div className="flex items-center justify-between mt-8 pt-6 border-t">
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <a href="/releases">Cancel</a>
+              <Link href="/dashboard/releases">Cancel</Link>
             </Button>
             {currentStep > 1 && (
               <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
