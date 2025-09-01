@@ -1,0 +1,37 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.1.2 effective-5.10 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)
+// swift-module-flags: -target x86_64-apple-ios12.0-simulator -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -module-name Airborne
+// swift-module-flags-ignorable:  -interface-compiler-version 6.1.2
+@_exported import Airborne
+import Foundation
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+@objc public protocol AirborneDelegate {
+  @objc optional func namespace() -> Swift.String
+  @objc optional func bundle() -> Foundation.Bundle
+  @objc optional func dimensions() -> [Swift.String : Swift.String]
+  @objc optional func onBootComplete(indexBundleURL: Foundation.URL?)
+  @objc optional func onEvent(level: Swift.String, label: Swift.String, key: Swift.String, value: [Swift.String : Any], category: Swift.String, subcategory: Swift.String)
+  @objc optional func onLazyPackageDownloadComplete(downloadSuccess: Swift.Bool, url: Swift.String, filePath: Swift.String)
+  @objc optional func onAllLazyPackageDownloadsComplete()
+}
+@objc public class AirborneServices : ObjectiveC.NSObject {
+  @objc public init(releaseConfigURL: Swift.String, delegate: (any Airborne.AirborneDelegate)? = nil)
+  @objc public func getBaseBundle() -> Foundation.Bundle
+  @objc deinit
+}
+extension Airborne.AirborneServices {
+  @objc dynamic public func getIndexBundlePath() -> Foundation.URL
+  @objc dynamic public func getReleaseConfig() -> Swift.String
+  @objc dynamic public func getFileContent(atPath path: Swift.String) -> Swift.String?
+}
+extension Airborne.AirborneServices : Airborne.HPJPApplicationManagerDelegate {
+  @objc dynamic public func getReleaseConfigURL() -> Swift.String
+  @objc dynamic public func getReleaseConfigHeaders() -> [Swift.String : Swift.String]
+}
+extension Airborne.AirborneServices : HyperCore.HPJPLoggerDelegate {
+  @objc dynamic public func trackEvent(withLevel level: Swift.String!, label: Swift.String!, value: Any!, category: Swift.String!, subcategory: Swift.String!)
+  @objc dynamic public func trackEvent(withLevel level: Swift.String!, label: Swift.String!, key: Swift.String!, value: Any!, category: Swift.String!, subcategory: Swift.String!)
+}

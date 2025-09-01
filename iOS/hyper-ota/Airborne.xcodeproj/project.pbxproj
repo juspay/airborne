@@ -3,393 +3,408 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 77;
 	objects = {
 
+/* Begin PBXAggregateTarget section */
+		DC76412C2E6194390028FCDA /* AirborneAggregate */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = DC76412D2E6194390028FCDA /* Build configuration list for PBXAggregateTarget "AirborneAggregate" */;
+			buildPhases = (
+				DC7641312E61945B0028FCDA /* ShellScript */,
+			);
+			dependencies = (
+			);
+			name = AirborneAggregate;
+			packageProductDependencies = (
+			);
+			productName = AirborneAggregate;
+		};
+/* End PBXAggregateTarget section */
+
 /* Begin PBXBuildFile section */
-		07A870673DB98A1C73420C60 /* HPJPApplicationManifest.m in Sources */ = {isa = PBXBuildFile; fileRef = 94ABC8C32ED46F31DBB0DC12 /* HPJPApplicationManifest.m */; };
-		16BD67014883B03CC72D404D /* Airborne.h in Headers */ = {isa = PBXBuildFile; fileRef = 9140D6B590B1526956494877 /* Airborne.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		280CD91E56E3DEB055A81267 /* HPJPApplicationTracker.h in Headers */ = {isa = PBXBuildFile; fileRef = 25A34E6B271DE01F5595F5E4 /* HPJPApplicationTracker.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		33845B253EB1C18C03DC792C /* Airborne.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7A674E7AF4C4D625038839 /* Airborne.swift */; };
-		3491C2D431C5CE93D836824A /* HPJPResource.h in Headers */ = {isa = PBXBuildFile; fileRef = 6735ECF47514630248A07F56 /* HPJPResource.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		3C024669AF6DCFDAA2CA4BAD /* HPJPApplicationResources.m in Sources */ = {isa = PBXBuildFile; fileRef = EC69136FD35DA18D763F0CED /* HPJPApplicationResources.m */; };
-		3C68F5B599453BA8BDE05353 /* HPJPApplicationConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = ABE799952D731D4309D5025E /* HPJPApplicationConstants.m */; };
-		4443C619DAEF32543D0ED1D3 /* HPJPApplicationConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = BB17CAF932033D725962084D /* HPJPApplicationConfig.m */; };
-		44FCAC4CFE490FB7EAA0C5BE /* HPJPApplicationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 0B8581F37E9C5332D3085514 /* HPJPApplicationManager.m */; };
-		54B31955175E75DAA52A8BE8 /* HPJPApplicationPackage.h in Headers */ = {isa = PBXBuildFile; fileRef = ABC9D36C918973C3A31DA083 /* HPJPApplicationPackage.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		59A49C4E16FA236C2A68D036 /* project.yml in Resources */ = {isa = PBXBuildFile; fileRef = D46C4F2F46CDEF3E28DF6862 /* project.yml */; };
-		5A8B051D73A3C200B1B9DBB5 /* HPJPApplicationTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = 5A69B2784F90FC19A09BE361 /* HPJPApplicationTracker.m */; };
-		5D7F33F570856EE96CA88C91 /* HPJPApplicationConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = 3BDF922BBA785609B77104A2 /* HPJPApplicationConstants.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		7A9558AEECDF627DD3C473D6 /* HPJPApplicationManager.h in Headers */ = {isa = PBXBuildFile; fileRef = BDFB444C39970BFC7E6B900A /* HPJPApplicationManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		7D7582BD50987A497C641DD7 /* HPJPResource.m in Sources */ = {isa = PBXBuildFile; fileRef = A0F8BB3064B602877E8B6F17 /* HPJPResource.m */; };
-		8D299A61723D3B127CFE172C /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 09BEF80BAE0BBF19B07B9E85 /* README.md */; };
-		9AFC5552FEEEA999D0E34641 /* HPJPApplicationResources.h in Headers */ = {isa = PBXBuildFile; fileRef = 0C5852BB20E2C09814A1E885 /* HPJPApplicationResources.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		BD02A99F976D95EDDA5A3460 /* HPJPApplicationManagerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 0C5670B7727CCD921A1EF1B6 /* HPJPApplicationManagerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		CFA8F1CDE732D69B2307D34A /* HPJPApplicationPackage.m in Sources */ = {isa = PBXBuildFile; fileRef = 26CABD457196B3B1626B7C5B /* HPJPApplicationPackage.m */; };
-		D5C212FCE81437B828CA2571 /* HPJPApplicationConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = C4DAADCBBE2534D0465CF20E /* HPJPApplicationConfig.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		E159D9F0C3E4F227D17CC703 /* Airborne.podspec in Resources */ = {isa = PBXBuildFile; fileRef = 97D8C0478166374E0AAECA87 /* Airborne.podspec */; };
-		FBF67CF24923FBE348EB8E9B /* HPJPApplicationManifest.h in Headers */ = {isa = PBXBuildFile; fileRef = E0659BE3EB3FE9C5B342340C /* HPJPApplicationManifest.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC7995DE2E657CF7003D40F2 /* HyperCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC7995DD2E657CF7003D40F2 /* HyperCore.framework */; };
+		DC7995DF2E657CF7003D40F2 /* HyperCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC7995DD2E657CF7003D40F2 /* HyperCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DCB6144D2E61924D0099D87E /* Airborne.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB6144B2E61924D0099D87E /* Airborne.swift */; };
+		DCB6144E2E61924D0099D87E /* HPJPApplicationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614472E61924D0099D87E /* HPJPApplicationManager.m */; };
+		DCB6144F2E61924D0099D87E /* HPJPApplicationConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB6143E2E61924D0099D87E /* HPJPApplicationConstants.m */; };
+		DCB614502E61924D0099D87E /* HPJPApplicationConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614322E61924D0099D87E /* HPJPApplicationConfig.m */; };
+		DCB614512E61924D0099D87E /* HPJPApplicationManifest.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614352E61924D0099D87E /* HPJPApplicationManifest.m */; };
+		DCB614522E61924D0099D87E /* HPJPResource.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614412E61924D0099D87E /* HPJPResource.m */; };
+		DCB614532E61924D0099D87E /* HPJPApplicationPackage.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614382E61924D0099D87E /* HPJPApplicationPackage.m */; };
+		DCB614542E61924D0099D87E /* HPJPApplicationResources.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB6143B2E61924D0099D87E /* HPJPApplicationResources.m */; };
+		DCB614552E61924D0099D87E /* HPJPApplicationTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614442E61924D0099D87E /* HPJPApplicationTracker.m */; };
+		DCB614562E61924D0099D87E /* Airborne.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB6144A2E61924D0099D87E /* Airborne.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB614572E61924D0099D87E /* HPJPApplicationManifest.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614342E61924D0099D87E /* HPJPApplicationManifest.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB614582E61924D0099D87E /* HPJPApplicationResources.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB6143A2E61924D0099D87E /* HPJPApplicationResources.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB614592E61924D0099D87E /* HPJPApplicationManager.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614462E61924D0099D87E /* HPJPApplicationManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB6145A2E61924D0099D87E /* HPJPApplicationManagerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614482E61924D0099D87E /* HPJPApplicationManagerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB6145B2E61924D0099D87E /* HPJPApplicationConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB6143D2E61924D0099D87E /* HPJPApplicationConstants.h */; };
+		DCB6145C2E61924D0099D87E /* HPJPApplicationConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614312E61924D0099D87E /* HPJPApplicationConfig.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB6145D2E61924D0099D87E /* HPJPResource.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614402E61924D0099D87E /* HPJPResource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DCB6145E2E61924D0099D87E /* HPJPApplicationTracker.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614432E61924D0099D87E /* HPJPApplicationTracker.h */; };
+		DCB6145F2E61924D0099D87E /* HPJPApplicationPackage.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614372E61924D0099D87E /* HPJPApplicationPackage.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		D1D9D7092E5C648500DB900F /* PBXContainerItemProxy */ = {
+		DC7995E42E657D00003D40F2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = D1D9D7062E5C648500DB900F /* HyperCore.xcodeproj */;
+			containerPortal = DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */;
 			proxyType = 1;
 			remoteGlobalIDString = 8C3D868E2D489E08001C24DD;
 			remoteInfo = HyperCore;
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		DC7995E02E657CF7003D40F2 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				DC7995DF2E657CF7003D40F2 /* HyperCore.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		09BEF80BAE0BBF19B07B9E85 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		0B8581F37E9C5332D3085514 /* HPJPApplicationManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationManager.m; sourceTree = "<group>"; };
-		0C5670B7727CCD921A1EF1B6 /* HPJPApplicationManagerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationManagerDelegate.h; sourceTree = "<group>"; };
-		0C5852BB20E2C09814A1E885 /* HPJPApplicationResources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationResources.h; sourceTree = "<group>"; };
-		25A34E6B271DE01F5595F5E4 /* HPJPApplicationTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationTracker.h; sourceTree = "<group>"; };
-		26CABD457196B3B1626B7C5B /* HPJPApplicationPackage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationPackage.m; sourceTree = "<group>"; };
-		3BDF922BBA785609B77104A2 /* HPJPApplicationConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationConstants.h; sourceTree = "<group>"; };
-		5A69B2784F90FC19A09BE361 /* HPJPApplicationTracker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationTracker.m; sourceTree = "<group>"; };
-		6735ECF47514630248A07F56 /* HPJPResource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPResource.h; sourceTree = "<group>"; };
-		6A7A674E7AF4C4D625038839 /* Airborne.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Airborne.swift; sourceTree = "<group>"; };
-		70E0722BAFDBEA8C36906930 /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
-		77E93790239E6756BF4F2F84 /* Airborne.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Airborne.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		9140D6B590B1526956494877 /* Airborne.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Airborne.h; sourceTree = "<group>"; };
-		94ABC8C32ED46F31DBB0DC12 /* HPJPApplicationManifest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationManifest.m; sourceTree = "<group>"; };
-		95C397C9806F49CBDCDB5534 /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
-		97D8C0478166374E0AAECA87 /* Airborne.podspec */ = {isa = PBXFileReference; lastKnownFileType = text; path = Airborne.podspec; sourceTree = "<group>"; };
-		A0F8BB3064B602877E8B6F17 /* HPJPResource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPResource.m; sourceTree = "<group>"; };
-		ABC9D36C918973C3A31DA083 /* HPJPApplicationPackage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationPackage.h; sourceTree = "<group>"; };
-		ABE799952D731D4309D5025E /* HPJPApplicationConstants.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationConstants.m; sourceTree = "<group>"; };
-		B43235D063CB2728F3FC99DE /* .gitkeep */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitkeep; sourceTree = "<group>"; };
-		BB17CAF932033D725962084D /* HPJPApplicationConfig.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationConfig.m; sourceTree = "<group>"; };
-		BDFB444C39970BFC7E6B900A /* HPJPApplicationManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationManager.h; sourceTree = "<group>"; };
-		C4DAADCBBE2534D0465CF20E /* HPJPApplicationConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationConfig.h; sourceTree = "<group>"; };
-		D1D9D6FF2E5C609A00DB900F /* HyperCore.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = HyperCore.xcodeproj; path = "/Users/yaswanth.polisetti/repos/bitbucket/hyper-core-lib-ios/HyperCore.xcodeproj"; sourceTree = "<absolute>"; };
-		D1D9D7062E5C648500DB900F /* HyperCore.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = HyperCore.xcodeproj; path = "/Users/yaswanth.polisetti/repos/bitbucket/hyper-core-lib-ios/HyperCore.xcodeproj"; sourceTree = "<absolute>"; };
-		D1D9D7752E5FB96B00DB900F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		D46C4F2F46CDEF3E28DF6862 /* project.yml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = project.yml; sourceTree = "<group>"; };
-		DF4AED0A98B81D1822726B0A /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-		E0659BE3EB3FE9C5B342340C /* HPJPApplicationManifest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationManifest.h; sourceTree = "<group>"; };
-		EC69136FD35DA18D763F0CED /* HPJPApplicationResources.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationResources.m; sourceTree = "<group>"; };
+		DC76412B2E61931B0028FCDA /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
+		DC7995DD2E657CF7003D40F2 /* HyperCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = HyperCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = HyperCore.xcodeproj; path = "/Users/balaganesh/Desktop/JUSPAY/HyperSDK_2.0/devtools-ios/hyper-core-lib-ios/HyperCore.xcodeproj"; sourceTree = "<absolute>"; };
+		DCB613FB2E6191FB0099D87E /* Airborne.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Airborne.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCB614312E61924D0099D87E /* HPJPApplicationConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationConfig.h; sourceTree = "<group>"; };
+		DCB614322E61924D0099D87E /* HPJPApplicationConfig.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationConfig.m; sourceTree = "<group>"; };
+		DCB614342E61924D0099D87E /* HPJPApplicationManifest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationManifest.h; sourceTree = "<group>"; };
+		DCB614352E61924D0099D87E /* HPJPApplicationManifest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationManifest.m; sourceTree = "<group>"; };
+		DCB614372E61924D0099D87E /* HPJPApplicationPackage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationPackage.h; sourceTree = "<group>"; };
+		DCB614382E61924D0099D87E /* HPJPApplicationPackage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationPackage.m; sourceTree = "<group>"; };
+		DCB6143A2E61924D0099D87E /* HPJPApplicationResources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationResources.h; sourceTree = "<group>"; };
+		DCB6143B2E61924D0099D87E /* HPJPApplicationResources.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationResources.m; sourceTree = "<group>"; };
+		DCB6143D2E61924D0099D87E /* HPJPApplicationConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationConstants.h; sourceTree = "<group>"; };
+		DCB6143E2E61924D0099D87E /* HPJPApplicationConstants.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationConstants.m; sourceTree = "<group>"; };
+		DCB614402E61924D0099D87E /* HPJPResource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPResource.h; sourceTree = "<group>"; };
+		DCB614412E61924D0099D87E /* HPJPResource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPResource.m; sourceTree = "<group>"; };
+		DCB614432E61924D0099D87E /* HPJPApplicationTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationTracker.h; sourceTree = "<group>"; };
+		DCB614442E61924D0099D87E /* HPJPApplicationTracker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationTracker.m; sourceTree = "<group>"; };
+		DCB614462E61924D0099D87E /* HPJPApplicationManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationManager.h; sourceTree = "<group>"; };
+		DCB614472E61924D0099D87E /* HPJPApplicationManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationManager.m; sourceTree = "<group>"; };
+		DCB614482E61924D0099D87E /* HPJPApplicationManagerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationManagerDelegate.h; sourceTree = "<group>"; };
+		DCB6144A2E61924D0099D87E /* Airborne.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Airborne.h; sourceTree = "<group>"; };
+		DCB6144B2E61924D0099D87E /* Airborne.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Airborne.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFrameworksBuildPhase section */
+		DCB613F82E6191FB0099D87E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC7995DE2E657CF7003D40F2 /* HyperCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
 /* Begin PBXGroup section */
-		028EF2043A5FFBD27207640B /* Resource */ = {
+		DC7641262E6192BC0028FCDA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				6735ECF47514630248A07F56 /* HPJPResource.h */,
-				A0F8BB3064B602877E8B6F17 /* HPJPResource.m */,
+				DC7995DD2E657CF7003D40F2 /* HyperCore.framework */,
 			);
-			path = Resource;
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		0ADC1C284BD6B2D6FA68DF76 /* Tracker */ = {
+		DC7995E22E657D00003D40F2 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				25A34E6B271DE01F5595F5E4 /* HPJPApplicationTracker.h */,
-				5A69B2784F90FC19A09BE361 /* HPJPApplicationTracker.m */,
 			);
-			path = Tracker;
+			name = Products;
 			sourceTree = "<group>";
 		};
-		1E63026D25D5C362F0855D59 /* Classes */ = {
+		DCB613F12E6191FB0099D87E = {
 			isa = PBXGroup;
 			children = (
-				95C397C9806F49CBDCDB5534 /* .gitkeep */,
-				9140D6B590B1526956494877 /* Airborne.h */,
-				6A7A674E7AF4C4D625038839 /* Airborne.swift */,
-				B26E2198C2D228CB5990649C /* ApplicationManager */,
+				DCB6144C2E61924D0099D87E /* Airborne */,
+				DC7641262E6192BC0028FCDA /* Frameworks */,
+				DCB613FC2E6191FB0099D87E /* Products */,
+				DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */,
 			);
-			path = Classes;
 			sourceTree = "<group>";
 		};
-		2B099B8036E5362227855C62 /* Assets */ = {
+		DCB613FC2E6191FB0099D87E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B43235D063CB2728F3FC99DE /* .gitkeep */,
+				DCB613FB2E6191FB0099D87E /* Airborne.framework */,
 			);
-			path = Assets;
+			name = Products;
 			sourceTree = "<group>";
 		};
-		5A7D76FF4970456E3A4C0BEB /* AppConfig */ = {
+		DCB614332E61924D0099D87E /* AppConfig */ = {
 			isa = PBXGroup;
 			children = (
-				C4DAADCBBE2534D0465CF20E /* HPJPApplicationConfig.h */,
-				BB17CAF932033D725962084D /* HPJPApplicationConfig.m */,
+				DCB614312E61924D0099D87E /* HPJPApplicationConfig.h */,
+				DCB614322E61924D0099D87E /* HPJPApplicationConfig.m */,
 			);
 			path = AppConfig;
 			sourceTree = "<group>";
 		};
-		5F9CDDD0302F178E9942F122 = {
+		DCB614362E61924D0099D87E /* AppManifest */ = {
 			isa = PBXGroup;
 			children = (
-				D1D9D7752E5FB96B00DB900F /* Info.plist */,
-				D1D9D6FF2E5C609A00DB900F /* HyperCore.xcodeproj */,
-				6115BEB98D0625E1D87644C6 /* Airborne */,
-				D3C92FACE221729C919B3B5C /* hyper-ota */,
-				7CBFC65A1FFE0855CA63A00A /* Products */,
-				D1D9D7062E5C648500DB900F /* HyperCore.xcodeproj */,
-			);
-			sourceTree = "<group>";
-		};
-		6115BEB98D0625E1D87644C6 /* Airborne */ = {
-			isa = PBXGroup;
-			children = (
-				2B099B8036E5362227855C62 /* Assets */,
-				1E63026D25D5C362F0855D59 /* Classes */,
-			);
-			path = Airborne;
-			sourceTree = "<group>";
-		};
-		7CBFC65A1FFE0855CA63A00A /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				77E93790239E6756BF4F2F84 /* Airborne.framework */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		B26E2198C2D228CB5990649C /* ApplicationManager */ = {
-			isa = PBXGroup;
-			children = (
-				BDFB444C39970BFC7E6B900A /* HPJPApplicationManager.h */,
-				0B8581F37E9C5332D3085514 /* HPJPApplicationManager.m */,
-				0C5670B7727CCD921A1EF1B6 /* HPJPApplicationManagerDelegate.h */,
-				5A7D76FF4970456E3A4C0BEB /* AppConfig */,
-				EACF6439AB7121A982CA10E8 /* AppManifest */,
-				D316903280A1075F0D287632 /* AppPackage */,
-				F20A46540E32D7C954225374 /* AppResources */,
-				E8B58BB4F497A652F1CD794B /* Constants */,
-				028EF2043A5FFBD27207640B /* Resource */,
-				0ADC1C284BD6B2D6FA68DF76 /* Tracker */,
-			);
-			path = ApplicationManager;
-			sourceTree = "<group>";
-		};
-		D1D9D7072E5C648500DB900F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		D1D9D8392E605C4500DB900F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		D316903280A1075F0D287632 /* AppPackage */ = {
-			isa = PBXGroup;
-			children = (
-				ABC9D36C918973C3A31DA083 /* HPJPApplicationPackage.h */,
-				26CABD457196B3B1626B7C5B /* HPJPApplicationPackage.m */,
-			);
-			path = AppPackage;
-			sourceTree = "<group>";
-		};
-		D3C92FACE221729C919B3B5C /* hyper-ota */ = {
-			isa = PBXGroup;
-			children = (
-				70E0722BAFDBEA8C36906930 /* Airborne.modulemap */,
-				97D8C0478166374E0AAECA87 /* Airborne.podspec */,
-				DF4AED0A98B81D1822726B0A /* LICENSE */,
-				D46C4F2F46CDEF3E28DF6862 /* project.yml */,
-				09BEF80BAE0BBF19B07B9E85 /* README.md */,
-			);
-			name = "hyper-ota";
-			path = .;
-			sourceTree = "<group>";
-		};
-		E8B58BB4F497A652F1CD794B /* Constants */ = {
-			isa = PBXGroup;
-			children = (
-				3BDF922BBA785609B77104A2 /* HPJPApplicationConstants.h */,
-				ABE799952D731D4309D5025E /* HPJPApplicationConstants.m */,
-			);
-			path = Constants;
-			sourceTree = "<group>";
-		};
-		EACF6439AB7121A982CA10E8 /* AppManifest */ = {
-			isa = PBXGroup;
-			children = (
-				E0659BE3EB3FE9C5B342340C /* HPJPApplicationManifest.h */,
-				94ABC8C32ED46F31DBB0DC12 /* HPJPApplicationManifest.m */,
+				DCB614342E61924D0099D87E /* HPJPApplicationManifest.h */,
+				DCB614352E61924D0099D87E /* HPJPApplicationManifest.m */,
 			);
 			path = AppManifest;
 			sourceTree = "<group>";
 		};
-		F20A46540E32D7C954225374 /* AppResources */ = {
+		DCB614392E61924D0099D87E /* AppPackage */ = {
 			isa = PBXGroup;
 			children = (
-				0C5852BB20E2C09814A1E885 /* HPJPApplicationResources.h */,
-				EC69136FD35DA18D763F0CED /* HPJPApplicationResources.m */,
+				DCB614372E61924D0099D87E /* HPJPApplicationPackage.h */,
+				DCB614382E61924D0099D87E /* HPJPApplicationPackage.m */,
+			);
+			path = AppPackage;
+			sourceTree = "<group>";
+		};
+		DCB6143C2E61924D0099D87E /* AppResources */ = {
+			isa = PBXGroup;
+			children = (
+				DCB6143A2E61924D0099D87E /* HPJPApplicationResources.h */,
+				DCB6143B2E61924D0099D87E /* HPJPApplicationResources.m */,
 			);
 			path = AppResources;
+			sourceTree = "<group>";
+		};
+		DCB6143F2E61924D0099D87E /* Constants */ = {
+			isa = PBXGroup;
+			children = (
+				DCB6143D2E61924D0099D87E /* HPJPApplicationConstants.h */,
+				DCB6143E2E61924D0099D87E /* HPJPApplicationConstants.m */,
+			);
+			path = Constants;
+			sourceTree = "<group>";
+		};
+		DCB614422E61924D0099D87E /* Resource */ = {
+			isa = PBXGroup;
+			children = (
+				DCB614402E61924D0099D87E /* HPJPResource.h */,
+				DCB614412E61924D0099D87E /* HPJPResource.m */,
+			);
+			path = Resource;
+			sourceTree = "<group>";
+		};
+		DCB614452E61924D0099D87E /* Tracker */ = {
+			isa = PBXGroup;
+			children = (
+				DCB614432E61924D0099D87E /* HPJPApplicationTracker.h */,
+				DCB614442E61924D0099D87E /* HPJPApplicationTracker.m */,
+			);
+			path = Tracker;
+			sourceTree = "<group>";
+		};
+		DCB614492E61924D0099D87E /* ApplicationManager */ = {
+			isa = PBXGroup;
+			children = (
+				DCB614332E61924D0099D87E /* AppConfig */,
+				DCB614362E61924D0099D87E /* AppManifest */,
+				DCB614392E61924D0099D87E /* AppPackage */,
+				DCB6143C2E61924D0099D87E /* AppResources */,
+				DCB6143F2E61924D0099D87E /* Constants */,
+				DCB614422E61924D0099D87E /* Resource */,
+				DCB614452E61924D0099D87E /* Tracker */,
+				DCB614462E61924D0099D87E /* HPJPApplicationManager.h */,
+				DCB614472E61924D0099D87E /* HPJPApplicationManager.m */,
+				DCB614482E61924D0099D87E /* HPJPApplicationManagerDelegate.h */,
+			);
+			path = ApplicationManager;
+			sourceTree = "<group>";
+		};
+		DCB6144C2E61924D0099D87E /* Airborne */ = {
+			isa = PBXGroup;
+			children = (
+				DCB614492E61924D0099D87E /* ApplicationManager */,
+				DCB6144A2E61924D0099D87E /* Airborne.h */,
+				DCB6144B2E61924D0099D87E /* Airborne.swift */,
+				DC76412B2E61931B0028FCDA /* Airborne.modulemap */,
+			);
+			path = Airborne;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
-		B054232803647BD96AC5AF8E /* Headers */ = {
+		DCB613F62E6191FB0099D87E /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				16BD67014883B03CC72D404D /* Airborne.h in Headers */,
-				D5C212FCE81437B828CA2571 /* HPJPApplicationConfig.h in Headers */,
-				5D7F33F570856EE96CA88C91 /* HPJPApplicationConstants.h in Headers */,
-				7A9558AEECDF627DD3C473D6 /* HPJPApplicationManager.h in Headers */,
-				BD02A99F976D95EDDA5A3460 /* HPJPApplicationManagerDelegate.h in Headers */,
-				FBF67CF24923FBE348EB8E9B /* HPJPApplicationManifest.h in Headers */,
-				54B31955175E75DAA52A8BE8 /* HPJPApplicationPackage.h in Headers */,
-				9AFC5552FEEEA999D0E34641 /* HPJPApplicationResources.h in Headers */,
-				280CD91E56E3DEB055A81267 /* HPJPApplicationTracker.h in Headers */,
-				3491C2D431C5CE93D836824A /* HPJPResource.h in Headers */,
+				DCB614562E61924D0099D87E /* Airborne.h in Headers */,
+				DCB614582E61924D0099D87E /* HPJPApplicationResources.h in Headers */,
+				DCB614592E61924D0099D87E /* HPJPApplicationManager.h in Headers */,
+				DCB6145A2E61924D0099D87E /* HPJPApplicationManagerDelegate.h in Headers */,
+				DCB6145C2E61924D0099D87E /* HPJPApplicationConfig.h in Headers */,
+				DCB6145D2E61924D0099D87E /* HPJPResource.h in Headers */,
+				DCB6145F2E61924D0099D87E /* HPJPApplicationPackage.h in Headers */,
+				DCB614572E61924D0099D87E /* HPJPApplicationManifest.h in Headers */,
+				DCB6145B2E61924D0099D87E /* HPJPApplicationConstants.h in Headers */,
+				DCB6145E2E61924D0099D87E /* HPJPApplicationTracker.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
-		401E6F82EEBD893306B1507A /* Airborne */ = {
+		DCB613FA2E6191FB0099D87E /* Airborne */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2D21212E6554B38DE61F475C /* Build configuration list for PBXNativeTarget "Airborne" */;
+			buildConfigurationList = DCB614022E6191FB0099D87E /* Build configuration list for PBXNativeTarget "Airborne" */;
 			buildPhases = (
-				B054232803647BD96AC5AF8E /* Headers */,
-				9FBDCD2C56CA0448A55EED70 /* Sources */,
-				3E8D93FB7834C969FA8DA791 /* Resources */,
+				DCB613F62E6191FB0099D87E /* Headers */,
+				DCB613F72E6191FB0099D87E /* Sources */,
+				DCB613F82E6191FB0099D87E /* Frameworks */,
+				DCB613F92E6191FB0099D87E /* Resources */,
+				DC7995E02E657CF7003D40F2 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				D1D9D70A2E5C648500DB900F /* PBXTargetDependency */,
+				DC7995E52E657D00003D40F2 /* PBXTargetDependency */,
 			);
 			name = Airborne;
 			packageProductDependencies = (
 			);
 			productName = Airborne;
-			productReference = 77E93790239E6756BF4F2F84 /* Airborne.framework */;
+			productReference = DCB613FB2E6191FB0099D87E /* Airborne.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2EBC139D68AC79B699017A67 /* Project object */ = {
+		DCB613F22E6191FB0099D87E /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					DC76412C2E6194390028FCDA = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					DCB613FA2E6191FB0099D87E = {
+						CreatedOnToolsVersion = 16.4;
+					};
+				};
 			};
-			buildConfigurationList = 284F868286791343797CF8AF /* Build configuration list for PBXProject "Airborne" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = DCB613F52E6191FB0099D87E /* Build configuration list for PBXProject "Airborne" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				Base,
 				en,
+				Base,
 			);
-			mainGroup = 5F9CDDD0302F178E9942F122;
+			mainGroup = DCB613F12E6191FB0099D87E;
 			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = DCB613FC2E6191FB0099D87E /* Products */;
 			projectDirPath = "";
 			projectReferences = (
 				{
-					ProductGroup = D1D9D7072E5C648500DB900F /* Products */;
-					ProjectRef = D1D9D7062E5C648500DB900F /* HyperCore.xcodeproj */;
-				},
-				{
-					ProductGroup = D1D9D8392E605C4500DB900F /* Products */;
-					ProjectRef = D1D9D6FF2E5C609A00DB900F /* HyperCore.xcodeproj */;
+					ProductGroup = DC7995E22E657D00003D40F2 /* Products */;
+					ProjectRef = DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */;
 				},
 			);
 			projectRoot = "";
 			targets = (
-				401E6F82EEBD893306B1507A /* Airborne */,
+				DCB613FA2E6191FB0099D87E /* Airborne */,
+				DC76412C2E6194390028FCDA /* AirborneAggregate */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		3E8D93FB7834C969FA8DA791 /* Resources */ = {
+		DCB613F92E6191FB0099D87E /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E159D9F0C3E4F227D17CC703 /* Airborne.podspec in Resources */,
-				8D299A61723D3B127CFE172C /* README.md in Resources */,
-				59A49C4E16FA236C2A68D036 /* project.yml in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		DC7641312E61945B0028FCDA /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/sh\nFRAMEWORK_NAME=\"Airborne\"\n\nFRAMEWORK=\"${UNIVERSAL_LIBRARY_DIR}/${FRAMEWORK_NAME}.framework\"\n\nOUTPUT_DIR=\"./${FRAMEWORK_NAME}-Framework\"\n\n# Clean and build the framework for the iOS simulator\nxcodebuild -project ${FRAMEWORK_NAME}.xcodeproj \\\n    -scheme ${FRAMEWORK_NAME} \\\n    -sdk iphonesimulator \\\n    -configuration ${CONFIGURATION} \\\n    -destination 'generic/platform=iOS Simulator' \\\n    clean build \\\n    CONFIGURATION_BUILD_DIR=${BUILD_DIR}/Release-iphonesimulator \\\n    -UseModernBuildSystem=YES > /dev/null\n\n# Clean and build the framework for iOS devices\nxcodebuild -project ${FRAMEWORK_NAME}.xcodeproj \\\n    -scheme ${FRAMEWORK_NAME} \\\n    -sdk iphoneos \\\n    -configuration ${CONFIGURATION} \\\n    -destination 'generic/platform=iOS' \\\n    build \\\n    CONFIGURATION_BUILD_DIR=${BUILD_DIR}/${CONFIGURATION}-iphoneos \\\n    -UseModernBuildSystem=YES > /dev/null\n\n# Remove any existing build directories\nrm -rf \"${BUILD_DIR}/iphone\"\nrm -rf \"${BUILD_DIR}/simulator\"\n\n# Create directories to hold device and simulator builds\nmkdir \"${BUILD_DIR}/iphone\"\nmkdir \"${BUILD_DIR}/simulator\"\n\nrm -rf ${BUILD_DIR}/${FRAMEWORK_NAME}.xcframework\ncp -r ${BUILD_DIR}/${CONFIGURATION}-iphoneos/${FRAMEWORK_NAME}.framework ${BUILD_DIR}/iphone/${FRAMEWORK_NAME}.framework\ncp -r ${BUILD_DIR}/${CONFIGURATION}-iphonesimulator/${FRAMEWORK_NAME}.framework ${BUILD_DIR}/simulator/${FRAMEWORK_NAME}.framework\n\n# Create an XCFramework from the device and simulator builds\nxcrun xcodebuild -create-xcframework -framework ${BUILD_DIR}/iphone/${FRAMEWORK_NAME}.framework -framework ${BUILD_DIR}/simulator/${FRAMEWORK_NAME}.framework -output ${BUILD_DIR}/${FRAMEWORK_NAME}.xcframework\n\nrm -rf \"$OUTPUT_DIR/${FRAMEWORK_NAME}.xcframework\"\nmkdir -p \"$OUTPUT_DIR\"\n\n# Copy the XCFramework to the output directory\ncp -r ${BUILD_DIR}/${FRAMEWORK_NAME}.xcframework ${OUTPUT_DIR}\n\nopen \"${OUTPUT_DIR}\"\n\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
-		9FBDCD2C56CA0448A55EED70 /* Sources */ = {
+		DCB613F72E6191FB0099D87E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				33845B253EB1C18C03DC792C /* Airborne.swift in Sources */,
-				4443C619DAEF32543D0ED1D3 /* HPJPApplicationConfig.m in Sources */,
-				3C68F5B599453BA8BDE05353 /* HPJPApplicationConstants.m in Sources */,
-				44FCAC4CFE490FB7EAA0C5BE /* HPJPApplicationManager.m in Sources */,
-				07A870673DB98A1C73420C60 /* HPJPApplicationManifest.m in Sources */,
-				CFA8F1CDE732D69B2307D34A /* HPJPApplicationPackage.m in Sources */,
-				3C024669AF6DCFDAA2CA4BAD /* HPJPApplicationResources.m in Sources */,
-				5A8B051D73A3C200B1B9DBB5 /* HPJPApplicationTracker.m in Sources */,
-				7D7582BD50987A497C641DD7 /* HPJPResource.m in Sources */,
+				DCB6144D2E61924D0099D87E /* Airborne.swift in Sources */,
+				DCB6144E2E61924D0099D87E /* HPJPApplicationManager.m in Sources */,
+				DCB6144F2E61924D0099D87E /* HPJPApplicationConstants.m in Sources */,
+				DCB614502E61924D0099D87E /* HPJPApplicationConfig.m in Sources */,
+				DCB614512E61924D0099D87E /* HPJPApplicationManifest.m in Sources */,
+				DCB614522E61924D0099D87E /* HPJPResource.m in Sources */,
+				DCB614532E61924D0099D87E /* HPJPApplicationPackage.m in Sources */,
+				DCB614542E61924D0099D87E /* HPJPApplicationResources.m in Sources */,
+				DCB614552E61924D0099D87E /* HPJPApplicationTracker.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		D1D9D70A2E5C648500DB900F /* PBXTargetDependency */ = {
+		DC7995E52E657D00003D40F2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = HyperCore;
-			targetProxy = D1D9D7092E5C648500DB900F /* PBXContainerItemProxy */;
+			targetProxy = DC7995E42E657D00003D40F2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		14B0027ED3EF6BE5B9AF34C2 /* Release */ = {
+		DC76412E2E6194390028FCDA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
-				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 1;
-				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				INFOPLIST_FILE = Info.plist;
-				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.Airborne;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VERSIONING_SYSTEM = "apple-generic";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		DC76412F2E6194390028FCDA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
 		};
-		24412219F071777712707B2E /* Debug */ = {
+		DCB614002E6191FB0099D87E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -416,16 +431,18 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					"$(inherited)",
 					"DEBUG=1",
+					"$(inherited)",
 				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -433,25 +450,27 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
 			};
 			name = Debug;
 		};
-		B37888736451C721ECAB4F83 /* Release */ = {
+		DCB614012E6191FB0099D87E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
@@ -478,10 +497,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -489,69 +510,123 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
 			};
 			name = Release;
 		};
-		BBECF9126F131878CBF0EAEE /* Debug */ = {
+		DCB614032E6191FB0099D87E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
-				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
-				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
-				INFOPLIST_FILE = Info.plist;
+				ENABLE_MODULE_VERIFIER = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				FRAMEWORK_SEARCH_PATHS = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
+				MODULEMAP_FILE = Airborne/Airborne.modulemap;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
 				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.Airborne;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SDKROOT = iphoneos;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INSTALL_MODULE = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
+		};
+		DCB614042E6191FB0099D87E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				FRAMEWORK_SEARCH_PATHS = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULEMAP_FILE = Airborne/Airborne.modulemap;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.Airborne;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INSTALL_MODULE = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		284F868286791343797CF8AF /* Build configuration list for PBXProject "Airborne" */ = {
+		DC76412D2E6194390028FCDA /* Build configuration list for PBXAggregateTarget "AirborneAggregate" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				24412219F071777712707B2E /* Debug */,
-				B37888736451C721ECAB4F83 /* Release */,
+				DC76412E2E6194390028FCDA /* Debug */,
+				DC76412F2E6194390028FCDA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Release;
 		};
-		2D21212E6554B38DE61F475C /* Build configuration list for PBXNativeTarget "Airborne" */ = {
+		DCB613F52E6191FB0099D87E /* Build configuration list for PBXProject "Airborne" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BBECF9126F131878CBF0EAEE /* Debug */,
-				14B0027ED3EF6BE5B9AF34C2 /* Release */,
+				DCB614002E6191FB0099D87E /* Debug */,
+				DCB614012E6191FB0099D87E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Release;
+		};
+		DCB614022E6191FB0099D87E /* Build configuration list for PBXNativeTarget "Airborne" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCB614032E6191FB0099D87E /* Debug */,
+				DCB614042E6191FB0099D87E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2EBC139D68AC79B699017A67 /* Project object */;
+	rootObject = DCB613F22E6191FB0099D87E /* Project object */;
 }

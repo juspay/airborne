@@ -1,0 +1,890 @@
+{
+  "ABIRoot": {
+    "kind": "Root",
+    "name": "Airborne",
+    "printedName": "Airborne",
+    "children": [
+      {
+        "kind": "Import",
+        "name": "Foundation",
+        "printedName": "Foundation",
+        "declKind": "Import",
+        "moduleName": "Airborne",
+        "declAttributes": [
+          "RawDocComment"
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "AirborneDelegate",
+        "printedName": "AirborneDelegate",
+        "children": [
+          {
+            "kind": "Function",
+            "name": "namespace",
+            "printedName": "namespace()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)namespace",
+            "mangledName": "$s8Airborne0A8DelegateP9namespaceSSyF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "bundle",
+            "printedName": "bundle()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bundle",
+                "printedName": "Foundation.Bundle",
+                "usr": "c:objc(cs)NSBundle"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)bundle",
+            "mangledName": "$s8Airborne0A8DelegateP6bundleSo8NSBundleCyF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "dimensions",
+            "printedName": "dimensions()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Dictionary",
+                "printedName": "[Swift.String : Swift.String]",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:SD"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)dimensions",
+            "mangledName": "$s8Airborne0A8DelegateP10dimensionsSDyS2SGyF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onBootComplete",
+            "printedName": "onBootComplete(indexBundleURL:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Foundation.URL?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "URL",
+                    "printedName": "Foundation.URL",
+                    "usr": "s:10Foundation3URLV"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)onBootCompleteWithIndexBundleURL:",
+            "mangledName": "$s8Airborne0A8DelegateP14onBootComplete14indexBundleURLy10Foundation0H0VSg_tF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "objc_name": "onBootCompleteWithIndexBundleURL:",
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onEvent",
+            "printedName": "onEvent(level:label:key:value:category:subcategory:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Dictionary",
+                "printedName": "[Swift.String : Any]",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Any"
+                  }
+                ],
+                "usr": "s:SD"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)onEventWithLevel:label:key:value:category:subcategory:",
+            "mangledName": "$s8Airborne0A8DelegateP7onEvent5level5label3key5value8category11subcategoryySS_S2SSDySSypGS2StF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "objc_name": "onEventWithLevel:label:key:value:category:subcategory:",
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onLazyPackageDownloadComplete",
+            "printedName": "onLazyPackageDownloadComplete(downloadSuccess:url:filePath:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Bool",
+                "printedName": "Swift.Bool",
+                "usr": "s:Sb"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)onLazyPackageDownloadCompleteWithDownloadSuccess:url:filePath:",
+            "mangledName": "$s8Airborne0A8DelegateP29onLazyPackageDownloadComplete15downloadSuccess3url8filePathySb_S2StF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "objc_name": "onLazyPackageDownloadCompleteWithDownloadSuccess:url:filePath:",
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "onAllLazyPackageDownloadsComplete",
+            "printedName": "onAllLazyPackageDownloadsComplete()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(pl)AirborneDelegate(im)onAllLazyPackageDownloadsComplete",
+            "mangledName": "$s8Airborne0A8DelegateP33onAllLazyPackageDownloadsCompleteyyF",
+            "moduleName": "Airborne",
+            "genericSig": "<τ_0_0 where τ_0_0 : Airborne.AirborneDelegate>",
+            "sugared_genericSig": "<Self where Self : Airborne.AirborneDelegate>",
+            "protocolReq": true,
+            "declAttributes": [
+              "Optional",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "reqNewWitnessTableEntry": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Protocol",
+        "usr": "c:@M@Airborne@objc(pl)AirborneDelegate",
+        "mangledName": "$s8Airborne0A8DelegateP",
+        "moduleName": "Airborne",
+        "genericSig": "<τ_0_0 : AnyObject>",
+        "sugared_genericSig": "<Self : AnyObject>",
+        "declAttributes": [
+          "AccessControl",
+          "ObjC",
+          "RawDocComment"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          }
+        ]
+      },
+      {
+        "kind": "TypeDecl",
+        "name": "AirborneServices",
+        "printedName": "AirborneServices",
+        "children": [
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init(releaseConfigURL:delegate:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "AirborneServices",
+                "printedName": "Airborne.AirborneServices",
+                "usr": "c:@M@Airborne@objc(cs)AirborneServices"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "(any Airborne.AirborneDelegate)?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "AirborneDelegate",
+                    "printedName": "any Airborne.AirborneDelegate",
+                    "usr": "c:@M@Airborne@objc(pl)AirborneDelegate"
+                  }
+                ],
+                "hasDefaultArg": true,
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "c:@M@Airborne@objc(cs)AirborneServices(im)initWithReleaseConfigURL:delegate:",
+            "mangledName": "$s8Airborne0A8ServicesC16releaseConfigURL8delegateACSS_AA0A8Delegate_pSgtcfc",
+            "moduleName": "Airborne",
+            "objc_name": "initWithReleaseConfigURL:delegate:",
+            "declAttributes": [
+              "AccessControl",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "getBaseBundle",
+            "printedName": "getBaseBundle()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Bundle",
+                "printedName": "Foundation.Bundle",
+                "usr": "c:objc(cs)NSBundle"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@M@Airborne@objc(cs)AirborneServices(im)getBaseBundle",
+            "mangledName": "$s8Airborne0A8ServicesC13getBaseBundleSo8NSBundleCyF",
+            "moduleName": "Airborne",
+            "objc_name": "getBaseBundle",
+            "declAttributes": [
+              "ObjC",
+              "AccessControl"
+            ],
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Constructor",
+            "name": "init",
+            "printedName": "init()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "AirborneServices",
+                "printedName": "Airborne.AirborneServices",
+                "usr": "c:@M@Airborne@objc(cs)AirborneServices"
+              }
+            ],
+            "declKind": "Constructor",
+            "usr": "c:@M@Airborne@objc(cs)AirborneServices(im)init",
+            "mangledName": "$s8Airborne0A8ServicesCACycfc",
+            "moduleName": "Airborne",
+            "overriding": true,
+            "implicit": true,
+            "objc_name": "init",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "Override"
+            ],
+            "init_kind": "Designated"
+          },
+          {
+            "kind": "Function",
+            "name": "getIndexBundlePath",
+            "printedName": "getIndexBundlePath()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "URL",
+                "printedName": "Foundation.URL",
+                "usr": "s:10Foundation3URLV"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)getIndexBundlePath",
+            "mangledName": "$s8Airborne0A8ServicesC18getIndexBundlePath10Foundation3URLVyF",
+            "moduleName": "Airborne",
+            "declAttributes": [
+              "Dynamic",
+              "AccessControl",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "getReleaseConfig",
+            "printedName": "getReleaseConfig()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)getReleaseConfig",
+            "mangledName": "$s8Airborne0A8ServicesC16getReleaseConfigSSyF",
+            "moduleName": "Airborne",
+            "declAttributes": [
+              "Dynamic",
+              "AccessControl",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "getFileContent",
+            "printedName": "getFileContent(atPath:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Optional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)getFileContentAtPath:",
+            "mangledName": "$s8Airborne0A8ServicesC14getFileContent6atPathSSSgSS_tF",
+            "moduleName": "Airborne",
+            "objc_name": "getFileContentAtPath:",
+            "declAttributes": [
+              "Dynamic",
+              "AccessControl",
+              "ObjC",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "getReleaseConfigURL",
+            "printedName": "getReleaseConfigURL()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "String",
+                "printedName": "Swift.String",
+                "usr": "s:SS"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)getReleaseConfigURL",
+            "mangledName": "$s8Airborne0A8ServicesC19getReleaseConfigURLSSyF",
+            "moduleName": "Airborne",
+            "objc_name": "getReleaseConfigURL",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "getReleaseConfigHeaders",
+            "printedName": "getReleaseConfigHeaders()",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Dictionary",
+                "printedName": "[Swift.String : Swift.String]",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  },
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:SD"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)getReleaseConfigHeaders",
+            "mangledName": "$s8Airborne0A8ServicesC23getReleaseConfigHeadersSDyS2SGyF",
+            "moduleName": "Airborne",
+            "objc_name": "getReleaseConfigHeaders",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "trackEvent",
+            "printedName": "trackEvent(withLevel:label:value:category:subcategory:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Any?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Any"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)trackEventWithLevel:label:value:category:subcategory:",
+            "mangledName": "$s8Airborne0A8ServicesC10trackEvent9withLevel5label5value8category11subcategoryySSSg_AJypSgA2JtF",
+            "moduleName": "Airborne",
+            "objc_name": "trackEventWithLevel:label:value:category:subcategory:",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          },
+          {
+            "kind": "Function",
+            "name": "trackEvent",
+            "printedName": "trackEvent(withLevel:label:key:value:category:subcategory:)",
+            "children": [
+              {
+                "kind": "TypeNominal",
+                "name": "Void",
+                "printedName": "()"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Any?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "ProtocolComposition",
+                    "printedName": "Any"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              },
+              {
+                "kind": "TypeNominal",
+                "name": "ImplicitlyUnwrappedOptional",
+                "printedName": "Swift.String?",
+                "children": [
+                  {
+                    "kind": "TypeNominal",
+                    "name": "String",
+                    "printedName": "Swift.String",
+                    "usr": "s:SS"
+                  }
+                ],
+                "usr": "s:Sq"
+              }
+            ],
+            "declKind": "Func",
+            "usr": "c:@CM@Airborne@objc(cs)AirborneServices(im)trackEventWithLevel:label:key:value:category:subcategory:",
+            "mangledName": "$s8Airborne0A8ServicesC10trackEvent9withLevel5label3key5value8category11subcategoryySSSg_A2KypSgA2KtF",
+            "moduleName": "Airborne",
+            "objc_name": "trackEventWithLevel:label:key:value:category:subcategory:",
+            "declAttributes": [
+              "Dynamic",
+              "ObjC",
+              "AccessControl",
+              "RawDocComment"
+            ],
+            "isFromExtension": true,
+            "funcSelfKind": "NonMutating"
+          }
+        ],
+        "declKind": "Class",
+        "usr": "c:@M@Airborne@objc(cs)AirborneServices",
+        "mangledName": "$s8Airborne0A8ServicesC",
+        "moduleName": "Airborne",
+        "declAttributes": [
+          "AccessControl",
+          "ObjC",
+          "RawDocComment"
+        ],
+        "superclassUsr": "c:objc(cs)NSObject",
+        "superclassNames": [
+          "ObjectiveC.NSObject"
+        ],
+        "conformances": [
+          {
+            "kind": "Conformance",
+            "name": "Copyable",
+            "printedName": "Copyable",
+            "usr": "s:s8CopyableP",
+            "mangledName": "$ss8CopyableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Escapable",
+            "printedName": "Escapable",
+            "usr": "s:s9EscapableP",
+            "mangledName": "$ss9EscapableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Equatable",
+            "printedName": "Equatable",
+            "usr": "s:SQ",
+            "mangledName": "$sSQ"
+          },
+          {
+            "kind": "Conformance",
+            "name": "Hashable",
+            "printedName": "Hashable",
+            "usr": "s:SH",
+            "mangledName": "$sSH"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CVarArg",
+            "printedName": "CVarArg",
+            "usr": "s:s7CVarArgP",
+            "mangledName": "$ss7CVarArgP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObservingPublishing",
+            "printedName": "_KeyValueCodingAndObservingPublishing",
+            "usr": "s:10Foundation37_KeyValueCodingAndObservingPublishingP",
+            "mangledName": "$s10Foundation37_KeyValueCodingAndObservingPublishingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "_KeyValueCodingAndObserving",
+            "printedName": "_KeyValueCodingAndObserving",
+            "usr": "s:10Foundation27_KeyValueCodingAndObservingP",
+            "mangledName": "$s10Foundation27_KeyValueCodingAndObservingP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomStringConvertible",
+            "printedName": "CustomStringConvertible",
+            "usr": "s:s23CustomStringConvertibleP",
+            "mangledName": "$ss23CustomStringConvertibleP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "CustomDebugStringConvertible",
+            "printedName": "CustomDebugStringConvertible",
+            "usr": "s:s28CustomDebugStringConvertibleP",
+            "mangledName": "$ss28CustomDebugStringConvertibleP"
+          }
+        ]
+      }
+    ],
+    "json_format_version": 8
+  },
+  "ConstValues": [
+    {
+      "filePath": "\/Users\/balaganesh\/Desktop\/JUSPAY\/HyperSDK_2.0\/devtools-ios\/airborne\/iOS\/hyper-ota\/Airborne\/Airborne.swift",
+      "kind": "StringLiteral",
+      "offset": 5321,
+      "length": 9,
+      "value": "\"default\""
+    },
+    {
+      "filePath": "\/Users\/balaganesh\/Desktop\/JUSPAY\/HyperSDK_2.0\/devtools-ios\/airborne\/iOS\/hyper-ota\/Airborne\/Airborne.swift",
+      "kind": "Dictionary",
+      "offset": 5428,
+      "length": 3,
+      "value": "[]"
+    }
+  ]
+}
