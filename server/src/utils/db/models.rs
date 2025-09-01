@@ -10,7 +10,7 @@ use crate::utils::db::schema::hyperotaserver::{
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct File {
     pub url: String,
-    #[serde(rename = "filePath")]
+    #[serde(alias = "filePath")]
     pub file_path: String,
 }
 

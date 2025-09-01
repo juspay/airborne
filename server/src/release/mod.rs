@@ -82,7 +82,7 @@ struct InnerPackage {
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct File {
     url: String,
-    #[serde(rename = "filePath")]
+    #[serde(alias = "filePath")]
     file_path: String,
 }
 
