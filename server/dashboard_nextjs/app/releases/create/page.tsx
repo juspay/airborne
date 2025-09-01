@@ -1,12 +1,505 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import SharedLayout from "@/components/shared-layout"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon } from "lucide-react"
+import { useAppContext } from "@/providers/app-context"
+import { apiFetch } from "@/lib/api"
 
-export default function LegacyCreateReleaseRedirect() {
-  const router = useRouter()
+type Pkg = { index: string; tag: string; version: number; files: string[] }
+type FileItem = { id: string; file_path: string; url: string; version: number; tag: string; size?: number }
+
+type TargetingRule = {
+  dimension: string
+  operator: "equals" | "not_equals" | "in" | "not_in"
+  values: string[]
+}
+
+export default function CreateReleasePage() {
+  const totalSteps = 3
+  const [currentStep, setCurrentStep] = useState(1)
+
+  const [releaseName, setReleaseName] = useState("")
+  const [version, setVersion] = useState("")
+  const [description, setDescription] = useState("")
+  const [propertiesJSON, setPropertiesJSON] = useState<string>("{}")
+
+  const [pkgSearch, setPkgSearch] = useState("")
+  const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(null)
+
+  const [files, setFiles] = useState<FileItem[]>([])
+  const [filePriority, setFilePriority] = useState<Record<string, "important" | "lazy">>({})
+  const [targetingRules, setTargetingRules] = useState<TargetingRule[]>([])
+  const [rolloutPercentage, setRolloutPercentage] = useState(100)
+  const [dimensions, setDimensions] = useState<{ dimension: string; values: string[] }[]>([])
+  const [packages, setPackages] = useState<Pkg[]>([])
+
+  const { token, org, app } = useAppContext()
+
+  // Load packages list
   useEffect(() => {
-    router.replace("/dashboard/releases/create")
-  }, [router])
-  return null
+    if (!token || !org || !app) return
+    apiFetch("/packages/list", { query: { offset: 0, limit: 100 } }, { token, org, app })
+      .then((res) => setPackages(res.packages || []))
+      .catch(() => setPackages([]))
+  }, [token, org, app])
+
+  // Load files list for step 2 (default all important)
+  useEffect(() => {
+    if (!token || !org || !app) return
+    apiFetch("/file/list", { query: { page: 1, per_page: 200 } }, { token, org, app })
+      .then((res) => {
+        const list: FileItem[] = res.files || []
+        setFiles(list)
+        const init: Record<string, "important" | "lazy"> = {}
+        list.forEach((f) => (init[f.id || `${f.file_path}@version:${f.version}`] = "important"))
+        setFilePriority(init)
+      })
+      .catch(() => {})
+  }, [token, org, app])
+
+  // Load dimensions options
+  useEffect(() => {
+    if (!token || !org || !app) return
+    apiFetch("/organisations/applications/dimension/list", {}, { token, org, app })
+      .then((res) => {
+        const data = (res.data || []) as any[]
+        const dims: any = data.map((d) => ({
+          dimension: d.dimension,
+          values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
+        }))
+        setDimensions(dims)
+      })
+      .catch(() => setDimensions([]))
+  }, [token, org, app])
+
+  const filteredPackages = useMemo(
+    () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
+    [packages, pkgSearch],
+  )
+
+  const importantFiles = Object.entries(filePriority)
+    .filter(([, v]) => v === "important")
+    .map(([k]) => k)
+  const lazyFiles = Object.entries(filePriority)
+    .filter(([, v]) => v === "lazy")
+    .map(([k]) => k)
+
+  const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: [] }])
+  const removeRule = (i: number) => setTargetingRules((r) => r.filter((_, idx) => idx !== i))
+  const updateRule = (i: number, patch: Partial<TargetingRule>) =>
+    setTargetingRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, ...patch } : rule)))
+
+  const canProceedToStep = (step: number) => {
+    switch (step) {
+      case 1:
+        return releaseName.trim().length > 0
+      case 2:
+        return true
+      case 3:
+        return true
+      default:
+        return false
+    }
+  }
+
+  const handleSubmit = async () => {
+    let properties: Record<string, any> = {}
+    try {
+      properties = propertiesJSON.trim() ? JSON.parse(propertiesJSON) : {}
+    } catch {
+      alert("Package properties must be valid JSON")
+      return
+    }
+
+    const dimensionsObj: Record<string, any> = {}
+    targetingRules.forEach((r) => {
+      if (!r.dimension || r.values.length === 0) return
+      // simplify: only "in" semantics
+      dimensionsObj[r.dimension] = r.values.length === 1 ? r.values[0] : r.values
+    })
+
+    const body: any = {
+      config: { traffic_percentage: rolloutPercentage },
+      package: { properties, important: importantFiles, lazy: lazyFiles },
+      dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
+      resources: [],
+    }
+    if (selectedPackage) {
+      body.package_id = `version:${selectedPackage.version}`
+    }
+    try {
+      await apiFetch("/releases", { method: "POST", body }, { token, org, app })
+      window.location.href = "/releases"
+    } catch (e: any) {
+      alert(e.message || "Failed to create release")
+    }
+  }
+
+  return (
+    <SharedLayout>
+      <div className="p-6">
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
+            Create Release
+          </h1>
+          <p className="text-muted-foreground mt-2">Step-by-step: package, files, targeting</p>
+
+          <div className="flex items-center gap-4 mt-6">
+            {[
+              { number: 1, title: "Package & Details", icon: PkgIcon },
+              { number: 2, title: "File Priorities", icon: Info },
+              { number: 3, title: "Targeting", icon: Target },
+            ].map((step, index) => {
+              const status =
+                step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming"
+              const Icon = step.icon
+              return (
+                <div key={step.number} className="flex items-center">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`
+                        flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
+                        ${status === "completed" ? "bg-primary border-primary text-primary-foreground" : status === "current" ? "border-primary text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground"}
+                      `}
+                    >
+                      {status === "completed" ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                    </div>
+                    <div className="hidden sm:block">
+                      <div
+                        className={`font-medium text-sm ${status !== "upcoming" ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        {step.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Step {step.number}</div>
+                    </div>
+                  </div>
+                  {index < 2 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-6 mt-6">
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Information</CardTitle>
+                  <CardDescription>Basic information about your release</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Release Name *</Label>
+                      <Input
+                        id="name"
+                        placeholder="Holiday Features"
+                        value={releaseName}
+                        onChange={(e) => setReleaseName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="version">Version (label)</Label>
+                      <Input
+                        id="version"
+                        placeholder="2.1.4"
+                        value={version}
+                        onChange={(e) => setVersion(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      rows={3}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package</CardTitle>
+                  <CardDescription>Choose an existing package to base this release on (optional)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search packages..."
+                        value={pkgSearch}
+                        onChange={(e) => setPkgSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead>Index</TableHead>
+                        <TableHead>Tag</TableHead>
+                        <TableHead>Version</TableHead>
+                        <TableHead>Files</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPackages.map((p) => {
+                        const key = `${p.tag}:${p.version}`
+                        const checked = selectedPackage
+                          ? `${selectedPackage.tag}:${selectedPackage.version}` === key
+                          : false
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={() => setSelectedPackage(checked ? null : p)}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{p.index}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{p.tag}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{p.version}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+
+                  <div className="mt-6 space-y-2">
+                    <Label>Package Properties (JSON)</Label>
+                    <Textarea
+                      rows={4}
+                      value={propertiesJSON}
+                      onChange={(e) => setPropertiesJSON(e.target.value)}
+                      placeholder='{"featureFlag": true}'
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
+                    Configure File Priorities
+                  </CardTitle>
+                  <CardDescription>Choose which files load immediately (important) vs on-demand (lazy)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <div className="text-sm">All files default to Important. Switch to Lazy to defer loading.</div>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>File</TableHead>
+                        <TableHead>Tag</TableHead>
+                        <TableHead>Version</TableHead>
+                        <TableHead>Priority</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {files.map((f) => {
+                        const id = f.id || `${f.file_path}@version:${f.version}`
+                        return (
+                          <TableRow key={id}>
+                            <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                            <TableCell className="text-muted-foreground">{f.tag}</TableCell>
+                            <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={filePriority[id] || "important"}
+                                onValueChange={(val: "important" | "lazy") =>
+                                  setFilePriority((prev) => ({ ...prev, [id]: val }))
+                                }
+                              >
+                                <SelectTrigger className="w-36">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="important">Important</SelectItem>
+                                  <SelectItem value="lazy">Lazy</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
+                  <CardDescription>Control which users receive this release based on dimensions</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="rollout">Rollout Percentage</Label>
+                      <span className="text-sm font-medium">{rolloutPercentage}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      id="rollout"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={rolloutPercentage}
+                      onChange={(e) => setRolloutPercentage(Number(e.target.value))}
+                      className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">Targeting Rules</h4>
+                        <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
+                      </div>
+                      <Button variant="outline" onClick={() => addRule()}>
+                        Add Rule
+                      </Button>
+                    </div>
+
+                    {targetingRules.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Target className="mx-auto h-8 w-8 mb-2" />
+                        <p className="text-sm">No targeting rules set - release will go to all users</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {targetingRules.map((rule, idx) => {
+                          const dimDef = dimensions.find((d) => d.dimension === rule.dimension)
+                          return (
+                            <Card key={idx} className="p-4">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Dimension</Label>
+                                  <Select
+                                    value={rule.dimension}
+                                    onValueChange={(v) => updateRule(idx, { dimension: v, values: [] })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select dimension" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {dimensions.map((d) => (
+                                        <SelectItem key={d.dimension} value={d.dimension}>
+                                          {d.dimension}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Operator</Label>
+                                  <Select
+                                    value={rule.operator}
+                                    onValueChange={(v: any) => updateRule(idx, { operator: v })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="equals">Equals</SelectItem>
+                                      <SelectItem value="not_equals">Not Equals</SelectItem>
+                                      <SelectItem value="in">In</SelectItem>
+                                      <SelectItem value="not_in">Not In</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Value</Label>
+                                  <Select
+                                    value={rule.values[0] || ""}
+                                    onValueChange={(v) => updateRule(idx, { values: [v] })}
+                                    disabled={!dimDef}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select value" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {(dimDef?.values || []).map((val) => (
+                                        <SelectItem key={val} value={String(val)}>
+                                          {String(val)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="flex items-end">
+                                  <Button variant="outline" onClick={() => removeRule(idx)}>
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mt-8 pt-6 border-t">
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <a href="/releases">Cancel</a>
+            </Button>
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
+                Previous
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {currentStep < totalSteps ? (
+              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
+                Next Step
+              </Button>
+            ) : (
+              <Button onClick={handleSubmit} disabled={!canProceedToStep(1)}>
+                Create Release
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </SharedLayout>
+  )
 }

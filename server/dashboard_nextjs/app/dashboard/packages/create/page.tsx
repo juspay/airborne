@@ -14,6 +14,7 @@ import { Search, ArrowLeft, FileText, Rocket } from "lucide-react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
+import { useRouter } from "next/navigation"
 
 type ApiFile = { id?: string; file_path: string; url: string; version: number; tag?: string; size?: number }
 
@@ -26,18 +27,21 @@ export default function CreatePackagePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const router = useRouter()
 
-  const { data, error, isLoading } = useSWR<ApiFile[]>(
+  const { data, error, mutate, isLoading } = useSWR(
     token && org && app ? ["/file/list", searchQuery] : null,
     async () =>
       apiFetch(
         "/file/list",
-        { method: "GET", query: { search: searchQuery || undefined, page: 1, per_page: 200 } },
+        { method: "GET", query: { search: searchQuery || undefined, page: 1, per_page: 50 } },
         { token, org, app },
-      ).then((res) => res.files || []),
+      ),
   )
 
-  const files = data || []
+  console.log("File List:", data)
+
+  const files: ApiFile[] = data?.files || []
 
   const toggle = (f: ApiFile) => {
     const key = f.id || `${f.file_path}@${f.version}`
@@ -46,7 +50,7 @@ export default function CreatePackagePage() {
 
   const selectedList = useMemo(() => {
     return files.filter((f) => {
-      const key = f.id || `${f.file_path}@${f.version}`
+      const key = f.id || `${f.file_path}@version:${f.version}`
       return selected[key]
     })
   }, [files, selected])
@@ -69,7 +73,7 @@ export default function CreatePackagePage() {
         },
         { token, org, app },
       )
-      window.location.href = "/dashboard/packages"
+      router.push("/dashboard/packages")
     } catch (e: any) {
       alert(e.message || "Failed to create package")
     } finally {
@@ -102,10 +106,10 @@ export default function CreatePackagePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Package Name *</Label>
+                <Label htmlFor="name">Package Index *</Label>
                 <Input
                   id="name"
-                  placeholder="e.g., core-ui-components"
+                  placeholder="e.g., /dist/bundle.js@tag:latest"
                   value={packageName}
                   onChange={(e) => setPackageName(e.target.value)}
                 />

@@ -2,10 +2,12 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { set } from "react-hook-form";
 
 type User = { name: string; user_id?: string } | null
 
 type AppContextType = {
+  loading: boolean
   token: string | null
   setToken: (t: string | null) => void
   org: string | null
@@ -30,6 +32,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [org, setOrgState] = useState<string | null>(null)
   const [app, setAppState] = useState<string | null>(null)
   const [user, setUserState] = useState<User>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setTokenState(localStorage.getItem(LS_TOKEN))
@@ -37,6 +40,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppState(localStorage.getItem(LS_APP))
     const u = localStorage.getItem(LS_USER)
     if (u) setUserState(JSON.parse(u))
+    
+    setLoading(false)
   }, [])
 
   const setToken = (t: string | null) => {
@@ -71,6 +76,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
+      loading,
       token,
       setToken,
       org,
@@ -82,7 +88,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logout,
       signOut: logout, // add alias for compatibility
     }),
-    [token, org, app, user],
+    [token, org, app, user, loading],
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

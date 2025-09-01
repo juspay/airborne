@@ -13,10 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function DashboardHome() {
   const router = useRouter()
-  const { org, app, setOrg, setApp, token } = useAppContext()
+  const { org, app, setOrg, setApp, token, logout } = useAppContext()
 
   const { data: orgs, mutate: refreshOrgs } = useSWR(token ? "/organisations" : null, (url) =>
-    apiFetch(url, {}, { token }),
+    apiFetch(url, {}, { token, logout }),
   )
   const orgList: { name: string; applications: { application: string }[] }[] = orgs || []
   const apps = useMemo(
@@ -45,7 +45,7 @@ export default function DashboardHome() {
   }, [orgList, org, apps, router])
 
   const onCreateOrg = async () => {
-    await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token })
+    await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token, logout })
     setOrgName("")
     await refreshOrgs()
   }
@@ -54,7 +54,7 @@ export default function DashboardHome() {
     await apiFetch(
       "/organisations/applications/create",
       { method: "POST", body: { application: appName } },
-      { token, org },
+      { token, org, logout },
     )
     setAppName("")
     await refreshOrgs()

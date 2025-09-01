@@ -13,7 +13,7 @@ type FetchOptions = {
 export async function apiFetch(
   path: string,
   opts: FetchOptions = {},
-  ctx?: { token?: string | null; org?: string | null; app?: string | null },
+  ctx?: { token?: string | null; org?: string | null; app?: string | null; logout?: () => void },
 ) {
   const url = new URL(
     (API_BASE || "") + path,
@@ -45,9 +45,11 @@ export async function apiFetch(
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   })
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(text || `HTTP ${res.status}`)
+  if (res.status === 401) {
+    // Handle unauthorized access
+    console.error("Unauthorized access - redirecting to login", ctx?.logout)
+    window.location.href = "/login"
+    if (ctx?.logout) ctx.logout()
   }
   const ct = res.headers.get("content-type")
   if (ct && ct.includes("application/json")) return res.json()

@@ -51,7 +51,6 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
     { href: "/dashboard/views", icon: Eye, label: "Views" },
     { href: "/dashboard/dimensions", icon: Sliders, label: "Dimensions" },
     { href: "/dashboard/organisation/users", icon: Users, label: "Users" },
-    { href: "/dashboard/applications", icon: Globe, label: "Applications" },
   ]
 
   const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href))
