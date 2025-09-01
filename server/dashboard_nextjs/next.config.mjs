@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
+const backend = (process.env.BACKEND_URL ?? "http://localhost:8081").replace(/\/$/, "");
+
 const nextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: "/:api(releases|files|organisations|applications|users|packages)/:path*",
+        destination: `${backend}/:api/:path*`,
+      },
+    ];
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -9,6 +19,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;

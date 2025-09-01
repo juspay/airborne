@@ -1,4 +1,4 @@
-import { useAppContext } from "@/providers/app-context"
+import { LS_TOKEN, useAppContext } from "@/providers/app-context"
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || ""
 
@@ -40,20 +40,29 @@ export async function apiFetch(
   if (org) headers["x-organisation"] = org
   if (app) headers["x-application"] = app
 
-  const res = await fetch(url.href, {
-    method: opts.method || "GET",
-    headers,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  })
-  if (res.status === 401) {
-    // Handle unauthorized access
-    console.error("Unauthorized access - redirecting to login", ctx?.logout)
-    window.location.href = "/login"
-    if (ctx?.logout) ctx.logout()
+  try{
+    const res = await fetch(path, {
+      method: opts.method || "GET",
+      headers,
+      credentials: "include",
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    })
+    if (res.status === 401 || res.status === 403) {
+      // Handle unauthorized access
+      console.error("Unauthorized access - redirecting to login", ctx?.logout)
+      localStorage.clear()
+      if (ctx?.logout) ctx.logout()
+      window.location.href = "/login"
+    }
+
+    const ct = res.headers.get("content-type")
+    if (ct && ct.includes("application/json")) return res.json()
+    return res.text()
+  }catch(err){
+    
   }
-  const ct = res.headers.get("content-type")
-  if (ct && ct.includes("application/json")) return res.json()
-  return res.text()
+  
+  return ""
 }
 
 // Convenience hooks
