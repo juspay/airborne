@@ -40,7 +40,7 @@ export async function apiFetch(
   if (org) headers["x-organisation"] = org
   if (app) headers["x-application"] = app
 
-  const res = await fetch(url.toString().replace(/^http:\/\/localhost/, ""), {
+  const res = await fetch(url.href, {
     method: opts.method || "GET",
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined,

@@ -12,6 +12,7 @@ import { Rocket, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
+import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const [name, setName] = useState("") // API expects "name"
@@ -20,10 +21,12 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const { setToken, setUser, setOrg: setOrganisation, setApp: setApplication, token } = useAppContext()
+  const router = useRouter()
 
   useEffect(() => {
-    if (token) window.location.replace("/dashboard")
-  }, [token])
+    console.log("Login Page Token:", token)
+    if (token) router.replace("/dashboard")
+  }, [token, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

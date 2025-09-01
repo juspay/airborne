@@ -10,6 +10,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
+    console.log("Dashboard Page Token:", token)
     if (!token) router.replace("/login")
   }, [token, router])
 
