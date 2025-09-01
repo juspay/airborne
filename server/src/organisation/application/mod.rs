@@ -64,7 +64,7 @@ struct ApplicationCreateRequest {
     application: String,
 }
 
-fn default_config<T: Clone>(
+pub fn default_config<T: Clone>(
     superposition_client: Client,
     workspace_name: String,
     superposition_org: String,

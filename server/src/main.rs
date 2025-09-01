@@ -37,7 +37,7 @@ use middleware::auth::Auth;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::home::index;
+use crate::{home::index, utils::migrations::{migrate_superposition, migrate_keycloak}};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -182,6 +182,22 @@ async fn main() -> std::io::Result<()> {
     let app_state_data = web::Data::from(app_state.clone());
     let _cleanup_handle = start_cleanup_job(app_state_data.clone());
     println!("Started transaction cleanup background job");
+
+    let keycloak_migration = migrate_keycloak(app_state_data.clone()).await;
+    let superposition_migration = 
+        migrate_superposition(app_state_data.clone(),
+            utils::migrations::SuperpositionMigrationStrategy::PATCH
+        ).await;
+    if keycloak_migration.is_err() {
+        panic!("Keycloak migration failed: {:?}", keycloak_migration.err());
+    } else {
+        println!("Keycloak migration completed successfully");
+    }
+    if superposition_migration.is_err() {
+        panic!("Superposition migration failed: {:?}", superposition_migration.err());
+    } else {
+        println!("Superposition migration completed successfully");
+    }
 
     HttpServer::new(move || {
         App::new()
