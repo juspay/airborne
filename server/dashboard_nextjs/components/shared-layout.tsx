@@ -85,7 +85,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   const isActive = useIsActive(navigationItems);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background h-full">
       <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="flex h-16 items-center px-6">
           <div className="flex items-center gap-4">
@@ -198,7 +198,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
       </header>
 
       <div className="flex">
-        <aside className="w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50">
+        <aside className="min-h-screen w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50">
           <nav className="p-4 space-y-2">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Application</div>
             {navigationItems.map((item) => {
