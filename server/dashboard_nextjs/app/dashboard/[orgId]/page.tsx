@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react"
 import useSWR, { mutate } from "swr"
-import SharedLayout from "@/components/shared-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,6 +19,7 @@ import { Rocket, Search, Plus } from "lucide-react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
+import { OrganisationsList } from "../page"
 
 type OrgResp = { name: string; applications: { application: string; organisation: string }[] }
 
@@ -29,14 +29,15 @@ export default function ApplicationsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [formData, setFormData] = useState({ name: "", description: "" })
 
-  const { data, isLoading, error } = useSWR<OrgResp[]>(token ? "/organisations" : null, (url) =>
-    apiFetch<any>(url, {}, { token, logout }),
+  const { data, isLoading, error } = useSWR<OrganisationsList>(token ? "/organisations" : null, (url) =>
+    apiFetch<OrganisationsList>(url, {}, { token, logout }),
   )
 
   const apps = useMemo(
-    () => data?.find((o) => o.name === org)?.applications?.map((a) => a.application) || [],
+    () => data?.organisations.find((o) => o.name === org)?.applications?.map((a) => a.application) || [],
     [data, org],
   )
+
   const filtered = apps.filter((a) => a.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const handleCreate = async () => {
@@ -51,7 +52,6 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -150,6 +150,5 @@ export default function ApplicationsPage() {
           </div>
         )}
       </div>
-    </SharedLayout>
   )
 }

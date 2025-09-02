@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import useSWR from "swr"
-import SharedLayout from "@/components/shared-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -54,7 +53,6 @@ export default function ReleasesPage() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -158,6 +156,5 @@ export default function ReleasesPage() {
           </CardContent>
         </Card>
       </div>
-    </SharedLayout>
   )
 }
