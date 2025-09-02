@@ -187,7 +187,6 @@ export default function OrganizationDashboard() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
@@ -522,6 +521,5 @@ export default function OrganizationDashboard() {
           </DialogContent>
         </Dialog>
       </div>
-    </SharedLayout>
   )
 }

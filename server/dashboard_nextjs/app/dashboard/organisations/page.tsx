@@ -3,12 +3,13 @@ import useSWR, { mutate } from "swr"
 import SharedLayout from "@/components/shared-layout"
 import { apiFetch } from "@/lib/api"
 import { useApp } from "@/providers/app-context"
+import { OrganisationsList } from "../page"
 
 type ApplicationRef = { application: string; organisation: string; access: string[] }
 type Organisation = { name: string; applications: ApplicationRef[]; access: string[] }
 
 export default function OrganisationsPage() {
-  const { data, error, isLoading } = useSWR<Organisation[]>("/organisations", (url) => apiFetch(url))
+ const { data, error, isLoading } = useSWR<OrganisationsList>("/organisations", (url) => apiFetch(url))
   const { setOrg, setApp, org } = useApp()
 
   const handleDelete = async (name: string) => {
@@ -25,7 +26,7 @@ export default function OrganisationsPage() {
         <div>Error loading organisations</div>
       ) : (
         <div className="space-y-4">
-          {data?.map((org) => (
+          {data?.organisations.map((org) => (
             <div key={org.name} className="border rounded p-4 flex items-center justify-between">
               <div>
                 <div className="font-medium">{org.name}</div>

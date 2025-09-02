@@ -10,6 +10,14 @@ const nextConfig = {
     }
     return [
       {
+        source: "/analytics/:path*",
+        destination: `https://airborne.juspay.in/analytics/:path*`,
+      },
+      {
+        source: "/api/dashboard/configuration",
+        destination: `${backend}/api/dashboard/configuration/`,
+      },
+      {
         source: "/api/:api(releases|file|organisations|applications|users|packages)/:path*",
         destination: `${backend}/api/:api/:path*`,
       },

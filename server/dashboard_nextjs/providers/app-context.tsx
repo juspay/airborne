@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api";
 import type React from "react"
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
@@ -17,6 +18,18 @@ type AppContextType = {
   setUser: (u: User) => void
   logout: () => void
   signOut: () => void // add alias for compatibility
+  config: Configuration | null
+}
+
+interface Configuration {
+  google_signin_enabled: boolean;
+  organisation_creation_disabled: boolean;
+  config: Configuration | null
+}
+
+interface Configuration {
+  google_signin_enabled: boolean;
+  organisation_creation_disabled: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -32,6 +45,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [app, setAppState] = useState<string | null>(null)
   const [user, setUserState] = useState<User>(null)
   const [loading, setLoading] = useState(true)
+  const [config, setConfig] = useState<Configuration | null>(null)
+
+
+  const fetchConfig = async () => {
+    const res: Configuration = await apiFetch("/dashboard/configuration");
+    setConfig(res);
+  }
 
   useEffect(() => {
     setTokenState(localStorage.getItem(LS_TOKEN))
@@ -39,7 +59,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppState(localStorage.getItem(LS_APP))
     const u = localStorage.getItem(LS_USER)
     if (u) setUserState(JSON.parse(u))
-    
+    fetchConfig()
+    fetchConfig()
     setLoading(false)
   }, [])
 
@@ -86,8 +107,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setUser,
       logout,
       signOut: logout, // add alias for compatibility
+      config,
+      config,
     }),
-    [token, org, app, user, loading],
+    [token, org, app, user, loading, config],
+    [token, org, app, user, loading, config],
   )
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

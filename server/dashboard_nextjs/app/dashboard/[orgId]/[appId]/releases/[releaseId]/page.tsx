@@ -33,13 +33,13 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import SharedLayout from "@/components/shared-layout"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 import json from "highlight.js/lib/languages/json"
 import hljs from 'highlight.js'
 import { toastWarning } from "@/hooks/use-toast"
 import "highlight.js/styles/vs2015.css"
+import Analytics from "@/components/analytics/Analytics"
 
 hljs.registerLanguage("json", json)
 
@@ -245,7 +245,6 @@ export default function ReleaseDetailPage() {
   ).value;
 
   return (
-    <SharedLayout>
       <div className="min-h-screen bg-background">
         <div className="flex">
           {/* Main Content */}
@@ -602,7 +601,7 @@ export default function ReleaseDetailPage() {
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>
                     <CardHeader>
                       <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Performance Metrics</CardTitle>
@@ -663,12 +662,12 @@ export default function ReleaseDetailPage() {
                       </div>
                     </CardContent>
                   </Card>
-                </div>
+                </div> */}
+                <Analytics releaseId={releaseId} />
               </TabsContent>
             </Tabs>
           </main>
         </div>
       </div>
-    </SharedLayout>
   )
 }

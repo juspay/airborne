@@ -58,7 +58,6 @@ export default function FilesPage() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -168,6 +167,5 @@ export default function FilesPage() {
 
         <FileCreationModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} onCreated={() => mutate()} />
       </div>
-    </SharedLayout>
   )
 }
