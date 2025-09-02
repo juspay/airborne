@@ -10,7 +10,7 @@ type FetchOptions = {
   query?: Record<string, string | number | undefined>
 }
 
-export async function apiFetch(
+export async function apiFetch<T>(
   path: string,
   opts: FetchOptions = {},
   ctx?: { token?: string | null; org?: string | null; app?: string | null; logout?: () => void },
@@ -59,7 +59,7 @@ export async function apiFetch(
     if (ct && ct.includes("application/json")) return res.json()
     return res.text()
   }catch(err){
-    
+    console.log(err)
   }
   
   return ""
