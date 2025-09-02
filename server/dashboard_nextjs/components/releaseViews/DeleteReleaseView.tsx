@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Trash } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { View } from "@/app/dashboard/views/page";
+import { View } from "@/app/dashboard/[orgId]/[appId]/views/page";
 
 interface DeleteReleaseViewProps {
   view: View;
