@@ -38,6 +38,7 @@ import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 import json from "highlight.js/lib/languages/json"
 import hljs from 'highlight.js'
+import { toastWarning } from "@/hooks/use-toast"
 import "highlight.js/styles/vs2015.css"
 
 hljs.registerLanguage("json", json)
@@ -121,7 +122,7 @@ export default function ReleaseDetailPage() {
   const { data, error, isLoading, mutate } = useSWR(
     canFetch ? ["/releases", releaseId, token, orgId, appId] : null,
     ([, id, t, o, a]) =>
-      apiFetch(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
+      apiFetch<any>(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
   );
 
   const [isRamping, setIsRamping] = useState(false)
@@ -190,7 +191,7 @@ export default function ReleaseDetailPage() {
     if (!input) return
 
     if(Number(input) > 50) {
-      alert("Traffic percentage cannot exceed 50%")
+      toastWarning("Invalid Traffic Percentage", "Traffic percentage cannot exceed 50%")
       return
     }
 
