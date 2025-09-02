@@ -73,7 +73,7 @@ export default function CreatePackagePage() {
         },
         { token, org, app },
       )
-      router.push("/dashboard/packages")
+      router.push(`/dashboard/${org}/${app}/packages`)
     } catch (e: any) {
       alert(e.message || "Failed to create package")
     } finally {

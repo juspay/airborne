@@ -46,7 +46,7 @@ export default function PackagesPage() {
             <p className="text-muted-foreground mt-2">Bundle files together with properties and metadata</p>
           </div>
           <Button asChild className="gap-2">
-            <Link href="/packages/create">
+            <Link href={`/dashboard/${org}/${app}/packages/create`}>
               <Plus className="h-4 w-4" />
               Create Package
             </Link>
