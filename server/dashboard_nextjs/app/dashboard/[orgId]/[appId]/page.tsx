@@ -147,7 +147,7 @@ export default function ApplicationDetailPage() {
   }
 
   return (
-    <SharedLayout>
+
     <div className="min-h-screen bg-background">
       <div className="flex">
         {/* Main Content */}
@@ -527,6 +527,6 @@ export default function ApplicationDetailPage() {
         </main>
       </div>
     </div>
-    </SharedLayout>
+
   )
 }

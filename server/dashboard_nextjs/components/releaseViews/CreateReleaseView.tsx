@@ -10,13 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash } from "lucide-react";
-import { Dimension } from "@/app/dashboard/dimensions/page";
+import { Dimension } from "@/app/dashboard/[orgId]/[appId]/dimensions/page";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { View } from "@/app/dashboard/views/page";
+import { View } from "@/app/dashboard/[orgId]/[appId]/views/page";
 
 interface DimensionEntry {
   key: string;

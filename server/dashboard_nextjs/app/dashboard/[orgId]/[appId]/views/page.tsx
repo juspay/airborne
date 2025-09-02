@@ -153,7 +153,6 @@ export default function ViewsPage() {
     };
   }, [loadMore, hasMore, isLoadingMore, viewsList.length]);
 
-
   const onViewCreated = (view: View) => {
     setViewsList((prev) => [...prev, view]);
     setTotalItems((prev) => prev + 1);
@@ -204,68 +203,79 @@ export default function ViewsPage() {
                 <div className="flex-1 overflow-y-auto">
                   <div className="space-y-4">
                     {viewsList.map((view) => {
-  const isOpen = selectedView?.id === view.id;
+                      const isOpen = selectedView?.id === view.id;
 
-  return (
-    <Card
-      key={view.id}
-      className="cursor-pointer transition-colors hover:bg-muted/70 p-2 space-y-0"
-      onClick={() =>
-        setSelectedView(isOpen ? null : view) // toggle accordion
-      }
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-2 px-3">
-        <CardTitle className="text-sm font-medium">{view.name}</CardTitle>
-        <div
-          className="flex items-center gap-1"
-          onClick={(e) => e.stopPropagation()} // prevent toggle when clicking actions
-        >
-          <EditReleaseView
-            view={view}
-            onViewUpdated={(updatedView: View) => {
-              setViewsList((prev) =>
-                prev.map((v) => (v.id === updatedView.id ? updatedView : v))
-              );
-            }}
-          />
-          <DeleteReleaseView
-            view={view}
-            onViewDeleted={(viewId: string) => {
-              setViewsList((prev) => prev.filter((v) => v.id !== viewId));
-              setTotalItems((prev) => prev - 1);
-              if (selectedView?.id === viewId) setSelectedView(null);
-            }}
-          />
-        </div>
-      </CardHeader>
+                      return (
+                        <Card
+                          key={view.id}
+                          className="cursor-pointer transition-colors hover:bg-muted/70 p-2 space-y-0"
+                          onClick={
+                            () => setSelectedView(view) 
+                          }
+                        >
+                          <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-2 px-3">
+                            <CardTitle className="text-sm font-medium">
+                              {view.name}
+                            </CardTitle>
+                            <div
+                              className="flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()} // prevent toggle when clicking actions
+                            >
+                              <EditReleaseView
+                                view={view}
+                                onViewUpdated={(updatedView: View) => {
+                                  setViewsList((prev) =>
+                                    prev.map((v) =>
+                                      v.id === updatedView.id ? updatedView : v
+                                    )
+                                  );
+                                }}
+                              />
+                              <DeleteReleaseView
+                                view={view}
+                                onViewDeleted={(viewId: string) => {
+                                  setViewsList((prev) =>
+                                    prev.filter((v) => v.id !== viewId)
+                                  );
+                                  setTotalItems((prev) => prev - 1);
+                                  if (selectedView?.id === viewId)
+                                    setSelectedView(null);
+                                }}
+                              />
+                            </div>
+                          </CardHeader>
 
-      {/* Show dimensions as badges when collapsed */}
-      {view.dimensions?.length > 0  && (
-        <CardContent className="pb-2 pt-0 px-3">
-          <div className="flex flex-wrap gap-1.5">
-            {view.dimensions.map((item: any, index: number) => (
-              <Badge
-                key={`${item.key}-${index}`}
-                variant="secondary"
-                className="px-2 py-0.5 text-xs"
-              >
-                <span className="font-medium">{item.key}:</span>
-                <span className="ml-1">{item.value}</span>
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      )}
+                          {/* Show dimensions as badges when collapsed */}
+                          {view.dimensions?.length > 0 && (
+                            <CardContent className="pb-2 pt-0 px-3">
+                              <div className="flex flex-wrap gap-1.5">
+                                {view.dimensions.map(
+                                  (item: any, index: number) => (
+                                    <Badge
+                                      key={`${item.key}-${index}`}
+                                      variant="secondary"
+                                      className="px-2 py-0.5 text-xs"
+                                    >
+                                      <span className="font-medium">
+                                        {item.key}:
+                                      </span>
+                                      <span className="ml-1">{item.value}</span>
+                                    </Badge>
+                                  )
+                                )}
+                              </div>
+                            </CardContent>
+                          )}
 
-      {/* Accordion expanded section */}
-      {isOpen && (
-        <CardContent className="pb-2 pt-0 px-3">
-          <ViewReleaseInfo view={view} />
-        </CardContent>
-      )}
-    </Card>
-  );
-})}
+                          
+                          {isOpen && (
+                            <CardContent className="pb-2 pt-0 px-3">
+                              <ViewReleaseInfo view={view} />
+                            </CardContent>
+                          )}
+                        </Card>
+                      );
+                    })}
                   </div>
 
                   <div

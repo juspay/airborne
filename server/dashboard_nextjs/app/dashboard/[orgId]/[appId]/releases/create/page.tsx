@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import SharedLayout from "@/components/shared-layout"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,8 +25,8 @@ type ResourceFile = { id: string; file_path: string; size?: number; created_at?:
 
 type TargetingRule = {
   dimension: string
-  operator: "equals" | "not_equals" | "in" | "not_in"
-  values: string[]
+  operator: "equals" 
+  values: string
 }
 
 export default function CreateReleasePage() {
@@ -136,7 +136,7 @@ export default function CreateReleasePage() {
     .filter(([, v]) => v === "lazy")
     .map(([k]) => k)
 
-  const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: [] }])
+  const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: "" }])
   const removeRule = (i: number) => setTargetingRules((r) => r.filter((_, idx) => idx !== i))
   const updateRule = (i: number, patch: Partial<TargetingRule>) =>
     setTargetingRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, ...patch } : rule)))
@@ -205,7 +205,7 @@ export default function CreateReleasePage() {
   }
 
   return (
-    <SharedLayout>
+
       <div className="p-6">
         <div className="flex-1">
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
@@ -579,7 +579,7 @@ export default function CreateReleasePage() {
                                   <Label>Dimension</Label>
                                   <Select
                                     value={rule.dimension}
-                                    onValueChange={(v) => updateRule(idx, { dimension: v, values: [] })}
+                                    onValueChange={(v) => updateRule(idx, { dimension: v, values: "" })}
                                   >
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select dimension" />
@@ -612,22 +612,10 @@ export default function CreateReleasePage() {
                                 </div>
                                 <div className="space-y-2">
                                   <Label>Value</Label>
-                                  <Select
-                                    value={rule.values[0] || ""}
-                                    onValueChange={(v) => updateRule(idx, { values: [v] })}
-                                    disabled={!dimDef}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select value" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {(dimDef?.values || []).map((val) => (
-                                        <SelectItem key={val} value={String(val)}>
-                                          {String(val)}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  <Input
+                                  value={rule.values || ""}
+                                  onChange={(e) => updateRule(idx, { values: e.target.value })}
+                                  />
                                 </div>
                                 <div className="flex items-end">
                                   <Button variant="outline" onClick={() => removeRule(idx)}>
@@ -671,6 +659,6 @@ export default function CreateReleasePage() {
           </div>
         </div>
       </div>
-    </SharedLayout>
+
   )
 }
