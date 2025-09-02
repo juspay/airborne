@@ -147,7 +147,7 @@ export default function CreateReleasePage() {
     }
     try {
       await apiFetch("/releases", { method: "POST", body }, { token, org, app })
-      router.push("/dashboard/releases")
+      router.push(`/dashboard/${org}/${app}/releases`)
     } catch (e: any) {
       alert(e.message || "Failed to create release")
     }
@@ -450,7 +450,7 @@ export default function CreateReleasePage() {
         <div className="flex items-center justify-between mt-8 pt-6 border-t">
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href="/dashboard/releases">Cancel</Link>
+              <Link href={`/dashboard/${org}/${app}/releases`}>Cancel</Link>
             </Button>
             {currentStep > 1 && (
               <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>

@@ -59,7 +59,7 @@ export default function ReleasesPage() {
             <p className="text-muted-foreground mt-2">Deploy packages to your users with controlled rollouts</p>
           </div>
           <Button asChild className="gap-2">
-            <Link href="/dashboard/releases/create">
+            <Link href={`/dashboard/${org}/${app}/releases/create`}>
               <Plus className="h-4 w-4" />
               New Release
             </Link>
@@ -119,7 +119,7 @@ export default function ReleasesPage() {
                   .map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-sm">
-                        <Link href={`/dashboard/releases/${encodeURIComponent(r.id)}`} className="hover:text-primary">
+                        <Link href={`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`} className="hover:text-primary">
                           {r.id}
                         </Link>
                       </TableCell>
@@ -138,7 +138,7 @@ export default function ReleasesPage() {
                           Conclude
                         </Button>
                         <Button asChild size="sm" variant="ghost">
-                          <Link href={`/dashboard/releases/${encodeURIComponent(r.id)}`}>
+                          <Link href={`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Link>
                         </Button>
