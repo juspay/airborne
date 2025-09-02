@@ -19,7 +19,6 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Airborne Dashboard",
   description: "OTA delivery platform for developers",
-  generator: "v0.app",
 }
 
 export default function RootLayout({

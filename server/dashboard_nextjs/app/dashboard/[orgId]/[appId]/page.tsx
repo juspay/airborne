@@ -30,20 +30,19 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import SharedLayout from "@/components/shared-layout"
 
 export default function ApplicationDetailPage() {
   const params = useParams()
-  const appId = params.id as string
+  const appId = params.appId as string
 
-  const [selectedOrg, setSelectedOrg] = useState("Acme Corp")
-  const [searchQuery, setSearchQuery] = useState("")
+  const org = params.orgId as string
 
-  // Mock application data
   const application = {
     id: appId,
-    name: "Mobile Banking App",
-    description: "Core banking application for iOS and Android",
-    platform: "React Native",
+    name: appId,
+    description: "",
+    platform: "",
     status: "active",
     createdAt: "2024-01-15",
     lastDeployment: "2024-01-28",
@@ -52,7 +51,6 @@ export default function ApplicationDetailPage() {
     teamMembers: 8,
   }
 
-  // Mock releases data
   const releases = [
     {
       id: "1",
@@ -149,120 +147,15 @@ export default function ApplicationDetailPage() {
   }
 
   return (
+    <SharedLayout>
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="flex h-16 items-center px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <Rocket className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-lg font-[family-name:var(--font-space-grotesk)]">Airborne</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Button variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-                {selectedOrg} <ChevronDown className="ml-1 h-3 w-3" />
-              </Button>
-              <span className="text-muted-foreground">›</span>
-              <Button variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-                {application.name} <ChevronDown className="ml-1 h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex-1 max-w-md mx-8">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search releases, files..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="text-xs">
-              ADMIN
-            </Badge>
-            <Button variant="ghost" size="sm">
-              <Bell className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
       <div className="flex">
-        {/* Sidebar */}
-        <aside className="w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50">
-          <nav className="p-4 space-y-2">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Application</div>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 bg-sidebar-accent text-sidebar-accent-foreground"
-            >
-              <Activity className="h-4 w-4" />
-              Overview
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              asChild
-            >
-              <Link href={`/applications/${appId}/files`}>
-                <Package className="h-4 w-4" />
-                Files
-              </Link>
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              asChild
-            >
-              <Link href={`/applications/${appId}/packages`}>
-                <Package className="h-4 w-4" />
-                Packages
-              </Link>
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              asChild
-            >
-              <Link href={`/applications/${appId}/releases`}>
-                <Rocket className="h-4 w-4" />
-                Releases
-              </Link>
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Target className="h-4 w-4" />
-              Analytics
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </Button>
-          </nav>
-        </aside>
-
         {/* Main Content */}
         <main className="flex-1 p-6">
           {/* Page Header */}
           <div className="flex items-center gap-4 mb-8">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/applications">
+              <Link href={"/dashboard/" + org}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
@@ -281,7 +174,7 @@ export default function ApplicationDetailPage() {
                 Settings
               </Button>
               <Button asChild>
-                <Link href={`/applications/${appId}/releases/create`}>
+                <Link href={`/dashboard/${org}/${appId}/releases/create`}>
                   <Rocket className="h-4 w-4 mr-2" />
                   Create Release
                 </Link>
@@ -634,5 +527,6 @@ export default function ApplicationDetailPage() {
         </main>
       </div>
     </div>
+    </SharedLayout>
   )
 }

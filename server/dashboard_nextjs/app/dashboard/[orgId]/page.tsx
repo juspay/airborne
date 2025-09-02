@@ -56,9 +56,9 @@ export default function ApplicationsPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
-              Applications
+              Organization Overview
             </h1>
-            <p className="text-muted-foreground mt-2">Manage your applications and their deployments</p>
+            <p className="text-muted-foreground mt-2">Manage your organization, applications, and team members</p>
           </div>
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
@@ -139,7 +139,7 @@ export default function ApplicationsPage() {
                     <span className="text-sm">Releases</span>
                   </div>
                   <Button asChild size="sm">
-                    <Link href="/releases">Open</Link>
+                    <Link href={"/dashboard/" + org + "/" + a}>Open</Link>
                   </Button>
                 </CardContent>
               </Card>

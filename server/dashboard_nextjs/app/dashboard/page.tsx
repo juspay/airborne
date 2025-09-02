@@ -35,19 +35,22 @@ export default function DashboardHome() {
 
     if (org && apps.length === 0) {
       // If org selected but no apps in that org → prompt to create app
+      router.replace("/dashboard/" + org)
       return
     }
 
     // When both selected, go to Files by default
     if (org && app) {
-      router.replace("/dashboard/files")
+      router.replace("/dashboard/"  + org + "/" + app)
     }
   }, [orgList, org, apps, router])
 
   const onCreateOrg = async () => {
     await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token, logout })
+    const createdOrg = orgName
     setOrgName("")
     await refreshOrgs()
+    setOrg(createdOrg)
   }
 
   const onCreateApp = async () => {
