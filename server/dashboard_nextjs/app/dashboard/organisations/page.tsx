@@ -9,7 +9,7 @@ type Organisation = { name: string; applications: ApplicationRef[]; access: stri
 
 export default function OrganisationsPage() {
   const { data, error, isLoading } = useSWR<Organisation[]>("/organisations", (url) => apiFetch(url))
-  const { setOrganisation, setApplication, organisation } = useApp()
+  const { setOrg, setApp, org } = useApp()
 
   const handleDelete = async (name: string) => {
     if (!confirm(`Delete organisation ${name}?`)) return
@@ -35,8 +35,8 @@ export default function OrganisationsPage() {
                 <button
                   className="border rounded px-3 py-1"
                   onClick={() => {
-                    setOrganisation(org.name)
-                    setApplication("")
+                    setOrg(org.name)
+                    setApp("")
                   }}
                 >
                   Select

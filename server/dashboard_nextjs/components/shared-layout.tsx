@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import useSWR from "swr"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,9 +20,10 @@ import {
   Eye,
   FileText,
   LogOut,
+  Users2,
 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useParams, usePathname } from "next/navigation"
 import { useAppContext } from "@/providers/app-context"
 import { FileCreationModal } from "@/components/file-creation-modal"
 import { apiFetch } from "@/lib/api"
@@ -32,10 +33,14 @@ interface SharedLayoutProps {
   title?: string
 }
 
+type NavItem = { href: string; icon: any; label: string };
+
 export default function SharedLayout({ children }: SharedLayoutProps) {
   const { org, app, user, token, setOrg: setOrganisation, setApp: setApplication, logout } = useAppContext()
   const [createFileOpen, setCreateFileOpen] = useState(false)
   const pathname = usePathname()
+
+  const appIdPath = useParams().appId as string;
 
   const { data: orgsData } = useSWR(token ? "/organisations" : null, (url) => apiFetch<any[]>(url, {}, { token }))
   const organisations: { name: string; applications: { application: string; organisation: string }[] }[] =
@@ -43,17 +48,40 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
   const appsForOrg = organisations.find((o) => o.name === org)?.applications?.map((a) => a.application) || []
 
-  const navigationItems = [
-    { href: "/dashboard", icon: Activity, label: "Overview" },
-    { href: "/dashboard/files", icon: FileText, label: "Files" },
-    { href: "/dashboard/packages", icon: Package, label: "Packages" },
-    { href: "/dashboard/releases", icon: Rocket, label: "Releases" },
-    { href: "/dashboard/views", icon: Eye, label: "Views" },
-    { href: "/dashboard/dimensions", icon: Sliders, label: "Dimensions" },
-    { href: "/dashboard/organisation/users", icon: Users, label: "Users" },
+  const navigationItems: NavItem[] = (appIdPath) ? [
+    { href: "/dashboard/" + org + "/" + app, icon: Activity, label: "Overview" },
+    { href: "/dashboard/" + org + "/" + app + "/files", icon: FileText, label: "Files" },
+    { href: "/dashboard/" + org + "/" + app + "/packages", icon: Package, label: "Packages" },
+    { href: "/dashboard/" + org + "/" + app + "/releases", icon: Rocket, label: "Releases" },
+    { href: "/dashboard/" + org + "/" + app + "/views", icon: Eye, label: "Views" },
+    { href: "/dashboard/" + org + "/" + app + "/dimensions", icon: Sliders, label: "Dimensions" },
+  ] : [
+    { href: "/dashboard/" + org, icon: Activity, label: "Overview" },
+    { href: "/dashboard/" + org + "/users", icon: Users2, label: "Users" },
   ]
 
-  const isActive = (href: string) => (href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href))
+  function useIsActive(items: NavItem[]) {
+    const pathname = usePathname();
+
+    const normalize = (s: string) => s.replace(/\/+$/, ""); // strip trailing slash
+    const match = (href: string) => {
+      const p = normalize(pathname);
+      const h = normalize(href);
+      return p === h || p.startsWith(h + "/");
+    };
+
+    const longestMatchHref = useMemo(() => {
+      const matches = items.filter(i => match(i.href));
+      if (matches.length === 0) return null;
+      return matches.reduce((best, i) =>
+        i.href.length > best.href.length ? i : best
+      ).href;
+    }, [items, pathname]);
+
+    return (href: string) => normalize(href) === longestMatchHref;
+  }
+
+  const isActive = useIsActive(navigationItems);
 
   return (
     <div className="min-h-screen bg-background">
