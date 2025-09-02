@@ -15,6 +15,7 @@ import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 import { useRouter } from "next/navigation"
+import { toastWarning } from "@/hooks/use-toast"
 
 type ApiFile = { id?: string; file_path: string; url: string; version: number; tag?: string; size?: number }
 
@@ -39,7 +40,7 @@ export default function CreatePackagePage() {
   const { data: indexFileData, error: indexFileError, isLoading: indexFileLoading } = useSWR(
     token && org && app && currentStep === 1 ? ["/file/list", indexFileSearch] : null,
     async () =>
-      apiFetch(
+      apiFetch<any>(
         "/file/list",
         { method: "GET", query: { search: indexFileSearch || undefined, page: 1, per_page: 50 } },
         { token, org, app },
@@ -49,7 +50,7 @@ export default function CreatePackagePage() {
   const { data, error, mutate, isLoading } = useSWR(
     token && org && app && currentStep === 2 ? ["/file/list", searchQuery] : null,
     async () =>
-      apiFetch(
+      apiFetch<any>(
         "/file/list",
         { method: "GET", query: { search: searchQuery || undefined, page: 1, per_page: 50 } },
         { token, org, app },
@@ -99,7 +100,7 @@ export default function CreatePackagePage() {
       try {
         properties = packageProperties.trim() ? JSON.parse(packageProperties) : {}
       } catch {
-        alert("Package properties must be valid JSON")
+        toastWarning("Invalid JSON", "Package properties must be valid JSON")
         setIsSubmitting(false)
         return
       }
@@ -122,7 +123,7 @@ export default function CreatePackagePage() {
       )
       router.push(`/dashboard/${org}/${app}/packages`)
     } catch (e: any) {
-      alert(e.message || "Failed to create package")
+      // Error toast will be shown automatically by apiFetch
     } finally {
       setIsSubmitting(false)
     }

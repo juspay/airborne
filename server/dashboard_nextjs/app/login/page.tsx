@@ -45,7 +45,7 @@ export default function LoginPage() {
       if (app) setApplication(app)
       window.location.href = "/dashboard"
     } catch (err: any) {
-      alert(err.message || "Login failed")
+      // Error toast will be shown automatically by apiFetch
     } finally {
       setIsLoading(false)
     }
@@ -62,7 +62,7 @@ export default function LoginPage() {
       }
     } catch (e: any) {
       setIsLoading(false)
-      alert(e.message || "Failed to start Google sign-in")
+      // Error toast will be shown automatically by apiFetch
     }
   }
 

@@ -17,6 +17,7 @@ import { apiFetch } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { parseFileRef } from "@/lib/utils"
 import Link from "next/link"
+import { toastWarning } from "@/hooks/use-toast"
 
 type Pkg = { index: string; tag: string; version: number; files: string[] }
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number }
@@ -56,7 +57,7 @@ export default function CreateReleasePage() {
   // Load packages list
   useEffect(() => {
     if (!token || !org || !app) return
-    apiFetch("/packages/list", { query: { offset: 0, limit: 100 } }, { token, org, app })
+    apiFetch<any>("/packages/list", { query: { offset: 0, limit: 100 } }, { token, org, app })
       .then((res) => {
         setPackages(res.packages || [])
       })
@@ -83,7 +84,7 @@ export default function CreateReleasePage() {
   // Load dimensions options
   useEffect(() => {
     if (!token || !org || !app) return
-    apiFetch("/organisations/applications/dimension/list", {}, { token, org, app })
+    apiFetch<any>("/organisations/applications/dimension/list", {}, { token, org, app })
       .then((res) => {
         const data = (res.data || []) as any[]
         const dims: any = data.map((d) => ({
@@ -98,7 +99,7 @@ export default function CreateReleasePage() {
   // Load all resources/files
   useEffect(() => {
     if (!token || !org || !app) return
-    apiFetch("/file/list", { query: { offset: 0, limit: 1000 } }, { token, org, app })
+    apiFetch<any>("/file/list", { query: { offset: 0, limit: 1000 } }, { token, org, app })
       .then((res) => {
         setAllResources(res.files || [])
       })
@@ -155,7 +156,7 @@ export default function CreateReleasePage() {
     try {
       properties = propertiesJSON.trim() ? JSON.parse(propertiesJSON) : {}
     } catch {
-      alert("Package properties must be valid JSON")
+      toastWarning("Invalid JSON", "Package properties must be valid JSON")
       return
     }
 
@@ -179,7 +180,7 @@ export default function CreateReleasePage() {
       await apiFetch("/releases", { method: "POST", body }, { token, org, app })
       router.push(`/dashboard/${org}/${app}/releases`)
     } catch (e: any) {
-      alert(e.message || "Failed to create release")
+      // Error toast will be shown automatically by apiFetch
     }
   }
 

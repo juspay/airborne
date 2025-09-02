@@ -20,10 +20,10 @@ export default function OAuthCallback() {
           body: { code, state },
         })
         setToken(res.user_token?.access_token || "")
-        setUser({ user_id: res.user_id })
+        setUser({ user_id: res.user_id, name: "" }) // OAuth users will get name from API response
         router.push("/organisations")
       } catch (e: any) {
-        alert(e.message || "OAuth failed")
+        // Error toast will be shown automatically by apiFetch
         router.push("/login")
       }
     })()

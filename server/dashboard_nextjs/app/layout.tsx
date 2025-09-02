@@ -4,6 +4,7 @@ import { Space_Grotesk } from "next/font/google"
 import "./globals.css"
 import { AppProvider } from "@/providers/app-context"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -31,6 +32,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AppProvider>{children}</AppProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

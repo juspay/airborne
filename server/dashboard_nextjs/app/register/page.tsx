@@ -13,6 +13,7 @@ import { Rocket, Mail, Lock, Eye, EyeOff, User, Building, Check } from "lucide-r
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
+import { toastWarning } from "@/hooks/use-toast"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -36,7 +37,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.password !== formData.confirmPassword) {
-      alert("Passwords don't match")
+      toastWarning("Password Mismatch", "Passwords don't match")
       return
     }
     setIsLoading(true)
@@ -51,7 +52,7 @@ export default function RegisterPage() {
       setUser({ user_id: res?.user_id, name: formData.email })
       window.location.href = "/dashboard"
     } catch (e: any) {
-      alert(e.message || "Registration failed")
+      // Error toast will be shown automatically by apiFetch
     } finally {
       setIsLoading(false)
     }
@@ -64,7 +65,7 @@ export default function RegisterPage() {
       if (data?.auth_url) window.location.href = data.auth_url
     } catch (e: any) {
       setIsLoading(false)
-      alert(e.message || "Failed to start Google sign up")
+      // Error toast will be shown automatically by apiFetch
     }
   }
 
