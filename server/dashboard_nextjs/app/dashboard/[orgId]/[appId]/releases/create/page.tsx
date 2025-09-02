@@ -11,16 +11,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon } from "lucide-react"
+import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText } from "lucide-react"
 import { useAppContext } from "@/providers/app-context"
 import { apiFetch } from "@/lib/api"
 import { useRouter } from "next/navigation"
 import { parseFileRef } from "@/lib/utils"
-import { set } from "react-hook-form"
 import Link from "next/link"
 
 type Pkg = { index: string; tag: string; version: number; files: string[] }
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number }
+type ResourceFile = { id: string; file_path: string; size?: number; created_at?: string; tag: string }
 
 type TargetingRule = {
   dimension: string
@@ -29,7 +29,7 @@ type TargetingRule = {
 }
 
 export default function CreateReleasePage() {
-  const totalSteps = 3
+  const totalSteps = 4
   const [currentStep, setCurrentStep] = useState(1)
 
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}")
@@ -43,6 +43,11 @@ export default function CreateReleasePage() {
   const [rolloutPercentage, setRolloutPercentage] = useState(100)
   const [dimensions, setDimensions] = useState<{ dimension: string; values: string[] }[]>([])
   const [packages, setPackages] = useState<Pkg[]>([])
+  
+  // Resource-related state
+  const [allResources, setAllResources] = useState<ResourceFile[]>([])
+  const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set())
+  const [resourceSearch, setResourceSearch] = useState("")
 
   const { token, org, app } = useAppContext()
 
@@ -90,9 +95,29 @@ export default function CreateReleasePage() {
       .catch(() => setDimensions([]))
   }, [token, org, app])
 
+  // Load all resources/files
+  useEffect(() => {
+    if (!token || !org || !app) return
+    apiFetch("/file/list", { query: { offset: 0, limit: 1000 } }, { token, org, app })
+      .then((res) => {
+        setAllResources(res.files || [])
+      })
+      .catch(() => setAllResources([]))
+  }, [token, org, app])
+
   const filteredPackages = useMemo(
     () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
     [packages, pkgSearch],
+  )
+
+  // Filter resources excluding package files
+  const packageFilePaths = new Set([...files.map(f => f.file_path), selectedPackage?.index])
+  const availableResources = useMemo(
+    () => allResources.filter((r) => 
+      !packageFilePaths.has(r.file_path) && 
+      r.file_path.toLowerCase().includes(resourceSearch.toLowerCase())
+    ),
+    [allResources, packageFilePaths, resourceSearch, selectedPackage],
   )
 
   const importantFiles = Object.entries(filePriority)
@@ -114,6 +139,8 @@ export default function CreateReleasePage() {
       case 2:
         return true
       case 3:
+        return true
+      case 4:
         return true
       default:
         return false
@@ -140,7 +167,7 @@ export default function CreateReleasePage() {
       config: { traffic_percentage: rolloutPercentage },
       package: { properties, important: importantFiles, lazy: lazyFiles },
       dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
-      resources: [],
+      resources: Array.from(selectedResources),
     }
     if (selectedPackage) {
       body.package_id = `version:${selectedPackage.version}`
@@ -165,8 +192,9 @@ export default function CreateReleasePage() {
           <div className="flex items-center gap-4 mt-6">
             {[
               { number: 1, title: "Package & Details", icon: PkgIcon },
-              { number: 2, title: "File Priorities", icon: Info },
-              { number: 3, title: "Targeting", icon: Target },
+              { number: 2, title: "Package File Priorities", icon: Info },
+              { number: 3, title: "Resources", icon: FileText },
+              { number: 4, title: "Targeting", icon: Target },
             ].map((step, index) => {
               const status =
                 step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming"
@@ -191,7 +219,7 @@ export default function CreateReleasePage() {
                       <div className="text-xs text-muted-foreground">Step {step.number}</div>
                     </div>
                   </div>
-                  {index < 2 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                  {index < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
                 </div>
               )
             })}
@@ -328,6 +356,93 @@ export default function CreateReleasePage() {
           )}
 
           {currentStep === 3 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
+                    Select Resources
+                  </CardTitle>
+                  <CardDescription>Choose additional files to include as resources in this release</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search resources..."
+                        value={resourceSearch}
+                        onChange={(e) => setResourceSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {availableResources.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="mx-auto h-8 w-8 mb-2" />
+                      <p className="text-sm">
+                        {resourceSearch ? "No resources found matching your search" : "No additional resources available"}
+                      </p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]"></TableHead>
+                          <TableHead>File Path</TableHead>
+                          <TableHead>Tag</TableHead>
+                          <TableHead>Created</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {availableResources.map((resource) => {
+                          const isSelected = selectedResources.has(resource.id)
+                          return (
+                            <TableRow key={resource.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    const newSelected = new Set(selectedResources)
+                                    if (checked) {
+                                      newSelected.add(resource.id)
+                                    } else {
+                                      newSelected.delete(resource.id)
+                                    }
+                                    setSelectedResources(newSelected)
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{resource.file_path}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {resource.tag}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {resource.created_at 
+                                  ? new Date(resource.created_at).toLocaleDateString()
+                                  : "—"
+                                }
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  {selectedResources.size > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="text-sm text-green-800">
+                        Selected {selectedResources.size} resource{selectedResources.size !== 1 ? 's' : ''} for this release
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {currentStep === 4 && (
             <div className="space-y-6">
               <Card>
                 <CardHeader>
