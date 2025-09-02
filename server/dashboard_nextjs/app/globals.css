@@ -15,7 +15,7 @@
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.65 0.2 285);
   --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.96 0 0);
+  --muted: oklch(0.94 0.003 240); /* Neutral light grey for loading states */
   --muted-foreground: oklch(0.45 0 0);
   --accent: oklch(0.65 0.2 285);
   --accent-foreground: oklch(1 0 0);
@@ -52,7 +52,7 @@
   --primary-foreground: oklch(0.08 0 0);
   --secondary: oklch(0.25 0.01 285); /* Softer secondary */
   --secondary-foreground: oklch(0.95 0.01 285);
-  --muted: oklch(0.22 0.01 285); /* Lighter muted background */
+  --muted: oklch(0.24 0.005 240); /* Neutral grey for loading states in dark mode */
   --muted-foreground: oklch(0.65 0.02 285);
   --accent: oklch(0.65 0.2 285);
   --accent-foreground: oklch(0.08 0 0);
