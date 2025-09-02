@@ -130,7 +130,6 @@ export default function CreatePackagePage() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="sm" asChild>
@@ -395,6 +394,5 @@ export default function CreatePackagePage() {
           </div>
         </div>
       </div>
-    </SharedLayout>
   )
 }

@@ -5,7 +5,7 @@ import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
-import SharedLayout from "@/components/shared-layout"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -66,7 +66,7 @@ export default function DashboardHome() {
   // No orgs → prompt to create
   if (orgList.length === 0) {
     return (
-      <SharedLayout>
+      <>
         <div className="mx-auto max-w-lg p-6">
           <h2 className="text-xl font-semibold mb-2">Create your first Organisation</h2>
           <p className="text-muted-foreground mb-4">You need an organisation to get started.</p>
@@ -76,14 +76,14 @@ export default function DashboardHome() {
             Create Organisation
           </Button>
         </div>
-      </SharedLayout>
+      </>
     )
   }
 
   // If org selected but no apps in that org → prompt to create app
   if (org && apps.length === 0) {
     return (
-      <SharedLayout>
+      <>
         <div className="mx-auto max-w-lg p-6">
           <h2 className="text-xl font-semibold mb-2">Create your first Application</h2>
           <p className="text-muted-foreground mb-4">Applications group files, packages, and releases.</p>
@@ -93,14 +93,14 @@ export default function DashboardHome() {
             Create Application
           </Button>
         </div>
-      </SharedLayout>
+      </>
     )
   }
 
   // Selection screen: pick org/app
   if (!org || !app) {
     return (
-      <SharedLayout>
+      <>
         <div className="mx-auto max-w-2xl p-6 space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-2">Select Organisation</h2>
@@ -140,7 +140,7 @@ export default function DashboardHome() {
             </Button>
           </div>
         </div>
-      </SharedLayout>
+      </>
     )
   }
 

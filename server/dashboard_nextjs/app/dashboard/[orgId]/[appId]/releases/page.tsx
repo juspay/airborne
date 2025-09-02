@@ -54,7 +54,6 @@ export default function ReleasesPage() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -158,6 +157,5 @@ export default function ReleasesPage() {
           </CardContent>
         </Card>
       </div>
-    </SharedLayout>
   )
 }

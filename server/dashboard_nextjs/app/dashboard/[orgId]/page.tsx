@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react"
 import useSWR, { mutate } from "swr"
-import SharedLayout from "@/components/shared-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -51,7 +50,6 @@ export default function ApplicationsPage() {
   }
 
   return (
-    <SharedLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -150,6 +148,5 @@ export default function ApplicationsPage() {
           </div>
         )}
       </div>
-    </SharedLayout>
   )
 }
