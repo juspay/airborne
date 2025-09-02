@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, ArrowLeft, FileText, Rocket } from "lucide-react"
+import { Search, ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package2 } from "lucide-react"
 import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
@@ -20,17 +20,34 @@ type ApiFile = { id?: string; file_path: string; url: string; version: number; t
 
 export default function CreatePackagePage() {
   const { token, org, app } = useAppContext()
-  const [packageName, setPackageName] = useState("")
-  const [version, setVersion] = useState("1.0.0")
-  const [description, setDescription] = useState("")
+  const totalSteps = 2
+  const [currentStep, setCurrentStep] = useState(1)
+  
+  // Step 1: Package Details & Index File
   const [tag, setTag] = useState("")
+  const [packageProperties, setPackageProperties] = useState("{}")
+  const [selectedIndexFile, setSelectedIndexFile] = useState<ApiFile | null>(null)
+  const [indexFileSearch, setIndexFileSearch] = useState("")
+  
+  // Step 2: Package Files
   const [searchQuery, setSearchQuery] = useState("")
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
 
+  // Data fetching for file lists
+  const { data: indexFileData, error: indexFileError, isLoading: indexFileLoading } = useSWR(
+    token && org && app && currentStep === 1 ? ["/file/list", indexFileSearch] : null,
+    async () =>
+      apiFetch(
+        "/file/list",
+        { method: "GET", query: { search: indexFileSearch || undefined, page: 1, per_page: 50 } },
+        { token, org, app },
+      ),
+  )
+
   const { data, error, mutate, isLoading } = useSWR(
-    token && org && app ? ["/file/list", searchQuery] : null,
+    token && org && app && currentStep === 2 ? ["/file/list", searchQuery] : null,
     async () =>
       apiFetch(
         "/file/list",
@@ -39,9 +56,18 @@ export default function CreatePackagePage() {
       ),
   )
 
-  console.log("File List:", data)
-
+  const indexFiles: ApiFile[] = indexFileData?.files || []
   const files: ApiFile[] = data?.files || []
+
+  // Filter out the selected index file from package files
+  const availableFiles = useMemo(() => {
+    if (!selectedIndexFile) return files
+    return files.filter(f => {
+      const indexKey = selectedIndexFile.id || `${selectedIndexFile.file_path}@${selectedIndexFile.version}`
+      const fileKey = f.id || `${f.file_path}@${f.version}`
+      return fileKey !== indexKey
+    })
+  }, [files, selectedIndexFile])
 
   const toggle = (f: ApiFile) => {
     const key = f.id || `${f.file_path}@${f.version}`
@@ -49,25 +75,46 @@ export default function CreatePackagePage() {
   }
 
   const selectedList = useMemo(() => {
-    return files.filter((f) => {
-      const key = f.id || `${f.file_path}@version:${f.version}`
+    return availableFiles.filter((f) => {
+      const key = f.id || `${f.file_path}@${f.version}`
       return selected[key]
     })
-  }, [files, selected])
+  }, [availableFiles, selected])
+
+  const canProceedToStep = (step: number) => {
+    switch (step) {
+      case 1:
+        return tag && selectedIndexFile
+      case 2:
+        return selectedList.length > 0
+      default:
+        return false
+    }
+  }
 
   async function onCreate(submitAsDraft?: boolean) {
     setIsSubmitting(true)
     try {
+      let properties: Record<string, any> = {}
+      try {
+        properties = packageProperties.trim() ? JSON.parse(packageProperties) : {}
+      } catch {
+        alert("Package properties must be valid JSON")
+        setIsSubmitting(false)
+        return
+      }
+
       const fileIds = selectedList.map((f) => f.id || f.file_path)
+      const indexPath = selectedIndexFile ? `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}` : ""
+      
       await apiFetch(
         "/packages",
         {
           method: "POST",
           body: {
-            index: packageName,
-            version,
+            index: indexPath,
             tag: tag || undefined,
-            description: description || undefined,
+            properties,
             files: fileIds,
           },
         },
@@ -86,162 +133,278 @@ export default function CreatePackagePage() {
       <div className="p-6">
         <div className="flex items-center gap-4 mb-8">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard/packages">
+            <Link href={`/dashboard/${org}/${app}/packages`}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
               Create Package
             </h1>
             <p className="text-muted-foreground mt-2">Bundle files together with properties and metadata</p>
+
+            <div className="flex items-center gap-4 mt-6">
+              {[
+                { number: 1, title: "Package Details & Index File", icon: Package2 },
+                { number: 2, title: "Select Package Files", icon: File },
+              ].map((step, index) => {
+                const status =
+                  step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming"
+                const Icon = step.icon
+                return (
+                  <div key={step.number} className="flex items-center">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`
+                          flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
+                          ${status === "completed" ? "bg-primary border-primary text-primary-foreground" : status === "current" ? "border-primary text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground"}
+                        `}
+                      >
+                        {status === "completed" ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                      </div>
+                      <div className="hidden sm:block">
+                        <div
+                          className={`font-medium text-sm ${status !== "upcoming" ? "text-foreground" : "text-muted-foreground"}`}
+                        >
+                          {step.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Step {step.number}</div>
+                      </div>
+                    </div>
+                    {index < 1 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Package Details</CardTitle>
-              <CardDescription>Basic information about your package</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Package Index *</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., /dist/bundle.js@tag:latest"
-                  value={packageName}
-                  onChange={(e) => setPackageName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="version">Version *</Label>
-                <Input
-                  id="version"
-                  placeholder="e.g., 1.0.0"
-                  value={version}
-                  onChange={(e) => setVersion(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tag">Tag</Label>
-                <Input id="tag" placeholder="e.g., latest" value={tag} onChange={(e) => setTag(e.target.value)} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Brief description of what this package contains..."
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-
-              {/* Selected Files Summary */}
-              {selectedList.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Selected Files ({selectedList.length})</Label>
-                  <div className="max-h-40 overflow-y-auto space-y-1">
-                    {selectedList.map((f) => {
-                      const key = f.id || `${f.file_path}@${f.version}`
-                      return (
-                        <div key={key} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4" />
-                            <span className="font-mono">{f.file_path}</span>
-                            <span className="text-muted-foreground">(v{f.version})</span>
-                          </div>
-                          <Button variant="ghost" size="sm" onClick={() => toggle(f)}>
-                            Remove
-                          </Button>
-                        </div>
-                      )
-                    })}
+        <div className="space-y-6">
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Package Details</CardTitle>
+                  <CardDescription>Basic information about your package</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tag">Tag *</Label>
+                    <Input 
+                      id="tag" 
+                      placeholder="e.g., latest, v1.0, production" 
+                      value={tag} 
+                      onChange={(e) => setTag(e.target.value)} 
+                    />
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Files</CardTitle>
-              <CardDescription>Choose files to include in this package</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search files..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="properties">Package Properties (JSON)</Label>
+                    <Textarea
+                      id="properties"
+                      placeholder='{"featureFlag": true, "environment": "production"}'
+                      rows={4}
+                      value={packageProperties}
+                      onChange={(e) => setPackageProperties(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional JSON object containing package metadata and configuration
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {error ? (
-                <div className="text-red-600">Failed to load files</div>
-              ) : isLoading ? (
-                <div>Loading…</div>
-              ) : files.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  No files found. Create a file first from the Create menu or the Files page.
-                </div>
-              ) : (
-                <div className="max-h-96 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50px]"></TableHead>
-                        <TableHead>File</TableHead>
-                        <TableHead>Version</TableHead>
-                        <TableHead>Tag</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {files.map((f) => {
-                        const key = f.id || `${f.file_path}@${f.version}`
-                        return (
-                          <TableRow key={key}>
-                            <TableCell>
-                              <Checkbox checked={!!selected[key]} onCheckedChange={() => toggle(f)} />
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                            <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                            <TableCell className="text-muted-foreground">{f.tag || "—"}</TableCell>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Index File</CardTitle>
+                  <CardDescription>Choose the main entry point file for your package</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search files..."
+                        value={indexFileSearch}
+                        onChange={(e) => setIndexFileSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {indexFileError ? (
+                    <div className="text-red-600">Failed to load files</div>
+                  ) : indexFileLoading ? (
+                    <div>Loading…</div>
+                  ) : indexFiles.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      No files found. Create a file first from the Create menu or the Files page.
+                    </div>
+                  ) : (
+                    <div className="max-h-96 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead>File</TableHead>
+                            <TableHead>Version</TableHead>
+                            <TableHead>Tag</TableHead>
                           </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {indexFiles.map((f) => {
+                            const key = f.id || `${f.file_path}@${f.version}`
+                            const isSelected = selectedIndexFile && (selectedIndexFile.id || `${selectedIndexFile.file_path}@${selectedIndexFile.version}`) === key
+                            return (
+                              <TableRow key={key}>
+                                <TableCell>
+                                  <Checkbox 
+                                    checked={!!isSelected} 
+                                    onCheckedChange={() => setSelectedIndexFile(isSelected ? null : f)} 
+                                  />
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                                <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                                <TableCell className="text-muted-foreground">{f.tag || "—"}</TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {selectedIndexFile && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-green-600" />
+                        <span className="font-mono text-sm">{selectedIndexFile.file_path}</span>
+                        <span className="text-muted-foreground text-xs">(v{selectedIndexFile.version})</span>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Files</CardTitle>
+                  <CardDescription>Choose additional files to include in this package</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search files..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {error ? (
+                    <div className="text-red-600">Failed to load files</div>
+                  ) : isLoading ? (
+                    <div>Loading…</div>
+                  ) : availableFiles.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">
+                      {searchQuery ? "No files found matching your search" : "No additional files available"}
+                    </div>
+                  ) : (
+                    <div className="max-h-96 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead>File</TableHead>
+                            <TableHead>Version</TableHead>
+                            <TableHead>Tag</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {availableFiles.map((f) => {
+                            const key = f.id || `${f.file_path}@${f.version}`
+                            return (
+                              <TableRow key={key}>
+                                <TableCell>
+                                  <Checkbox checked={!!selected[key]} onCheckedChange={() => toggle(f)} />
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                                <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                                <TableCell className="text-muted-foreground">{f.tag || "—"}</TableCell>
+                              </TableRow>
+                            )
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {selectedList.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <Label>Selected Files ({selectedList.length})</Label>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {selectedList.map((f) => {
+                          const key = f.id || `${f.file_path}@${f.version}`
+                          return (
+                            <div key={key} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                <span className="font-mono">{f.file_path}</span>
+                                <span className="text-muted-foreground">(v{f.version})</span>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => toggle(f)}>
+                                Remove
+                              </Button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between mt-8 pt-6 border-t">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/packages">Cancel</Link>
-          </Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onCreate(true)} disabled={isSubmitting}>
-              Save as Draft
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/${org}/${app}/packages`}>Cancel</Link>
             </Button>
-            <Button
-              onClick={() => onCreate()}
-              disabled={!packageName || !version || selectedList.length === 0 || isSubmitting}
-              className="gap-2"
-            >
-              <Rocket className="h-4 w-4" />
-              Create Package
-            </Button>
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
+                Previous
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {currentStep < totalSteps ? (
+              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
+                Next Step
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => onCreate(true)} disabled={isSubmitting}>
+                  Save as Draft
+                </Button>
+                <Button
+                  onClick={() => onCreate()}
+                  disabled={!canProceedToStep(1) || !canProceedToStep(2) || isSubmitting}
+                  className="gap-2"
+                >
+                  <Rocket className="h-4 w-4" />
+                  Create Package
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
