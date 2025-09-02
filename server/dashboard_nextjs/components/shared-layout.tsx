@@ -147,51 +147,51 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 ml-auto">
             <Badge variant="secondary" className="text-xs">
               {user?.name || user?.user_id || "GUEST"}
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-2" disabled={!org || !app}>
-                  <Plus className="h-4 w-4" />
-                  Create
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
+              <Button size="sm" className="gap-2" disabled={!org || !app}>
+                <Plus className="h-4 w-4" />
+                Create
+                <ChevronDown className="h-3 w-3" />
+              </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={!org || !app} onClick={() => setCreateFileOpen(true)}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Create File
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild disabled={!org || !app}>
-                  <Link href="/dashboard/packages/create">
-                    <Package className="mr-2 h-4 w-4" />
-                    Create Package
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild disabled={!org || !app}>
-                  <Link href="/dashboard/releases/create">
-                    <Rocket className="mr-2 h-4 w-4" />
-                    New Release
-                  </Link>
-                </DropdownMenuItem>
+              <DropdownMenuItem disabled={!org || !app} onClick={() => setCreateFileOpen(true)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Create File
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild disabled={!org || !app}>
+                <Link href="/dashboard/packages/create">
+                <Package className="mr-2 h-4 w-4" />
+                Create Package
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild disabled={!org || !app}>
+                <Link href="/dashboard/releases/create">
+                <Rocket className="mr-2 h-4 w-4" />
+                New Release
+                </Link>
+              </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <LogOut className="h-4 w-4" />
-                  <span className="sr-only">Sign out</span>
-                </Button>
+              <Button variant="ghost" size="sm">
+                <LogOut className="h-4 w-4" />
+                <span className="sr-only">Sign out</span>
+              </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={logout} className="text-red-600">
-                  <LogOut className="h-4 w-4 mr-2" /> Sign out
-                </DropdownMenuItem>
+              <DropdownMenuItem onClick={logout} className="text-red-600">
+                <LogOut className="h-4 w-4 mr-2" /> Sign out
+              </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+            </div>
         </div>
       </header>
 
