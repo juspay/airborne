@@ -111,7 +111,10 @@ export default function CreateReleasePage() {
   )
 
   // Filter resources excluding package files
-  const packageFilePaths = new Set([...files.map(f => f.file_path), selectedPackage?.index])
+  const packageFilePaths = new Set([
+    ...files.map(f => f.file_path), 
+    ...(selectedPackage?.index ? [parseFileRef(selectedPackage.index).filePath] : [])
+  ])
   const availableResources = useMemo(
     () => allResources.filter((r) => 
       !packageFilePaths.has(r.file_path) && 
