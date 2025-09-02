@@ -27,6 +27,7 @@ import { useParams, usePathname } from "next/navigation"
 import { useAppContext } from "@/providers/app-context"
 import { FileCreationModal } from "@/components/file-creation-modal"
 import { apiFetch } from "@/lib/api"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface SharedLayoutProps {
   children: React.ReactNode
@@ -151,6 +152,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
             <Badge variant="secondary" className="text-xs">
               {user?.name || user?.user_id || "GUEST"}
             </Badge>
+            <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
               <Button size="sm" className="gap-2" disabled={!org || !app}>
