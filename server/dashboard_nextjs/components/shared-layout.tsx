@@ -118,26 +118,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                   {organisations.length === 0 && <DropdownMenuItem disabled>No organisations</DropdownMenuItem>}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <span className="text-muted-foreground">›</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                    disabled={!org}
-                  >
-                    {app || "Select App"} <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {appsForOrg.map((a) => (
-                    <DropdownMenuItem key={a} onClick={() => setApplication(a)}>
-                      {a}
-                    </DropdownMenuItem>
-                  ))}
-                  {org && appsForOrg.length === 0 && <DropdownMenuItem disabled>No applications</DropdownMenuItem>}
-                </DropdownMenuContent>
-              </DropdownMenu>
+             
             </div>
           </div>
 
@@ -200,7 +181,28 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
       <div className="flex">
         <aside className="min-h-screen w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50">
           <nav className="p-4 space-y-2">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Application</div>
+           
+           <div className="flex items-center gap-2 text-sm"> 
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    disabled={!org}
+                  >
+                    {app || "Select App"} <ChevronDown className="ml-1 h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {appsForOrg.map((a) => (
+                    <DropdownMenuItem key={a} onClick={() => setApplication(a)}>
+                      {a}
+                    </DropdownMenuItem>
+                  ))}
+                  {org && appsForOrg.length === 0 && <DropdownMenuItem disabled>No applications</DropdownMenuItem>}
+                </DropdownMenuContent>
+              </DropdownMenu>
+           </div>
             {navigationItems.map((item) => {
               const Icon = item.icon
               const active = isActive(item.href)
