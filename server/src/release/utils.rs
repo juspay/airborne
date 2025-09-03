@@ -34,7 +34,7 @@ pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Opti
     })
 }
 
-pub fn extract_file_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<String> {
+pub fn extract_string_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<String> {
     opt_obj
     .as_ref()
     .and_then(|doc| {
@@ -46,6 +46,25 @@ pub fn extract_file_from_configs(opt_obj: &Option<Document>, key: &str) -> Optio
             None
         }
     })
+}
+
+pub fn extract_file_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<String> {
+    extract_string_from_configs(opt_obj, key)
+}
+
+pub fn extract_integer_from_configs<T>(opt_obj: &Option<Document>, key: &str) -> T where T: Default + From<i64> + From<u32> {
+    opt_obj
+        .as_ref()
+        .and_then(|doc| {
+            if let Document::Object(obj) = doc {
+                obj.get(key)
+                    .and_then(document_to_value)
+                    .and_then(|v| v.as_i64().map(|i| T::from(i)))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
 }
 
 pub fn extract_files_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> Vec<String> {
@@ -68,7 +87,28 @@ pub fn extract_files_from_experiment(experimental_variant: &Option<&Variant>, ke
         .unwrap_or_default()
 }
 
-pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> String {
+pub fn extract_integer_from_experiment<T>(experimental_variant: &Option<&Variant>, key: &str) -> T where T: Default + From<i64> + From<u32> {
+    experimental_variant
+        .and_then(|v| v.overrides.as_object())
+        .and_then(|obj| obj.get(key))
+        .and_then(|doc: &Document| {
+            if let Document::Number(s) = doc {
+                let f = s.to_f64_lossy();
+                if let Ok(i) = i64::try_from(f as i128) {
+                    Some(T::from(i))
+                } else if let Ok(u) = u32::try_from(f as u64) {
+                    Some(T::from(u))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
+}
+
+pub fn extract_string_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> String {
     experimental_variant
         .and_then(|v| v.overrides.as_object())
         .and_then(|obj| obj.get(key))
@@ -80,6 +120,10 @@ pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key
             }
         })
         .unwrap_or_default()
+}
+
+pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> String {
+    extract_string_from_experiment(experimental_variant, key)
 }
 
 pub fn get_files_by_file_keys(conn: &mut PooledConnection<ConnectionManager<PgConnection>>, organisation: &String, application: &String, file_paths: &Vec<String>) -> Result<Vec<FileEntry>, actix_web::error::Error> {
@@ -236,4 +280,39 @@ pub fn parse_kv_string(input: &str) -> HashMap<String, Value> {
             Some((key.to_string(), Value::String(value.to_string())))
         })
         .collect()
+}
+
+pub async fn invalidate_cf(
+    client: &aws_sdk_cloudfront::Client,
+    path: String,
+    distribution_id: &str) -> Result<(), aws_sdk_cloudfront::Error> {
+    // Make this unique on each call
+    let caller_reference = format!("invalidate-{}", Utc::now().timestamp_nanos_opt().unwrap_or(rand::random::<i64>()));
+
+    let paths = aws_sdk_cloudfront::types::Paths::builder()
+        .items(path)
+        .quantity(1) 
+        .build()?;
+
+    let batch = aws_sdk_cloudfront::types::InvalidationBatch::builder()
+        .caller_reference(caller_reference)
+        .paths(paths)
+        .build()?;
+
+    let resp = client
+        .create_invalidation()
+        .distribution_id(distribution_id)
+        .invalidation_batch(batch)
+        .send()
+        .await?;
+
+    resp.invalidation()
+        .map(|inv| {
+            println!("Invalidation created: {:?}", inv.id);
+        })
+        .unwrap_or_else(|| {
+            println!("Invalidation created but no ID returned");
+        });
+
+    Ok(())
 }

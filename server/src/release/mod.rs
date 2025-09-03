@@ -15,19 +15,17 @@
 use actix_web::{get, post, web::{self, Json, Path}, HttpResponse, Scope, error};
 use rand::Rng;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}};
 use diesel::{prelude::*};
 use chrono::{DateTime, Utc};
 use superposition_rust_sdk::types::builders::VariantBuilder;
 use aws_smithy_types::{Document};
 
 use crate::{
-    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, package::utils::parse_package_key, release::models::*, types::AppState, utils::{
+    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, package::utils::parse_package_key, release::{models::*, utils::value_to_document}, types::AppState, utils::{
         db::{
-            models::{PackageV2Entry},
-            schema::hyperotaserver::{
-                packages_v2::dsl as packages_dsl
-            },
+            models::PackageV2Entry,
+            schema::hyperotaserver::packages_v2::dsl as packages_dsl,
         },
         workspace::get_workspace_name_for_application,
     }
@@ -115,10 +113,19 @@ async fn get_release(
         .and_then(utils::document_to_value)
         .unwrap_or_default();
 
+    let rc_properties = experimental_variant
+        .and_then(|v| v.overrides.as_object())
+        .and_then(|obj| obj.get("config.properties"))
+        .and_then(utils::document_to_value)
+        .unwrap_or_default();
+
     let rc_package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
     let rc_package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
     let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
     let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
+    let rc_version = utils::extract_string_from_experiment(&experimental_variant, "config.version");
+    let rc_boot_timeout = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "config.boot_timeout");
+    let rc_release_config_timeout = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "config.release_config_timeout");
 
     let (index_file, important_files, lazy_files, resource_files) = {
 
@@ -191,10 +198,13 @@ async fn get_release(
             .map(|dt| dt.with_timezone(&Utc))
             .map_err(|_| error::ErrorInternalServerError("Failed to parse created_at as DateTime"))?,
         config: Config {
-            boot_timeout: 3000,
-            package_timeout: 6000,
+            boot_timeout: rc_boot_timeout as u32,
+            release_config_timeout: rc_release_config_timeout as u32,
+            version: rc_version,
+            properties: Some(rc_properties),
         },
         package: ServePackage {
+            name: "".to_string(),
             version: package_version,
             index: index_file,
             properties: package_properties,
@@ -450,13 +460,34 @@ async fn create_release(
     }
 
     let now = Utc::now();
+    let config_version = uuid::Uuid::new_v4().to_string();
 
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
     
     if !is_first_release {
         if let Some(Document::Object(obj)) = &config_document {
-            control_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
+            if let Some(version) = obj.get("config.version") {
+                control_overrides.insert("config.version".to_string(), version.clone());
+            } else {
+                control_overrides.insert("config.version".to_string(), Document::String(config_version.clone()));
+            }
+            if let Some(boot_timeout) = obj.get("config.boot_timeout") {
+                control_overrides.insert("config.boot_timeout".to_string(), boot_timeout.clone());
+            } else {
+                control_overrides.insert("config.boot_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout as u64)));
+            }
+            if let Some(release_config_timeout) = obj.get("config.release_config_timeout") {
+                control_overrides.insert("config.release_config_timeout".to_string(), release_config_timeout.clone());
+            } else {
+                control_overrides.insert("config.release_config_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.release_config_timeout as u64)));
+            }
+            if let Some(props) = obj.get("config.properties") {
+                control_overrides.insert("config.properties".to_string(), props.clone());
+            } else {
+                control_overrides.insert("config.properties".to_string(), Document::Object(std::collections::HashMap::new()));
+            }
+            control_overrides.insert("package.name".to_string(), Document::String(application.clone()));
             if let Some(package_idx) = obj.get("package.index") {
                 control_overrides.insert("package.index".to_string(), package_idx.clone());
             } else {
@@ -497,7 +528,14 @@ async fn create_release(
     }
 
     let mut experimental_overrides: std::collections::HashMap<String, Document> = std::collections::HashMap::new();
-    experimental_overrides.insert("package.name".to_string(), Document::String(workspace_name.clone()));
+    experimental_overrides.insert("config.version".to_string(), Document::String(config_version.clone()));
+    experimental_overrides.insert("config.boot_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout as u64)));
+    experimental_overrides.insert("config.release_config_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.release_config_timeout as u64)));
+    
+    let config_props = value_to_document(&req.config.properties.clone().unwrap_or_default());
+
+    experimental_overrides.insert("config.properties".to_string(), config_props.clone());
+    experimental_overrides.insert("package.name".to_string(), Document::String(application.clone()));
     experimental_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
     experimental_overrides.insert("package.index".to_string(), Document::String(package_data.index.clone()));
 
@@ -600,14 +638,29 @@ async fn create_release(
 
     let response_resources = final_resources.unwrap_or_default();
 
+    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
+
+    if let Err(e) = utils::invalidate_cf(
+        &state.cf_client,
+        path,
+        &state.env.cloudfront_distribution_id,
+    ).await {
+        eprintln!("Failed to invalidate CloudFront cache: {:?}", e);
+    }
+
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
         created_at: now,
         config: Config {
-            boot_timeout: 4000,
-            package_timeout: 4000
+            boot_timeout: req.config.boot_timeout as u32,
+            release_config_timeout: req.config.release_config_timeout as u32,
+            version: config_version.clone(),
+            properties: config_props.clone().as_object().map(|obj| {
+                obj.iter().map(|(k, v)| (k.clone(), utils::document_to_value(v).unwrap_or(Value::Null))).collect()
+            }),
         },
         package: ServePackage {
+            name: application.clone(),
             version: pkg_version,
             index: {
                 let (file_path, _, _) = parse_file_key(&package_data.index);
@@ -736,6 +789,14 @@ async fn list_releases(
         let rc_package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
         let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
         let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
+        let rc_version = utils::extract_string_from_experiment(&experimental_variant, "config.version");
+        let rc_boot_timeout = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "config.boot_timeout");
+        let rc_release_config_timeout = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "config.release_config_timeout");
+        let rc_config_properties = experimental_variant
+            .and_then(|v| v.overrides.as_object())
+            .and_then(|obj| obj.get("config.properties"))
+            .and_then(utils::document_to_value)
+            .unwrap_or_default();
 
         println!("Resources files: {:?}", rc_resources);
 
@@ -817,10 +878,13 @@ async fn list_releases(
             id: experiment.id.to_string(),
             created_at,
             config: Config {
-                boot_timeout: 4000,
-                package_timeout: 4000
+                boot_timeout: rc_boot_timeout as u32,
+                release_config_timeout: rc_release_config_timeout as u32,
+                version: rc_version,
+                properties: Some(rc_config_properties),
             },
             package: ServePackage {
+                name: application.clone(),
                 version: package_version,
                 index: index_file,
                 properties: rc_package_properties,
@@ -1016,7 +1080,7 @@ async fn serve_release(
     query: web::Query<std::collections::HashMap<String, String>>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ServeReleaseResponse>> {
+) -> Result<HttpResponse, actix_web::Error> {
     let (organisation, application) = path.into_inner();
     println!(
         "Serving release for org: {}, app: {}",
@@ -1112,6 +1176,19 @@ async fn serve_release(
     let rc_package_lazy = utils::extract_files_from_configs(&config_document, "package.lazy").unwrap_or_default();
     let rc_resources = utils::extract_files_from_configs(&config_document, "resources").unwrap_or_default();
     let rc_index = utils::extract_file_from_configs(&config_document, "package.index").unwrap_or_default();
+    let rc_version = utils::extract_string_from_configs(&config_document, "config.version").unwrap_or_default();
+    let rc_boot_timeout = utils::extract_integer_from_configs::<i64>(&config_document, "config.boot_timeout");
+    let rc_release_config_timeout = utils::extract_integer_from_configs::<i64>(&config_document, "config.release_config_timeout");
+    let opt_rc_config_properties = &config_document
+        .as_ref()
+        .and_then(|doc| {
+            if let Document::Object(obj) = doc {
+                obj.get("config.properties")
+                    .and_then(utils::document_to_value)
+            } else {
+                None
+            }
+        });
 
     let (index_file, important_files, lazy_files, resource_files) = {
 
@@ -1210,11 +1287,15 @@ async fn serve_release(
         });
 
     let release_response = ServeReleaseResponse {
+        version: rc_version.clone(),
         config: Config {
-            boot_timeout: 4000,
-            package_timeout: 4000
+            boot_timeout: rc_boot_timeout as u32,
+            release_config_timeout: rc_release_config_timeout as u32,
+            version: rc_version.clone(),
+            properties: opt_rc_config_properties.clone()
         },
         package: ServePackage {
+            name: application.clone(),
             version: version,
             index: index_file,
             properties: opt_rc_package_properties.clone().unwrap_or(serde_json::Value::default()),
@@ -1224,5 +1305,15 @@ async fn serve_release(
         resources: resource_files,
     };
 
-    Ok(actix_web::web::Json(release_response))
+    let response = actix_web::HttpResponse::Ok()
+        .insert_header((
+            actix_web::http::header::CACHE_CONTROL,
+            "Cache-Control: public, max-age=86400, stale-while-revalidate=60",
+        ))
+        .insert_header((
+            actix_web::http::header::CONTENT_TYPE,
+            "application/json",
+        ))
+        .json(release_response);
+    Ok(response)
 }

@@ -6,11 +6,18 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateReleaseRequest {
-    pub config: Option<HashMap<String, serde_json::Value>>,
+    pub config: ConfigRequest,
     pub package_id: Option<String>,
     pub package: Option<PackageRequest>,
     pub dimensions: Option<HashMap<String, serde_json::Value>>,
     pub resources: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfigRequest {
+    pub boot_timeout: u64,
+    pub release_config_timeout: u64,
+    pub properties: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,6 +36,7 @@ pub struct ServeFile {
 
 #[derive(Serialize)]
 pub struct ServePackage {
+    pub name: String,
     pub version: i32,
     pub index: ServeFile,
     pub properties: Value,
@@ -38,8 +46,10 @@ pub struct ServePackage {
 
 #[derive(Serialize)]
 pub struct Config {
-    pub boot_timeout: u64,
-    pub package_timeout: u64,
+    pub boot_timeout: u32,
+    pub release_config_timeout: u32,
+    pub version: String,
+    pub properties: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -116,6 +126,7 @@ pub struct ConcludeReleaseResponse {
 
 #[derive(Serialize)]
 pub struct ServeReleaseResponse {
+    pub version: String,
     pub config: Config,
     pub package: ServePackage,
     pub resources: Vec<ServeFile>,

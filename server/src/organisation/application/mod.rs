@@ -22,7 +22,6 @@ use aws_smithy_types::Document;
 use keycloak::types::GroupRepresentation;
 use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
-use serde_json::{json};
 use superposition_rust_sdk::operation::create_default_config::{CreateDefaultConfigOutput};
 use superposition_rust_sdk::types::WorkspaceStatus;
 use superposition_rust_sdk::Client;
@@ -430,7 +429,7 @@ async fn add_application(
             create_default_config_string(
                 "config.version".to_string(),
                 "0.0.0".to_string(),
-                "Value indicating the version of the release config".to_string(),
+                "Value indicating the version of the release config -> config".to_string(),
             ),
             "config.version",
             &transaction,
@@ -458,11 +457,11 @@ async fn add_application(
 
         create_config_with_tx(
             create_default_config_int(
-                "config.package_timeout".to_string(),
+                "config.boot_timeout".to_string(),
                 1000,
                 "Indicating the timeout for downloading the package block".to_string(),
             ),
-            "config.package_timeout",
+            "config.boot_timeout",
             &transaction,
             &admin,
             &realm,
@@ -527,6 +526,21 @@ async fn add_application(
                 "Value indicating the properties of the package".to_string(),
             ),
             "package.properties",
+            &transaction,
+            &admin,
+            &realm,
+            &state,
+        )
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
+
+        create_config_with_tx(
+            create_default_config_string(
+                "package.index".to_string(),
+                "".to_string(),
+                "Value indicating the index of the package".to_string(),
+            ),
+            "package.index",
             &transaction,
             &admin,
             &realm,

@@ -14,4 +14,4 @@ CREATE UNIQUE INDEX packages_v2_org_app_version_idx
   ON hyperotaserver.packages_v2 (org_id, app_id, version);
 
 CREATE UNIQUE INDEX packages_v2_org_app_tag_idx
-  ON hyperotaserver.packages_v2 (org_id, tag);
+  ON hyperotaserver.packages_v2 (org_id, app_id, tag);
