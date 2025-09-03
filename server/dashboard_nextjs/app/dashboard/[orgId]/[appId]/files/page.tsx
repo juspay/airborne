@@ -36,7 +36,7 @@ export default function FilesPage() {
   const { data, error, mutate, isLoading } = useSWR(
     token && org && app ? ["/file/list", searchQuery] : null,
     async () =>
-      apiFetch(
+      apiFetch<any>(
         "/file/list",
         { method: "GET", query: { search: searchQuery || undefined, page: 1, per_page: 50 } },
         { token, org, app },

@@ -38,7 +38,7 @@ export default function DimensionsPage() {
   const [dimensions, setDimensions] = useState<Dimension[]>([])
 
   const load = () =>
-    apiFetch("/organisations/applications/dimension/list", {}, { token, org, app })
+    apiFetch<any>("/organisations/applications/dimension/list", {}, { token, org, app })
       .then((res) => setDimensions((res.data as any[]) || []))
       .catch(() => setDimensions([]))
 

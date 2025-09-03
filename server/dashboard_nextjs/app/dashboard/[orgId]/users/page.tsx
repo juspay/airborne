@@ -11,7 +11,7 @@ type OrgUsers = { users: { user: string; access: string }[] }
 export default function OrganisationUsersPage() {
   const { token, org } = useAppContext()
   const { data, isLoading, error } = useSWR<OrgUsers>(token && org ? "/organisation/user" : null, (url) =>
-    apiFetch(url, {}, { token, org }),
+    apiFetch<any>(url, {}, { token, org }),
   )
 
   const [user, setUser] = React.useState("")
