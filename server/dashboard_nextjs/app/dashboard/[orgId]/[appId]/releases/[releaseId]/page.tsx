@@ -219,7 +219,10 @@ export default function ReleaseDetailPage() {
     try {
       await apiFetch(
         `/releases/${encodeURIComponent(releaseId)}/conclude`,
-        { method: "POST" },
+        { 
+          method: "POST",
+          body: { chosen_variant: `${releaseId}-experimental_1` }
+        },
         { token, org, app }
       )
       mutate()
