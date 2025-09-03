@@ -110,7 +110,7 @@ export default function ReleasesPage() {
                   <TableHead>Package</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="w-[200px]">Actions</TableHead>
+                  {/* <TableHead className="w-[200px]">Actions</TableHead> */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -130,7 +130,7 @@ export default function ReleasesPage() {
                       <TableCell className="text-muted-foreground">
                         {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
                       </TableCell>
-                      <TableCell className="flex gap-2">
+                      {/* <TableCell className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => rampRelease(r.id)}>
                           Ramp
                         </Button>
@@ -142,7 +142,7 @@ export default function ReleasesPage() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Link>
                         </Button>
-                      </TableCell>
+                      </TableCell> */}
                     </TableRow>
                   ))}
               </TableBody>
