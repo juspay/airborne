@@ -1055,6 +1055,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
                 [strongSelf downloadFileFromURL:split.url
                           andSaveInFilePath:tempPath
                                     inFolder:JUSPAY_PACKAGE_DIR
+                                    checksum:split.checksum
                            completionHandler:^(NSError *error) {
                     if (weakSelf) {
                         __strong HPJPApplicationManager* strongSelf = weakSelf;
@@ -1232,7 +1233,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
             __strong HPJPApplicationManager* strongSelf = weakSelf;
             if (strongSelf != nil) {
                 NSString *tempFilePath = [NSString stringWithFormat:@"%@/%@", JUSPAY_TEMP_DIR, split.filePath];
-                [strongSelf downloadFileFromURL:split.url andSaveInFilePath:tempFilePath inFolder:JUSPAY_PACKAGE_DIR completionHandler:^(NSError *error) {
+                [strongSelf downloadFileFromURL:split.url andSaveInFilePath:tempFilePath inFolder:JUSPAY_PACKAGE_DIR checksum:split.checksum completionHandler:^(NSError *error) {
                     if (error != nil) {
                         [strongSelf.tracker trackError:@"lazy_package_download_error" value:[@{@"url": [split.url absoluteString], @"error": [error localizedDescription]} mutableCopy]];
                         strongSelf.packageError = [NSString stringWithFormat:@"Failed to download lazy package: %@", [error localizedDescription]];
@@ -1484,6 +1485,7 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
             [strongSelf downloadFileFromURL:resource.url
                            andSaveInFilePath:resource.filePath
                                     inFolder:JUSPAY_RESOURCE_DIR
+                                    checksum:resource.checksum
                            completionHandler:^(NSError* downloadError) {
                 if (downloadError != nil) {
                     [strongSelf.tracker trackError:@"resource_download_failed"
@@ -1878,11 +1880,11 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     return error;
 }
 
-- (void)downloadFileFromURL:(NSURL *)resourceURL andSaveInFilePath:(NSString *)filePath inFolder:(NSString*)folderName completionHandler:(void (^)(NSError*))completionHandler {
+- (void)downloadFileFromURL:(NSURL *)resourceURL andSaveInFilePath:(NSString *)filePath inFolder:(NSString*)folderName checksum:(NSString *)checksum completionHandler:(void (^)(NSError*))completionHandler {
 
     NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970] * 1000;
     __weak HPJPApplicationManager* weakSelf = self;
-    [self.remoteFileUtil downloadFileWithoutCheckingFromURL:[resourceURL absoluteString] andSaveFileAtUrl:[self.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName] callback:^(Boolean status, id  _Nullable data, NSString * _Nullable error, NSURLResponse* response) {
+    [self.remoteFileUtil downloadFileWithoutCheckingFromURL:[resourceURL absoluteString] andSaveFileAtUrl:[self.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName] checksum:checksum callback:^(Boolean status, id  _Nullable data, NSString * _Nullable error, NSURLResponse* response) {
         if(weakSelf) {
             __strong HPJPApplicationManager* strongSelf = weakSelf;
             if (status) {

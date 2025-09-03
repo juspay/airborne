@@ -38,6 +38,18 @@
             return nil;
         }
         _filePath = filePath;
+
+        // Parse checksum
+        NSString *checksum = dictionary[@"checksum"];
+        if (checksum && ![checksum isKindOfClass:[NSString class]]) {
+            if (error) {
+                *error = [NSError errorWithDomain:@"ResourceError"
+                                            code:403
+                                        userInfo:@{NSLocalizedDescriptionKey: @"Invalid checksum"}];
+            }
+            return nil;
+        }
+        _checksum = checksum;
     }
     return self;
 }
@@ -45,7 +57,8 @@
 - (NSDictionary *)toDictionary {
     return @{
         @"url": [_url absoluteString],
-        @"file_path": _filePath
+        @"file_path": _filePath,
+        @"checksum": _checksum
     };
 }
 
@@ -69,6 +82,7 @@
         // For filePath, we expect a string
         NSSet *stringClasses = [NSSet setWithObjects:[NSString class], nil];
         _filePath = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"file_path"];
+        _checksum = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"checksum"];
     }
     return self;
 }
@@ -76,6 +90,7 @@
 - (void)encodeWithCoder:(NSCoder *)aCoder {
     [aCoder encodeObject:_url forKey:@"url"];
     [aCoder encodeObject:_filePath forKey:@"file_path"];
+    [aCoder encodeObject:_checksum forKey:@"checksum"];
 }
 
 @end
