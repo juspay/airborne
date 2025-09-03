@@ -1,7 +1,6 @@
 "use client"
 import useSWR, { mutate } from "swr"
 import React from "react"
-import SharedLayout from "@/components/shared-layout"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 import { Button } from "@/components/ui/button"
@@ -34,7 +33,7 @@ export default function OrganisationUsersPage() {
   }
 
   return (
-    <SharedLayout title="Access Management">
+    <div>
       {!org ? (
         <div className="p-6">Select an organisation first</div>
       ) : isLoading ? (
@@ -93,6 +92,6 @@ export default function OrganisationUsersPage() {
           </table>
         </div>
       )}
-    </SharedLayout>
+    </div>
   )
 }

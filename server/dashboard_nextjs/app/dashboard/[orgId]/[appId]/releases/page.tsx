@@ -13,7 +13,7 @@ import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 
-type ApiRelease = {
+export type ApiRelease = {
   id: string
   created_at?: string
   package?: { version?: number }
