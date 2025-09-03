@@ -49,7 +49,19 @@ pub struct CreateReleaseResponse {
     pub config: Config,
     pub package: ServePackage,
     pub resources: Vec<ServeFile>,
-    pub experiment: Option<ReleaseExperiment>
+    pub experiment: Option<ReleaseExperiment>,
+    pub dimensions: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Serialize)]
+pub struct GetReleaseResponse {
+    pub id: String,
+    pub created_at: DateTime<Utc>,
+    pub config: Config,
+    pub package: ServePackage,
+    pub resources: Vec<ServeFile>,
+    pub experiment: Option<ReleaseExperiment>,
+    pub dimensions: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Debug)]

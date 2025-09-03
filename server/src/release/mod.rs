@@ -115,45 +115,112 @@ async fn get_release(
         .and_then(utils::document_to_value)
         .unwrap_or_default();
 
-    let package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
-    let package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
-    let resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
+    let rc_package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
+    let rc_package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
+    let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
+    let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "id": release_key,
-        "experiment_id": release_key,
-        "org_id": organisation,
-        "app_id": application,
-        "package_version": package_version,
-        "config_version": format!("v{}", package_version),
-        "created_at": utils::dt(&exp_details.created_at),
-        "traffic_percentage": exp_details.traffic_percentage,
-        "status": match exp_details.status {
-            superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
-            superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
-            superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
-            superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
-            _ => "UNKNOWN",
-        },
-        "variants": exp_details.variants.iter().map(|variant| {
-            serde_json::json!({
-                "id": variant.id,
-                "variant_type": match variant.variant_type {
-                    superposition_rust_sdk::types::VariantType::Control => "control",
-                    superposition_rust_sdk::types::VariantType::Experimental => "experimental",
-                    _ => "unknown",
-                }
-            })
-        }).collect::<Vec<_>>(),
-        "configuration": {
-            "package": {
-                "properties": package_properties,
-                "important": package_important,
-                "lazy": package_lazy
-            },
-            "resources": resources
+    let (index_file, important_files, lazy_files, resource_files) = {
+
+        let all_files = rc_package_important.iter()
+            .chain(rc_package_lazy.iter())
+            .chain(rc_resources.iter())
+            .chain(vec![rc_index.clone()].iter())
+            .cloned()
+            .collect::<Vec<String>>();
+
+        let files_result = utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
+
+        if let Ok(files) = files_result {
+            let important_files: Vec<ServeFile> = rc_package_important.iter().filter_map(|file_key| {
+                let (file_path, _, _) = parse_file_key(file_key);
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                })
+            }).collect();
+            println!("Important files: {:?}", important_files);
+            
+            let lazy_files: Vec<ServeFile> = rc_package_lazy.iter().filter_map(|file_key| {
+                let (file_path, _, _) = parse_file_key(file_key);
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                })
+            }).collect();
+
+            let resource_files: Vec<ServeFile> = rc_resources.iter().filter_map(|file_key| {
+                let (file_path, _, _) = parse_file_key(file_key);
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                })
+            }).collect();
+
+            let index_file: ServeFile = {
+                let (file_path, _, _) = parse_file_key(&rc_index);
+                files.iter().find(|file| file.file_path == file_path.clone()).map(|file| ServeFile {
+                    file_path: file.file_path.clone(),
+                    url: file.url.clone(),
+                    checksum: file.checksum.clone()
+                }).unwrap_or_else(|| ServeFile {
+                    file_path: file_path.clone(),
+                    url: String::new(),
+                    checksum: String::new()
+                })
+            };
+
+            println!("Lazy files: {:?}", lazy_files);
+
+            (index_file, important_files, lazy_files, resource_files)
+        } else {
+            (ServeFile {
+                file_path: String::new(),
+                url: String::new(),
+                checksum: String::new()
+            }, Vec::new(), Vec::new(), Vec::new())
         }
-    })))
+    };
+
+    let resp = GetReleaseResponse {
+        id: release_key.clone(),
+        created_at: DateTime::parse_from_rfc3339(&utils::dt(&exp_details.created_at))
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|_| error::ErrorInternalServerError("Failed to parse created_at as DateTime"))?,
+        config: Config {
+            boot_timeout: 3000,
+            package_timeout: 6000,
+        },
+        package: ServePackage {
+            version: package_version,
+            index: index_file,
+            properties: package_properties,
+            important: important_files,
+            lazy: lazy_files,
+        },
+        resources: resource_files,
+        experiment: Some(ReleaseExperiment {
+            experiment_id: release_key,
+            package_version,
+            config_version: format!("v{}", package_version),
+            created_at: utils::dt(&exp_details.created_at),
+            traffic_percentage: exp_details.traffic_percentage as u32,
+            status: match exp_details.status {
+                superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED".to_string(),
+                superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS".to_string(),
+                superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED".to_string(),
+                superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED".to_string(),
+                _ => "UNKNOWN".to_string(),
+            },
+        }),
+        dimensions: exp_details.context.iter().map(|(k, v)| (k.clone(), utils::document_to_value(v).unwrap_or(Value::Null))).collect(),
+    };
+
+    Ok(HttpResponse::Ok().json(resp))
+
 }
 
 #[post("")]
@@ -580,6 +647,7 @@ async fn create_release(
                 checksum: file.checksum.clone()
             })
         }).collect(),
+        dimensions: dimensions.clone(),
         experiment: Some(ReleaseExperiment {
             experiment_id: experiment_id_for_ramping,
             package_version: pkg_version,
@@ -657,6 +725,12 @@ async fn list_releases(
             .and_then(|obj| obj.get("package.properties"))
             .and_then(utils::document_to_value)
             .unwrap_or_default();
+
+        
+        let dimensions: HashMap<String, Value> = experiment.context
+            .iter()
+            .map(|(k, v)| (k.clone(), utils::document_to_value(v).unwrap_or(Value::Null)))
+            .collect();
 
         let rc_package_important = utils::extract_files_from_experiment(&experimental_variant, "package.important");
         let rc_package_lazy = utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
@@ -754,6 +828,7 @@ async fn list_releases(
                 lazy: lazy_files,
             },
             resources: resource_files,
+            dimensions,
             experiment: Some(utils::build_release_experiment_from_experiment(
                 &experiment,
                 package_version,
