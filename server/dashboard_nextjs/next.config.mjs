@@ -5,6 +5,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: "/api/configuration",
+        destination: `${backend}/api/configuration/`,
+      },
+      {
         source: "/:api(releases|file|organisations|applications|users|packages)/:path*",
         destination: `${backend}/:api/:path*`,
       },
