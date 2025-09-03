@@ -91,21 +91,10 @@ async fn get_release(
             error::ErrorNotFound("Release/Experiment not found")
         })?;
 
-    let package_version = exp_details.name
-        .split('-')
-        .last()
-        .and_then(|part| part.strip_prefix("exp"))
-        .and_then(|v| v.parse::<i32>().ok())
-        .or_else(|| {
-            exp_details.variants.iter()
-                .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental)
-                .and_then(|v| v.id.strip_prefix("experimental_"))
-                .and_then(|v| v.parse::<i32>().ok())
-        })
-        .unwrap_or(0);
-
     let experimental_variant = exp_details.variants.iter()
         .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental);
+
+    let package_version = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "package.version");
 
     let package_properties = experimental_variant
         .and_then(|v| v.overrides.as_object())
@@ -204,8 +193,8 @@ async fn get_release(
             properties: Some(rc_properties),
         },
         package: ServePackage {
-            name: "".to_string(),
-            version: package_version,
+            name: application.clone(),
+            version: package_version as i32,
             index: index_file,
             properties: package_properties,
             important: important_files,
@@ -214,7 +203,7 @@ async fn get_release(
         resources: resource_files,
         experiment: Some(ReleaseExperiment {
             experiment_id: release_key,
-            package_version,
+            package_version: package_version as i32,
             config_version: format!("v{}", package_version),
             created_at: utils::dt(&exp_details.created_at),
             traffic_percentage: exp_details.traffic_percentage as u32,
@@ -1258,22 +1247,7 @@ async fn serve_release(
     println!("Important files: {:?}", important_files);
     println!("Lazy files: {:?}", lazy_files);
 
-    let opt_pkg_version_from_config = &config_document
-        .as_ref()
-        .and_then(|doc| {
-            if let Document::Object(obj) = doc {
-                obj.get("package.version")
-                    .and_then(utils::document_to_value)
-            } else {
-                None
-            }
-        });
-    
-    let version = opt_pkg_version_from_config
-        .as_ref()
-        .and_then(|v| v.as_i64())
-        .map(|v| v as i32)
-        .ok_or_else(|| error::ErrorBadRequest("Could not extract package version from config"))?;
+    let pkg_version = utils::extract_integer_from_configs::<i64>(&config_document, "package.version");
 
     let opt_rc_package_properties = &config_document
         .as_ref()
@@ -1296,7 +1270,7 @@ async fn serve_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: version,
+            version: pkg_version as i32,
             index: index_file,
             properties: opt_rc_package_properties.clone().unwrap_or(serde_json::Value::default()),
             important: important_files,
