@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText } from "lucide-react"
+import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings } from "lucide-react"
 import { useAppContext } from "@/providers/app-context"
 import { apiFetch } from "@/lib/api"
 import { useRouter } from "next/navigation"
@@ -30,8 +30,13 @@ type TargetingRule = {
 }
 
 export default function CreateReleasePage() {
-  const totalSteps = 4
+  const totalSteps = 5
   const [currentStep, setCurrentStep] = useState(1)
+
+  // Configuration state
+  const [bootTimeout, setBootTimeout] = useState<number>(4000)
+  const [releaseConfigTimeout, setReleaseConfigTimeout] = useState<number>(4000)
+  const [configProperties, setConfigProperties] = useState<string>("{}")
 
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}")
 
@@ -139,12 +144,14 @@ export default function CreateReleasePage() {
   const canProceedToStep = (step: number) => {
     switch (step) {
       case 1:
-        return selectedPackage !== null
+        return true // Configuration step - always can proceed
       case 2:
-        return true
+        return selectedPackage !== null
       case 3:
         return true
       case 4:
+        return true
+      case 5:
         return true
       default:
         return false
@@ -160,6 +167,14 @@ export default function CreateReleasePage() {
       return
     }
 
+    let configProps: Record<string, any> = {}
+    try {
+      configProps = configProperties.trim() ? JSON.parse(configProperties) : {}
+    } catch {
+      toastWarning("Invalid JSON", "Configuration properties must be valid JSON")
+      return
+    }
+
     const dimensionsObj: Record<string, any> = {}
     targetingRules.forEach((r) => {
       if (!r.dimension || r.values.length === 0) return
@@ -168,7 +183,12 @@ export default function CreateReleasePage() {
     })
 
     const body: any = {
-      config: { traffic_percentage: rolloutPercentage },
+      config: { 
+        traffic_percentage: rolloutPercentage,
+        boot_timeout: bootTimeout,
+        release_config_timeout: releaseConfigTimeout,
+        properties: configProps
+      },
       package: { properties, important: importantFiles, lazy: lazyFiles },
       dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
       resources: Array.from(selectedResources),
@@ -191,14 +211,15 @@ export default function CreateReleasePage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
             Create Release
           </h1>
-          <p className="text-muted-foreground mt-2">Step-by-step: package, files, targeting</p>
+          <p className="text-muted-foreground mt-2">Step-by-step: configure, package, files, targeting</p>
 
           <div className="flex items-center gap-4 mt-6">
             {[
-              { number: 1, title: "Package & Details", icon: PkgIcon },
-              { number: 2, title: "Package File Priorities", icon: Info },
-              { number: 3, title: "Resources", icon: FileText },
-              { number: 4, title: "Targeting", icon: Target },
+              { number: 1, title: "Configure", icon: Settings },
+              { number: 2, title: "Package & Details", icon: PkgIcon },
+              { number: 3, title: "Package File Priorities", icon: Info },
+              { number: 4, title: "Resources", icon: FileText },
+              { number: 5, title: "Targeting", icon: Target },
             ].map((step, index) => {
               const status =
                 step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming"
@@ -223,7 +244,7 @@ export default function CreateReleasePage() {
                       <div className="text-xs text-muted-foreground">Step {step.number}</div>
                     </div>
                   </div>
-                  {index < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                  {index < 4 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
                 </div>
               )
             })}
@@ -232,6 +253,66 @@ export default function CreateReleasePage() {
 
         <div className="space-y-6 mt-6">
           {currentStep === 1 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Configuration</CardTitle>
+                  <CardDescription>Configure timeout settings and additional properties for this release</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="bootTimeout">Boot Timeout (ms)</Label>
+                      <Input
+                        id="bootTimeout"
+                        type="number"
+                        value={bootTimeout}
+                        onChange={(e) => setBootTimeout(Number(e.target.value))}
+                        placeholder="4000"
+                        min="0"
+                        step="100"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maximum time to wait for application boot
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="releaseConfigTimeout">Release Config Timeout (ms)</Label>
+                      <Input
+                        id="releaseConfigTimeout"
+                        type="number"
+                        value={releaseConfigTimeout}
+                        onChange={(e) => setReleaseConfigTimeout(Number(e.target.value))}
+                        placeholder="4000"
+                        min="0"
+                        step="100"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Maximum time to wait for release configuration
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="configProperties">Additional Properties (JSON)</Label>
+                    <Textarea
+                      id="configProperties"
+                      rows={6}
+                      value={configProperties}
+                      onChange={(e) => setConfigProperties(e.target.value)}
+                      placeholder='{"feature_flags": {"new_ui": true}, "api_version": "v2"}'
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Additional configuration properties in JSON format
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {currentStep === 2 && (
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -301,7 +382,7 @@ export default function CreateReleasePage() {
             </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 3 && (
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -359,7 +440,7 @@ export default function CreateReleasePage() {
             </div>
           )}
 
-          {currentStep === 3 && (
+          {currentStep === 4 && (
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -446,7 +527,7 @@ export default function CreateReleasePage() {
             </div>
           )}
 
-          {currentStep === 4 && (
+          {currentStep === 5 && (
             <div className="space-y-6">
               <Card>
                 <CardHeader>
