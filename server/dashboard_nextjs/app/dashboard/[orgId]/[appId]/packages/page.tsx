@@ -28,7 +28,7 @@ export default function PackagesPage() {
   const { token, org, app } = useAppContext()
 
   const { data } = useSWR(token && org && app ? ["/packages/list", searchQuery] : null, async () =>
-    apiFetch("/packages/list", { query: { offset: 0, limit: 50 } }, { token, org, app }),
+    apiFetch<any>("/packages/list", { query: { offset: 0, limit: 50 } }, { token, org, app }),
   )
   const packages: ApiPackage[] = data?.packages || []
 
@@ -156,7 +156,7 @@ export default function PackagesPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{pkg.version}</TableCell>
                     <TableCell className="text-muted-foreground">{pkg.files.length} files</TableCell>
-                    <TableCell>
+                    {/* <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -178,7 +178,7 @@ export default function PackagesPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
+                    </TableCell> */}
                   </TableRow>
                 ))}
               </TableBody>
