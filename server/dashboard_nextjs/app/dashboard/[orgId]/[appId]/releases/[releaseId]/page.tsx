@@ -292,8 +292,8 @@ export default function ReleaseDetailPage() {
             <Tabs defaultValue="overview" className="space-y-6">
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="files">Files & Packages</TabsTrigger>
-                <TabsTrigger value="dimensions">Dimensions</TabsTrigger>
+                <TabsTrigger value="files">Files</TabsTrigger>
+                <TabsTrigger value="dimensions">Targeting</TabsTrigger>
                 <TabsTrigger value="analytics">Analytics</TabsTrigger>
               </TabsList>
 
@@ -436,6 +436,7 @@ export default function ReleaseDetailPage() {
               </TabsContent>
 
               <TabsContent value="files" className="space-y-6">
+                {/* Package Files */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Package Files</CardTitle>
@@ -448,11 +449,62 @@ export default function ReleaseDetailPage() {
                             <TableHead>Path</TableHead>
                             <TableHead>URL</TableHead>
                             <TableHead>Checksum</TableHead>
+                            <TableHead>Priority</TableHead>
                             <TableHead>Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {[...release.package.important, ...release.package.lazy].map((file, index) => (
+                            <TableRow key={index}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{file.file_path}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{file.url || "Unknown"}</Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {file.checksum}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {release.package.important.findIndex(f => f.checksum == file.checksum) !== -1 ? "important" : "lazy"}
+                              </TableCell>
+                              <TableCell>
+                                {file.url && (
+                                  <Button variant="ghost" size="sm" asChild>
+                                    <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                {/* Resource Files */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Resource Files</CardTitle>
+                    <CardDescription>Files included in this release resources</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Path</TableHead>
+                            <TableHead>URL</TableHead>
+                            <TableHead>Checksum</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {release.resources.map((file, index) => (
                             <TableRow key={index}>
                               <TableCell>
                                 <div className="flex items-center gap-2">
