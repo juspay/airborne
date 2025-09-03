@@ -30,7 +30,7 @@ export default function ApplicationsPage() {
   const [formData, setFormData] = useState({ name: "", description: "" })
 
   const { data, isLoading, error } = useSWR<OrgResp[]>(token ? "/organisations" : null, (url) =>
-    apiFetch(url, {}, { token, logout }),
+    apiFetch<any>(url, {}, { token, logout }),
   )
 
   const apps = useMemo(

@@ -28,7 +28,7 @@ export default function ReleasesPage() {
   const { token, org, app } = useAppContext()
 
   const { data, mutate } = useSWR(token && org && app ? ["/releases/list", searchQuery] : null, async () =>
-    apiFetch("/releases/list", {}, { token, org, app }),
+    apiFetch<any>("/releases/list", {}, { token, org, app }),
   )
   const releases: ApiRelease[] = data?.releases || []
 
