@@ -1,82 +1,21 @@
 "use client";
+import { ApiRelease } from "@/app/dashboard/[orgId]/[appId]/releases/page";
 import { View } from "@/app/dashboard/[orgId]/[appId]/views/page";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import React, { useEffect, useState } from "react";
-
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import Link from "next/link"
+import { Badge } from "../ui/badge";
+import { useRouter } from "next/navigation";
 interface ViewReleaseInfo {
   view: View;
 }
 
-interface ReleaseResponse {
-  id: string;
-  created_at: string;
-  config: {
-    boot_timeout: number;
-    package_timeout: number;
-  };
-  package: {
-    version: number;
-    index: {
-      file_path: string;
-      url: string;
-      checksum: string;
-    };
-    properties: Record<string, unknown>;
-    important: {
-      file_path: string;
-      url: string;
-      checksum: string;
-    }[];
-    lazy: any[];
-  };
-  resources: any[];
-  experiment: {
-    experiment_id: string;
-    package_version: number;
-    config_version: string;
-    created_at: string;
-    traffic_percentage: number;
-    status: string;
-  };
-}
-
-const demoRelease = {
-  id: "7368578018081640448",
-  created_at: "2025-09-02T09:38:21.126Z",
-  config: { boot_timeout: 4000, package_timeout: 4000 },
-  package: {
-    version: 0,
-    index: {
-      file_path: "/dist/bundle.js",
-      url: "https://assets.juspay.in/api/mpm/bigbasket.json",
-      checksum:
-        "4084cc70aab36188b520c98dd18cc3528175c010999948f41da73664b4703e0e",
-    },
-    properties: {},
-    important: [
-      {
-        file_path: "dist/app.json",
-        url: "https://airborne.sandbox.juspay.in/assets/airborne-react-example/ios/1/main.jsbundle",
-        checksum:
-          "6aae20d099c2935adce57afa6b7b23009e2a6f6888b9d271eae2a0aeb932bdf5",
-      },
-    ],
-    lazy: [],
-  },
-  resources: [],
-  experiment: {
-    experiment_id: "7368578018081640448",
-    package_version: 0,
-    config_version: "v0",
-    created_at: "2025-09-02T09:38:21.126Z",
-    traffic_percentage: 0,
-    status: "CREATED",
-  },
-};
 
 const ViewReleaseInfo: React.FC<ViewReleaseInfo> = ({ view }) => {
-  const [release, setRelease] = useState<ReleaseResponse | null>(null);
+  const router = useRouter();
+  const [releases, setReleases] = useState<ApiRelease[]>([]);
   const { token, org, app } = useAppContext();
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -87,8 +26,8 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfo> = ({ view }) => {
   const fetchRelease = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch(
-        `/releases/${org}/${app}`,
+      const {releases} : {releases : ApiRelease[]} = await apiFetch(
+        `/releases/list`,
         {
           headers: {
             "x-dimension": dimensionHeader,
@@ -96,7 +35,8 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfo> = ({ view }) => {
         },
         { token, org, app }
       );
-      setRelease(res);
+
+      setReleases(releases);
     } catch (err) {
       console.log(err);
     } finally {
@@ -116,43 +56,43 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfo> = ({ view }) => {
       </div>
     );
   }
-  const hasRelease = release?.id;
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-      {!hasRelease ? (
+      {releases.length === 0 ? (
         <p className="text-gray-600 dark:text-gray-300">No release yet</p>
       ) : (
-        <div className="space-y-2">
-          {/* Package version quick info */}
-          <div className="mt-2 text-sm text-gray-700">
-            <p>Package Version: {release?.package.version}</p>
-          </div>
+        <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Package</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
 
-          {/* Render config JSON */}
-          <div className="mt-3">
-            <h4 className="font-medium text-gray-800">Config</h4>
-            <pre className="bg-gray-100 text-black text-xs rounded-md p-3 overflow-x-auto">
-              {JSON.stringify(release?.config, null, 2)}
-            </pre>
-          </div>
-
-          {/* Render package JSON */}
-          <div className="mt-3">
-            <h4 className="font-medium text-gray-800">Package</h4>
-            <pre className="bg-gray-100 text-black text-xs rounded-md p-3 overflow-x-auto">
-              {JSON.stringify(release?.package, null, 2)}
-            </pre>
-          </div>
-
-          {/* Render resources JSON */}
-          <div className="mt-3">
-            <h4 className="font-medium text-gray-800">Resources</h4>
-            <pre className="bg-gray-100 text-black text-xs rounded-md p-3 overflow-x-auto">
-              {JSON.stringify(release?.resources, null, 2)}
-            </pre>
-          </div>
-        </div>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {releases
+                  .map((r) => (
+                    <TableRow key={r.id} onClick={() => router.push(`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`)}>
+                      <TableCell className="font-mono text-sm">
+                        <Link href={`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`} className="hover:text-primary">
+                          {r.id}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{r.package?.version ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{r.status || "—"}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                      </TableCell>
+                     
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
       )}
     </div>
   );

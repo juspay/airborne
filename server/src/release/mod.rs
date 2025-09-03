@@ -15,7 +15,10 @@
 use actix_web::{get, post, web::{self, Json, Path}, HttpResponse, Scope, error};
 use rand::Rng;
 use serde_json::Value;
-use std::{collections::{HashMap, HashSet}};
+use http::{Uri, uri::PathAndQuery};
+use std::str::FromStr;
+use url::form_urlencoded;
+use std::collections::{HashMap, HashSet};
 use diesel::{prelude::*};
 use chrono::{DateTime, Utc};
 use superposition_sdk::types::builders::VariantBuilder;
@@ -705,6 +708,7 @@ async fn create_release(
 
 #[get("/list")]
 async fn list_releases(
+    req :actix_web::HttpRequest,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<ListReleaseResponse>> {
@@ -726,11 +730,56 @@ async fn list_releases(
             error::ErrorInternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
 
+    let context: HashMap<String, Value> = req
+        .headers()
+        .get("x-dimension")
+        .and_then(|val| val.to_str().ok())
+        .map(utils::parse_kv_string)
+        .unwrap_or_default();
+
     let experiments_list = state
         .superposition_client
         .list_experiment()
         .org_id(superposition_org_id_from_env)
         .workspace_id(workspace_name)
+        .customize()
+        .mutate_request(move |req| {
+            let uri: http::Uri = req
+                .uri()
+                .parse()
+                .expect("Failed to parse URI from request");
+            // Split current URI into parts
+            let mut parts = uri.into_parts();
+            let (path, existing_q) = match parts.path_and_query.take() {
+                Some(pq) => {
+                    let s = pq.as_str();
+                    match s.split_once('?') {
+                        Some((p, q)) => (p.to_string(), Some(q.to_string())),
+                        None => (s.to_string(), None),
+                    }
+                }
+                None => ("/".to_string(), None),
+            };
+
+            
+            let mut ser = form_urlencoded::Serializer::new(String::new());
+            if let Some(eq) = existing_q {
+                for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
+                    ser.append_pair(&k, &v);
+                }
+            }
+            for (k, v) in &context {
+                if let Some(val_str) = v.as_str() {
+                    ser.append_pair(&format!("dimension[{k}]"), val_str);
+                }
+            }       
+
+            let new_q = ser.finish();
+            let pq = if new_q.is_empty() { path } else { format!("{path}?{new_q}") };
+
+            parts.path_and_query = Some(PathAndQuery::from_str(&pq).expect("valid path/query"));
+            *req.uri_mut() = Uri::from_parts(parts).expect("valid uri").into();
+        })
         .send()
         .await
         .map_err(|e| {

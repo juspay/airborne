@@ -33,7 +33,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import SharedLayout from "@/components/shared-layout"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 import json from "highlight.js/lib/languages/json"
@@ -245,7 +244,6 @@ export default function ReleaseDetailPage() {
   ).value;
 
   return (
-    <SharedLayout>
       <div className="min-h-screen bg-background">
         <div className="flex">
           {/* Main Content */}
@@ -669,6 +667,5 @@ export default function ReleaseDetailPage() {
           </main>
         </div>
       </div>
-    </SharedLayout>
   )
 }
