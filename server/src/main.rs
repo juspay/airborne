@@ -35,7 +35,7 @@ extern crate hyper;
 extern crate rustls;
 use google_sheets4::{yup_oauth2::{self, ServiceAccountAuthenticator}, Sheets, hyper_util, hyper_rustls};
 use middleware::auth::Auth;
-use superposition_rust_sdk::config::Config as SrsConfig;
+use superposition_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
 use crate::dashboard::configuration;
@@ -166,7 +166,7 @@ async fn main() -> std::io::Result<()> {
     
 
     // Create a shared state for the application
-    let superposition_client = superposition_rust_sdk::Client::from_conf(
+    let superposition_client = superposition_sdk::Client::from_conf(
         SrsConfig::builder()
             .endpoint_url(cac_url.clone())
             .behavior_version_latest()
@@ -195,7 +195,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::Compress::default())
             .service(docs::add_routes())
             .service(
-                web::scope(&format!("/{}/release", server_path_prefix)).service(release::add_public_routes()),
+                web::scope("/release").service(release::add_public_routes()),
                 // Decide if this needs auth; Ideally this only needs signature verfication
             )
             .service(

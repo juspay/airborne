@@ -18,7 +18,7 @@ use serde_json::Value;
 use std::{collections::{HashMap, HashSet}};
 use diesel::{prelude::*};
 use chrono::{DateTime, Utc};
-use superposition_rust_sdk::types::builders::VariantBuilder;
+use superposition_sdk::types::builders::VariantBuilder;
 use aws_smithy_types::{Document};
 
 use crate::{
@@ -92,7 +92,7 @@ async fn get_release(
         })?;
 
     let experimental_variant = exp_details.variants.iter()
-        .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental);
+        .find(|v| v.variant_type == superposition_sdk::types::VariantType::Experimental);
 
     let package_version = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "package.version");
 
@@ -208,10 +208,10 @@ async fn get_release(
             created_at: utils::dt(&exp_details.created_at),
             traffic_percentage: exp_details.traffic_percentage as u32,
             status: match exp_details.status {
-                superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED".to_string(),
-                superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS".to_string(),
-                superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED".to_string(),
-                superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED".to_string(),
+                superposition_sdk::types::ExperimentStatusType::Created => "CREATED".to_string(),
+                superposition_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS".to_string(),
+                superposition_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED".to_string(),
+                superposition_sdk::types::ExperimentStatusType::Discarded => "DISCARDED".to_string(),
                 _ => "UNKNOWN".to_string(),
             },
         }),
@@ -454,66 +454,68 @@ async fn create_release(
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
     
-    if !is_first_release {
-        if let Some(Document::Object(obj)) = &config_document {
-            if let Some(version) = obj.get("config.version") {
-                control_overrides.insert("config.version".to_string(), version.clone());
-            } else {
-                control_overrides.insert("config.version".to_string(), Document::String(config_version.clone()));
-            }
-            if let Some(boot_timeout) = obj.get("config.boot_timeout") {
-                control_overrides.insert("config.boot_timeout".to_string(), boot_timeout.clone());
-            } else {
-                control_overrides.insert("config.boot_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout as u64)));
-            }
-            if let Some(release_config_timeout) = obj.get("config.release_config_timeout") {
-                control_overrides.insert("config.release_config_timeout".to_string(), release_config_timeout.clone());
-            } else {
-                control_overrides.insert("config.release_config_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.release_config_timeout as u64)));
-            }
-            if let Some(props) = obj.get("config.properties") {
-                control_overrides.insert("config.properties".to_string(), props.clone());
-            } else {
-                control_overrides.insert("config.properties".to_string(), Document::Object(std::collections::HashMap::new()));
-            }
-            control_overrides.insert("package.name".to_string(), Document::String(application.clone()));
-            if let Some(package_idx) = obj.get("package.index") {
-                control_overrides.insert("package.index".to_string(), package_idx.clone());
-            } else {
-                control_overrides.insert("package.index".to_string(), Document::String("".to_string()));
-            }
-            if let Some(version) = obj.get("package.version") {
-                control_overrides.insert("package.version".to_string(), version.clone());
-            } else {
-                control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
-            }
-            if let Some(props) = obj.get("package.properties") {
-                control_overrides.insert("package.properties".to_string(), props.clone());
-            } else {
-                control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
-            }
-            if let Some(important) = obj.get("package.important") {
-                control_overrides.insert("package.important".to_string(), important.clone());
-            } else {
-                let default_important_docs: Vec<Document> = package_data.files.iter()
-                    .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
-                    .collect();
-                control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
-            }
-            if let Some(lazy) = obj.get("package.lazy") {
-                control_overrides.insert("package.lazy".to_string(), lazy.clone());
-            } else {
-                control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
-            }
-            if let Some(resources) = obj.get("resources") {
-                control_overrides.insert("resources".to_string(), resources.clone());
-            } else {
-                control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
-            }
+    if let Some(Document::Object(obj)) = &config_document {
+        if let Some(version) = obj.get("config.version") {
+            control_overrides.insert("config.version".to_string(), version.clone());
         } else {
-            // Config is empty, throw internal error
-            return Err(error::ErrorInternalServerError("Resolved config is not an object".to_string()));
+            control_overrides.insert("config.version".to_string(), Document::String(config_version.clone()));
         }
+        if let Some(boot_timeout) = obj.get("config.boot_timeout") {
+            control_overrides.insert("config.boot_timeout".to_string(), boot_timeout.clone());
+        } else {
+            control_overrides.insert("config.boot_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout as u64)));
+        }
+        if let Some(release_config_timeout) = obj.get("config.release_config_timeout") {
+            control_overrides.insert("config.release_config_timeout".to_string(), release_config_timeout.clone());
+        } else {
+            control_overrides.insert("config.release_config_timeout".to_string(), Document::Number(aws_smithy_types::Number::PosInt(req.config.release_config_timeout as u64)));
+        }
+        if let Some(props) = obj.get("config.properties") {
+            control_overrides.insert("config.properties".to_string(), props.clone());
+        } else {
+            control_overrides.insert("config.properties".to_string(), Document::Object(std::collections::HashMap::new()));
+        }
+        if let Some(version) = obj.get("package.name") {
+            control_overrides.insert("package.name".to_string(), version.clone());
+        } else {
+            control_overrides.insert("package.name".to_string(), Document::String("".to_string()));
+        }
+        if let Some(package_idx) = obj.get("package.index") {
+            control_overrides.insert("package.index".to_string(), package_idx.clone());
+        } else {
+            control_overrides.insert("package.index".to_string(), Document::String("".to_string()));
+        }
+        if let Some(version) = obj.get("package.version") {
+            control_overrides.insert("package.version".to_string(), version.clone());
+        } else {
+            control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
+        }
+        if let Some(props) = obj.get("package.properties") {
+            control_overrides.insert("package.properties".to_string(), props.clone());
+        } else {
+            control_overrides.insert("package.properties".to_string(), Document::Object(std::collections::HashMap::new()));
+        }
+        if let Some(important) = obj.get("package.important") {
+            control_overrides.insert("package.important".to_string(), important.clone());
+        } else {
+            let default_important_docs: Vec<Document> = package_data.files.iter()
+                .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
+                .collect();
+            control_overrides.insert("package.important".to_string(), Document::Array(default_important_docs));
+        }
+        if let Some(lazy) = obj.get("package.lazy") {
+            control_overrides.insert("package.lazy".to_string(), lazy.clone());
+        } else {
+            control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
+        }
+        if let Some(resources) = obj.get("resources") {
+            control_overrides.insert("resources".to_string(), resources.clone());
+        } else {
+            control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
+        }
+    } else {
+        // Config is empty, throw internal error
+        return Err(error::ErrorInternalServerError("Resolved config is not an object".to_string()));
     }
 
     let mut experimental_overrides: std::collections::HashMap<String, Document> = std::collections::HashMap::new();
@@ -546,18 +548,12 @@ async fn create_release(
         experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
     }
 
-    // If it's first release, make control same as experimental
-    if is_first_release {
-        control_overrides = experimental_overrides.clone();
-        control_overrides.insert("package.version".to_string(), Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)));
-    }
-
     println!("Control overrides: {:?}", control_overrides);
     println!("Experimental overrides: {:?}", experimental_overrides);
 
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
-        .variant_type(superposition_rust_sdk::types::VariantType::Control)
+        .variant_type(superposition_sdk::types::VariantType::Control)
         .overrides(Document::Object(control_overrides))
         .build()
         .map_err(error::ErrorInternalServerError)?;
@@ -566,25 +562,10 @@ async fn create_release(
     
     let experimental_variant = VariantBuilder::default()
         .id(experimental_variant_id.clone())
-        .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
+        .variant_type(superposition_sdk::types::VariantType::Experimental)
         .overrides(Document::Object(experimental_overrides))
         .build()
         .map_err(error::ErrorInternalServerError)?;
-
-    let context = if let Some(dims) = &req.dimensions {
-        let conditions: Vec<Document> = dims.iter().map(|(key, value)| {
-            let condition = serde_json::json!({
-                "==": [
-                    {"var": key},
-                    value
-                ]
-            });
-            utils::value_to_document(&condition)
-        }).collect();
-        conditions
-    } else {
-        vec![]
-    };
 
     let created_experiment_response = state
         .superposition_client
@@ -592,7 +573,7 @@ async fn create_release(
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
         .name(format!("{}-{}-release-exp", application, organisation))
-        .experiment_type(superposition_rust_sdk::types::ExperimentType::Default)
+        .experiment_type(superposition_sdk::types::ExperimentType::Default)
         .description(format!(
             "Release experiment for application {} in organisation {} with package version {}",
             application, organisation, pkg_version
@@ -604,11 +585,13 @@ async fn create_release(
         .variants(control_variant)
         .variants(experimental_variant);
 
-    let created_experiment_response = if !context.is_empty() {
-        created_experiment_response.context("and", Document::Array(context))
-    } else {
-        created_experiment_response.set_context(Some(std::collections::HashMap::new()))
-    };
+    let created_experiment_response = created_experiment_response.set_context(Some(
+        req.dimensions.clone()
+            .unwrap_or(HashMap::new())
+            .into_iter()
+            .map(|(k, v)| (k.clone(), utils::value_to_document(&v)))
+            .collect::<HashMap<_, _>>()
+    ));
     
     let created_experiment_response = created_experiment_response.send().await.map_err(|e| {
         eprintln!("Failed to create experiment: {:?}", e);
@@ -622,6 +605,25 @@ async fn create_release(
             .filter_map(|f| f.as_ref().cloned())
             .collect()
     });
+
+    if is_first_release {
+        // For first ever release -> Directly conclude the experiment to make it live
+        let transformed_variant_id = format!("{}-experimental_1", experiment_id_for_ramping);
+        println!("Concluding first release experiment with variant id: {}", transformed_variant_id);
+        let _ = ramp_experiment(&state, &workspace_name, &experiment_id_for_ramping, 50, &Some("Ramping first release experiment to 50%".to_string())).await?;
+        let _ = state.superposition_client.conclude_experiment()
+            .org_id(superposition_org_id_from_env.clone())
+            .workspace_id(workspace_name.clone())
+            .id(experiment_id_for_ramping.clone())
+            .chosen_variant(transformed_variant_id.clone())
+            .change_reason(
+                "Concluding first release experiment to make it live".to_string()
+            )
+            .send().await.map_err(|e| {
+                eprintln!("Failed to conclude first release experiment: {:?}", e);
+                error::ErrorInternalServerError("Failed to conclude experiment".to_string())
+            });
+    }
 
     let response_lazy = final_lazy.unwrap_or_default();
 
@@ -746,21 +748,11 @@ async fn list_releases(
     let mut releases = Vec::new();
     
     for experiment in release_experiments {
-        let package_version = experiment.name
-            .split('-')
-            .last()
-            .and_then(|part| part.strip_prefix("exp"))
-            .and_then(|v| v.parse::<i32>().ok())
-            .or_else(|| {
-                experiment.variants.iter()
-                    .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental)
-                    .and_then(|v| v.id.strip_prefix("experimental_"))
-                    .and_then(|v| v.parse::<i32>().ok())
-            })
-            .unwrap_or(0);
 
         let experimental_variant = experiment.variants.iter()
-            .find(|v| v.variant_type == superposition_rust_sdk::types::VariantType::Experimental);
+            .find(|v| v.variant_type == superposition_sdk::types::VariantType::Experimental);
+
+        let package_version = utils::extract_integer_from_experiment::<i64>(&experimental_variant, "package.version") as i32;
 
         let rc_package_properties = experimental_variant
             .and_then(|v| v.overrides.as_object())
@@ -1105,7 +1097,7 @@ async fn serve_release(
         superposition_org_id_from_env
     );
 
-    let toss = rand::thread_rng().gen_range(1..=100);
+    let toss = rand::thread_rng().gen_range(1..=1000000000);
 
     let applicable_variants = context.iter().fold(
         state
@@ -1113,7 +1105,7 @@ async fn serve_release(
             .applicable_variants()
             .workspace_id(workspace_name.clone())
             .org_id(superposition_org_id_from_env.clone())
-            .toss(toss),
+            .identifier(toss.to_string()),
         |builder, (key, value)| {
             builder.context(
                 key.clone(),

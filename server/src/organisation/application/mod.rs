@@ -22,9 +22,9 @@ use aws_smithy_types::Document;
 use keycloak::types::GroupRepresentation;
 use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
-use superposition_rust_sdk::operation::create_default_config::{CreateDefaultConfigOutput};
-use superposition_rust_sdk::types::WorkspaceStatus;
-use superposition_rust_sdk::Client;
+use superposition_sdk::operation::create_default_config::{CreateDefaultConfigOutput};
+use superposition_sdk::types::WorkspaceStatus;
+use superposition_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, WRITE};
 use crate::types::{ABError, AppState};

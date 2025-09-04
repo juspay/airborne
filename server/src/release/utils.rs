@@ -4,7 +4,7 @@ use diesel::{pg::Pg, pg::PgConnection, prelude::*, r2d2::{ConnectionManager, Poo
 use chrono::{DateTime, Utc};
 use aws_smithy_types::{Document};
 use serde_json::Value;
-use superposition_rust_sdk::types::Variant;
+use superposition_sdk::types::Variant;
 
 use crate::{
     file::utils::parse_file_key, release::models::*, utils::db::{
@@ -87,7 +87,7 @@ pub fn extract_files_from_experiment(experimental_variant: &Option<&Variant>, ke
         .unwrap_or_default()
 }
 
-pub fn extract_integer_from_experiment<T>(experimental_variant: &Option<&Variant>, key: &str) -> T where T: Default + From<i64> + From<u32> {
+pub fn extract_integer_from_experiment<T>(experimental_variant: &Option<&Variant>, key: &str) -> T where T: Default + From<i32> + From<i64> + From<u32> {
     experimental_variant
         .and_then(|v| v.overrides.as_object())
         .and_then(|obj| obj.get(key))
@@ -165,7 +165,7 @@ pub fn get_files_by_file_keys(conn: &mut PooledConnection<ConnectionManager<PgCo
 }
 
 pub fn build_release_experiment_from_experiment(
-    experiment: &superposition_rust_sdk::types::ExperimentResponse,
+    experiment: &superposition_sdk::types::ExperimentResponse,
     package_version: i32,
 ) -> ReleaseExperiment {
     ReleaseExperiment {
@@ -175,10 +175,10 @@ pub fn build_release_experiment_from_experiment(
         created_at: dt(&experiment.created_at),
         traffic_percentage: experiment.traffic_percentage as u32,
         status: match experiment.status {
-            superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
-            superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
-            superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
-            superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
+            superposition_sdk::types::ExperimentStatusType::Created => "CREATED",
+            superposition_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
+            superposition_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
+            superposition_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
             _ => "UNKNOWN",
         }.to_string(),
     }

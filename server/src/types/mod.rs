@@ -15,7 +15,7 @@
 use actix_web::{http::StatusCode};
 use thiserror::Error;
 use serde::{Deserialize, Serialize};
-use superposition_rust_sdk::Client;
+use superposition_sdk::Client;
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 
 use crate::utils::db;
@@ -182,16 +182,6 @@ pub struct Config {
 #[derive(Serialize, Debug)]
 pub struct ConfigProperties {
     pub tenant_info: serde_json::Value,
-}
-
-#[derive(Debug)]
-pub struct PackageMeta {
-    pub package: InnerPackage,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct InnerPackage {
-    pub version: i32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
