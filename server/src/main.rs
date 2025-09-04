@@ -22,8 +22,9 @@ mod docs;
 mod home;
 mod middleware;
 mod organisation;
-mod release;
+mod package;
 mod user;
+mod file;
 
 mod types;
 mod utils;
@@ -34,11 +35,12 @@ extern crate hyper;
 extern crate rustls;
 use google_sheets4::{yup_oauth2::{self, ServiceAccountAuthenticator}, Sheets, hyper_util, hyper_rustls};
 use middleware::auth::Auth;
-use superposition_rust_sdk::config::Config as SrsConfig;
+use superposition_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::home::index;
+use crate::dashboard::configuration;
 
+mod release;
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[actix_web::main]
@@ -86,6 +88,9 @@ async fn main() -> std::io::Result<()> {
         std::env::var("CLOUDFRONT_DISTRIBUTION_ID")
             .unwrap_or_default();
 
+    let server_path_prefix = std::env::var("SERVER_PATH_PREFIX")
+        .unwrap_or_else(|_| "api".to_string());
+
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
     let mut force_path_style = false;
@@ -119,7 +124,7 @@ async fn main() -> std::io::Result<()> {
         bucket_name,
         superposition_org_id: superposition_org_id_env,
         enable_google_signin: enable_google_signin,
-        organisation_creation_disabled: organisation_creation_disabled,
+        organisation_creation_disabled: false,
         google_spreadsheet_id: spreadsheet_id.clone(),
         cloudfront_distribution_id: cf_distribution_id.clone()
     };
@@ -161,7 +166,7 @@ async fn main() -> std::io::Result<()> {
     
 
     // Create a shared state for the application
-    let superposition_client = superposition_rust_sdk::Client::from_conf(
+    let superposition_client = superposition_sdk::Client::from_conf(
         SrsConfig::builder()
             .endpoint_url(cac_url.clone())
             .behavior_version_latest()
@@ -188,44 +193,47 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::from(app_state.clone()))
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::Compress::default())
-            .service(
-                // APIs specific to the dashboard
-                // These will be all public (or with token as cookie) endpoints which serve dashboard JS code
-                // Can eventually be migrated to some server side rendering
-                web::scope("/dashboard").service(dashboard::add_routes()),
-            )
-            .route("/", web::get().to(index))
-            .route("", web::get().to(index))
-            .route("/privacy-policy", web::get().to(index))
-            .route("/terms-of-use", web::get().to(index))
             .service(docs::add_routes())
-            .service(home::add_routes())
             .service(
-                web::scope("/organisations")
+                web::scope("/release").service(release::add_public_routes()),
+                // Decide if this needs auth; Ideally this only needs signature verfication
+            )
+            .service(
+                web::scope(&format!("/{}/dashboard/configuration", server_path_prefix)).service(configuration::add_routes()),
+            )
+            .service(
+                web::scope(&format!("/{}/organisations", server_path_prefix))
                     .wrap(Auth { env: env.clone() })
                     .service(organisation::add_routes()),
             )
             .service(
-                web::scope("/organisation/user")
+                web::scope(&format!("/{}/organisation/user", server_path_prefix))
                     .wrap(Auth { env: env.clone() })
                     .service(organisation::user::add_routes()),
             )
             .service(
-                web::scope("/user")
+                web::scope(&format!("/{}/user", server_path_prefix))
                     .wrap(Auth { env: env.clone() })
                     .service(user::get_user),
             )
-            .service(web::scope("/users").service(user::add_routes()))
+            .service(web::scope(&format!("/{}/users", server_path_prefix)).service(user::add_routes()))
             .service(
-                web::scope("/release").service(release::add_routes()),
-                // Decide if this needs auth; Ideally this only needs signature verfication
+                web::scope(&format!("/{}/file", server_path_prefix))
+                    .wrap(Auth { env: env.clone() })
+                    .service(file::add_routes()),
+            )
+            .service(
+                web::scope(&format!("/{}/packages", server_path_prefix))
+                    .wrap(Auth { env: env.clone() })
+                    .service(package::add_routes()),
+            )
+            .service(
+                web::scope(&format!("/{}/releases", server_path_prefix))
+                    .wrap(Auth { env: env.clone() })
+                    .service(release::add_routes()),
             )
     })
     .bind(("0.0.0.0", port))? // Listen on all interfaces
     .run()
     .await
 }
-
-// Create Workspace
-// Update Worspace
-// Middleware for authentication via CAC key cloak
