@@ -140,7 +140,7 @@ export default function CreatePackagePage() {
           </Button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
-              Create Package
+              Create Package Version
             </h1>
             <p className="text-muted-foreground mt-2">Bundle files together with properties and metadata</p>
 
@@ -197,20 +197,6 @@ export default function CreatePackagePage() {
                       value={tag} 
                       onChange={(e) => setTag(e.target.value)} 
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="properties">Package Properties (JSON)</Label>
-                    <Textarea
-                      id="properties"
-                      placeholder='{"featureFlag": true, "environment": "production"}'
-                      rows={4}
-                      value={packageProperties}
-                      onChange={(e) => setPackageProperties(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Optional JSON object containing package metadata and configuration
-                    </p>
                   </div>
                 </CardContent>
               </Card>
