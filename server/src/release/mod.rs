@@ -15,9 +15,15 @@
 use std::collections::HashMap;
 
 use actix_web::{
-    error::{self}, get, web::{self, Json}, HttpResponse, Result, Scope
+    error::{self},
+    get,
+    web::{self},
+    HttpResponse, Result, Scope,
 };
 use aws_smithy_types::Document;
+use diesel::prelude::*;
+use diesel::ExpressionMethods;
+use diesel::QueryDsl;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -37,10 +43,6 @@ use crate::{
 };
 
 use crate::utils::db::schema::hyperotaserver::packages::dsl::*;
-
-use diesel::prelude::*;
-use diesel::ExpressionMethods;
-use diesel::QueryDsl;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -299,10 +301,7 @@ async fn serve_release(
             actix_web::http::header::CACHE_CONTROL,
             "Cache-Control: public, max-age=86400, stale-while-revalidate=60",
         ))
-        .insert_header((
-            actix_web::http::header::CONTENT_TYPE,
-            "application/json",
-        ))
+        .insert_header((actix_web::http::header::CONTENT_TYPE, "application/json"))
         .json(release_config);
     Ok(response)
 }
