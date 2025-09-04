@@ -18,7 +18,7 @@ export async function apiFetch<T>(
   ctx?: { token?: string | null; org?: string | null; app?: string | null; logout?: () => void },
 ): Promise<T> {
   const showErrorToast = opts.showErrorToast !== false // Default to true unless explicitly set to false
-  
+  path = `/api/${path}`
   const url = new URL(
     (API_BASE || "") + path,
     typeof window === "undefined" ? "http://localhost" : window.location.origin,
@@ -53,7 +53,7 @@ export async function apiFetch<T>(
     })
 
     // Handle different HTTP status codes
-    if (res.status === 401 || res.status === 403) {
+    if ((res.status === 401 || res.status === 403) && !path.includes("login")) {
       // Handle unauthorized access
       console.error("Unauthorized access - redirecting to login")
       localStorage.clear()

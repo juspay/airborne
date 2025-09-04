@@ -5,8 +5,8 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: "/:api(releases|file|organisations|applications|users|packages)/:path*",
-        destination: `${backend}/:api/:path*`,
+        source: "/api/:api(releases|file|organisations|applications|users|packages)/:path*",
+        destination: `${backend}/api/:api/:path*`,
       },
     ];
   },

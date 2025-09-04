@@ -24,7 +24,10 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (token) router.replace("/dashboard")
+    if (token && token != ""){
+      console.log("Nav to dashboard effect", token)
+      router.replace("/dashboard")
+    }
   }, [token, router])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -43,7 +46,7 @@ export default function LoginPage() {
       const app = res?.organisations?.[0]?.applications?.[0]?.application || ""
       if (org) setOrganisation(org)
       if (app) setApplication(app)
-      window.location.href = "/dashboard"
+      // if(res?.user_token?.access_token) window.location.href = "/dashboard"
     } catch (err: any) {
       // Error toast will be shown automatically by apiFetch
     } finally {

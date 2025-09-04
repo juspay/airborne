@@ -18,6 +18,8 @@ import { useRouter } from "next/navigation"
 import { parseFileRef } from "@/lib/utils"
 import Link from "next/link"
 import { toastWarning } from "@/hooks/use-toast"
+import { ApiRelease } from "../page"
+import useSWR from "swr"
 
 type Pkg = { index: string; tag: string; version: number; files: string[] }
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number }
@@ -110,6 +112,11 @@ export default function CreateReleasePage() {
       })
       .catch(() => setAllResources([]))
   }, [token, org, app])
+
+  const { data, mutate } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
+    apiFetch<any>("/releases/list", {}, { token, org, app }),
+  )
+  const releases: ApiRelease[] = data?.releases || []
 
   const filteredPackages = useMemo(
     () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
@@ -527,15 +534,15 @@ export default function CreateReleasePage() {
             </div>
           )}
 
-          {currentStep === 5 && (
+          {currentStep === 5 && releases.length > 0 && (
             <div className="space-y-6">
               <Card>
-                <CardHeader>
+                {/* <CardHeader>
                   <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
                   <CardDescription>Control which users receive this release based on dimensions</CardDescription>
-                </CardHeader>
+                </CardHeader> */}
                 <CardContent className="space-y-6">
-                  <div className="space-y-4">
+                  {/* <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="rollout">Rollout Percentage</Label>
                       <span className="text-sm font-medium">{rolloutPercentage}%</span>
@@ -550,7 +557,7 @@ export default function CreateReleasePage() {
                       onChange={(e) => setRolloutPercentage(Number(e.target.value))}
                       className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
                     />
-                  </div>
+                  </div> */}
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -642,6 +649,17 @@ export default function CreateReleasePage() {
                     )}
                   </div>
                 </CardContent>
+              </Card>
+            </div>
+          )}
+          {currentStep == 5 && releases.length == 0 && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
+                  <CardDescription>You are not allowed to target or stagger your first release, this is going to be your default release.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6"></CardContent>
               </Card>
             </div>
           )}

@@ -14,12 +14,15 @@ import Link from "next/link"
 import { apiFetch } from "@/lib/api"
 import { useAppContext } from "@/providers/app-context"
 
-type ApiRelease = {
+export type ApiRelease = {
   id: string
   created_at?: string
   package?: { version?: number }
   configuration?: any
-  status?: string
+  experiment?: {
+    status: string
+    traffic_percentage: number
+  }
 }
 
 export default function ReleasesPage() {
@@ -115,7 +118,7 @@ export default function ReleasesPage() {
               </TableHeader>
               <TableBody>
                 {releases
-                  .filter((r) => (filterStatus === "all" ? true : r.status === filterStatus))
+                  .filter((r) => (filterStatus === "all" ? true : r.experiment?.status === filterStatus))
                   .map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-sm">
@@ -125,7 +128,12 @@ export default function ReleasesPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{r.package?.version ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{r.status || "—"}</Badge>
+                        {r.experiment?.status != "INPROGRESS" && (
+                          <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
+                        )}
+                        {r.experiment?.status == "INPROGRESS" && (
+                          <Badge variant="outline">Ramping to {r.experiment?.traffic_percentage || "—"}%</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
