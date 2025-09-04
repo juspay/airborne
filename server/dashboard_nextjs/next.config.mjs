@@ -5,6 +5,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: "/analytics/:path*",
+        destination: `https://airborne.juspay.in/analytics/:path*`,
+      },
+      {
         source: "/api/dashboard/configuration",
         destination: `${backend}/api/dashboard/configuration/`,
       },

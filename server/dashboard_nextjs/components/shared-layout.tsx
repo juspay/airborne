@@ -153,7 +153,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   };
   return (
     <div className="min-h-screen bg-background h-full">
-      <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+      <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
         <div className="flex h-16 items-center px-6">
           <div className="flex items-center gap-4">
             <Link href="/dashboard" className="flex items-center gap-2">
@@ -272,7 +272,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
       <div className="flex">
         {org && (
-          <aside className="min-h-screen w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50">
+          <aside className="sticky top-16 h-[calc(100vh-4rem)] w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50 overflow-y-auto">
             <nav className="p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm">
                 <DropdownMenu>

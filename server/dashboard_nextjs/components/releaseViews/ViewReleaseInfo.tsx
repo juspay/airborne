@@ -83,7 +83,7 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfo> = ({ view }) => {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{r.package?.version ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{r.status || "—"}</Badge>
+                        <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}

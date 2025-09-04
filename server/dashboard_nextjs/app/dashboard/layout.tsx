@@ -16,7 +16,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (!token) return null
   return <SharedLayout>
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {children}
     </div>
   </SharedLayout>
