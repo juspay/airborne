@@ -611,9 +611,6 @@ export default function CreateReleasePage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="equals">Equals</SelectItem>
-                                      <SelectItem value="not_equals">Not Equals</SelectItem>
-                                      <SelectItem value="in">In</SelectItem>
-                                      <SelectItem value="not_in">Not In</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>

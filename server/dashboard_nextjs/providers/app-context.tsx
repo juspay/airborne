@@ -1,5 +1,6 @@
 "use client"
 
+import { apiFetch } from "@/lib/api";
 import type React from "react"
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
@@ -42,9 +43,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const fetchConfig = async () => {
-    const res = await fetch("/api/configuration");
-    const data = await res.json();
-    setConfig(data);
+    const res: Configuration = await apiFetch("/dashboard/configuration");
+    setConfig(res);
   }
 
   useEffect(() => {

@@ -112,7 +112,7 @@ export default function DimensionsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Description *</Label>
                   <Textarea
                     id="description"
                     rows={2}
@@ -125,7 +125,7 @@ export default function DimensionsPage() {
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreate} disabled={ !formData.key }>
+                  <Button onClick={handleCreate} disabled={ !formData.key || !formData.description }>
                     Create Dimension
                   </Button>
                 </div>

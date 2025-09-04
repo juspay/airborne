@@ -290,7 +290,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                     {appsForOrg.map((a) => (
                       <DropdownMenuItem
                         key={a}
-                        onClick={() => setApplication(a)}
+                        onClick={() => router.push("/dashboard/" + org + "/" + a)}
                       >
                         {a}
                       </DropdownMenuItem>
