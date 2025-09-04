@@ -13,33 +13,37 @@ use urlencoding::encode;
 // Type alias for Diesel's connection pool
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 
-pub async fn get_database_url(userkey: &str, passwordkey: &str, kms_client: &Client) -> String {
-    let db_user: String = env::var(userkey).expect("DB_USER must be set");
-
-    // Check if DATABASE_URL is set - use it directly if available for local development
-    if let Ok(database_url) = env::var("DATABASE_URL") {
+pub async fn get_database_url(
+    user_key: &str,
+    password_key: &str,
+    url_key: &str,
+    kms_client: &Client,
+) -> String {
+    // Check if `url_key` is set - use it directly if available for local development
+    if let Ok(database_url) = env::var(url_key) {
         return database_url;
     }
 
+    let db_user: String = env::var(user_key).expect(&format!("{user_key} must be set"));
+
     let x = decrypt_kms(
         kms_client,
-        env::var(passwordkey).expect("DB_PASSWORD must be set"),
+        env::var(password_key).expect(&format!("{password_key} must be set")),
     )
     .await;
 
     let db_password = encode(&x);
 
     let db_host: String = env::var("DB_HOST").expect("DB_HOST must be set");
+    let db_port: String = env::var("DB_PORT").expect("DB_PORT must be set");
     let db_name: String = env::var("DB_NAME").expect("DB_NAME must be set");
 
-    let url = format!("postgres://{db_user}:{db_password}@{db_host}/{db_name}");
-
-    url
+    format!("postgres://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}")
 }
 
 // Function to create a new connection pool
 pub async fn establish_pool(kms_client: &Client) -> DbPool {
-    let database_url = get_database_url("DB_USER", "DB_PASSWORD", kms_client).await;
+    let database_url = get_database_url("DB_USER", "DB_PASSWORD", "DB_URL", kms_client).await;
     let max_connections: u32 = env::var("DATABASE_POOL_SIZE")
         .unwrap_or_else(|_| "4".to_string()) // Default to "4" if not set
         .parse()
@@ -69,7 +73,12 @@ pub async fn establish_pool(kms_client: &Client) -> DbPool {
 
 pub async fn establish_connection(kms_client: &Client) -> PgConnection {
     // Have a different user with higher access for DB migrations
-    let database_url =
-        get_database_url("DB_MIGRATION_USER", "DB_MIGRATION_PASSWORD", kms_client).await;
+    let database_url = get_database_url(
+        "DB_MIGRATION_USER",
+        "DB_MIGRATION_PASSWORD",
+        "DB_MIGRATION_URL",
+        kms_client,
+    )
+    .await;
     PgConnection::establish(&database_url).expect("Failed to connect to database")
 }

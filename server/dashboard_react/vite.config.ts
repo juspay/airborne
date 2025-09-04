@@ -12,59 +12,59 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ command }) => {
-  const isDev = command === 'serve'
+  const isDev = command === "serve";
 
   return {
     plugins: [react()],
-    base: '/dashboard/',
+    base: "/dashboard/",
     ...(isDev && {
       server: {
-        host: '0.0.0.0',
+        host: "0.0.0.0",
         port: 5173,
         strictPort: true,
         hmr: {
-          protocol: 'ws',
-          host: 'localhost',
+          protocol: "ws",
+          host: "localhost",
           port: 5173,
         },
         watch: {
           usePolling: true,
         },
         proxy: {
-          '/dashboard/configuration': {
-            target: 'http://backend:9000',
+          "/dashboard/configuration": {
+            target: "http://localhost:8081",
             changeOrigin: false,
           },
-          '/organisations': {
-            target: 'http://backend:9000',
+          "/organisations": {
+            target: "http://localhost:8081",
             changeOrigin: false,
           },
-          '/organisation': {
-            target: 'http://backend:9000',
+          "/organisation": {
+            target: "http://localhost:8081",
             changeOrigin: false,
           },
-          '/user': {
-            target: 'http://backend:9000',
+          "/user": {
+            target: "http://localhost:8081",
             changeOrigin: false,
           },
-          '/users': {
-            target: 'http://backend:9000',
+          "/users": {
+            target: "http://localhost:8081",
             changeOrigin: false,
           },
-          '/release': {
-            target: 'http://backend:9000',
+          "/release": {
+            target: "http://localhost:8081",
             changeOrigin: false,
           },
-          '/analytics': {
-            target: 'http://host.docker.internal:6400',
+          "/analytics": {
+            target: "http://host.docker.internal:6400",
             changeOrigin: false,
-          }
+          },
         },
-      }
-    })
-  }
-})
+      },
+    }),
+  };
+});

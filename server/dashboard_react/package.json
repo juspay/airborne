@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:dev": "vite build --mode development --watch",
     "lint": "eslint .",
     "preview": "vite preview",
     "watch-build": "nodemon --watch src --ext js,ts,vue,jsx,tsx,css,html --exec 'vite build'"
