@@ -293,7 +293,7 @@ export default function CreateReleasePage() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-2 hidden">
                     <Label htmlFor="configProperties">Additional Properties (JSON)</Label>
                     <Textarea
                       id="configProperties"
@@ -316,7 +316,7 @@ export default function CreateReleasePage() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package</CardTitle>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Version</CardTitle>
                   <CardDescription>Choose an existing package to base this release on (optional)</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -336,9 +336,9 @@ export default function CreateReleasePage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[50px]"></TableHead>
-                        <TableHead>Index</TableHead>
-                        <TableHead>Tag</TableHead>
                         <TableHead>Version</TableHead>
+                        <TableHead>Tag</TableHead>
+                        <TableHead>Index</TableHead>
                         <TableHead>Files</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -356,11 +356,11 @@ export default function CreateReleasePage() {
                                 onCheckedChange={() => setSelectedPackage(checked ? null : p)}
                               />
                             </TableCell>
-                            <TableCell className="font-mono text-sm">{p.index}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.version}</TableCell>
                             <TableCell>
                               <Badge variant="outline">{p.tag}</Badge>
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{p.version}</TableCell>
+                            <TableCell className="font-mono text-sm">{p.index}</TableCell>
                             <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
                           </TableRow>
                         )
@@ -368,7 +368,7 @@ export default function CreateReleasePage() {
                     </TableBody>
                   </Table>
 
-                  <div className="mt-6 space-y-2">
+                  <div className="mt-6 space-y-2 hidden">
                     <Label>Package Properties (JSON)</Label>
                     <Textarea
                       rows={4}
