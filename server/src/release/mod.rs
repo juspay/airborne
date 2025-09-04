@@ -1097,7 +1097,7 @@ async fn serve_release(
         superposition_org_id_from_env
     );
 
-    let toss = rand::thread_rng().gen_range(1..=1000000000);
+    let toss = rand::thread_rng().gen_range(1..=100);
 
     let applicable_variants = context.iter().fold(
         state
