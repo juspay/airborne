@@ -4,9 +4,10 @@
 .DS_Store
 /**/.DS_Store
 .env
+.env.generated
 .vscode
 localstack-data/
 superposition/
-**/.env*
+.direnv
 
 airborne-gcp.json

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/create-manifest.cjs && tsc -b && vite build",
+    "build:dev": "vite build --mode development --watch",
     "lint": "eslint .",
     "preview": "vite preview"
   },
