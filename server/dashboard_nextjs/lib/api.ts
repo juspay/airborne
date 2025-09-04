@@ -18,7 +18,7 @@ export async function apiFetch<T>(
   ctx?: { token?: string | null; org?: string | null; app?: string | null; logout?: () => void },
 ): Promise<T> {
   const showErrorToast = opts.showErrorToast !== false // Default to true unless explicitly set to false
-  
+  path = `/api/${path}`
   const url = new URL(
     (API_BASE || "") + path,
     typeof window === "undefined" ? "http://localhost" : window.location.origin,
