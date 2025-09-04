@@ -356,14 +356,14 @@ export default function ReleaseDetailPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Rollout Progress</CardTitle>
-                    <CardDescription>Current deployment status and traffic distribution</CardDescription>
+                    <CardDescription>Max percentage you can choose for your release is capped to 50%, this is to balance traffic between your A(Control) and B(Experiment) release. To make this release live for everyone, you can conclude the release.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Traffic Percentage</span>
                       <span className="text-sm text-muted-foreground">{currentTrafficPercentage}% of {targetPercentage}%</span>
                     </div>
-                    <Progress value={currentTrafficPercentage} className="w-full" />
+                    <Progress value={currentTrafficPercentage*2} className="w-full" />
                     <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="font-medium">Strategy</p>
