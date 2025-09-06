@@ -17,7 +17,6 @@ node_modules/
 
 # Exclude environment files
 .env*
-!.env.example
 
 # Exclude temporary files
 **/*.rs.bk

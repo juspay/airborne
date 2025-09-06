@@ -11,32 +11,34 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-use std::sync::Arc;
-
-use actix_web::{web, App, HttpServer};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-
+#![deny(unused_crate_dependencies)]
 mod dashboard;
 mod docs;
 mod home;
 mod middleware;
 mod organisation;
 mod release;
-mod user;
-
 mod types;
+mod user;
 mod utils;
 
+use std::sync::Arc;
+
+use actix_web::{web, App, HttpServer};
 use aws_sdk_s3::config::Builder;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenvy::dotenv;
-extern crate hyper;
-extern crate rustls;
-use google_sheets4::{yup_oauth2::{self, ServiceAccountAuthenticator}, Sheets, hyper_util, hyper_rustls};
+use google_sheets4::{
+    hyper_rustls, hyper_util,
+    yup_oauth2::{self, ServiceAccountAuthenticator},
+    Sheets,
+};
 use middleware::auth::Auth;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
+extern crate hyper;
+extern crate rustls;
 use crate::home::index;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
@@ -57,34 +59,29 @@ async fn main() -> std::io::Result<()> {
         std::env::var("SUPERPOSITION_ORG_ID").expect("SUPERPOSITION_ORG_ID must be set");
     let bucket_name = std::env::var("AWS_BUCKET").expect("AWS_BUCKET must be set");
     let public_url = std::env::var("PUBLIC_ENDPOINT").expect("PUBLIC_ENDPOINT must be set");
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "9000".to_string())
-        .parse()
-        .expect("PORT must be a valid number");
+    let port =
+        std::env::var("PORT").map_or(8081, |v| v.parse().expect("PORT must be a valid number"));
     let enable_google_signin = std::env::var("ENABLE_GOOGLE_SIGNIN")
-        .unwrap_or_else(|_| "false".to_string())
-        .parse::<bool>()
-        .unwrap_or(false);
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
     let organisation_creation_disabled = std::env::var("ORGANISATION_CREATION_DISABLED")
-        .unwrap_or_else(|_| "false".to_string())
-        .parse::<bool>()
-        .unwrap_or(false);
-    let gcp_service_account_json_path = 
-        if organisation_creation_disabled {
-            std::env::var("GCP_SERVICE_ACCOUNT_PATH").expect("GCP_SERVICE_ACCOUNT_PATH must be set if ORGANISATION_CREATION_DISABLED=true")
-        } else {
-            "".to_string()
-        };
-    let spreadsheet_id =
-        if organisation_creation_disabled {
-            std::env::var("GOOGLE_SPREADSHEET_ID")
-                .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true")
-        } else {
-            "".to_string()
-        };
-    let cf_distribution_id = 
-        std::env::var("CLOUDFRONT_DISTRIBUTION_ID")
-            .unwrap_or_default();
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+    let gcp_service_account_json_path = if organisation_creation_disabled {
+        std::env::var("GCP_SERVICE_ACCOUNT_PATH")
+            .expect("GCP_SERVICE_ACCOUNT_PATH must be set if ORGANISATION_CREATION_DISABLED=true")
+    } else {
+        "".to_string()
+    };
+    let spreadsheet_id = if organisation_creation_disabled {
+        std::env::var("GOOGLE_SPREADSHEET_ID")
+            .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true")
+    } else {
+        "".to_string()
+    };
+    let cf_distribution_id = std::env::var("CLOUDFRONT_DISTRIBUTION_ID").unwrap_or_default();
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -121,7 +118,7 @@ async fn main() -> std::io::Result<()> {
         enable_google_signin: enable_google_signin,
         organisation_creation_disabled: organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
-        cloudfront_distribution_id: cf_distribution_id.clone()
+        cloudfront_distribution_id: cf_distribution_id.clone(),
     };
 
     // This is required for localStack
@@ -132,10 +129,12 @@ async fn main() -> std::io::Result<()> {
 
     let aws_s3_client = aws_sdk_s3::Client::from_conf(s3_config);
 
-    // Configure Google Sheets 
+    // Configure Google Sheets
     let mut hub = None;
     if organisation_creation_disabled {
-        rustls::crypto::ring::default_provider().install_default().expect("Failed to install rustls crypto provider");
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
         let creds = yup_oauth2::read_service_account_key(gcp_service_account_json_path)
             .await
             .expect("Can't read gcp credential, an error occurred");
@@ -145,20 +144,18 @@ async fn main() -> std::io::Result<()> {
             .await
             .expect("There was an error, trying to build connection with gcp authenticator");
 
-        let client = hyper_util::client::legacy::Client::builder(
-            hyper_util::rt::TokioExecutor::new()
-        )
-        .build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .unwrap()
-                .https_or_http()
-                .enable_http1()
-                .build()
-        );
+        let client =
+            hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+                .build(
+                    hyper_rustls::HttpsConnectorBuilder::new()
+                        .with_native_roots()
+                        .unwrap()
+                        .https_or_http()
+                        .enable_http1()
+                        .build(),
+                );
         hub = Some(Sheets::new(client, gcp_auth));
     }
-    
 
     // Create a shared state for the application
     let superposition_client = superposition_rust_sdk::Client::from_conf(
