@@ -74,14 +74,14 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
 
       # Publish aggregation (both modules). nmcp builds a single ZIP and uploads to Portal API
-      # - name: Publish to Maven Central (Central Portal)
-      #   working-directory: android
-      #   run: ./gradlew --no-daemon publishAggregationToCentralPortal
-      #   env:
-      #     # Central Portal token (username/password pair)
-      #     SONATYPE_MAVEN_USERNAME: ${{ secrets.SONATYPE_MAVEN_USERNAME }}
-      #     SONATYPE_MAVEN_PASSWORD: ${{ secrets.SONATYPE_MAVEN_PASSWORD }}
+      - name: Publish to Maven Central (Central Portal)
+        working-directory: android
+        run: ./gradlew --no-daemon publishAggregationToCentralPortal
+        env:
+          # Central Portal token (username/password pair)
+          SONATYPE_MAVEN_USERNAME: ${{ secrets.SONATYPE_MAVEN_USERNAME }}
+          SONATYPE_MAVEN_PASSWORD: ${{ secrets.SONATYPE_MAVEN_PASSWORD }}
 
-      #     # Gradle signing properties (nmcp uses existing publications)
-      #     ORG_GRADLE_PROJECT_signingKey: ${{ env.DECODED_SIGNING_KEY }}
-      #     ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+          # Gradle signing properties (nmcp uses existing publications)
+          ORG_GRADLE_PROJECT_signingKey: ${{ env.DECODED_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
