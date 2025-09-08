@@ -56,7 +56,12 @@ pub async fn add_user_with_transaction(
     let org_group = find_org_group(admin, realm, &org_context.org_id)
         .await
         .map_err(|e| OrgError::Internal(format!("Failed to find organization group: {}", e)))?
-        .ok_or_else(|| OrgError::Internal(format!("Organization group {} not found", org_context.org_id)))?;
+        .ok_or_else(|| {
+            OrgError::Internal(format!(
+                "Organization group {} not found",
+                org_context.org_id
+            ))
+        })?;
 
     let mut roles = get_additional_roles(role_name)
         .await
@@ -65,9 +70,16 @@ pub async fn add_user_with_transaction(
     roles.push(role_name.to_string());
 
     for role_name in roles.clone() {
-        add_user_to_group(admin, realm, &target_user.user_id, &org_context.group_id, &role_name, &transaction)
-            .await
-            .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;        
+        add_user_to_group(
+            admin,
+            realm,
+            &target_user.user_id,
+            &org_context.group_id,
+            &role_name,
+            &transaction,
+        )
+        .await
+        .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;
     }
 
     println!("Let's update the subgroups");
@@ -79,33 +91,49 @@ pub async fn add_user_with_transaction(
             None,
             None,
             org_group.sub_group_count.map(|v| v as i32),
-            None
+            None,
         )
-    .await
+        .await
     {
         Ok(groups) => {
             // Record the user groups in the transaction
-            let child_roles = roles.clone().iter().filter(|role| **role != "owner").cloned().collect::<Vec<_>>();
+            let child_roles = roles
+                .clone()
+                .iter()
+                .filter(|role| **role != "owner")
+                .cloned()
+                .collect::<Vec<_>>();
             // remove groups that are roles
-            let groups: Vec<_> = groups.into_iter().filter(|g| {
-                if let Some(name) = &g.name {
-                    let roles = vec!["admin", "write", "read", "owner"];
-                    !roles.contains(&name.as_str())
-                } else {
-                    true
-                }
-            }).collect();
+            let groups: Vec<_> = groups
+                .into_iter()
+                .filter(|g| {
+                    if let Some(name) = &g.name {
+                        let roles = ["admin", "write", "read", "owner"];
+                        !roles.contains(&name.as_str())
+                    } else {
+                        true
+                    }
+                })
+                .collect();
             for group in groups {
                 for role_name in child_roles.iter() {
                     match group.id {
                         Some(ref group_id) => {
-                            add_user_to_group(&admin, &realm, &target_user.user_id, group_id, role_name, &transaction)
-                                .await
-                                .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;     
+                            add_user_to_group(
+                                admin,
+                                realm,
+                                &target_user.user_id,
+                                group_id,
+                                role_name,
+                                &transaction,
+                            )
+                            .await
+                            .map_err(|e| {
+                                OrgError::Internal(format!("Failed to add user to group: {}", e))
+                            })?;
                         }
                         None => warn!("Group has no ID, skipping"),
                     }
-                       
                 }
             }
         }
@@ -130,9 +158,7 @@ pub async fn add_user_with_transaction(
 
 /// Roles come with additional roles like Owner has Admin, Write, Read
 /// This function retrieves those additional roles for a given role name
-async fn get_additional_roles(
-    role_name: &str
-) -> Result<Vec<String>, OrgError> {
+async fn get_additional_roles(role_name: &str) -> Result<Vec<String>, OrgError> {
     let additional_roles = match role_name {
         "owner" => vec!["admin".to_string(), "write".to_string(), "read".to_string()],
         "admin" => vec!["write".to_string(), "read".to_string()],
@@ -172,11 +198,7 @@ async fn add_user_to_group(
 
     // Step 1: Add user to role group
     match admin
-        .realm_users_with_user_id_groups_with_group_id_put(
-            realm,
-            &user_id,
-            &role_group_id,
-        )
+        .realm_users_with_user_id_groups_with_group_id_put(realm, user_id, &role_group_id)
         .await
     {
         Ok(_) => {
@@ -185,10 +207,7 @@ async fn add_user_to_group(
                 "user_group_membership",
                 &format!("{}:{}", user_id, role_group_id),
             );
-            debug!(
-                "Added user {} to role group {}",
-                user_id, role_name
-            );
+            debug!("Added user {} to role group {}", user_id, role_name);
         }
         Err(e) => {
             // If this fails, there's nothing to roll back yet

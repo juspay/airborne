@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{middleware::auth::AuthResponse, types::ABError};
 use crate::types::AppState;
+use crate::{middleware::auth::AuthResponse, types::ABError};
 use actix_web::{
     delete, get, post,
     web::{self, Json, Path},
@@ -113,9 +113,7 @@ async fn request_organisation(
             Some(organisation_name.clone()),
         )
         .await
-        .map_err(|e| {
-            ABError::Unauthorized(format!("Failed to check existing groups: {}", e))
-        })?;
+        .map_err(|e| ABError::Unauthorized(format!("Failed to check existing groups: {}", e)))?;
 
     if !groups.is_empty() {
         return Err(ABError::BadRequest(
@@ -145,7 +143,9 @@ async fn request_organisation(
                 .value_input_option("USER_ENTERED")
                 .doit()
                 .await
-                .map_err(|e| ABError::InternalServerError(format!(" Google Sheet error: {:?}", e)))?;
+                .map_err(|e| {
+                    ABError::InternalServerError(format!(" Google Sheet error: {:?}", e))
+                })?;
         }
         None => {
             return Err(ABError::InternalServerError(
@@ -153,7 +153,6 @@ async fn request_organisation(
             ));
         }
     }
-    
 
     Ok(Json(OrganisationRequestResponse {
         organisation_name,
@@ -188,15 +187,20 @@ async fn create_organisation(
     let group_representations = admin
         .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
         .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch user groups: {:?}", e)))?;
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to fetch user groups: {:?}", e))
+        })?;
 
     // Extract group paths
-    let group_paths: Vec<String> = group_representations.iter().filter_map(|g| g.path.clone()).collect();
+    let group_paths: Vec<String> = group_representations
+        .iter()
+        .filter_map(|g| g.path.clone())
+        .collect();
 
     // Parse groups into organizations
     let organizations = parse_user_organizations(group_paths);
 
-    if organizations.len() == 0 && state.env.organisation_creation_disabled {
+    if organizations.is_empty() && state.env.organisation_creation_disabled {
         return Err(ABError::BadRequest(
             "You do not have permission to create new organisation".to_string(),
         ));
@@ -234,7 +238,9 @@ async fn create_organisation(
         &state,
     )
     .await
-    .map_err(|e| ABError::InternalServerError(format!("Error occurred while creating org: {:?}", e)))?;
+    .map_err(|e| {
+        ABError::InternalServerError(format!("Error occurred while creating org: {:?}", e))
+    })?;
 
     Ok(Json(org))
 }
@@ -279,7 +285,9 @@ async fn delete_organisation(
         })?;
 
     if groups.is_empty() {
-        return Err(ABError::BadRequest("Organisation does not exist".to_string()));
+        return Err(ABError::BadRequest(
+            "Organisation does not exist".to_string(),
+        ));
     }
 
     // Check if user has permissions to delete organization
@@ -290,7 +298,10 @@ async fn delete_organisation(
     {
         // Delete the organization using the transaction manager
         transaction::delete_organisation_with_transaction(&organisation, &admin, &realm, &state)
-            .await.map_err(|_| ABError::InternalServerError("Could not delete organisation".to_string()))?;
+            .await
+            .map_err(|_| {
+                ABError::InternalServerError("Could not delete organisation".to_string())
+            })?;
 
         Ok(Json(
             json!({"Success" : "Organisation deleted successfully"}),
@@ -323,9 +334,7 @@ async fn list_organisations(
     let groups = admin
         .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
         .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to fetch user groups: {}", e))
-        })?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch user groups: {}", e)))?;
 
     // Extract group paths
     let group_paths: Vec<String> = groups.iter().filter_map(|g| g.path.clone()).collect();
@@ -410,11 +419,15 @@ pub fn validate_organisation_name(name: &str) -> actix_web::Result<(), ABError> 
     let trimmed = name.trim();
 
     if trimmed.is_empty() {
-        return Err(ABError::BadRequest("Organisation name cannot be empty".to_string()));
+        return Err(ABError::BadRequest(
+            "Organisation name cannot be empty".to_string(),
+        ));
     }
 
     if trimmed.len() > MAX_ORG_NAME_LENGTH {
-        return Err(ABError::BadRequest("Organisation name is too long".to_string()));
+        return Err(ABError::BadRequest(
+            "Organisation name is too long".to_string(),
+        ));
     }
 
     // Basic pattern matching for valid organization name

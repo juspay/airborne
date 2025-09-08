@@ -195,7 +195,8 @@ where
                                             None => {
                                                 return Err(ABError::Unauthorized(
                                                     "No Access to Application".to_string(),
-                                                ).into())
+                                                )
+                                                .into())
                                             }
                                         };
                                     }
@@ -209,8 +210,9 @@ where
                                         }
                                         None => {
                                             return Err(ABError::Unauthorized(
-                                                "No Access to Application".to_string()
-                                            ).into());
+                                                "No Access to Application".to_string(),
+                                            )
+                                            .into());
                                         }
                                     };
                                 }
@@ -220,20 +222,16 @@ where
                                     organisation,
                                     application,
                                 });
-                                return service.call(req).await.map_err(Into::into);
+                                service.call(req).await
                             }
                             Err(e) => {
-                                return Err(ABError::Unauthorized(format!("Invalid token: {:?}", e)).into());
+                                Err(ABError::Unauthorized(format!("Invalid token: {:?}", e)).into())
                             }
                         }
                     }
-                    None => {
-                        return Err(ABError::Unauthorized("No AdminToken".to_string()).into());
-                    }
+                    None => Err(ABError::Unauthorized("No AdminToken".to_string()).into()),
                 },
-                Err(e) => {
-                    return Err(ABError::Unauthorized(format!("{:?}", e)).into());
-                }
+                Err(e) => Err(ABError::Unauthorized(format!("{:?}", e)).into()),
             }
         })
     }

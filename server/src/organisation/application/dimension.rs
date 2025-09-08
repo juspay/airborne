@@ -60,10 +60,10 @@ async fn create_dimension_api(
     state: web::Data<AppState>,
 ) -> Result<Json<CreateDimensionResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     // Get database connection
     let mut conn = state
@@ -72,8 +72,8 @@ async fn create_dimension_api(
         .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
         .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let current_dimensions = state
@@ -83,9 +83,7 @@ async fn create_dimension_api(
         .workspace_id(workspace_name.clone())
         .send()
         .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to list dimensions: {}", e))
-        })?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;
 
     // Find the highest position using nested match statements
     let highest_position = match &current_dimensions.data {
@@ -105,9 +103,7 @@ async fn create_dimension_api(
         .change_reason("Creating new dimension".to_string())
         .send()
         .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to create dimension: {}", e))
-        })?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to create dimension: {}", e)))?;
 
     Ok(Json(CreateDimensionResponse {
         dimension: dimension.dimension,
@@ -142,10 +138,10 @@ async fn list_dimensions_api(
     state: web::Data<AppState>,
 ) -> Result<Json<ListDimensionsResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     // Get database connection
     let mut conn = state
@@ -154,8 +150,8 @@ async fn list_dimensions_api(
         .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
         .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let dimensionsreq = state
@@ -173,9 +169,10 @@ async fn list_dimensions_api(
     } else {
         dimensionsreq // Default count if not provided
     };
-    let dimensions = dimensionsreq.send().await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to list dimensions: {}", e))
-    })?;
+    let dimensions = dimensionsreq
+        .send()
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;
 
     Ok(Json(ListDimensionsResponse {
         total_pages: dimensions.total_pages,
@@ -204,10 +201,10 @@ async fn update_dimension_api(
     state: web::Data<AppState>,
 ) -> Result<Json<Dimension>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     // Get database connection
     let mut conn = state
@@ -216,8 +213,8 @@ async fn update_dimension_api(
         .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
         .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let update_dimension = state
@@ -235,9 +232,7 @@ async fn update_dimension_api(
         .change_reason(req.change_reason.clone())
         .send()
         .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to update dimension: {}", e))
-        })?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
 
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
@@ -256,10 +251,10 @@ async fn delete_dimension_api(
     state: web::Data<AppState>,
 ) -> Result<Json<()>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     // Get database connection
     let mut conn = state
@@ -268,8 +263,8 @@ async fn delete_dimension_api(
         .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
 
     // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
         .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     state
@@ -280,9 +275,7 @@ async fn delete_dimension_api(
         .dimension(path.into_inner())
         .send()
         .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to delete dimension: {}", e))
-        })?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;
 
     Ok(Json(()))
 }

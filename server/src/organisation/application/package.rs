@@ -70,10 +70,10 @@ async fn list(
     auth_response: ReqData<AuthResponse>,
 ) -> Result<Json<PackageList>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, READ).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, READ).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, READ)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, READ)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
@@ -166,10 +166,10 @@ async fn create_package_json_v1(
     state: web::Data<AppState>,
 ) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
@@ -192,8 +192,8 @@ async fn create_package_json_v1(
     );
 
     // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
         .map_err(|_| ABError::InternalServerError("Could not get workspace".to_string()))?;
     println!(
         "Using workspace name for create_package_json_v1: {}",
@@ -230,10 +230,10 @@ async fn create_json_v1_multipart(
     state: web::Data<AppState>,
 ) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
 
     // Parse the JSON request
     let mut req: PackageJsonV1Request = serde_json::from_str(&form.json.into_inner())
@@ -256,7 +256,9 @@ async fn create_json_v1_multipart(
     if let Some(index_file) = form.index {
         let index_name = index_file.file_name.clone().unwrap_or_default();
         if index_name.is_empty() {
-            return Err(ABError::BadRequest("Index file name cannot be empty".to_string()));
+            return Err(ABError::BadRequest(
+                "Index file name cannot be empty".to_string(),
+            ));
         }
 
         let s3_client = &state.s3_client;
@@ -303,8 +305,8 @@ async fn create_json_v1_multipart(
     );
 
     // Get workspace name for this application
-    let workspace_name =
-        get_workspace_name_for_application(&application, &organisation, &mut conn).await
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
         .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
     println!(
         "Using workspace name for create_json_v1_multipart: {}",

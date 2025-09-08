@@ -16,19 +16,23 @@ mod transaction;
 mod utils;
 
 use actix_web::{
-    get, post,
+    get,
+    http::StatusCode,
+    post,
     web::{self, Json},
     HttpMessage, HttpRequest, Scope,
 };
-use hyper::StatusCode;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    impl_response_error, middleware::auth::{
+    impl_response_error,
+    middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
-    }, types::{ABError, ABErrorCodes, AppError, AppState, HasLabel}, utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action}
+    },
+    types::{ABError, ABErrorCodes, AppError, AppState, HasLabel},
+    utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
 };
 
 use self::{
@@ -65,28 +69,27 @@ pub enum OrgError {
 }
 
 impl AppError for OrgError {
-  fn code(&self) -> &'static str {
-    match self {
-      OrgError::UserNotFound(_)        => ABErrorCodes::NotFound.label(),
-      OrgError::OrgNotFound(_)         => ABErrorCodes::NotFound.label(),
-      OrgError::InvalidAccessLevel(_)  => ABErrorCodes::Unauthorized.label(),
-      OrgError::Internal(_)            => ABErrorCodes::InternalServerError.label(),
-      OrgError::Unauthorized(_)        => ABErrorCodes::Unauthorized.label(),
-      OrgError::PermissionDenied(_)    => ABErrorCodes::Unauthorized.label(),
-      OrgError::LastOwner(_)           => ABErrorCodes::Unauthorized.label(),
+    fn code(&self) -> &'static str {
+        match self {
+            OrgError::UserNotFound(_) => ABErrorCodes::NotFound.label(),
+            OrgError::OrgNotFound(_) => ABErrorCodes::NotFound.label(),
+            OrgError::InvalidAccessLevel(_) => ABErrorCodes::Unauthorized.label(),
+            OrgError::Internal(_) => ABErrorCodes::InternalServerError.label(),
+            OrgError::Unauthorized(_) => ABErrorCodes::Unauthorized.label(),
+            OrgError::PermissionDenied(_) => ABErrorCodes::Unauthorized.label(),
+            OrgError::LastOwner(_) => ABErrorCodes::Unauthorized.label(),
+        }
     }
-  }
-  fn status_code(&self) -> StatusCode {
-    match self {
-      OrgError::UserNotFound(_)       => StatusCode::NOT_FOUND,
-      OrgError::OrgNotFound(_)        => StatusCode::NOT_FOUND,
-      OrgError::InvalidAccessLevel(_) |
-      OrgError::LastOwner(_)          => StatusCode::BAD_REQUEST,
-      OrgError::Unauthorized(_)       => StatusCode::UNAUTHORIZED,
-      OrgError::PermissionDenied(_)   => StatusCode::FORBIDDEN,
-      OrgError::Internal(_)           => StatusCode::INTERNAL_SERVER_ERROR,
+    fn status_code(&self) -> StatusCode {
+        match self {
+            OrgError::UserNotFound(_) => StatusCode::NOT_FOUND,
+            OrgError::OrgNotFound(_) => StatusCode::NOT_FOUND,
+            OrgError::InvalidAccessLevel(_) | OrgError::LastOwner(_) => StatusCode::BAD_REQUEST,
+            OrgError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            OrgError::PermissionDenied(_) => StatusCode::FORBIDDEN,
+            OrgError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
     }
-  }
 }
 impl_response_error!(OrgError);
 
@@ -158,8 +161,8 @@ async fn get_org_context(
         .await
         .map_err(OrgError::Unauthorized)?;
 
-    let org_name =
-        validate_user(auth.organisation.clone(), required_level).map_err(|e: ABError| OrgError::Unauthorized(e.to_string()))?;
+    let org_name = validate_user(auth.organisation.clone(), required_level)
+        .map_err(|e: ABError| OrgError::Unauthorized(e.to_string()))?;
 
     Ok((org_name, auth))
 }
@@ -265,11 +268,10 @@ async fn organisation_add_user(
             if org_access.level < ADMIN.access {
                 return Err(OrgError::PermissionDenied(
                     "Admin permission required to assign admin or owner roles".into(),
-                )
-                .into());
+                ));
             }
         } else {
-            return Err(OrgError::Unauthorized("No organization access".to_string()).into());
+            return Err(OrgError::Unauthorized("No organization access".to_string()));
         }
     }
 
@@ -413,8 +415,7 @@ async fn organisation_remove_user(
     if is_last {
         return Err(OrgError::LastOwner(
             "Cannot remove the last owner from the organization".to_string(),
-        )
-        .into());
+        ));
     }
 
     // Check if requester has permission to modify this user (hierarchy check)

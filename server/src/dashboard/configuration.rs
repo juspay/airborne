@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{get, web::{self, Json}, HttpRequest, Scope};
 use crate::types::AppState;
-use serde::{ Serialize, Deserialize };
+use actix_web::{
+    get,
+    web::{self, Json},
+    HttpRequest, Scope,
+};
+use serde::{Deserialize, Serialize};
 
 pub fn add_routes() -> Scope {
-    Scope::new("")
-        .service(get_global_configurations)
+    Scope::new("").service(get_global_configurations)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -32,7 +35,6 @@ async fn get_global_configurations(
     _: HttpRequest,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<Configuration>> {
-    
     let config = Configuration {
         google_signin_enabled: state.env.enable_google_signin,
         organisation_creation_disabled: state.env.organisation_creation_disabled,

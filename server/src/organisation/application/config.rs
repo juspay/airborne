@@ -73,10 +73,10 @@ async fn create_config_json_v1(
     state: web::Data<AppState>,
 ) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
@@ -145,10 +145,10 @@ async fn create_config_json_v1_multipart(
     state: web::Data<AppState>,
 ) -> Result<Json<Response>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     // Parse the JSON request
     let req: ConfigJsonV1Request = serde_json::from_str(&form.json.into_inner())

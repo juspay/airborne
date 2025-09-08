@@ -39,7 +39,10 @@ pub async fn add_user_with_transaction(
     role_name: &str,
 ) -> Result<(), AppError> {
     // Create a new transaction manager for this operation
-    let transaction = TransactionManager::new(&format!("{}/{}", app_context.org_name, app_context.app_name), "application_user");
+    let transaction = TransactionManager::new(
+        &format!("{}/{}", app_context.org_name, app_context.app_name),
+        "application_user",
+    );
 
     debug!(
         "Starting transaction to add user {} to app {}/{} with role {}",
@@ -55,15 +58,29 @@ pub async fn add_user_with_transaction(
 
     // Add user to each role group
     for role_name in roles {
-        add_user_to_group(admin, realm, &target_user.user_id, &app_context.app_group_id, &role_name, &transaction)
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to add user to group: {}", e)))?;        
-    }
-    
-    // Add user to the organisation group as well with READ role
-    add_user_to_group(admin, realm, &target_user.user_id, &app_context.org_group_id, "read", &transaction)
+        add_user_to_group(
+            admin,
+            realm,
+            &target_user.user_id,
+            &app_context.app_group_id,
+            &role_name,
+            &transaction,
+        )
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to add user to organisation group: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to add user to group: {}", e)))?;
+    }
+
+    // Add user to the organisation group as well with READ role
+    add_user_to_group(
+        admin,
+        realm,
+        &target_user.user_id,
+        &app_context.org_group_id,
+        "read",
+        &transaction,
+    )
+    .await
+    .map_err(|e| AppError::Internal(format!("Failed to add user to organisation group: {}", e)))?;
 
     // Mark transaction as complete
     transaction.set_database_inserted();
@@ -78,9 +95,7 @@ pub async fn add_user_with_transaction(
 
 /// Roles come with additional roles like Admin has Write, Read
 /// This function retrieves those additional roles for a given role name
-async fn get_additional_roles(
-    role_name: &str
-) -> Result<Vec<String>, AppError> {
+async fn get_additional_roles(role_name: &str) -> Result<Vec<String>, AppError> {
     let additional_roles = match role_name {
         "admin" => vec!["write".to_string(), "read".to_string()],
         "write" => vec!["read".to_string()],
@@ -119,11 +134,7 @@ async fn add_user_to_group(
 
     // Add user to role group
     match admin
-        .realm_users_with_user_id_groups_with_group_id_put(
-            realm,
-            &user_id,
-            &role_group_id,
-        )
+        .realm_users_with_user_id_groups_with_group_id_put(realm, user_id, &role_group_id)
         .await
     {
         Ok(_) => {
@@ -132,10 +143,7 @@ async fn add_user_to_group(
                 "user_group_membership",
                 &format!("{}:{}", user_id, role_group_id),
             );
-            debug!(
-                "Added user {} to role group {}",
-                user_id, role_name
-            );
+            debug!("Added user {} to role group {}", user_id, role_name);
         }
         Err(e) => {
             // If this fails, there's nothing to roll back yet
@@ -159,20 +167,28 @@ pub async fn update_user_with_transaction(
     state: &web::Data<AppState>,
 ) -> Result<(), AppError> {
     // Create a new transaction manager
-    let transaction = TransactionManager::new(&format!("{}/{}", app_context.org_name, app_context.app_name), "application_user_update");
+    let transaction = TransactionManager::new(
+        &format!("{}/{}", app_context.org_name, app_context.app_name),
+        "application_user_update",
+    );
 
     debug!(
         "Starting transaction to update user {} in app {}/{} from role {} to {}",
-        target_user.username, app_context.org_name, app_context.app_name, current_role, new_role_name
+        target_user.username,
+        app_context.org_name,
+        app_context.app_name,
+        current_role,
+        new_role_name
     );
 
     // Find current role group
-    let current_role_group = find_role_subgroup(admin, realm, &app_context.app_group_id, current_role)
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to find current role group: {}", e)))?
-        .ok_or_else(|| {
-            AppError::Internal(format!("Current role group {} not found", current_role))
-        })?;
+    let current_role_group =
+        find_role_subgroup(admin, realm, &app_context.app_group_id, current_role)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to find current role group: {}", e)))?
+            .ok_or_else(|| {
+                AppError::Internal(format!("Current role group {} not found", current_role))
+            })?;
 
     let current_role_id = current_role_group
         .id
@@ -272,7 +288,11 @@ pub async fn update_user_with_transaction(
 
     info!(
         "Successfully completed transaction to update user {} in app {}/{} from role {} to {}",
-        target_user.username, app_context.org_name, app_context.app_name, current_role, new_role_name
+        target_user.username,
+        app_context.org_name,
+        app_context.app_name,
+        current_role,
+        new_role_name
     );
 
     Ok(())
@@ -288,7 +308,10 @@ pub async fn remove_user_with_transaction(
     state: &web::Data<AppState>,
 ) -> Result<(), AppError> {
     // Create a new transaction manager
-    let transaction = TransactionManager::new(&format!("{}/{}", app_context.org_name, app_context.app_name), "application_user_remove");
+    let transaction = TransactionManager::new(
+        &format!("{}/{}", app_context.org_name, app_context.app_name),
+        "application_user_remove",
+    );
 
     debug!(
         "Starting transaction to remove user {} from app {}/{}",

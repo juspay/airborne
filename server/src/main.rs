@@ -27,7 +27,7 @@ use std::sync::Arc;
 use actix_web::{web, App, HttpServer};
 use aws_sdk_s3::config::Builder;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use dotenvy::dotenv;
+use dotenv::dotenv;
 use google_sheets4::{
     hyper_rustls, hyper_util,
     yup_oauth2::{self, ServiceAccountAuthenticator},
@@ -37,8 +37,6 @@ use middleware::auth::Auth;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-extern crate hyper;
-extern crate rustls;
 use crate::home::index;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
@@ -115,8 +113,8 @@ async fn main() -> std::io::Result<()> {
         realm,
         bucket_name,
         superposition_org_id: superposition_org_id_env,
-        enable_google_signin: enable_google_signin,
-        organisation_creation_disabled: organisation_creation_disabled,
+        enable_google_signin,
+        organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
         cloudfront_distribution_id: cf_distribution_id.clone(),
     };

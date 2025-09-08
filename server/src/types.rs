@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::Serialize;
-use actix_web::{http::StatusCode};
-use thiserror::Error;
-use superposition_rust_sdk::Client;
+use actix_web::http::StatusCode;
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
+use serde::Serialize;
+use superposition_rust_sdk::Client;
+use thiserror::Error;
 
 use crate::utils::db;
 
@@ -27,7 +27,9 @@ pub struct AppState {
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
     pub superposition_client: Client,
-    pub sheets_hub: Option<Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>>
+    pub sheets_hub: Option<
+        Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
+    >,
 }
 
 #[derive(Clone, Debug)]
@@ -52,7 +54,7 @@ pub trait AppError: std::error::Error + Send + Sync + 'static {
     fn message(&self) -> String {
         self.to_string()
     }
-} 
+}
 
 #[derive(Serialize)]
 pub struct ErrorBody {
@@ -85,7 +87,7 @@ impl AppError for ABError {
     fn code(&self) -> &'static str {
         match self {
             ABError::NotFound(_) => ABErrorCodes::NotFound.label(),
-            ABError::DbError(_)         => ABErrorCodes::DbError.label(),
+            ABError::DbError(_) => ABErrorCodes::DbError.label(),
             ABError::InternalServerError(_) => ABErrorCodes::InternalServerError.label(),
             ABError::Unauthorized(_) => ABErrorCodes::Unauthorized.label(),
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
@@ -96,7 +98,7 @@ impl AppError for ABError {
     fn status_code(&self) -> StatusCode {
         match *self {
             ABError::NotFound(_) => StatusCode::NOT_FOUND,
-            ABError::DbError(_)         => StatusCode::INTERNAL_SERVER_ERROR,
+            ABError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
@@ -111,7 +113,7 @@ macro_rules! impl_response_error {
         $(
             use actix_web::{http::StatusCode as SC, HttpResponse as HR};
             use actix_web::ResponseError as RE;
-            use crate::types::{AppError as AE, ErrorBody as EB};
+            use $crate::types::{AppError as AE, ErrorBody as EB};
             impl RE for $err {
                 fn status_code(&self) -> SC {
                     AE::status_code(self)

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use actix_files::{Files, NamedFile};
-use actix_web::{web, Scope, Result};
+use actix_web::{web, Result, Scope};
 
 async fn index() -> Result<NamedFile> {
     Ok(NamedFile::open("./docs_react/dist/index.html")?)
@@ -21,11 +21,6 @@ async fn index() -> Result<NamedFile> {
 
 pub fn add_routes() -> Scope {
     Scope::new("/docs")
-    .service(
-        Scope::new("home")
-        .route("", web::get().to(index))
-    )
-    .service(
-        Files::new("/", "./docs_react/dist").index_file("index.html"),
-    )
+        .service(Scope::new("home").route("", web::get().to(index)))
+        .service(Files::new("/", "./docs_react/dist").index_file("index.html"))
 }
