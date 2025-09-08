@@ -34,7 +34,6 @@ export function ApplicationUserManagement({
   organization,
   onInviteUser,
   onRemoveUser,
-  onUpdateUser,
 }: ApplicationUserManagementProps) {
   const [activeTab, setActiveTab] = useState<"members" | "invite">("members");
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -109,26 +108,26 @@ export function ApplicationUserManagement({
     }
   };
 
-  const handleUpdateUserRole = async (username: string, newRole: string) => {
-    if (onUpdateUser) {
-      try {
-        await applicationUserService.updateUser(organization.name, application.application, {
-          user: username,
-          access: newRole
-        });
-        onUpdateUser(username, newRole);
-        await loadUsers(); // Refresh the list
-      } catch (err: any) {
-        console.error("Failed to update user role:", err);
-        // Extract error message from response if available
-        const errorMessage = err?.response?.data?.message || 
-                            err?.response?.data || 
-                            err?.message || 
-                            "Failed to update user role";
-        setError(typeof errorMessage === 'string' ? errorMessage : "Failed to update user role");
-      }
-    }
-  };
+  // const handleUpdateUserRole = async (username: string, newRole: string) => {
+  //   if (onUpdateUser) {
+  //     try {
+  //       await applicationUserService.updateUser(organization.name, application.application, {
+  //         user: username,
+  //         access: newRole
+  //       });
+  //       onUpdateUser(username, newRole);
+  //       await loadUsers(); // Refresh the list
+  //     } catch (err: any) {
+  //       console.error("Failed to update user role:", err);
+  //       // Extract error message from response if available
+  //       const errorMessage = err?.response?.data?.message || 
+  //                           err?.response?.data || 
+  //                           err?.message || 
+  //                           "Failed to update user role";
+  //       setError(typeof errorMessage === 'string' ? errorMessage : "Failed to update user role");
+  //     }
+  //   }
+  // };
 
   // Check if current user has admin access in this application
   const hasAdminAccess = application.access.includes("admin");
