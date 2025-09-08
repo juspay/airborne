@@ -70,11 +70,23 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.source=${{ github.repository }}
+      - name: Show workspace & dockerignore
+        run: |
+          set -e
+          echo "---- tree server/ (top 2 levels) ----"
+          find server -maxdepth 2 -type d -print | sort
+          echo "---- server/.dockerignore ----"
+          [ -f server/.dockerignore ] && sed -n '1,120p' server/.dockerignore || echo "(none)"
+          echo "---- sanity checks ----"
+          for d in dashboard_react docs_react home_react; do
+            test -d "server/$d" || { echo "::error::Missing server/$d"; exit 1; }
+            test -f "server/$d/package.json" || echo "::warning::server/$d/package.json missing"
+          done
 
       - name: Build & Push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./server/
           file: ./server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
