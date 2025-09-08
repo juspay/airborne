@@ -96,7 +96,7 @@ pub fn validate_access_level(access: &str) -> Result<(String, u8), AppError> {
         "write" => Ok(("write".to_string(), WRITE.access)),
         "admin" => Ok(("admin".to_string(), ADMIN.access)),
         _ => Err(AppError::InvalidAccessLevel(format!(
-            "Invalid access level '{}'. Applications only support: read, write, admin", 
+            "Invalid access level '{}'. Applications only support: read, write, admin",
             access
         ))),
     }
@@ -146,7 +146,7 @@ pub async fn is_last_admin_in_application(
             // Check if user has admin role in this application
             let is_admin = user_groups.iter().any(|group| {
                 // Check if this group is an admin role group under this application
-                group.parent_id.as_ref() == Some(&app_group_id.to_string()) 
+                group.parent_id.as_ref() == Some(&app_group_id.to_string())
                     && group.name.as_ref() == Some(&"admin".to_string())
             });
 

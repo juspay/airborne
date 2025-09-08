@@ -4,7 +4,7 @@ use std::path::Path;
 
 pub async fn index() -> Result<actix_files::NamedFile, std::io::Error> {
     let path = Path::new("home_react/dist/index.html");
-    Ok(actix_files::NamedFile::open(path)?)
+    actix_files::NamedFile::open(path)
 }
 
 pub fn add_routes() -> Scope {

@@ -15,8 +15,8 @@
 use std::collections::HashMap;
 
 use actix_web::{
-    error, get, post, patch,
-    web::{self, Json, ReqData, Path},
+    error, get, patch, post,
+    web::{self, Json, Path, ReqData},
     Result, Scope,
 };
 use aws_smithy_types::Document;
@@ -126,7 +126,6 @@ struct ExperimentVariant {
     variant_type: String,
 }
 
-
 #[post("/create")]
 async fn create(
     req: Json<CreateRequest>,
@@ -134,10 +133,10 @@ async fn create(
     state: web::Data<AppState>,
 ) -> Result<Json<CreateResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation =
-        validate_user(auth_response.organisation, WRITE).map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application =
-        validate_user(auth_response.application, WRITE).map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state
         .db_pool
@@ -163,7 +162,9 @@ async fn create(
             ))
             .first::<Option<i32>>(&mut conn)
             .map_err(|_| ABError::InternalServerError("".to_string()))?
-            .ok_or_else(|| ABError::NotFound("No packages found for this application".to_string()))?
+            .ok_or_else(|| {
+                ABError::NotFound("No packages found for this application".to_string())
+            })?
     };
 
     // Verify package exists
@@ -243,7 +244,7 @@ async fn create(
         .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
     let experimental_variant_id = format!("experimental_{}", pkg_version);
-    
+
     let experimental_variant = VariantBuilder::default()
         .id(experimental_variant_id.clone())
         .variant_type(superposition_rust_sdk::types::VariantType::Experimental)
@@ -312,15 +313,21 @@ async fn create(
         .metadata
         .clone()
         .unwrap_or_else(|| serde_json::json!({}));
-    
+
     let experiment_variant_id = format!("experimental_{}", pkg_version);
-    
+
     if let serde_json::Value::Object(ref mut map) = release_metadata {
-        map.insert("experiment_id".to_string(), serde_json::Value::String(experiment_id_for_ramping.clone()));
-        map.insert("variants".to_string(), serde_json::json!([
-            {"id": "control", "name": "Control (Original)"},
-            {"id": experiment_variant_id, "name": format!("Experimental (v{})", pkg_version)}
-        ]));
+        map.insert(
+            "experiment_id".to_string(),
+            serde_json::Value::String(experiment_id_for_ramping.clone()),
+        );
+        map.insert(
+            "variants".to_string(),
+            serde_json::json!([
+                {"id": "control", "name": "Control (Original)"},
+                {"id": experiment_variant_id, "name": format!("Experimental (v{})", pkg_version)}
+            ]),
+        );
     } else {
         release_metadata = serde_json::json!({
             "experiment_id": experiment_id_for_ramping.clone(),
@@ -354,7 +361,9 @@ async fn create(
         &state.cf_client,
         path,
         &state.env.cloudfront_distribution_id,
-    ).await {
+    )
+    .await
+    {
         eprintln!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
@@ -451,7 +460,11 @@ async fn ramp_release(
 
     println!(
         "Ramping experiment {} to {}% traffic for release {} in workspace {} org {}",
-        experiment_id, req.traffic_percentage, release_id, workspace_name, superposition_org_id_from_env
+        experiment_id,
+        req.traffic_percentage,
+        release_id,
+        workspace_name,
+        superposition_org_id_from_env
     );
 
     state
@@ -461,11 +474,12 @@ async fn ramp_release(
         .workspace_id(workspace_name)
         .id(experiment_id.to_string())
         .traffic_percentage(req.traffic_percentage as i32)
-        .change_reason(
-            req.change_reason
-                .clone()
-                .unwrap_or_else(|| format!("Ramping release {} to {}% traffic", release_id, req.traffic_percentage))
-        )
+        .change_reason(req.change_reason.clone().unwrap_or_else(|| {
+            format!(
+                "Ramping release {} to {}% traffic",
+                release_id, req.traffic_percentage
+            )
+        }))
         .send()
         .await
         .map_err(|e| {
@@ -477,7 +491,10 @@ async fn ramp_release(
 
     Ok(Json(RampReleaseResponse {
         success: true,
-        message: format!("Release experiment ramped to {}% traffic", req.traffic_percentage),
+        message: format!(
+            "Release experiment ramped to {}% traffic",
+            req.traffic_percentage
+        ),
         experiment_id: experiment_id.to_string(),
         traffic_percentage: req.traffic_percentage,
     }))
@@ -540,7 +557,6 @@ async fn conclude_release(
             error::ErrorInternalServerError("Failed to get experiment details from Superposition")
         })?;
 
-
     let transformed_variant_id = experiment_details
         .variants
         .iter()
@@ -550,9 +566,15 @@ async fn conclude_release(
         })
         .map(|variant| variant.id.clone())
         .ok_or_else(|| {
-            error::ErrorBadRequest(format!("Variant '{}' not found in experiment. Available variants: {:?}", 
-                req.chosen_variant, 
-                experiment_details.variants.iter().map(|v| &v.id).collect::<Vec<_>>()))
+            error::ErrorBadRequest(format!(
+                "Variant '{}' not found in experiment. Available variants: {:?}",
+                req.chosen_variant,
+                experiment_details
+                    .variants
+                    .iter()
+                    .map(|v| &v.id)
+                    .collect::<Vec<_>>()
+            ))
         })?;
 
     println!(
@@ -567,11 +589,12 @@ async fn conclude_release(
         .workspace_id(workspace_name)
         .id(experiment_id.to_string())
         .chosen_variant(transformed_variant_id.clone())
-        .change_reason(
-            req.change_reason
-                .clone()
-                .unwrap_or_else(|| format!("Concluding release {} with variant {}", release_id, req.chosen_variant))
-        )
+        .change_reason(req.change_reason.clone().unwrap_or_else(|| {
+            format!(
+                "Concluding release {} with variant {}",
+                release_id, req.chosen_variant
+            )
+        }))
         .send()
         .await
         .map_err(|e| {
@@ -579,11 +602,17 @@ async fn conclude_release(
             error::ErrorInternalServerError("Failed to conclude experiment in Superposition")
         })?;
 
-    println!("Successfully concluded experiment {} with variant {}", experiment_id, transformed_variant_id);
+    println!(
+        "Successfully concluded experiment {} with variant {}",
+        experiment_id, transformed_variant_id
+    );
 
     Ok(Json(ConcludeReleaseResponse {
         success: true,
-        message: format!("Release experiment concluded with variant {}", req.chosen_variant),
+        message: format!(
+            "Release experiment concluded with variant {}",
+            req.chosen_variant
+        ),
         experiment_id: experiment_id.to_string(),
         chosen_variant: req.chosen_variant.clone(),
     }))
@@ -627,7 +656,6 @@ async fn get_experiment_details(
             error::ErrorInternalServerError("Failed to get experiment details from Superposition")
         })?;
 
-
     let variants = experiment_details
         .variants
         .iter()
@@ -637,7 +665,7 @@ async fn get_experiment_details(
                 superposition_rust_sdk::types::VariantType::Experimental => "experimental",
                 _ => "unknown",
             };
-            
+
             ExperimentVariant {
                 id: variant.id.clone(),
                 name: if variant_type_str == "control" {
@@ -652,7 +680,7 @@ async fn get_experiment_details(
 
     let status_str = match experiment_details.status {
         superposition_rust_sdk::types::ExperimentStatusType::Created => "CREATED",
-        superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS", 
+        superposition_rust_sdk::types::ExperimentStatusType::Inprogress => "INPROGRESS",
         superposition_rust_sdk::types::ExperimentStatusType::Concluded => "CONCLUDED",
         superposition_rust_sdk::types::ExperimentStatusType::Discarded => "DISCARDED",
         _ => "UNKNOWN",
@@ -669,13 +697,19 @@ async fn get_experiment_details(
 async fn invalidate_cf(
     client: &aws_sdk_cloudfront::Client,
     path: String,
-    distribution_id: &str) -> Result<(), aws_sdk_cloudfront::Error> {
+    distribution_id: &str,
+) -> Result<(), aws_sdk_cloudfront::Error> {
     // Make this unique on each call
-    let caller_reference = format!("invalidate-{}", Utc::now().timestamp_nanos_opt().unwrap_or(rand::random::<i64>()));
+    let caller_reference = format!(
+        "invalidate-{}",
+        Utc::now()
+            .timestamp_nanos_opt()
+            .unwrap_or(rand::random::<i64>())
+    );
 
     let paths = aws_sdk_cloudfront::types::Paths::builder()
         .items(path)
-        .quantity(1) 
+        .quantity(1)
         .build()?;
 
     let batch = aws_sdk_cloudfront::types::InvalidationBatch::builder()
@@ -689,7 +723,7 @@ async fn invalidate_cf(
         .invalidation_batch(batch)
         .send()
         .await?;
-    
+
     resp.invalidation()
         .map(|inv| {
             println!("Invalidation created: {:?}", inv.id);

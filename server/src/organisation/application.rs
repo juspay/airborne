@@ -143,7 +143,10 @@ async fn add_application(
     println!("Validating organisation: {:?}", organisation);
     let organisation = validate_user(organisation, WRITE).map_err(|e| {
         println!("Error validating organisation: {:?}", e);
-        ABError::Unauthorized(format!("User does not have WRITE access to organisation: {}", e))
+        ABError::Unauthorized(format!(
+            "User does not have WRITE access to organisation: {}",
+            e
+        ))
     })?;
     println!("Organisation validated successfully.");
 
@@ -151,9 +154,10 @@ async fn add_application(
     let transaction = TransactionManager::new(&application, "application_create");
 
     // Get DB connection
-    let mut conn = state.db_pool.get().map_err(|e| {
-        ABError::DbError(format!("Failed to get database connection: {}", e))
-    })?;
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|e| ABError::DbError(format!("Failed to get database connection: {}", e)))?;
 
     // Get Keycloak Admin Token
     let client = reqwest::Client::new();

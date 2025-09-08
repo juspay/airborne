@@ -24,11 +24,11 @@ pub async fn get_database_url(
         return database_url;
     }
 
-    let db_user: String = env::var(user_key).expect(&format!("{user_key} must be set"));
+    let db_user: String = env::var(user_key).unwrap_or_else(|_| panic!("{user_key} must be set"));
 
     let x = decrypt_kms(
         kms_client,
-        env::var(password_key).expect(&format!("{password_key} must be set")),
+        env::var(password_key).unwrap_or_else(|_| panic!("{password_key} must be set")),
     )
     .await;
 
