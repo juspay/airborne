@@ -37,7 +37,7 @@ use self::{
         add_user_with_transaction, get_user_current_role, remove_user_with_transaction,
         update_user_with_transaction,
     },
-    utils::{check_role_hierarchy, validate_access_level, is_last_admin_in_application},
+    utils::{check_role_hierarchy, is_last_admin_in_application, validate_access_level},
 };
 
 /// Errors that can occur during application operations
@@ -148,26 +148,29 @@ async fn get_app_context(
     // For application operations, we need to check:
     // 1. User has some access to the organization (at least READ)
     // 2. User has the required access level to the application
-    
+
     // Ensure user has at least read access to the organization
     let org_name = validate_user(auth.organisation.clone(), READ)
-        .map_err(AppError::Unauthorized)?;
-    
+        .map_err(|e| AppError::Unauthorized(e.to_string()))?;
+
     // Check if user has the required application-level access
     let app_name = validate_user(auth.application.clone(), required_level)
-        .map_err(AppError::Unauthorized)?;
+        .map_err(|e| AppError::Unauthorized(e.to_string()))?;
 
     // For application admin operations, application-level permissions take precedence
     // over organization-level permissions
     if let Some(app_access) = &auth.application {
         if app_access.level >= required_level.access {
             // User has sufficient application-level access
-            return Ok((AppContext {
-                org_name: org_name.clone(),
-                app_name: app_name.clone(),
-                org_group_id: String::new(), // Will be filled by find_application
-                app_group_id: String::new(), // Will be filled by find_application
-            }, auth));
+            return Ok((
+                AppContext {
+                    org_name: org_name.clone(),
+                    app_name: app_name.clone(),
+                    org_group_id: String::new(), // Will be filled by find_application
+                    app_group_id: String::new(), // Will be filled by find_application
+                },
+                auth,
+            ));
         }
     }
 
@@ -176,12 +179,15 @@ async fn get_app_context(
         .await
         .map_err(AppError::Unauthorized)?;
 
-    Ok((AppContext {
-        org_name: org_name.clone(),
-        app_name: app_name.clone(),
-        org_group_id: String::new(), // Will be filled by find_application
-        app_group_id: String::new(), // Will be filled by find_application
-    }, auth))
+    Ok((
+        AppContext {
+            org_name: org_name.clone(),
+            app_name: app_name.clone(),
+            org_group_id: String::new(), // Will be filled by find_application
+            app_group_id: String::new(), // Will be filled by find_application
+        },
+        auth,
+    ))
 }
 
 /// Find a user and extract their ID
@@ -358,7 +364,8 @@ async fn application_update_user(
 
     // Find target user and application
     let target_user = find_target_user(&admin, &realm, &request.user).await?;
-    app_context = find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
+    app_context =
+        find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
 
     // Check if requester has permission to modify this user (hierarchy check)
     check_role_hierarchy(
@@ -376,8 +383,13 @@ async fn application_update_user(
 
     // Check if this would demote the last admin (can't do that)
     if current_role == "admin" && role_name != "admin" {
-        let is_last_admin = is_last_admin_in_application(&admin, &realm, &app_context.app_group_id, &target_user.user_id)
-            .await?;
+        let is_last_admin = is_last_admin_in_application(
+            &admin,
+            &realm,
+            &app_context.app_group_id,
+            &target_user.user_id,
+        )
+        .await?;
 
         if is_last_admin {
             return Err(AppError::PermissionDenied(
@@ -430,11 +442,17 @@ async fn application_remove_user(
 
     // Find target user and application
     let target_user = find_target_user(&admin, &realm, &request.user).await?;
-    app_context = find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
+    app_context =
+        find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
 
     // Check if this user is the last admin in the application (can't remove them)
-    let is_last_admin = is_last_admin_in_application(&admin, &realm, &app_context.app_group_id, &target_user.user_id)
-        .await?;
+    let is_last_admin = is_last_admin_in_application(
+        &admin,
+        &realm,
+        &app_context.app_group_id,
+        &target_user.user_id,
+    )
+    .await?;
 
     if is_last_admin {
         return Err(AppError::PermissionDenied(
@@ -496,7 +514,8 @@ async fn application_list_users(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Find the application
-    let app_context = find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
+    let app_context =
+        find_application(&admin, &realm, &app_context.org_name, &app_context.app_name).await?;
 
     debug!(
         "Listing users for application: {}/{} (ID: {})",
@@ -556,7 +575,10 @@ async fn application_list_users(
                     .iter()
                     .filter_map(|group| {
                         if let Some(path) = &group.path {
-                            if path.starts_with(&format!("/{}/{}/", app_context.org_name, app_context.app_name)) {
+                            if path.starts_with(&format!(
+                                "/{}/{}/",
+                                app_context.org_name, app_context.app_name
+                            )) {
                                 return path.split('/').next_back().map(String::from);
                             }
                         }
