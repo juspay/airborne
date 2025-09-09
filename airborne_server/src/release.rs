@@ -15,10 +15,11 @@
 use actix_web::{
     error, get, post, put,
     web::{self, Json, Path},
-    HttpResponse, Scope,
+    Scope,
 };
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
+use http::{HeaderValue, StatusCode};
 use log::info;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -29,7 +30,8 @@ use crate::{
     file::utils::parse_file_key,
     middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
     release::types::*,
-    types::{ABError, AppState},
+    types as airborne_types,
+    types::{ABError, AppState, WithHeaders},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
 
@@ -60,7 +62,7 @@ async fn get_release(
     release_id: Path<String>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<HttpResponse, ABError> {
+) -> airborne_types::Result<Json<GetReleaseResponse>> {
     let release_key = release_id.into_inner();
     if release_key.is_empty() {
         return Err(ABError::BadRequest(
@@ -310,7 +312,7 @@ async fn get_release(
             .collect(),
     };
 
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(Json(resp))
 }
 
 #[post("")]
@@ -318,7 +320,7 @@ async fn create_release(
     req: Json<CreateReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<CreateReleaseResponse>, ABError> {
+) -> airborne_types::Result<Json<CreateReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -586,7 +588,7 @@ async fn list_releases(
     req: actix_web::HttpRequest,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ListReleaseResponse>, ABError> {
+) -> airborne_types::Result<Json<ListReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -857,7 +859,7 @@ async fn ramp_release(
     req: Json<RampReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<RampReleaseResponse>, ABError> {
+) -> airborne_types::Result<Json<RampReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -933,7 +935,7 @@ async fn ramp_experiment(
     experiment_id: &String,
     traffic_percentage: i32,
     change_reason: &Option<String>,
-) -> Result<(), actix_web::Error> {
+) -> airborne_types::Result<()> {
     state
         .superposition_client
         .ramp_experiment()
@@ -951,7 +953,7 @@ async fn ramp_experiment(
         .await
         .map_err(|e| {
             info!("Failed to ramp experiment: {:?}", e);
-            error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
+            ABError::InternalServerError("Failed to ramp experiment in Superposition".to_owned())
         })?;
     Ok(())
 }
@@ -962,7 +964,7 @@ async fn conclude_release(
     req: Json<ConcludeReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ConcludeReleaseResponse>, ABError> {
+) -> airborne_types::Result<Json<ConcludeReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -1081,7 +1083,7 @@ async fn serve_release(
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
     serve_release_handler(path, req, query, state).await
 }
 
@@ -1091,7 +1093,7 @@ async fn serve_release_v2(
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
     serve_release_handler(path, req, query, state).await
 }
 
@@ -1100,7 +1102,7 @@ async fn serve_release_handler(
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
     let (organisation, application) = path.into_inner();
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
@@ -1363,14 +1365,16 @@ async fn serve_release_handler(
         resources: resource_files,
     };
 
-    let response = actix_web::HttpResponse::Ok()
-        .insert_header((
+    Ok(WithHeaders::new(Json(release_response))
+        .header(
+            actix_web::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        )
+        .header(
             actix_web::http::header::CACHE_CONTROL,
-            "public, s-maxage=86400, max-age=0",
-        ))
-        .insert_header((actix_web::http::header::CONTENT_TYPE, "application/json"))
-        .json(release_response);
-    Ok(response)
+            HeaderValue::from_static("public, s-maxage=86400, max-age=0"),
+        )
+        .status(StatusCode::OK))
 }
 
 #[put("/{release_id}")]
@@ -1379,7 +1383,7 @@ async fn update_release(
     req: Json<CreateReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<CreateReleaseResponse>, ABError> {
+) -> airborne_types::Result<Json<CreateReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {

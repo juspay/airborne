@@ -2,9 +2,12 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::str::FromStr;
 
-use actix_web::{get, web, HttpResponse, Scope};
+use actix_web::web::Json;
+use actix_web::{get, web, Scope};
 use aws_smithy_types::Document;
+use bytes::Bytes;
 use diesel::prelude::*;
+use http::HeaderValue;
 use log::info;
 use serde::Serialize;
 use serde_json::Value;
@@ -13,6 +16,7 @@ use zip::ZipWriter;
 
 use crate::file::utils::download_file_content;
 use crate::release::utils::get_files_by_file_keys_async;
+use crate::types::WithHeaders;
 use crate::utils::db::schema::hyperotaserver::builds::{
     application as app_column, build_version, dsl::builds, organisation as org_column,
     release_id as release_id_column,
@@ -20,7 +24,7 @@ use crate::utils::db::schema::hyperotaserver::builds::{
 use crate::utils::s3::push_file_byte_arr;
 use crate::utils::semver::SemVer;
 use crate::{
-    release, run_blocking,
+    release, run_blocking, types as airborne_types,
     types::{ABError, AppState},
     utils::{
         db::models::{BuildEntry, NewBuildEntry},
@@ -85,7 +89,7 @@ fn generate_pom_content(org: &String, app: &String, version: &SemVer) -> String 
     )
 }
 
-fn parse_existing_maven_metadata(metadata_content: &str) -> Result<Vec<SemVer>, ABError> {
+fn parse_existing_maven_metadata(metadata_content: &str) -> airborne_types::Result<Vec<SemVer>> {
     // Simple XML parsing to extract version numbers
     let mut versions = Vec::new();
 
@@ -201,7 +205,7 @@ async fn create_and_upload_build(
     new_build_version: &SemVer,
     config_document: Option<Document>,
     state: web::Data<AppState>,
-) -> Result<(), ABError> {
+) -> airborne_types::Result<()> {
     // Extract files from config
     let package_index =
         crate::release::utils::extract_file_from_configs(&config_document, "package.index")
@@ -533,7 +537,7 @@ async fn build(
     release_id: String,
     config_document: Option<Document>,
     state: web::Data<AppState>,
-) -> Result<SemVer, ABError> {
+) -> airborne_types::Result<SemVer> {
     info!(
         "Starting build for {}/{} with release id {}",
         org, app, release_id
@@ -589,7 +593,7 @@ async fn extract_args(
     path: web::Path<(String, String)>,
     state: web::Data<AppState>,
     req: actix_web::HttpRequest,
-) -> Result<Arguments, ABError> {
+) -> airborne_types::Result<Arguments> {
     let _conn = state
         .db_pool
         .get()
@@ -622,7 +626,7 @@ async fn extract_args(
 async fn generate(
     arguments: Arguments,
     state: web::Data<AppState>,
-) -> Result<BuildResponse, ABError> {
+) -> airborne_types::Result<BuildResponse> {
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     // Get workspace name (similar to serve_release)
@@ -777,7 +781,7 @@ async fn serve_version(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Json<BuildResponse>>> {
     // Where do I save the last updated aar / zip?
     // S3 can just dump to archive/org/app/zip/release-id.zip?
     // S3 can just dump to archive/org/app/aar/version.aar/pom/hashes,
@@ -790,13 +794,16 @@ async fn serve_version(
     let _args = extract_args(path, state_clone, req).await?;
     let build_response = generate(_args, state.clone()).await?;
 
-    Ok(actix_web::HttpResponse::Ok()
-        .insert_header((
+    Ok(WithHeaders::new(Json(build_response))
+        .header(
             actix_web::http::header::CACHE_CONTROL,
-            "public, s-maxage=86400, max-age=0",
-        ))
-        .insert_header((actix_web::http::header::CONTENT_TYPE, "application/json"))
-        .json(build_response))
+            HeaderValue::from_static("public, s-maxage=86400, max-age=0"),
+        )
+        .header(
+            actix_web::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        )
+        .status(actix_web::http::StatusCode::OK))
 }
 
 #[get("{organisation}/{application}/zip")]
@@ -804,7 +811,7 @@ async fn serve_zip(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Bytes>> {
     // Extract args
     let _args = extract_args(path, state.clone(), req).await?;
     let org_id = _args.organisation.clone();
@@ -833,17 +840,25 @@ async fn serve_zip(
         .map_err(|e| ABError::InternalServerError(format!("Failed to read S3 object: {}", e)))?
         .into_bytes();
 
-    // Return it as the HTTP response
-    Ok(HttpResponse::Ok()
-        .insert_header((actix_web::http::header::CONTENT_TYPE, "application/zip"))
-        .insert_header((
+    Ok(WithHeaders::new(data)
+        .header(
+            actix_web::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/zip"),
+        )
+        .header(
             actix_web::http::header::CONTENT_DISPOSITION,
-            format!(
+            HeaderValue::from_str(&format!(
                 "attachment; filename=\"Assets-{}.zip\"",
                 build_response.version
-            ),
-        ))
-        .body(data))
+            ))
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to create content disposition header: {}",
+                    e
+                ))
+            })?,
+        )
+        .status(actix_web::http::StatusCode::OK))
 }
 
 #[get("{organisation}/{application}/aar")]
@@ -851,7 +866,7 @@ async fn serve_aar(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Bytes>> {
     // Extract args
     let _args = extract_args(path, state.clone(), req).await?;
     let org_id = _args.organisation.clone();
@@ -885,15 +900,23 @@ async fn serve_aar(
         .map_err(|e| ABError::InternalServerError(format!("Failed to read S3 object: {}", e)))?
         .into_bytes();
 
-    // Return it as the HTTP response
-    Ok(HttpResponse::Ok()
-        .insert_header((actix_web::http::header::CONTENT_TYPE, "application/zip"))
-        .insert_header((
+    Ok(WithHeaders::new(data)
+        .header(
+            actix_web::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/zip"),
+        )
+        .header(
             actix_web::http::header::CONTENT_DISPOSITION,
-            format!(
+            HeaderValue::from_str(&format!(
                 "attachment; filename=\"airborne-assets-{}.aar\"",
                 build_response.version
-            ),
-        ))
-        .body(data))
+            ))
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to create content disposition header: {}",
+                    e
+                ))
+            })?,
+        )
+        .status(actix_web::http::StatusCode::OK))
 }

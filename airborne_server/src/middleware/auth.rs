@@ -31,7 +31,7 @@ use crate::{
     utils::keycloak::{decode_jwt_token, get_token},
 };
 
-use crate::types::ABError;
+use crate::types::{ABError, Result as ABResult};
 
 // There are two steps in middleware processing.
 // 1. Middleware initialization, middleware factory gets called with
@@ -92,7 +92,7 @@ pub const WRITE: Access = Access { access: 2 };
 pub const READ: Access = Access { access: 1 };
 pub const ROLES: [&str; 4] = ["owner", "admin", "write", "read"];
 
-pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> Result<String, ABError> {
+pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> ABResult<String> {
     if let Some(access_level) = access_level {
         if access_level.level >= access.access {
             Ok(access_level.name)
@@ -141,6 +141,9 @@ where
             };
             let header_value = req.headers().clone();
             let auth_header = header_value.get("Authorization");
+            if auth_header.is_none() {
+                return Err(ABError::Unauthorized("No Authorization Header".to_string()).into());
+            }
             let org_header = header_value.get("x-organisation");
             let app_header = header_value.get("x-application");
             let auth = auth_header
@@ -247,9 +250,7 @@ where
                                 });
                                 service.call(req).await
                             }
-                            Err(e) => {
-                                Err(ABError::Unauthorized(format!("Invalid token: {:?}", e)).into())
-                            }
+                            Err(e) => Err(e.into()),
                         }
                     }
                     None => Err(ABError::Unauthorized("No AdminToken".to_string()).into()),
@@ -270,14 +271,17 @@ pub async fn validate_required_access(
     auth: &AuthResponse,
     required_level: u8,
     operation: &str,
-) -> Result<(), String> {
+) -> ABResult<()> {
     if let Some(access) = &auth.organisation {
         if access.level >= required_level {
             Ok(())
         } else {
-            Err(format!("Insufficient permissions for {}", operation))
+            Err(ABError::Forbidden(format!(
+                "Insufficient permissions for {}",
+                operation
+            )))
         }
     } else {
-        Err("No organization access".to_string())
+        Err(ABError::Forbidden("No organisation access".to_string()))
     }
 }

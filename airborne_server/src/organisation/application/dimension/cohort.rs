@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use actix_web::{
     get, post, put,
     web::{self, Json, Path, ReqData},
-    Result, Scope,
+    Scope,
 };
 use log::info;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     organisation::application::dimension::cohort::types::CohortDimensionSchema,
+    types as airborne_types,
     types::{ABError, AppState},
 };
 
@@ -30,7 +31,7 @@ async fn list_cohorts_api(
     cohort_dimension: Path<String>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<CohortDimensionSchema>, ABError> {
+) -> airborne_types::Result<Json<CohortDimensionSchema>> {
     let cohort_dimension_id = cohort_dimension.into_inner();
 
     let auth_response = auth_response.into_inner();
@@ -84,7 +85,7 @@ async fn create_cohort_checkpoint_api(
     req: Json<types::CreateCohortDimensionCheckpointInput>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<types::CreateCohortDimensionCheckpointOutput>, ABError> {
+) -> airborne_types::Result<Json<types::CreateCohortDimensionCheckpointOutput>> {
     let cohort_dimension_id = cohort_dimension.into_inner();
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
@@ -252,7 +253,7 @@ async fn create_cohort_group_api(
     req: Json<types::CreateCohortGroupInput>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<types::CreateCohortGroupOutput>, ABError> {
+) -> airborne_types::Result<Json<types::CreateCohortGroupOutput>> {
     let cohort_dimension_id = cohort_dimension.into_inner();
 
     let auth_response = auth_response.into_inner();
@@ -352,7 +353,7 @@ async fn get_cohort_priority_api(
     cohort_dimension: Path<String>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<types::GetPriorityOutput>, ABError> {
+) -> airborne_types::Result<Json<types::GetPriorityOutput>> {
     let cohort_dimension = cohort_dimension.into_inner();
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
@@ -426,7 +427,7 @@ async fn update_cohort_priority_api(
     req: Json<types::UpdatePriorityInput>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<types::UpdatePriorityOutput>, ABError> {
+) -> airborne_types::Result<Json<types::UpdatePriorityOutput>> {
     let cohort_dimension_id = cohort_dimension.into_inner();
 
     let auth_response = auth_response.into_inner();

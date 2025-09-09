@@ -18,6 +18,7 @@ use crate::{
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     organisation::application::properties::types::ConfigProperty,
     release::utils::parse_kv_string,
+    types as airborne_types,
     types::{ABError, AppState},
     utils::document::{
         document_to_json_value, dotted_docs_to_nested, hashmap_to_json_value,
@@ -58,7 +59,7 @@ async fn put_properties_schema_api(
     req: Json<types::PutPropertiesSchemaRequest>,
     auth_response: ReqData<AuthResponse>,
     state: Data<AppState>,
-) -> actix_web::Result<Json<types::PutPropertiesSchemaResponse>> {
+) -> airborne_types::Result<Json<types::PutPropertiesSchemaResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -297,11 +298,12 @@ async fn put_properties_schema_api(
     {
         Ok(values) => info!("All good: {:?}", values),
         Err(e) => match e {
-            transaction::TxnError::Operation { source, .. } => return Err(source.into()),
+            transaction::TxnError::Operation { source, .. } => return Err(source),
             transaction::TxnError::Join { source, .. } => {
-                return Err(
-                    ABError::InternalServerError(format!("Task join error: {}", source)).into(),
-                )
+                return Err(ABError::InternalServerError(format!(
+                    "Task join error: {}",
+                    source
+                )));
             }
         },
     }
@@ -320,7 +322,7 @@ async fn rollback_config_update(
 
     for &index in &success_indices {
         if let Some(task_meta) = metadata.get(index) {
-            let result: Result<String, String> = match &task_meta.action {
+            let result: airborne_types::Result<String> = match &task_meta.action {
                 types::PutPropertiesSchemaTaskAction::Create => {
                     // Rollback Create: Delete the created config
                     info!("Rolling back CREATE for key: {}", task_meta.key);
@@ -338,7 +340,10 @@ async fn rollback_config_update(
                             )
                         })
                         .map_err(|e| {
-                            format!("Failed to rollback create for {}: {}", task_meta.key, e)
+                            ABError::InternalServerError(format!(
+                                "Failed to rollback create for {}: {}",
+                                task_meta.key, e
+                            ))
                         })
                 }
                 types::PutPropertiesSchemaTaskAction::Update => {
@@ -360,13 +365,16 @@ async fn rollback_config_update(
                             .await
                             .map(|_| format!("Rolled back update for {}", task_meta.key))
                             .map_err(|e| {
-                                format!("Failed to rollback update for {}: {}", task_meta.key, e)
+                                ABError::InternalServerError(format!(
+                                    "Failed to rollback update for {}: {}",
+                                    task_meta.key, e
+                                ))
                             })
                     } else {
-                        Err(format!(
+                        Err(ABError::InternalServerError(format!(
                             "No old schema available for rollback of {}",
                             task_meta.key
-                        ))
+                        )))
                     }
                 }
                 types::PutPropertiesSchemaTaskAction::Delete => {
@@ -388,13 +396,16 @@ async fn rollback_config_update(
                             .await
                             .map(|_| format!("Rolled back delete for {}", task_meta.key))
                             .map_err(|e| {
-                                format!("Failed to rollback delete for {}: {}", task_meta.key, e)
+                                ABError::InternalServerError(format!(
+                                    "Failed to rollback delete for {}: {}",
+                                    task_meta.key, e
+                                ))
                             })
                     } else {
-                        Err(format!(
+                        Err(ABError::InternalServerError(format!(
                             "No old schema available for rollback of {}",
                             task_meta.key
-                        ))
+                        )))
                     }
                 }
             };
@@ -420,7 +431,7 @@ async fn get_properties_schema_api(
     req: actix_web::HttpRequest,
     auth_response: ReqData<AuthResponse>,
     state: Data<AppState>,
-) -> actix_web::Result<Json<types::GetPropertiesSchemaResponse>> {
+) -> airborne_types::Result<Json<types::GetPropertiesSchemaResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -582,7 +593,7 @@ async fn list_properties_api(
     auth_response: ReqData<AuthResponse>,
     req: actix_web::HttpRequest,
     state: Data<AppState>,
-) -> actix_web::Result<Json<types::ListPropertiesResponse>> {
+) -> airborne_types::Result<Json<types::ListPropertiesResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {

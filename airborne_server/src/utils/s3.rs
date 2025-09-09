@@ -1,16 +1,18 @@
-use actix_web::error;
 use aws_sdk_s3::{
-    error::BoxError, operation::put_object::PutObjectOutput, primitives::ByteStream,
-    types::ChecksumAlgorithm, Client,
+    operation::put_object::PutObjectOutput, primitives::ByteStream, types::ChecksumAlgorithm,
+    Client,
 };
 use log::info;
+
+use crate::types as airborne_types;
+use crate::types::ABError;
 
 pub async fn push_file_byte_arr(
     s3_client: &Client,
     bucket_name: String,
     byte_arr: Vec<u8>,
     filename: String,
-) -> actix_web::Result<PutObjectOutput> {
+) -> airborne_types::Result<PutObjectOutput> {
     let byte_stream = ByteStream::from(byte_arr);
 
     s3_client
@@ -20,7 +22,7 @@ pub async fn push_file_byte_arr(
         .body(byte_stream)
         .send()
         .await
-        .map_err(error::ErrorInternalServerError)
+        .map_err(|e| ABError::InternalServerError(e.to_string()))
 }
 
 pub async fn stream_file(
@@ -30,7 +32,7 @@ pub async fn stream_file(
     filename: String,
     file_size: i64,
     checksum: String,
-) -> Result<PutObjectOutput, BoxError> {
+) -> airborne_types::Result<PutObjectOutput> {
     info!("Uploading file: {}", filename);
     info!("Uploading File: {}", file_size);
     s3_client
@@ -43,5 +45,5 @@ pub async fn stream_file(
         .body(byte_stream)
         .send()
         .await
-        .map_err(|e| e.into())
+        .map_err(|e| ABError::InternalServerError(e.to_string()))
 }

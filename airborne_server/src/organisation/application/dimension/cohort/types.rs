@@ -6,6 +6,7 @@ use serde_json::{Map, Value};
 
 use crate::{
     organisation::application::dimension::{cohort::utils, types::DimensionSchema},
+    types as airborne_types,
     types::ABError,
     utils::document::value_to_document,
 };
@@ -136,7 +137,7 @@ impl From<&JsonLogicKey> for String {
 impl TryFrom<HashMap<String, Document>> for CohortDimensionSchema {
     type Error = ABError;
 
-    fn try_from(map: HashMap<String, Document>) -> Result<Self, Self::Error> {
+    fn try_from(map: HashMap<String, Document>) -> airborne_types::Result<Self> {
         let r#type = match map.get("type") {
             Some(Document::String(s)) if s == "string" => DimensionSchema::String,
             _ => DimensionSchema::String,

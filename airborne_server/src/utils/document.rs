@@ -4,6 +4,7 @@ use aws_smithy_types::Document;
 use log::info;
 use serde_json::{json, Map, Value};
 
+use crate::types as airborne_types;
 use crate::types::ABError;
 
 pub fn document_to_json_value(doc: &Document) -> Value {
@@ -75,7 +76,7 @@ pub fn value_to_document(doc: &Value) -> Document {
     }
 }
 
-pub fn dotted_docs_to_nested<T>(input: T) -> Result<Value, ABError>
+pub fn dotted_docs_to_nested<T>(input: T) -> airborne_types::Result<Value>
 where
     T: IntoIterator<Item = (String, Document)>,
 {

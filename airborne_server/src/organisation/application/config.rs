@@ -16,7 +16,7 @@ use actix_multipart::form::{text::Text, MultipartForm};
 use actix_web::{
     post,
     web::{self, Json, ReqData},
-    Result, Scope,
+    Scope,
 };
 use diesel::prelude::*;
 use diesel::ExpressionMethods;
@@ -26,7 +26,7 @@ use serde_json::json;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE},
-    run_blocking,
+    run_blocking, types as airborne_types,
     types::{ABError, AppState},
     utils::db::{
         models::ConfigEntry, schema::hyperotaserver::configs::dsl::configs as configs_table,
@@ -72,7 +72,7 @@ async fn create_config_json_v1(
     req: Json<ConfigJsonV1Request>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Response>, ABError> {
+) -> airborne_types::Result<Json<Response>> {
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
@@ -147,7 +147,7 @@ async fn create_config_json_v1_multipart(
     MultipartForm(form): MultipartForm<ConfigJsonV1MultipartRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Response>, ABError> {
+) -> airborne_types::Result<Json<Response>> {
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;

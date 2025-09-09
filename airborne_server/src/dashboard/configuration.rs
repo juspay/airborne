@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::types as airborne_types;
 use crate::types::AppState;
 use actix_web::{
     get,
@@ -34,7 +35,7 @@ struct Configuration {
 async fn get_global_configurations(
     _: HttpRequest,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Configuration>> {
+) -> airborne_types::Result<Json<Configuration>> {
     let config = Configuration {
         google_signin_enabled: state.env.enable_google_signin,
         organisation_creation_disabled: state.env.organisation_creation_disabled,

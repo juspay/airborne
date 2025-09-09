@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-// use tracing_appender::rolling;
-
 pub mod db;
 pub mod document;
 pub mod encryption;
@@ -24,6 +21,8 @@ pub mod s3;
 pub mod semver;
 pub mod transaction_manager;
 pub mod workspace;
+
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 pub fn init_tracing(log_format: String) {
     let (nb_stderr, stderr_guard) = tracing_appender::non_blocking(std::io::stderr());
