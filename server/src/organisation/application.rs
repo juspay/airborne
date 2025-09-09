@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use actix_web::web::{Json, ReqData};
-use actix_web::{error, Scope};
+use actix_web::Scope;
 
 use actix_web::{post, web};
 use aws_smithy_types::Document;
@@ -27,7 +27,7 @@ use superposition_rust_sdk::types::WorkspaceStatus;
 use superposition_rust_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, WRITE};
-use crate::types::{ABError, AppState};
+use crate::types::{ABError, ABResult, AppState};
 use diesel::RunQueryDsl;
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
@@ -39,7 +39,7 @@ mod config;
 mod dimension;
 mod package;
 mod release;
-mod user;
+pub mod user;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -70,7 +70,7 @@ fn default_config<T: Clone>(
     superposition_client: Client,
     workspace_name: String,
     superposition_org: String,
-) -> impl AsyncFn(String, T, String) -> actix_web::Result<CreateDefaultConfigOutput>
+) -> impl AsyncFn(String, T, String) -> ABResult<CreateDefaultConfigOutput>
 where
     Document: From<T>,
 {
@@ -86,7 +86,10 @@ where
             .schema(get_scheme(value.clone()))
             .send()
             .await
-            .map_err(error::ErrorInternalServerError)
+            .map_err(|e| {
+                println!("[DEFAULT_CONFIG] Failed to create default config: {}", e);
+                ABError::InternalServerError("Failed to create default configurations".to_string())
+            })
     }
 }
 
@@ -129,7 +132,7 @@ async fn add_application(
     body: Json<ApplicationCreateRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Application>, ABError> {
+) -> ABResult<Json<Application>> {
     // Get organisation and application names
     let body = body.into_inner();
     let application = body.application;
@@ -393,7 +396,7 @@ async fn add_application(
             admin: &KeycloakAdmin,
             realm: &str,
             state: &web::Data<AppState>,
-        ) -> Result<T, actix_web::Error>
+        ) -> ABResult<T>
         where
             E: std::fmt::Display,
         {
@@ -411,7 +414,7 @@ async fn add_application(
                         println!("Rollback failed: {}", rollback_err);
                     }
 
-                    Err(error::ErrorInternalServerError(format!(
+                    Err(ABError::InternalServerError(format!(
                         "Failed to create configuration for {}: {}",
                         key, e
                     )))
@@ -502,7 +505,7 @@ async fn add_application(
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();
 
-        actix_web::Result::Ok(Json(Application {
+        Ok(Json(Application {
             application,
             organisation,
             access: roles.iter().map(|&s| s.to_string()).collect(),

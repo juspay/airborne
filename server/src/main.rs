@@ -181,14 +181,10 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(app_state.clone()))
+            .app_data(web::JsonConfig::default().error_handler(utils::json_error_handler))
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::Compress::default())
-            .service(
-                // APIs specific to the dashboard
-                // These will be all public (or with token as cookie) endpoints which serve dashboard JS code
-                // Can eventually be migrated to some server side rendering
-                web::scope("/dashboard").service(dashboard::add_routes()),
-            )
+            .service(web::scope("/dashboard").service(dashboard::add_routes()))
             .route("/", web::get().to(index))
             .route("", web::get().to(index))
             .route("/privacy-policy", web::get().to(index))
@@ -220,7 +216,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-
-// Create Workspace
-// Update Worspace
-// Middleware for authentication via CAC key cloak
