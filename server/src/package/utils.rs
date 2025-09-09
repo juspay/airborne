@@ -1,4 +1,4 @@
-use crate::{package::models::Package, utils::db::models::PackageV2Entry};
+use crate::{package::types::Package, utils::db::models::PackageV2Entry};
 
 pub fn parse_package_key(spec: &str) -> (Option<i32>, Option<String>) {
     if let Some((kind, value)) = spec.split_once(':') {

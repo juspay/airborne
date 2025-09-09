@@ -1,6 +1,6 @@
 pub mod utils;
 use actix_web::{get, post, web::{self, Query}, HttpResponse, Result, Scope};
-use crate::{middleware::auth::READ, package::{models::*, utils::parse_package_key}, types::ABError, utils::db::{
+use crate::{middleware::auth::READ, package::{types::*, utils::parse_package_key}, types::ABError, utils::db::{
     models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
     schema::hyperotaserver::{
         files::{
@@ -22,7 +22,7 @@ use diesel::pg::Pg;
 use diesel::expression::BoxableExpression;
 use diesel::sql_types::Bool;
 
-pub mod models;
+pub mod types;
 
 pub fn add_routes() -> Scope {
     Scope::new("")

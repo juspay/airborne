@@ -11,10 +11,10 @@ use uuid::Uuid;
 use chrono::Utc;
 use zip::ZipArchive;
 pub mod utils;
-pub mod models;
+pub mod types;
 
 use crate::{
-    file::models::*, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, types::{ABError, AppState}, utils::{
+    file::types::*, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, types::{ABError, AppState}, utils::{
         db::{
             models::{FileEntry as DbFile, NewFileEntry},
             schema::hyperotaserver::files::dsl::*,

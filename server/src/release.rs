@@ -12,18 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
-use actix_web::{
-    error::{self},
-    get,
-    web::{self},
-    HttpResponse, Result, Scope,
-};
-use aws_smithy_types::Document;
-use diesel::prelude::*;
-use diesel::ExpressionMethods;
-use diesel::QueryDsl;
+use actix_web::{get, post, web::{self, Json, Path}, HttpResponse, Scope, error};
 use rand::Rng;
 use serde_json::Value;
 use std::{collections::{HashMap, HashSet}};
@@ -34,7 +23,7 @@ use aws_smithy_types::{Document};
 use crate::types::ABError;
 
 use crate::{
-    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, package::utils::parse_package_key, release::{models::*, utils::value_to_document}, types::AppState, utils::{
+    file::utils::parse_file_key, middleware::auth::{validate_user, AuthResponse, READ, WRITE}, package::utils::parse_package_key, release::{types::*, utils::value_to_document}, types::AppState, utils::{
         db::{
             models::PackageV2Entry,
             schema::hyperotaserver::packages_v2::dsl as packages_dsl,
@@ -43,9 +32,8 @@ use crate::{
     }
 };
 
-use crate::utils::db::schema::hyperotaserver::packages::dsl::*;
 mod utils;
-mod models;
+mod types;
 
 pub fn add_routes() -> Scope {
     Scope::new("")

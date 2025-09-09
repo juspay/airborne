@@ -14,7 +14,7 @@
 
 use actix_web::{http::StatusCode};
 use thiserror::Error;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use superposition_sdk::Client;
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 
@@ -154,42 +154,4 @@ impl HasLabel for ABErrorCodes {
             ABErrorCodes::Forbidden => "AB_006",
         }
     }
-}
-
-#[derive(Debug, Deserialize, Serialize, Default)]
-pub struct Resource {
-    #[serde(rename = "filePath")]
-    pub file_path: String,
-    pub url: String,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ReleaseConfig {
-    pub version: String,
-    pub config: Config,
-    pub package: Package,
-    pub resources: Vec<Resource>,
-}
-
-#[derive(Serialize, Debug)]
-pub struct Config {
-    pub version: String,
-    pub release_config_timeout: u32,
-    pub boot_timeout: u32,
-    pub properties: ConfigProperties,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ConfigProperties {
-    pub tenant_info: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Package {
-    pub name: String,
-    pub version: String,
-    pub properties: serde_json::Value,
-    pub index: Resource,
-    pub important: Vec<Resource>,
-    pub lazy: Vec<Resource>,
 }

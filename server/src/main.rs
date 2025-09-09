@@ -21,10 +21,8 @@ mod package;
 mod user;
 mod file;
 mod release;
-mod models;
 
 mod types;
-mod user;
 mod utils;
 
 use std::sync::Arc;
@@ -197,7 +195,7 @@ async fn main() -> std::io::Result<()> {
                 // Decide if this needs auth; Ideally this only needs signature verfication
             )
             .service(
-                web::scope(server_path_prefix)
+                web::scope(&server_path_prefix)
                 .service(
                     web::scope("/dashboard/configuration").service(configuration::add_routes()),
                 )
