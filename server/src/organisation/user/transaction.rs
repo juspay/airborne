@@ -63,7 +63,9 @@ pub async fn add_user_with_transaction(
             ))
         })?;
 
-    let mut roles = get_additional_roles(role_name)
+    let role_name = role_name.trim().to_ascii_lowercase();
+
+    let mut roles = get_additional_roles(&role_name)
         .await
         .map_err(|e| OrgError::Internal(format!("Failed to get additional roles: {}", e)))?;
 
@@ -166,7 +168,7 @@ async fn get_additional_roles(role_name: &str) -> Result<Vec<String>, OrgError> 
         _ => vec![],
     };
 
-    if additional_roles.is_empty() {
+    if additional_roles.is_empty() && role_name != "read" {
         return Err(OrgError::Internal(format!(
             "No additional roles found for role {}",
             role_name
@@ -373,13 +375,6 @@ pub async fn remove_user_with_transaction(
         .iter()
         .filter(|g| g.path.as_ref().is_some_and(|p| p.contains(&org_path)))
         .collect();
-
-    if org_groups.is_empty() {
-        return Err(OrgError::Internal(format!(
-            "User {} is not a member of any groups in organization {}",
-            target_user.username, org_context.org_id
-        )));
-    }
 
     // Keep track of groups we've removed the user from (for potential rollback)
     let mut removed_groups = Vec::new();

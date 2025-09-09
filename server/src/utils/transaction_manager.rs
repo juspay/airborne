@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{error, web};
+use actix_web::web;
 use chrono::{DateTime, Utc};
 use diesel::RunQueryDsl;
 use keycloak::KeycloakAdmin;
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use crate::types::AppState;
+use crate::types::{ABError, ABResult, AppState};
 use crate::utils::db::models::CleanupOutboxEntry;
 use crate::utils::db::schema::hyperotaserver::cleanup_outbox::dsl::cleanup_outbox;
 
@@ -108,7 +108,7 @@ impl TransactionManager {
         admin: &KeycloakAdmin,
         realm: &str,
         app_state: &web::Data<AppState>,
-    ) -> Result<bool, actix_web::Error> {
+    ) -> ABResult<bool> {
         if self.is_complete() {
             return Ok(false);
         }
@@ -187,14 +187,14 @@ async fn cleanup_superposition_resource(
 pub async fn record_failed_cleanup(
     app_state: &web::Data<AppState>,
     tx_state: &TransactionState,
-) -> Result<(), actix_web::Error> {
-    let mut conn = app_state.db_pool.get().map_err(|e| {
-        error::ErrorInternalServerError(format!("Database connection error: {}", e))
-    })?;
+) -> ABResult<()> {
+    let mut conn = app_state
+        .db_pool
+        .get()
+        .map_err(|e| ABError::DbError(format!("Database connection error: {}", e)))?;
 
-    let state_json = serde_json::to_value(tx_state).map_err(|e| {
-        error::ErrorInternalServerError(format!("Failed to serialize transaction state: {}", e))
-    })?;
+    let state_json = serde_json::to_value(tx_state)
+        .map_err(|e| ABError::DbError(format!("Failed to serialize transaction state: {}", e)))?;
 
     let outbox_entry = CleanupOutboxEntry {
         transaction_id: tx_state.transaction_id.clone(),
@@ -209,9 +209,7 @@ pub async fn record_failed_cleanup(
     diesel::insert_into(cleanup_outbox)
         .values(&outbox_entry)
         .execute(&mut conn)
-        .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to insert cleanup job: {}", e))
-        })?;
+        .map_err(|e| ABError::DbError(format!("Failed to insert cleanup job: {}", e)))?;
 
     info!(
         "Recorded cleanup job for transaction {} to outbox",

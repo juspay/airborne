@@ -31,7 +31,7 @@ use crate::{
     middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
     },
-    types::{ABError, ABErrorCodes, AppError, AppState, HasLabel},
+    types::{ABError, ABErrorCodes, ABResult, AppError, AppState, HasLabel},
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
 };
 
@@ -150,7 +150,7 @@ async fn get_org_context(
     req: &HttpRequest,
     required_level: Access,
     operation: &str,
-) -> Result<(String, AuthResponse), OrgError> {
+) -> Result<(String, AuthResponse), ABError> {
     let auth = req
         .extensions()
         .get::<AuthResponse>()
@@ -172,7 +172,7 @@ async fn find_target_user(
     admin: &keycloak::KeycloakAdmin,
     realm: &str,
     username: &str,
-) -> Result<UserContext, OrgError> {
+) -> Result<UserContext, ABError> {
     let target_user = find_user_by_username(admin, realm, username)
         .await
         .map_err(|e| OrgError::Internal(format!("Keycloak error: {}", e)))?
@@ -201,7 +201,7 @@ async fn find_organization(
     admin: &keycloak::KeycloakAdmin,
     realm: &str,
     org_name: &str,
-) -> Result<OrgContext, OrgError> {
+) -> Result<OrgContext, ABError> {
     let org_group = find_org_group(admin, realm, org_name)
         .await
         .map_err(|e| OrgError::Internal(format!("Keycloak error: {}", e)))?
@@ -247,7 +247,7 @@ async fn organisation_add_user(
     req: HttpRequest,
     body: Json<UserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, OrgError> {
+) -> ABResult<Json<UserOperationResponse>> {
     let body = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -268,10 +268,11 @@ async fn organisation_add_user(
             if org_access.level < ADMIN.access {
                 return Err(OrgError::PermissionDenied(
                     "Admin permission required to assign admin or owner roles".into(),
-                ));
+                )
+                .into());
             }
         } else {
-            return Err(OrgError::Unauthorized("No organization access".to_string()));
+            return Err(OrgError::Unauthorized("No organization access".to_string()).into());
         }
     }
 
@@ -319,7 +320,7 @@ async fn organisation_update_user(
     req: HttpRequest,
     body: Json<UserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, OrgError> {
+) -> ABResult<Json<UserOperationResponse>> {
     let request = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -391,7 +392,7 @@ async fn organisation_remove_user(
     req: HttpRequest,
     body: Json<RemoveUserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, OrgError> {
+) -> ABResult<Json<UserOperationResponse>> {
     let request = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -415,7 +416,8 @@ async fn organisation_remove_user(
     if is_last {
         return Err(OrgError::LastOwner(
             "Cannot remove the last owner from the organization".to_string(),
-        ));
+        )
+        .into());
     }
 
     // Check if requester has permission to modify this user (hierarchy check)
@@ -461,7 +463,7 @@ async fn organisation_remove_user(
 async fn organisation_list_users(
     req: HttpRequest,
     state: web::Data<AppState>,
-) -> Result<Json<ListUsersResponse>, OrgError> {
+) -> ABResult<Json<ListUsersResponse>> {
     // Get organization context and validate requester's permissions
     let (org_name, _) = get_org_context(&req, READ, "list users").await?;
 

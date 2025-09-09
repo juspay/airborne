@@ -28,10 +28,8 @@ use serde_json::json;
 
 use crate::{
     middleware::auth::AuthResponse,
-    organisation::application::Application,
-    organisation::Organisation,
-    types::ABError,
-    types::AppState,
+    organisation::{application::Application, Organisation},
+    types::{ABError, ABResult, AppState},
     utils::keycloak::{decode_jwt_token, get_token},
 };
 
@@ -81,14 +79,14 @@ struct UserToken {
 async fn create_user(
     req: Json<UserCredentials>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+) -> ABResult<Json<User>> {
     println!("[CREATE_USER] Attempting to create user: {}", req.name);
 
     // Get Keycloak Admin Token
     let client = reqwest::Client::new();
     let admin_token = get_token(state.env.clone(), client)
         .await
-        .map_err(|_| ABError::InternalServerError("Failed to get admin token".to_string()))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to get admin token: {}", e)))?;
     println!("[CREATE_USER] Got admin token successfully");
 
     let client = reqwest::Client::new();
@@ -118,7 +116,7 @@ async fn create_user(
             Some(req.name.clone()),
         )
         .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch users: {}", e)))?;
 
     println!("[CREATE_USER] Checking if user already exists");
     // Reject if user is present in db
@@ -144,23 +142,20 @@ async fn create_user(
     admin
         .realm_users_post(&realm, user)
         .await
-        .map_err(|_| ABError::InternalServerError("Failed to create user".to_string()))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to create user: {}", e)))?;
 
     login_implementation(req, state).await
 }
 
 #[post("login")]
-async fn login(
-    req: Json<UserCredentials>,
-    state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+async fn login(req: Json<UserCredentials>, state: web::Data<AppState>) -> ABResult<Json<User>> {
     login_implementation(req.into_inner(), state).await
 }
 
 async fn login_implementation(
     req: UserCredentials,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+) -> ABResult<Json<User>> {
     println!("[LOGIN] Login attempt for user: {}", req.name);
 
     // Move ENVs to App State
@@ -182,19 +177,15 @@ async fn login_implementation(
         ("password", req.password.clone()),
     ];
 
-    let response = client
-        .post(&url)
-        .form(&params)
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?; // Handle request failure
+    let response = client.post(&url).form(&params).send().await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to send login request: {}", e))
+    })?;
 
     if response.status().is_success() {
         println!("[LOGIN] Login successful for user: {}", req.name);
-        let token: UserToken = response
-            .json()
-            .await
-            .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+        let token: UserToken = response.json().await.map_err(|e| {
+            ABError::InternalServerError(format!("Failed to parse login response: {}", e))
+        })?;
         println!("[LOGIN] Token successful for user: {:?}", token);
         let token_data = decode_jwt_token(
             &token.access_token,
@@ -203,9 +194,9 @@ async fn login_implementation(
         )
         .map_err(|_| ABError::Unauthorized("Token has expired or is invalid".to_string()))?;
         println!("[LOGIN] Token data successful for user: {:?}", token_data);
-        let admin_token = get_token(state.env.clone(), client)
-            .await
-            .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+        let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
+            ABError::InternalServerError(format!("Failed to get admin token: {}", e))
+        })?;
         println!("[LOGIN] Token admin successful for user: {:?}", admin_token);
         let mut user_resp = get_user_impl(
             AuthResponse {
@@ -245,10 +236,7 @@ struct User {
 }
 
 #[get("")]
-async fn get_user(
-    req: HttpRequest,
-    state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+async fn get_user(req: HttpRequest, state: web::Data<AppState>) -> ABResult<Json<User>> {
     let auth = req
         .extensions()
         .get::<AuthResponse>()
@@ -262,7 +250,7 @@ async fn get_user(
 async fn get_user_impl(
     authresponse: AuthResponse,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+) -> ABResult<Json<User>> {
     println!(
         "[GET_USER] Fetching user details for ID: {}",
         authresponse.sub
@@ -280,7 +268,7 @@ async fn get_user_impl(
     let groups = admin
         .realm_users_with_user_id_groups_get(&realm, &user_id, None, None, None, None)
         .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch user groups: {}", e)))?;
     println!("[GET_USER] Retrieved {} groups for user", groups.len());
 
     // Reject if organisation is present in db
@@ -395,7 +383,7 @@ struct OAuthState {
 async fn get_oauth_url(
     _req: HttpRequest,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<serde_json::Value>, ABError> {
+) -> ABResult<Json<serde_json::Value>> {
     // Use external URL directly from config
     if !state.env.enable_google_signin {
         return Err(ABError::BadRequest(
@@ -434,7 +422,7 @@ async fn exchange_code_for_token(
     code: &str,
     _req: &HttpRequest,
     state: &web::Data<AppState>,
-) -> actix_web::Result<TokenResponse, ABError> {
+) -> ABResult<TokenResponse> {
     // Use internal URL for backend-to-backend communication
     let url = format!(
         "{}/realms/{}/protocol/openid-connect/token",
@@ -467,14 +455,14 @@ async fn exchange_code_for_token(
         .await
         .map_err(|e| {
             println!("[EXCHANGE_CODE] Request failed: {}", e);
-            ABError::InternalServerError(e.to_string())
+            ABError::InternalServerError(format!("Failed to exchange code for token: {}", e))
         })?;
 
     if response.status().is_success() {
-        response
-            .json::<TokenResponse>()
-            .await
-            .map_err(|e| ABError::InternalServerError(e.to_string()))
+        response.json::<TokenResponse>().await.map_err(|e| {
+            println!("[EXCHANGE_CODE] Failed to parse token response: {}", e);
+            ABError::InternalServerError(format!("Failed to parse token response: {}", e))
+        })
     } else {
         let error_text = response.text().await.unwrap_or_default();
         println!("[EXCHANGE_CODE] Token exchange failed: {}", error_text);
@@ -490,7 +478,7 @@ async fn oauth_login(
     req: HttpRequest,
     json_req: Json<OAuthLoginRequest>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+) -> ABResult<Json<User>> {
     if !state.env.enable_google_signin {
         return Err(ABError::BadRequest(
             "Google Sign-in is disabled".to_string(),
@@ -516,14 +504,15 @@ async fn oauth_login(
     )
     .map_err(|e| {
         println!("[OAUTH_LOGIN] Token decode failed: {:?}", e);
-        ABError::BadRequest("Invalid token".to_string())
+        ABError::Unauthorized("Invalid token".to_string())
     })?;
 
     // Get admin token for user operations
     let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client)
-        .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
+        println!("[OAUTH_LOGIN] Failed to get admin token: {}", e);
+        ABError::InternalServerError(format!("Failed to get admin token: {}", e))
+    })?;
 
     let mut user_resp = get_user_impl(
         AuthResponse {
@@ -558,7 +547,7 @@ async fn oauth_signup(
     req: HttpRequest,
     json_req: Json<OAuthRequest>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+) -> ABResult<Json<User>> {
     if !state.env.enable_google_signin {
         return Err(ABError::BadRequest(
             "Google Sign-in is disabled".to_string(),
@@ -586,9 +575,10 @@ async fn oauth_signup(
 
     // Get admin token for user operations
     let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client)
-        .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
+        println!("[OAUTH_SIGNUP] Failed to get admin token: {}", e);
+        ABError::InternalServerError(format!("Failed to get admin token: {}", e))
+    })?;
 
     // For signup, we process it the same way as login since Keycloak handles user creation
     // The user account is automatically created in Keycloak when they sign in with Google

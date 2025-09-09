@@ -187,6 +187,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::from(app_state.clone()))
+            .app_data(web::JsonConfig::default().error_handler(utils::json_error_handler))
             .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::Compress::default())
             .service(docs::add_routes())
