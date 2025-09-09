@@ -24,7 +24,6 @@
 
 /* Begin PBXBuildFile section */
 		DC7995DE2E657CF7003D40F2 /* HyperCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC7995DD2E657CF7003D40F2 /* HyperCore.framework */; };
-		DC7995DF2E657CF7003D40F2 /* HyperCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC7995DD2E657CF7003D40F2 /* HyperCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DCB6144D2E61924D0099D87E /* Airborne.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB6144B2E61924D0099D87E /* Airborne.swift */; };
 		DCB6144E2E61924D0099D87E /* HPJPApplicationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614472E61924D0099D87E /* HPJPApplicationManager.m */; };
 		DCB6144F2E61924D0099D87E /* HPJPApplicationConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB6143E2E61924D0099D87E /* HPJPApplicationConstants.m */; };
@@ -55,20 +54,6 @@
 			remoteInfo = HyperCore;
 		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		DC7995E02E657CF7003D40F2 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				DC7995DF2E657CF7003D40F2 /* HyperCore.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		DC76412B2E61931B0028FCDA /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
@@ -263,7 +248,6 @@
 				DCB613F72E6191FB0099D87E /* Sources */,
 				DCB613F82E6191FB0099D87E /* Frameworks */,
 				DCB613F92E6191FB0099D87E /* Resources */,
-				DC7995E02E657CF7003D40F2 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
