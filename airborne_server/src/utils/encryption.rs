@@ -1,18 +1,18 @@
-use crate::{run_blocking, types::ABError};
+use crate::{run_blocking, types as airborne_types, types::ABError};
 use aes_gcm::{
     aead::{rand_core::RngCore, Aead, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
 };
 use base64::{engine::general_purpose, Engine as _};
 
-pub async fn generate_random_key() -> Result<String, ABError> {
+pub async fn generate_random_key() -> airborne_types::Result<String> {
     run_blocking!({
         let mut key_bytes = [0u8; 32];
         OsRng.fill_bytes(&mut key_bytes);
         Ok(general_purpose::STANDARD.encode(key_bytes))
     })
 }
-pub async fn encrypt_string(plaintext: &str, key_b64: &str) -> Result<String, ABError> {
+pub async fn encrypt_string(plaintext: &str, key_b64: &str) -> airborne_types::Result<String> {
     let plaintext = plaintext.to_owned();
     let key_b64 = key_b64.to_owned();
     run_blocking!({
@@ -49,7 +49,7 @@ pub async fn encrypt_string(plaintext: &str, key_b64: &str) -> Result<String, AB
     })
 }
 
-pub async fn decrypt_string(encrypted_b64: &str, key_b64: &str) -> Result<String, ABError> {
+pub async fn decrypt_string(encrypted_b64: &str, key_b64: &str) -> airborne_types::Result<String> {
     let encrypted_b64 = encrypted_b64.to_owned();
     let key_b64 = key_b64.to_owned();
     run_blocking!({

@@ -15,22 +15,22 @@
 use std::collections::HashMap;
 
 use actix_web::web::{Json, ReqData};
-use actix_web::{error, Scope};
+use actix_web::Scope;
 
 use actix_web::{post, web};
 use aws_smithy_types::Document;
+use diesel::RunQueryDsl;
 use keycloak::types::GroupRepresentation;
 use keycloak::KeycloakAdmin;
 use log::info;
-use serde::{Deserialize, Serialize};
 use superposition_sdk::operation::create_default_config::CreateDefaultConfigOutput;
 use superposition_sdk::types::WorkspaceStatus;
 use superposition_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, ADMIN};
-use crate::types::{ABError, AppState};
+use crate::organisation::application::types::*;
+use crate::types::{self as airborne_types, ABError, AppState};
 use crate::utils::document::{schema_doc_to_hashmap, value_to_document};
-use diesel::RunQueryDsl;
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
 use crate::utils::db::schema::hyperotaserver::workspace_names;
@@ -40,7 +40,8 @@ use crate::utils::transaction_manager::TransactionManager;
 mod config;
 mod dimension;
 mod properties;
-mod user;
+pub mod types;
+pub mod user;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -54,23 +55,11 @@ pub fn add_routes() -> Scope {
         .service(Scope::new("/properties").service(properties::add_routes()))
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Application {
-    pub application: String,
-    pub organisation: String,
-    pub access: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct ApplicationCreateRequest {
-    application: String,
-}
-
 fn default_config<T: Clone>(
     superposition_client: Client,
     workspace_name: String,
     superposition_org: String,
-) -> impl AsyncFn(String, T, String) -> actix_web::Result<CreateDefaultConfigOutput>
+) -> impl AsyncFn(String, T, String) -> airborne_types::Result<CreateDefaultConfigOutput>
 where
     Document: From<T>,
 {
@@ -86,7 +75,10 @@ where
             .set_schema(Some(schema_doc_to_hashmap(&get_scheme(value.clone()))))
             .send()
             .await
-            .map_err(error::ErrorInternalServerError)
+            .map_err(|e| {
+                info!("[DEFAULT_CONFIG] Failed to create default config: {}", e);
+                ABError::InternalServerError("Failed to create default configurations".to_string())
+            })
     }
 }
 
@@ -133,7 +125,7 @@ async fn add_application(
     body: Json<ApplicationCreateRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Application>, ABError> {
+) -> airborne_types::Result<Json<Application>> {
     // Get organisation and application names
     let body = body.into_inner();
     let application = body.application;
@@ -398,17 +390,14 @@ async fn add_application(
         );
 
         // Helper function to create default config with error handling
-        async fn create_config_with_tx<T, E>(
-            create_fn: impl futures::Future<Output = Result<T, E>>,
+        async fn create_config_with_tx<T>(
+            create_fn: impl futures::Future<Output = airborne_types::Result<T>>,
             key: &str,
             transaction: &TransactionManager,
             admin: &KeycloakAdmin,
             realm: &str,
             state: &web::Data<AppState>,
-        ) -> Result<T, actix_web::Error>
-        where
-            E: std::fmt::Display,
-        {
+        ) -> airborne_types::Result<T> {
             match create_fn.await {
                 Ok(result) => {
                     info!("Created configuration for key: {}", key);
@@ -423,7 +412,7 @@ async fn add_application(
                         info!("Rollback failed: {}", rollback_err);
                     }
 
-                    Err(error::ErrorInternalServerError(format!(
+                    Err(ABError::InternalServerError(format!(
                         "Failed to create configuration for {}: {}",
                         key, e
                     )))
@@ -604,7 +593,7 @@ async fn add_application(
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();
 
-        actix_web::Result::Ok(Json(Application {
+        Ok(Json(Application {
             application,
             organisation,
             access: roles.iter().map(|&s| s.to_string()).collect(),

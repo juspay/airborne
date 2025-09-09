@@ -2,7 +2,7 @@ pub mod utils;
 use crate::{
     package::{types::*, utils::parse_package_key},
     run_blocking,
-    types::ABError,
+    types::{ABError, WithHeaders},
     utils::db::{
         models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
         schema::hyperotaserver::{
@@ -19,13 +19,14 @@ use crate::{
 };
 use actix_web::{
     get, post,
-    web::{self, Query},
-    HttpResponse, Result, Scope,
+    web::{self, Json, Query},
+    Scope,
 };
 
 use crate::{
     file::utils::parse_file_key,
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    types as airborne_types,
     types::AppState,
 };
 use diesel::expression::BoxableExpression;
@@ -48,7 +49,7 @@ async fn create_package(
     req: web::Json<CreatePackageInput>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Json<Package>>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -141,7 +142,10 @@ async fn create_package(
         Ok(result)
     })?;
 
-    Ok(HttpResponse::Created().json(utils::db_response_to_package(package)))
+    Ok(
+        WithHeaders::new(Json(utils::db_response_to_package(package)))
+            .status(actix_web::http::StatusCode::CREATED),
+    )
 }
 
 #[get("")]
@@ -149,7 +153,7 @@ async fn get_package(
     query: Query<GetPackageQuery>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<Json<Package>> {
     let package_id = query.into_inner().package_key;
     let (opt_pkg_version, mut opt_pkg_tag) = parse_package_key(&package_id);
 
@@ -196,7 +200,7 @@ async fn get_package(
         }
     })?;
 
-    Ok(HttpResponse::Ok().json(utils::db_response_to_package(package)))
+    Ok(Json(utils::db_response_to_package(package)))
 }
 
 #[get("/list")]
@@ -204,7 +208,7 @@ async fn list_packages(
     input: Query<ListPackagesInput>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<Json<ListPackagesOutput>> {
     let ListPackagesInput { offset, limit } = input.into_inner();
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
@@ -269,5 +273,5 @@ async fn list_packages(
         total_pages,
     };
 
-    Ok(HttpResponse::Ok().json(out))
+    Ok(Json(out))
 }

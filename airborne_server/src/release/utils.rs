@@ -30,7 +30,7 @@ use crate::{
     file::utils::parse_file_key,
     package::utils::parse_package_key,
     release::types::*,
-    run_blocking,
+    run_blocking, types as airborne_types,
     types::{ABError, AppState},
     utils::db::{
         models::FileEntry,
@@ -171,7 +171,7 @@ pub async fn get_files_by_file_keys_async(
     organisation: String,
     application: String,
     file_paths: Vec<String>,
-) -> Result<Vec<FileEntry>, ABError> {
+) -> airborne_types::Result<Vec<FileEntry>> {
     if file_paths.is_empty() {
         return Ok(vec![]);
     }
@@ -346,26 +346,33 @@ pub async fn invalidate_cf(
     client: &aws_sdk_cloudfront::Client,
     path: String,
     distribution_id: &str,
-) -> Result<(), aws_sdk_cloudfront::Error> {
+) -> airborne_types::Result<()> {
     // Make this unique on each call
     let caller_reference = format!("invalidate-{}", uuid::Uuid::new_v4());
 
     let paths = aws_sdk_cloudfront::types::Paths::builder()
         .items(path)
         .quantity(1)
-        .build()?;
+        .build()
+        .map_err(|e| ABError::InternalServerError(format!("Failed to build paths: {}", e)))?;
 
     let batch = aws_sdk_cloudfront::types::InvalidationBatch::builder()
         .caller_reference(caller_reference)
         .paths(paths)
-        .build()?;
+        .build()
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to build invalidation batch: {}", e))
+        })?;
 
     let resp = client
         .create_invalidation()
         .distribution_id(distribution_id)
         .invalidation_batch(batch)
         .send()
-        .await?;
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to send invalidation request: {}", e))
+        })?;
 
     resp.invalidation()
         .map(|inv| {
@@ -383,7 +390,7 @@ pub async fn check_non_concluded_releases(
     dims: HashMap<String, Value>,
     state: web::Data<AppState>,
     workspace: String,
-) -> Result<bool, ABError> {
+) -> airborne_types::Result<bool> {
     let experiments_list = list_experiments_by_context(
         superposition_org_id.clone(),
         workspace.clone(),
@@ -411,7 +418,7 @@ pub async fn build_overrides(
     dims: HashMap<String, Value>,
     state: web::Data<AppState>,
     workspace: String,
-) -> Result<BuildOverrides, ABError> {
+) -> airborne_types::Result<BuildOverrides> {
     let resolved_config_builder = dims.iter().fold(
         state
             .superposition_client
@@ -812,7 +819,7 @@ pub async fn list_experiments_by_context(
     context: HashMap<String, Value>,
     strict_mode: bool,
     state: web::Data<AppState>,
-) -> Result<ListExperimentOutput, ABError> {
+) -> airborne_types::Result<ListExperimentOutput> {
     let experiments_list = state
         .superposition_client
         .list_experiment()

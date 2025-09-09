@@ -2,21 +2,20 @@ use base64::{engine::general_purpose, Engine as _};
 use log::info;
 use sha2::{Digest, Sha256 as checksum_algorithm};
 
+use crate::types as airborne_types;
 use crate::types::ABError;
 
-pub async fn download_and_checksum(
-    file_url: &str,
-) -> Result<(u64, String), Box<dyn std::error::Error>> {
+pub async fn download_and_checksum(file_url: &str) -> airborne_types::Result<(u64, String)> {
     let bytes = download_and_calculate_filesize(file_url).await?;
     Ok((bytes.1, calculate_checksum(bytes.0).await))
 }
 
-pub async fn download_file_content(url: &str) -> Result<Vec<u8>, ABError> {
+pub async fn download_file_content(url: &str) -> airborne_types::Result<Vec<u8>> {
     let bytes = download_and_calculate_filesize(url).await?;
     Ok(bytes.0)
 }
 
-pub async fn download_and_calculate_filesize(url: &str) -> Result<(Vec<u8>, u64), ABError> {
+pub async fn download_and_calculate_filesize(url: &str) -> airborne_types::Result<(Vec<u8>, u64)> {
     info!("Downloading file from url, {:?}", url);
     let client = reqwest::Client::new();
     let response = client

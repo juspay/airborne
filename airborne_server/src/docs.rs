@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::types as airborne_types;
 use actix_files::{Files, NamedFile};
-use actix_web::{web, Result, Scope};
+use actix_web::{web, Scope};
 
-async fn index() -> Result<NamedFile> {
+async fn index() -> airborne_types::Result<NamedFile> {
     Ok(NamedFile::open("./docs_react/dist/index.html")?)
 }
 

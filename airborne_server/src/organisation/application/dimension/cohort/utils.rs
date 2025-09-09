@@ -2,6 +2,7 @@ use crate::{
     organisation::application::dimension::cohort::types::{
         DefinitionMap, DefinitionValue, JsonLogicKey,
     },
+    types as airborne_types,
     types::ABError,
     utils::document::document_to_json_value,
 };
@@ -28,7 +29,7 @@ fn key_str_to_enum(s: &str) -> Option<JsonLogicKey> {
 /// Parse a Document::Object into DefinitionMap, enforcing the And/Leaf rule.
 pub fn parse_definition_map_object(
     obj: &HashMap<String, Document>,
-) -> Result<DefinitionMap, ABError> {
+) -> airborne_types::Result<DefinitionMap> {
     let mut out: DefinitionMap = HashMap::new();
 
     for (k, v) in obj {

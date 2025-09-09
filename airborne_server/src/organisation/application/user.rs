@@ -13,22 +13,23 @@
 // limitations under the License.
 
 mod transaction;
+mod types;
 mod utils;
 
 use actix_web::{
-    error, get, post,
+    get, post,
     web::{self, Json},
     HttpMessage, HttpRequest, Scope,
 };
 use log::{debug, info};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 use crate::{
     middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ,
     },
-    types::AppState,
+    organisation::application::{types::OrgAppError, user::types::*},
+    types as airborne_types,
+    types::{ABError, AppState},
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
 };
 
@@ -40,45 +41,6 @@ use self::{
     utils::{check_role_hierarchy, is_last_admin_in_application, validate_access_level},
 };
 
-/// Errors that can occur during application operations
-#[derive(Error, Debug)]
-pub enum AppError {
-    #[error("User not found: {0}")]
-    UserNotFound(String),
-
-    #[error("Organisation not found: {0}")]
-    OrgNotFound(String),
-
-    #[error("Application not found: {0}")]
-    AppNotFound(String),
-
-    #[error("Invalid access level: {0}")]
-    InvalidAccessLevel(String),
-
-    #[error("Internal error: {0}")]
-    Internal(String),
-
-    #[error("Unauthorized: {0}")]
-    Unauthorized(String),
-
-    #[error("Permission denied: {0}")]
-    PermissionDenied(String),
-}
-
-impl From<AppError> for actix_web::Error {
-    fn from(err: AppError) -> Self {
-        match err {
-            AppError::UserNotFound(_) => error::ErrorBadRequest(err.to_string()),
-            AppError::OrgNotFound(_) => error::ErrorBadRequest(err.to_string()),
-            AppError::AppNotFound(_) => error::ErrorBadRequest(err.to_string()),
-            AppError::InvalidAccessLevel(_) => error::ErrorBadRequest(err.to_string()),
-            AppError::Internal(_) => error::ErrorInternalServerError(err.to_string()),
-            AppError::Unauthorized(_) => error::ErrorUnauthorized(err.to_string()),
-            AppError::PermissionDenied(_) => error::ErrorForbidden(err.to_string()),
-        }
-    }
-}
-
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(application_list_users)
@@ -87,79 +49,17 @@ pub fn add_routes() -> Scope {
         .service(application_remove_user)
 }
 
-// Request and Response Types
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "lowercase")]
-enum AccessLvl {
-    Admin,
-    Write,
-    Read,
-}
-
-impl AccessLvl {
-    fn as_str(&self) -> String {
-        match self {
-            Self::Admin => "admin".to_string(),
-            Self::Write => "write".to_string(),
-            Self::Read => "read".to_string(),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct UserRequest {
-    user: String,
-    access: AccessLvl,
-}
-
-#[derive(Deserialize)]
-struct RemoveUserRequest {
-    user: String,
-}
-
-#[derive(Serialize)]
-struct UserOperationResponse {
-    user: String,
-    success: bool,
-    operation: String,
-}
-
-#[derive(Serialize)]
-struct ListUsersResponse {
-    users: Vec<UserInfo>,
-}
-
-#[derive(Serialize)]
-struct UserInfo {
-    username: String,
-    email: Option<String>,
-    roles: Vec<String>,
-}
-
-// Helper structs
-
-struct UserContext {
-    user_id: String,
-    username: String,
-}
-
-struct AppContext {
-    org_name: String,
-    app_name: String,
-    app_group_id: String,
-}
-
 /// Get application context and validate user permissions
 async fn get_app_context(
     req: &HttpRequest,
     required_level: Access,
     operation: &str,
-) -> Result<(AppContext, AuthResponse), AppError> {
+) -> airborne_types::Result<(AppContext, AuthResponse)> {
     let auth = req
         .extensions()
         .get::<AuthResponse>()
         .cloned()
-        .ok_or_else(|| AppError::Unauthorized("Missing auth context".to_string()))?;
+        .ok_or_else(|| ABError::Unauthorized("Missing auth".to_string()))?;
 
     // For application operations, we need to check:
     // 1. User has some access to the organization (at least READ)
@@ -169,14 +69,14 @@ async fn get_app_context(
         Ok(org_name) => auth
             .application
             .clone()
-            .ok_or_else(|| AppError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth.organisation.clone(), READ)
             .and_then(|org_name| {
                 validate_user(auth.application.clone(), required_level)
                     .map(|app_name| (org_name, app_name))
             })
-            .map_err(|e| AppError::Unauthorized(e.to_string())),
+            .map_err(|e| ABError::Unauthorized(e.to_string())),
     }?;
 
     // For application admin operations, application-level permissions take precedence
@@ -196,9 +96,7 @@ async fn get_app_context(
     }
 
     // Fallback: check organization-level permissions for the operation
-    validate_required_access(&auth, required_level.access, operation)
-        .await
-        .map_err(AppError::Unauthorized)?;
+    validate_required_access(&auth, required_level.access, operation).await?;
 
     Ok((
         AppContext {
@@ -215,22 +113,21 @@ async fn find_target_user(
     admin: &keycloak::KeycloakAdmin,
     realm: &str,
     username: &str,
-) -> Result<UserContext, AppError> {
+) -> airborne_types::Result<UserContext> {
     let target_user = find_user_by_username(admin, realm, username)
-        .await
-        .map_err(|e| AppError::Internal(format!("Keycloak error: {}", e)))?
-        .ok_or_else(|| AppError::UserNotFound(username.to_string()))?;
+        .await?
+        .ok_or_else(|| OrgAppError::UserNotFound(username.to_string()))?;
 
     let target_user_id = target_user
         .id
         .as_ref()
-        .ok_or_else(|| AppError::Internal("User has no ID".to_string()))?
+        .ok_or_else(|| ABError::InternalServerError("User has no ID".to_string()))?
         .to_string();
 
     let username = target_user
         .username
         .as_ref()
-        .ok_or_else(|| AppError::Internal("User has no username".to_string()))?
+        .ok_or_else(|| ABError::InternalServerError("User has no username".to_string()))?
         .to_string();
 
     Ok(UserContext {
@@ -245,24 +142,22 @@ async fn find_application(
     realm: &str,
     org_name: &str,
     app_name: &str,
-) -> Result<AppContext, AppError> {
+) -> airborne_types::Result<AppContext> {
     // First find the organization group
     let org_group = find_org_group(admin, realm, org_name)
-        .await
-        .map_err(|e| AppError::Internal(format!("Keycloak error: {}", e)))?
-        .ok_or_else(|| AppError::OrgNotFound(org_name.to_string()))?;
+        .await?
+        .ok_or_else(|| OrgAppError::OrgNotFound(org_name.to_string()))?;
 
     let org_group_id = org_group
         .id
         .as_ref()
-        .ok_or_else(|| AppError::Internal("Organization group has no ID".to_string()))?
+        .ok_or_else(|| ABError::InternalServerError("Organization group has no ID".to_string()))?
         .to_string();
 
     // Find the application subgroup within the organization
     let app_subgroups = admin
         .realm_groups_with_group_id_children_get(realm, &org_group_id, None, None, None, None, None)
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to get organization subgroups: {}", e)))?;
+        .await?;
 
     let app_group = app_subgroups
         .iter()
@@ -273,12 +168,12 @@ async fn find_application(
                 false
             }
         })
-        .ok_or_else(|| AppError::AppNotFound(app_name.to_string()))?;
+        .ok_or_else(|| OrgAppError::AppNotFound(app_name.to_string()))?;
 
     let app_group_id = app_group
         .id
         .as_ref()
-        .ok_or_else(|| AppError::Internal("Application group has no ID".to_string()))?
+        .ok_or_else(|| ABError::InternalServerError("Application group has no ID".to_string()))?
         .to_string();
 
     Ok(AppContext {
@@ -293,7 +188,7 @@ async fn application_add_user(
     req: HttpRequest,
     body: Json<UserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, actix_web::Error> {
+) -> airborne_types::Result<Json<UserOperationResponse>> {
     let body = body.into_inner();
 
     // Get application context and validate requester's permissions
@@ -301,9 +196,7 @@ async fn application_add_user(
     let requester_id = &auth.sub;
 
     // Prepare Keycloak admin client
-    let (admin, realm) = prepare_user_action(&req, state.clone())
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let (admin, realm) = prepare_user_action(&req, state.clone()).await?;
 
     // Validate access level (only admin, write, read for applications)
     let (role_name, _role_level) = validate_access_level(&body.access.as_str())?;
@@ -352,7 +245,7 @@ async fn application_update_user(
     req: HttpRequest,
     body: Json<UserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, actix_web::Error> {
+) -> airborne_types::Result<Json<UserOperationResponse>> {
     let request = body.into_inner();
 
     // Get application context and validate requester's permissions
@@ -360,9 +253,7 @@ async fn application_update_user(
     let requester_id = &auth.sub;
 
     // Prepare Keycloak admin client
-    let (admin, realm) = prepare_user_action(&req, state.clone())
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let (admin, realm) = prepare_user_action(&req, state.clone()).await?;
 
     // Validate the requested access level
     let (role_name, _access_level) = validate_access_level(&request.access.as_str())?;
@@ -397,7 +288,7 @@ async fn application_update_user(
         .await?;
 
         if is_last_admin {
-            return Err(AppError::PermissionDenied(
+            return Err(OrgAppError::PermissionDenied(
                 "Cannot demote the last admin from the application. Applications must have at least one admin.".to_string(),
             )
             .into());
@@ -433,7 +324,7 @@ async fn application_remove_user(
     req: HttpRequest,
     body: Json<RemoveUserRequest>,
     state: web::Data<AppState>,
-) -> Result<Json<UserOperationResponse>, actix_web::Error> {
+) -> airborne_types::Result<Json<UserOperationResponse>> {
     let request = body.into_inner();
 
     // Get application context and validate requester's permissions
@@ -441,9 +332,7 @@ async fn application_remove_user(
     let requester_id = &auth.sub;
 
     // Prepare Keycloak admin client
-    let (admin, realm) = prepare_user_action(&req, state.clone())
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let (admin, realm) = prepare_user_action(&req, state.clone()).await?;
 
     // Find target user and application
     let target_user = find_target_user(&admin, &realm, &request.user).await?;
@@ -460,7 +349,7 @@ async fn application_remove_user(
     .await?;
 
     if is_last_admin {
-        return Err(AppError::PermissionDenied(
+        return Err(OrgAppError::PermissionDenied(
             "Cannot remove the last admin from the application. Applications must have at least one admin.".to_string(),
         )
         .into());
@@ -479,8 +368,7 @@ async fn application_remove_user(
     // Get user's current groups
     let user_groups = admin
         .realm_users_with_user_id_groups_get(&realm, &target_user.user_id, None, None, None, None)
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to get user groups: {}", e)))?;
+        .await?;
 
     // Use transaction function to remove user
     remove_user_with_transaction(
@@ -509,14 +397,12 @@ async fn application_remove_user(
 async fn application_list_users(
     req: HttpRequest,
     state: web::Data<AppState>,
-) -> Result<Json<ListUsersResponse>, actix_web::Error> {
+) -> airborne_types::Result<Json<ListUsersResponse>> {
     // Get application context and validate requester's permissions
     let (app_context, _) = get_app_context(&req, READ, "list users").await?;
 
     // Prepare Keycloak admin client
-    let (admin, realm) = prepare_user_action(&req, state)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let (admin, realm) = prepare_user_action(&req, state).await?;
 
     // Find the application
     let app_context =
@@ -546,8 +432,7 @@ async fn application_list_users(
             None,
             None,
         )
-        .await
-        .map_err(|e| AppError::Internal(format!("Failed to get users: {}", e)))?;
+        .await?;
 
     // Collect information about users in this application
     let mut user_infos = Vec::new();
@@ -558,8 +443,7 @@ async fn application_list_users(
             // Get groups for this user
             let user_groups = admin
                 .realm_users_with_user_id_groups_get(&realm, user_id, None, None, None, None)
-                .await
-                .map_err(|e| AppError::Internal(format!("Failed to get user groups: {}", e)))?;
+                .await?;
 
             // Check if user is in this application
             let is_member = user_groups.iter().any(|group| {
@@ -570,10 +454,9 @@ async fn application_list_users(
             });
 
             if is_member {
-                let username = user
-                    .username
-                    .as_ref()
-                    .ok_or_else(|| AppError::Internal("User has no username".to_string()))?;
+                let username = user.username.as_ref().ok_or_else(|| {
+                    ABError::InternalServerError("User has no username".to_string())
+                })?;
 
                 // Extract roles from group paths
                 let roles = user_groups

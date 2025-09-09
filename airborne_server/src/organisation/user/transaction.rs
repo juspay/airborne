@@ -18,8 +18,8 @@ use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    organisation::user::OrgError,
-    types::AppState,
+    types as airborne_types,
+    types::{ABError, AppState},
     utils::{
         keycloak::{find_org_group, find_role_subgroup},
         transaction_manager::{record_failed_cleanup, TransactionManager},
@@ -44,7 +44,7 @@ pub async fn add_user_with_transaction(
     target_user: &UserContext,
     role_name: &str,
     // state: &web::Data<AppState>,
-) -> Result<(), OrgError> {
+) -> airborne_types::Result<()> {
     // Create a new transaction manager for this operation
     let transaction = TransactionManager::new(&org_context.org_id, "organization_user");
 
@@ -55,17 +55,21 @@ pub async fn add_user_with_transaction(
 
     let org_group = find_org_group(admin, realm, &org_context.org_id)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to find organization group: {}", e)))?
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to find organization group: {}", e))
+        })?
         .ok_or_else(|| {
-            OrgError::Internal(format!(
+            ABError::InternalServerError(format!(
                 "Organization group {} not found",
                 org_context.org_id
             ))
         })?;
 
-    let mut roles = get_additional_roles(role_name)
-        .await
-        .map_err(|e| OrgError::Internal(format!("Failed to get additional roles: {}", e)))?;
+    let role_name = role_name.trim().to_ascii_lowercase();
+
+    let mut roles = get_additional_roles(&role_name).await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to get additional roles: {}", e))
+    })?;
 
     roles.push(role_name.to_string());
 
@@ -79,7 +83,7 @@ pub async fn add_user_with_transaction(
             &transaction,
         )
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to add user to group: {}", e)))?;
     }
 
     if role_name == "admin" {
@@ -130,7 +134,7 @@ pub async fn add_user_with_transaction(
                                 )
                                 .await
                                 .map_err(|e| {
-                                    OrgError::Internal(format!(
+                                    ABError::InternalServerError(format!(
                                         "Failed to add user to group: {}",
                                         e
                                     ))
@@ -162,7 +166,7 @@ pub async fn add_user_with_transaction(
 
 /// Roles come with additional roles like Owner has Admin, Write, Read
 /// This function retrieves those additional roles for a given role name
-async fn get_additional_roles(role_name: &str) -> Result<Vec<String>, OrgError> {
+async fn get_additional_roles(role_name: &str) -> airborne_types::Result<Vec<String>> {
     let additional_roles = match role_name {
         "owner" => vec!["admin".to_string(), "write".to_string(), "read".to_string()],
         "admin" => vec!["write".to_string(), "read".to_string()],
@@ -171,7 +175,7 @@ async fn get_additional_roles(role_name: &str) -> Result<Vec<String>, OrgError> 
     };
 
     if additional_roles.is_empty() && role_name != "read" {
-        return Err(OrgError::Internal(format!(
+        return Err(ABError::InternalServerError(format!(
             "No additional roles found for role {}",
             role_name
         )));
@@ -187,17 +191,19 @@ async fn add_user_to_group(
     group_id: &str,
     role_name: &str,
     transaction: &TransactionManager,
-) -> Result<(), OrgError> {
+) -> airborne_types::Result<()> {
     // Find the role group
     let role_group = find_role_subgroup(admin, realm, group_id, role_name)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to find role group: {}", e)))?
-        .ok_or_else(|| OrgError::Internal(format!("Role group {} not found", role_name)))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to find role group: {}", e)))?
+        .ok_or_else(|| {
+            ABError::InternalServerError(format!("Role group {} not found", role_name))
+        })?;
 
     let role_group_id = role_group
         .id
         .as_ref()
-        .ok_or_else(|| OrgError::Internal("Role group has no ID".to_string()))?
+        .ok_or_else(|| ABError::InternalServerError("Role group has no ID".to_string()))?
         .to_string();
 
     // Step 1: Add user to role group
@@ -215,7 +221,7 @@ async fn add_user_to_group(
         }
         Err(e) => {
             // If this fails, there's nothing to roll back yet
-            return Err(OrgError::Internal(format!(
+            return Err(ABError::InternalServerError(format!(
                 "Failed to add user to role group: {}",
                 e
             )));
@@ -231,17 +237,19 @@ async fn remove_user_from_group(
     group_id: &str,
     role_name: &str,
     transaction: &TransactionManager,
-) -> Result<(), OrgError> {
+) -> airborne_types::Result<()> {
     // Find the role group
     let role_group = find_role_subgroup(admin, realm, group_id, role_name)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to find role group: {}", e)))?
-        .ok_or_else(|| OrgError::Internal(format!("Role group {} not found", role_name)))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to find role group: {}", e)))?
+        .ok_or_else(|| {
+            ABError::InternalServerError(format!("Role group {} not found", role_name))
+        })?;
 
     let role_group_id = role_group
         .id
         .as_ref()
-        .ok_or_else(|| OrgError::Internal("Role group has no ID".to_string()))?
+        .ok_or_else(|| ABError::InternalServerError("Role group has no ID".to_string()))?
         .to_string();
 
     // Step 1: Remove user to role group
@@ -258,7 +266,7 @@ async fn remove_user_from_group(
         }
         Err(e) => {
             // If this fails, there's nothing to roll back yet
-            return Err(OrgError::Internal(format!(
+            return Err(ABError::InternalServerError(format!(
                 "Failed to remove user from role group: {}",
                 e
             )));
@@ -275,17 +283,17 @@ pub async fn update_user_with_transaction(
     new_role_name: &str,
     current_role: &str,
     _state: &web::Data<AppState>,
-) -> Result<(), OrgError> {
+) -> airborne_types::Result<()> {
     let transaction = TransactionManager::new(&org_context.org_id, "organization_user_update");
 
-    let mut new_roles = get_additional_roles(new_role_name)
-        .await
-        .map_err(|e| OrgError::Internal(format!("Failed to get additional roles: {}", e)))?;
+    let mut new_roles = get_additional_roles(new_role_name).await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to get additional roles: {}", e))
+    })?;
     new_roles.push(new_role_name.to_string());
 
-    let mut current_roles = get_additional_roles(current_role)
-        .await
-        .map_err(|e| OrgError::Internal(format!("Failed to get additional roles: {}", e)))?;
+    let mut current_roles = get_additional_roles(current_role).await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to get additional roles: {}", e))
+    })?;
     current_roles.push(current_role.to_string());
 
     let to_add: Vec<_> = new_roles
@@ -311,7 +319,7 @@ pub async fn update_user_with_transaction(
         )
         .await
         .map_err(|e| {
-            OrgError::Internal(format!(
+            ABError::InternalServerError(format!(
                 "Failed to add user to group '{}': {}",
                 role_name, e
             ))
@@ -329,7 +337,7 @@ pub async fn update_user_with_transaction(
         )
         .await
         .map_err(|e| {
-            OrgError::Internal(format!(
+            ABError::InternalServerError(format!(
                 "Failed to remove user from group '{}': {}",
                 role_name, e
             ))
@@ -338,9 +346,11 @@ pub async fn update_user_with_transaction(
 
     let org_group = find_org_group(admin, realm, &org_context.org_id)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to find organization group: {}", e)))?
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to find organization group: {}", e))
+        })?
         .ok_or_else(|| {
-            OrgError::Internal(format!(
+            ABError::InternalServerError(format!(
                 "Organization group {} not found",
                 org_context.org_id
             ))
@@ -393,7 +403,7 @@ pub async fn update_user_with_transaction(
                                 )
                                 .await
                                 .map_err(|e| {
-                                    OrgError::Internal(format!(
+                                    ABError::InternalServerError(format!(
                                         "Failed to add user to group: {}",
                                         e
                                     ))
@@ -425,7 +435,7 @@ pub async fn remove_user_with_transaction(
     target_user: &UserContext,
     user_groups: &[keycloak::types::GroupRepresentation],
     state: &web::Data<AppState>,
-) -> Result<(), OrgError> {
+) -> airborne_types::Result<()> {
     // Create a new transaction manager
     let transaction = TransactionManager::new(&org_context.org_id, "organization_user_remove");
 
@@ -440,13 +450,6 @@ pub async fn remove_user_with_transaction(
         .iter()
         .filter(|g| g.path.as_ref().is_some_and(|p| p.contains(&org_path)))
         .collect();
-
-    if org_groups.is_empty() {
-        return Err(OrgError::Internal(format!(
-            "User {} is not a member of any groups in organization {}",
-            target_user.username, org_context.org_id
-        )));
-    }
 
     // Keep track of groups we've removed the user from (for potential rollback)
     let mut removed_groups = Vec::new();
@@ -515,7 +518,7 @@ pub async fn remove_user_with_transaction(
                         }
                     }
 
-                    return Err(OrgError::Internal(format!(
+                    return Err(ABError::InternalServerError(format!(
                         "Failed to remove user from group {}: {}",
                         path, e
                     )));
@@ -541,12 +544,12 @@ pub async fn get_user_current_role(
     realm: &str,
     org_context: &OrgContext,
     user_id: &str,
-) -> Result<String, OrgError> {
+) -> airborne_types::Result<String> {
     // Get user's groups
     let user_groups = admin
         .realm_users_with_user_id_groups_get(realm, user_id, None, None, None, None)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to get user groups: {}", e)))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to get user groups: {}", e)))?;
 
     // Find role groups under this organization
     let org_path = format!("/{}/", org_context.org_id);
@@ -578,7 +581,7 @@ pub async fn get_user_current_role(
         }
     }
 
-    Err(OrgError::Internal(format!(
+    Err(ABError::InternalServerError(format!(
         "User is not a member of any role in organization {}",
         org_context.org_id
     )))

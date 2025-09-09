@@ -14,3 +14,9 @@
 
 pub mod auth;
 pub mod request;
+use crate::types::ABError;
+use actix_web::{error::JsonPayloadError, Error, HttpRequest};
+
+pub fn json_error_handler(err: JsonPayloadError, _req: &HttpRequest) -> Error {
+    Error::from(ABError::BadRequest(err.to_string()))
+}

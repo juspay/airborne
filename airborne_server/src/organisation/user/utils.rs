@@ -14,6 +14,8 @@
 
 use crate::{
     middleware::auth::{ADMIN, OWNER, READ, WRITE},
+    types as airborne_types,
+    types::ABError,
     utils::keycloak::find_role_subgroup,
 };
 
@@ -59,7 +61,7 @@ pub async fn check_role_hierarchy(
     org_group_id: &str,
     requester_id: &str,
     target_user_id: &str,
-) -> Result<(), OrgError> {
+) -> airborne_types::Result<()> {
     if requester_id == target_user_id {
         return Ok(());
     }
@@ -69,15 +71,15 @@ pub async fn check_role_hierarchy(
         admin.realm_users_with_user_id_groups_get(realm, target_user_id, None, None, None, None)
     );
 
-    let requester_groups = requester_groups_result
-        .map_err(|e| OrgError::Internal(format!("Failed to get requester groups: {}", e)))?;
+    let requester_groups = requester_groups_result.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to get requester groups: {}", e))
+    })?;
 
-    let target_groups = target_groups_result
-        .map_err(|e| OrgError::Internal(format!("Failed to get target user groups: {}", e)))?;
+    let target_groups = target_groups_result?;
 
     let requester_level =
         get_user_highest_level(&requester_groups, org_group_id).ok_or_else(|| {
-            OrgError::Internal("Failed to determine requester's access level".to_string())
+            ABError::InternalServerError("Failed to determine requester's access level".to_string())
         })?;
 
     let target_level = get_user_highest_level(&target_groups, org_group_id).unwrap_or(0);
@@ -85,7 +87,8 @@ pub async fn check_role_hierarchy(
     if target_level > requester_level {
         return Err(OrgError::PermissionDenied(
             "Cannot modify users with higher access levels".into(),
-        ));
+        )
+        .into());
     }
 
     Ok(())
@@ -97,23 +100,22 @@ pub async fn is_last_owner(
     realm: &str,
     org_group_id: &str,
     user_id: &str,
-) -> Result<bool, OrgError> {
+) -> airborne_types::Result<bool> {
     // Find owner group
     let owner_group = find_role_subgroup(admin, realm, org_group_id, "owner")
-        .await
-        .map_err(|e| OrgError::Internal(format!("Failed to find owner group: {}", e)))?
-        .ok_or_else(|| OrgError::Internal("Owner group not found".to_string()))?;
+        .await?
+        .ok_or_else(|| ABError::InternalServerError("Owner group not found".to_string()))?;
 
     let owner_group_id = owner_group
         .id
         .as_ref()
-        .ok_or_else(|| OrgError::Internal("Owner group has no ID".to_string()))?;
+        .ok_or_else(|| ABError::InternalServerError("Owner group has no ID".to_string()))?;
 
     // Check if user is an owner
     let user_groups = admin
         .realm_users_with_user_id_groups_get(realm, user_id, None, None, None, None)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to get user groups: {}", e)))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to get user groups: {}", e)))?;
 
     let is_owner = user_groups
         .iter()
@@ -127,18 +129,18 @@ pub async fn is_last_owner(
     let all_owners = admin
         .realm_groups_with_group_id_members_get(realm, owner_group_id, None, None, None)
         .await
-        .map_err(|e| OrgError::Internal(format!("Failed to get group members: {}", e)))?;
+        .map_err(|e| ABError::InternalServerError(format!("Failed to get group members: {}", e)))?;
 
     Ok(all_owners.len() <= 1)
 }
 
 /// Validate access level string
-pub fn validate_access_level(access: &str) -> Result<(String, u8), OrgError> {
+pub fn validate_access_level(access: &str) -> airborne_types::Result<(String, u8)> {
     match access.to_lowercase().as_str() {
         "read" => Ok(("read".to_string(), READ.access)),
         "write" => Ok(("write".to_string(), WRITE.access)),
         "admin" => Ok(("admin".to_string(), ADMIN.access)),
         "owner" => Ok(("owner".to_string(), OWNER.access)),
-        _ => Err(OrgError::InvalidAccessLevel(access.to_string())),
+        _ => Err(OrgError::InvalidAccessLevel(access.to_string()).into()),
     }
 }

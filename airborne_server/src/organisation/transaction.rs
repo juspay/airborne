@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{error, web};
+use actix_web::web;
 use keycloak::{types::GroupRepresentation, KeycloakAdmin};
 use log::{debug, error, info, warn};
 
 use crate::{
-    middleware::auth::ROLES, types::AppState, utils::transaction_manager::TransactionManager,
+    middleware::auth::ROLES,
+    types as airborne_types,
+    types::{ABError, AppState},
+    utils::transaction_manager::TransactionManager,
 };
 
 use super::Organisation;
@@ -28,7 +31,7 @@ pub async fn create_organisation_with_transaction(
     realm: &str,
     user_id: &str,
     state: &web::Data<AppState>,
-) -> actix_web::Result<Organisation> {
+) -> airborne_types::Result<Organisation> {
     // Create a transaction manager for this operation
     let transaction = TransactionManager::new(organisation, "organization_create");
 
@@ -56,7 +59,7 @@ pub async fn create_organisation_with_transaction(
             group_id
         }
         Err(e) => {
-            return Err(error::ErrorInternalServerError(format!(
+            return Err(ABError::InternalServerError(format!(
                 "Failed to create organization group: {}",
                 e
             )))
@@ -94,7 +97,7 @@ pub async fn create_organisation_with_transaction(
                         error!("Rollback failed: {}", rollback_err);
                     }
 
-                    return Err(error::ErrorInternalServerError(format!(
+                    return Err(ABError::InternalServerError(format!(
                         "Failed to add user to role group: {}",
                         e
                     )));
@@ -109,7 +112,7 @@ pub async fn create_organisation_with_transaction(
                     error!("Rollback failed: {}", rollback_err);
                 }
 
-                return Err(error::ErrorInternalServerError(format!(
+                return Err(ABError::InternalServerError(format!(
                     "Failed to create role group: {}",
                     e
                 )));
@@ -143,7 +146,7 @@ pub async fn delete_organisation_with_transaction(
     realm: &str,
     // user_id: &str,
     state: &web::Data<AppState>,
-) -> actix_web::Result<()> {
+) -> airborne_types::Result<()> {
     // Create a transaction manager for this operation
     let transaction = TransactionManager::new(organisation, "organization_delete");
 
@@ -171,7 +174,7 @@ pub async fn delete_organisation_with_transaction(
     {
         Ok(groups) => groups,
         Err(e) => {
-            return Err(error::ErrorInternalServerError(format!(
+            return Err(ABError::InternalServerError(format!(
                 "Failed to retrieve organization groups: {}",
                 e
             )))
@@ -186,13 +189,13 @@ pub async fn delete_organisation_with_transaction(
         Some(group) => match &group.id {
             Some(id) => id.clone(),
             None => {
-                return Err(error::ErrorInternalServerError(
+                return Err(ABError::InternalServerError(
                     "Parent group has no ID".to_string(),
                 ))
             }
         },
         None => {
-            return Err(error::ErrorInternalServerError(
+            return Err(ABError::InternalServerError(
                 "Parent group not found".to_string(),
             ))
         }
@@ -229,7 +232,7 @@ pub async fn delete_organisation_with_transaction(
                 error!("Rollback failed: {}", rollback_err);
             }
 
-            return Err(error::ErrorInternalServerError(format!(
+            return Err(ABError::InternalServerError(format!(
                 "Failed to delete organization groups in Keycloak: {}",
                 e
             )));

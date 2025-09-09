@@ -8,12 +8,13 @@ use actix_web::{
     error::PayloadError,
     get, patch, post,
     web::{self, Json, Path, Payload, Query, ReqData},
-    HttpResponse, Result, Scope,
+    Scope,
 };
 use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
 use diesel::prelude::*;
 use futures_util::StreamExt;
+use http::HeaderValue;
 use log::info;
 use serde_json::json;
 use tokio::sync::mpsc;
@@ -24,8 +25,8 @@ use zip::ZipArchive;
 use crate::{
     file::types::*,
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
-    run_blocking,
-    types::{ABError, AppState},
+    run_blocking, types as airborne_types,
+    types::{ABError, AppState, WithHeaders},
     utils::{
         db::{
             models::{FileEntry as DbFile, NewFileEntry},
@@ -70,7 +71,7 @@ async fn create_file(
     req: Json<FileRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<FileResponse>, ABError> {
+) -> airborne_types::Result<Json<FileResponse>> {
     let auth_response = auth_response.into_inner();
 
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
@@ -167,7 +168,7 @@ async fn bulk_create_files(
     req: Json<BulkFileRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<WithHeaders<Json<BulkFileResponse>>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -284,7 +285,12 @@ async fn bulk_create_files(
         skipped_files,
     };
 
-    Ok(HttpResponse::Accepted().json(response))
+    Ok(WithHeaders::new(Json(response))
+        .header(
+            actix_web::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        )
+        .status(actix_web::http::StatusCode::ACCEPTED))
 }
 
 /// Retrieves a file by its Key.
@@ -294,7 +300,7 @@ async fn get_file(
     query: Query<GetFileQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<FileResponse>, ABError> {
+) -> airborne_types::Result<Json<FileResponse>> {
     let file_id = query.file_key.clone();
     if file_id.is_empty() {
         return Err(ABError::BadRequest("File key cannot be empty".to_string()));
@@ -362,7 +368,7 @@ async fn list_files(
     query: Query<FileListQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<FileListResponse>, ABError> {
+) -> airborne_types::Result<Json<FileListResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -447,7 +453,7 @@ async fn update_file(
     req: Json<UpdateFileRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<FileResponse>, ABError> {
+) -> airborne_types::Result<Json<FileResponse>> {
     let file_id = path.into_inner();
     let (input_file_path, file_version, file_tag) = utils::parse_file_key(&file_id);
 
@@ -518,7 +524,7 @@ async fn upload_file(
     query: Query<UploadFileQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<FileResponse>, ABError> {
+) -> airborne_types::Result<Json<FileResponse>> {
     let auth_response = auth_response.into_inner();
 
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
@@ -784,7 +790,7 @@ async fn upload_bulk_files(
     MultipartForm(req): MultipartForm<UploadBulkFilesRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> airborne_types::Result<Json<BulkFileUploadResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -963,5 +969,5 @@ async fn upload_bulk_files(
         }
     }
 
-    Ok(HttpResponse::Ok().json(BulkFileUploadResponse { uploaded, skipped }))
+    Ok(Json(BulkFileUploadResponse { uploaded, skipped }))
 }
