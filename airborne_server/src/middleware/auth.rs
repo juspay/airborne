@@ -31,7 +31,7 @@ use crate::{
     utils::keycloak::{decode_jwt_token, get_token},
 };
 
-use crate::types::ABError;
+use crate::types::{ABError, Result as ABResult};
 
 // There are two steps in middleware processing.
 // 1. Middleware initialization, middleware factory gets called with
@@ -52,7 +52,7 @@ where
     type Error = Error;
     type InitError = ();
     type Transform = AuthMiddleware<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+    type Future = Ready<std::result::Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
         ready(Ok(AuthMiddleware {
@@ -91,7 +91,7 @@ pub const WRITE: Access = Access { access: 2 };
 pub const READ: Access = Access { access: 1 };
 pub const ROLES: [&str; 4] = ["owner", "admin", "write", "read"];
 
-pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> Result<String, ABError> {
+pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> ABResult<String> {
     if let Some(access_level) = access_level {
         if access_level.level >= access.access {
             Ok(access_level.name)
@@ -123,7 +123,7 @@ where
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, self::Error>>;
+    type Future = LocalBoxFuture<'static, std::result::Result<Self::Response, self::Error>>;
 
     forward_ready!(service);
 
@@ -261,14 +261,17 @@ pub async fn validate_required_access(
     auth: &AuthResponse,
     required_level: u8,
     operation: &str,
-) -> Result<(), String> {
+) -> ABResult<()> {
     if let Some(access) = &auth.organisation {
         if access.level >= required_level {
             Ok(())
         } else {
-            Err(format!("Insufficient permissions for {}", operation))
+            Err(ABError::Forbidden(format!(
+                "Insufficient permissions for {}",
+                operation
+            )))
         }
     } else {
-        Err("No organization access".to_string())
+        Err(ABError::Forbidden("No organisation access".to_string()))
     }
 }

@@ -1,7 +1,7 @@
 use actix_web::{
     delete, get, post, put,
     web::{self, Json, Path, ReqData},
-    Result, Scope,
+    Scope,
 };
 use serde::Serialize;
 
@@ -9,7 +9,7 @@ use crate::{
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     organisation::application::dimension::cohort::types::CohortDimensionSchema,
     run_blocking,
-    types::{ABError, AppState},
+    types::{ABError, AppState, Result},
     utils::{
         db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
         document::{hashmap_to_json_value, schema_doc_to_hashmap, value_to_document},
@@ -52,7 +52,7 @@ async fn create_dimension_api(
     req: Json<CreateDimensionRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<CreateDimensionResponse>, ABError> {
+) -> Result<Json<CreateDimensionResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -156,7 +156,7 @@ async fn list_dimensions_api(
     auth_response: ReqData<AuthResponse>,
     query: web::Query<ListDimensionsQuery>,
     state: web::Data<AppState>,
-) -> Result<Json<ListDimensionsResponse>, ABError> {
+) -> Result<Json<ListDimensionsResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -236,7 +236,7 @@ async fn update_dimension_api(
     req: Json<UpdateDimensionRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<Dimension>, ABError> {
+) -> Result<Json<Dimension>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -299,7 +299,7 @@ async fn delete_dimension_api(
     path: Path<String>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<()>, ABError> {
+) -> Result<Json<()>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -340,7 +340,7 @@ async fn create_release_view_api(
     req: Json<CreateReleaseViewRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<ReleaseView>, ABError> {
+) -> Result<Json<ReleaseView>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -442,7 +442,7 @@ async fn list_release_views_api(
     auth_response: ReqData<AuthResponse>,
     query: web::Query<ListReleaseViewsQuery>,
     state: web::Data<AppState>,
-) -> Result<Json<ListReleaseViewsResponse>, actix_web::Error> {
+) -> Result<Json<ListReleaseViewsResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -503,7 +503,7 @@ async fn get_release_view_api(
     path: Path<String>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<ReleaseView>, actix_web::Error> {
+) -> Result<Json<ReleaseView>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -553,7 +553,7 @@ async fn update_release_view_api(
     req: Json<UpdateReleaseViewRequest>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<ReleaseView>, ABError> {
+) -> Result<Json<ReleaseView>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -663,7 +663,7 @@ async fn delete_release_view_api(
     path: Path<String>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<DeleteReleaseViewResponse>, ABError> {
+) -> Result<Json<DeleteReleaseViewResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {

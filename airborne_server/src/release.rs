@@ -29,7 +29,7 @@ use crate::{
     file::utils::parse_file_key,
     middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
     release::types::*,
-    types::{ABError, AppState},
+    types::{ABError, AppState, Result},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
 
@@ -60,7 +60,7 @@ async fn get_release(
     release_id: Path<String>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<HttpResponse, ABError> {
+) -> Result<Json<GetReleaseResponse>> {
     let release_key = release_id.into_inner();
     if release_key.is_empty() {
         return Err(ABError::BadRequest(
@@ -310,7 +310,7 @@ async fn get_release(
             .collect(),
     };
 
-    Ok(HttpResponse::Ok().json(resp))
+    Ok(Json(resp))
 }
 
 #[post("")]
@@ -318,7 +318,7 @@ async fn create_release(
     req: Json<CreateReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<CreateReleaseResponse>, ABError> {
+) -> Result<Json<CreateReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -586,7 +586,7 @@ async fn list_releases(
     req: actix_web::HttpRequest,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ListReleaseResponse>, ABError> {
+) -> Result<Json<ListReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -857,7 +857,7 @@ async fn ramp_release(
     req: Json<RampReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<RampReleaseResponse>, ABError> {
+) -> Result<Json<RampReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -933,7 +933,7 @@ async fn ramp_experiment(
     experiment_id: &String,
     traffic_percentage: i32,
     change_reason: &Option<String>,
-) -> Result<(), actix_web::Error> {
+) -> Result<()> {
     state
         .superposition_client
         .ramp_experiment()
@@ -951,7 +951,7 @@ async fn ramp_experiment(
         .await
         .map_err(|e| {
             info!("Failed to ramp experiment: {:?}", e);
-            error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
+            ABError::InternalServerError("Failed to ramp experiment in Superposition".to_owned())
         })?;
     Ok(())
 }
@@ -962,7 +962,7 @@ async fn conclude_release(
     req: Json<ConcludeReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ConcludeReleaseResponse>, ABError> {
+) -> Result<Json<ConcludeReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -1081,7 +1081,7 @@ async fn serve_release(
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     serve_release_handler(path, req, query, state).await
 }
 
@@ -1091,7 +1091,7 @@ async fn serve_release_v2(
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     serve_release_handler(path, req, query, state).await
 }
 
@@ -1100,7 +1100,7 @@ async fn serve_release_handler(
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     let (organisation, application) = path.into_inner();
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
@@ -1379,7 +1379,7 @@ async fn update_release(
     req: Json<CreateReleaseRequest>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<CreateReleaseResponse>, ABError> {
+) -> Result<Json<CreateReleaseResponse>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {

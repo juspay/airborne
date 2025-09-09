@@ -4,8 +4,8 @@ use crate::{
     middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ},
     run_blocking,
     token::types::*,
-    types::{ABError, AppState, ListResponse},
-    user::{login_implementation, User, UserCredentials as UserCred},
+    types::{ABError, AppState, ListResponse, Result},
+    user::{login_implementation, types::User, types::UserCredentials},
     utils::{
         db::{
             models::UserCredentialsEntry,
@@ -41,7 +41,7 @@ async fn create_token(
     req: Json<UserCredentials>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Token>, ABError> {
+) -> Result<Json<Token>> {
     let key = generate_random_key().await?;
     let auth_response = auth_response.into_inner();
 
@@ -110,9 +110,7 @@ async fn create_token(
             client_secret: key,
         }))
     } else {
-        Err(ABError::Unauthorized(
-            "Login failed: Wrong Password".to_string(),
-        ))
+        Err(ABError::Forbidden("Invalid Credentials".to_string()))
     }
 }
 
@@ -121,7 +119,7 @@ async fn delete_token(
     client_id: web::Path<uuid::Uuid>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<DeleteTokenResponse>, ABError> {
+) -> Result<Json<DeleteTokenResponse>> {
     let auth_response = auth_response.into_inner();
     let (_organisation, _application) =
         match validate_user(auth_response.organisation.clone(), ADMIN) {
@@ -154,7 +152,7 @@ async fn delete_token(
 async fn list_tokens(
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<ListResponse<Vec<TokenListEntry>>>, ABError> {
+) -> Result<Json<ListResponse<Vec<TokenListEntry>>>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -194,10 +192,7 @@ async fn list_tokens(
 }
 
 #[post("issue")]
-async fn issue_token(
-    req: Json<Token>,
-    state: web::Data<AppState>,
-) -> actix_web::Result<Json<User>, ABError> {
+async fn issue_token(req: Json<Token>, state: web::Data<AppState>) -> Result<Json<User>> {
     let pool = state.db_pool.clone();
     let client_id = req.client_id;
     let user = run_blocking!({
@@ -213,7 +208,7 @@ async fn issue_token(
 
     let decrypted_pass = decrypt_string(&user.password, &req.client_secret).await?;
     login_implementation(
-        UserCred {
+        UserCredentials {
             name: user.username.clone(),
             password: decrypted_pass.clone(),
         },

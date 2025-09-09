@@ -238,6 +238,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::from_fn(request_id_mw))
             .wrap(TracingLogger::default())
             .app_data(web::Data::from(app_state.clone()))
+            .app_data(web::JsonConfig::default().error_handler(middleware::json_error_handler))
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())
             .service(docs::add_routes())

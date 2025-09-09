@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use actix_web::{error, web};
+use actix_web::web;
 use chrono::{DateTime, Utc};
 use diesel::RunQueryDsl;
 use keycloak::KeycloakAdmin;
@@ -21,7 +21,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-use crate::types::AppState;
+use crate::run_blocking;
+use crate::types::{ABError, AppState, Result};
 use crate::utils::db::models::CleanupOutboxEntry;
 use crate::utils::db::schema::hyperotaserver::cleanup_outbox::dsl::cleanup_outbox;
 
@@ -108,7 +109,7 @@ impl TransactionManager {
         admin: &KeycloakAdmin,
         realm: &str,
         app_state: &web::Data<AppState>,
-    ) -> Result<bool, actix_web::Error> {
+    ) -> Result<bool> {
         if self.is_complete() {
             return Ok(false);
         }
@@ -158,7 +159,7 @@ impl TransactionManager {
 async fn cleanup_superposition_resource(
     resource_id: &str,
     resource_type: &str,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Implement based on resource type
     match resource_type {
         "organization_create" => {
@@ -187,13 +188,9 @@ async fn cleanup_superposition_resource(
 pub async fn record_failed_cleanup(
     app_state: &web::Data<AppState>,
     tx_state: &TransactionState,
-) -> Result<(), actix_web::Error> {
-    let mut conn = app_state.db_pool.get().map_err(|e| {
-        error::ErrorInternalServerError(format!("Database connection error: {}", e))
-    })?;
-
+) -> Result<()> {
     let state_json = serde_json::to_value(tx_state).map_err(|e| {
-        error::ErrorInternalServerError(format!("Failed to serialize transaction state: {}", e))
+        ABError::InternalServerError(format!("Failed to serialize transaction state: {}", e))
     })?;
 
     let outbox_entry = CleanupOutboxEntry {
@@ -206,12 +203,15 @@ pub async fn record_failed_cleanup(
         last_attempt: None,
     };
 
-    diesel::insert_into(cleanup_outbox)
-        .values(&outbox_entry)
-        .execute(&mut conn)
-        .map_err(|e| {
-            error::ErrorInternalServerError(format!("Failed to insert cleanup job: {}", e))
-        })?;
+    let pool = app_state.db_pool.clone();
+    let _ = run_blocking!({
+        let mut conn = pool.get()?;
+
+        diesel::insert_into(cleanup_outbox)
+            .values(&outbox_entry)
+            .execute(&mut conn)?;
+        Ok(())
+    });
 
     info!(
         "Recorded cleanup job for transaction {} to outbox",
@@ -224,7 +224,7 @@ pub async fn record_failed_cleanup(
 /// Process the cleanup outbox to retry failed cleanups
 pub async fn process_cleanup_outbox(
     app_state: &web::Data<AppState>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use crate::utils::db::schema::hyperotaserver::cleanup_outbox::dsl::*;
     use chrono::Utc;
     use diesel::prelude::*;
@@ -236,9 +236,6 @@ pub async fn process_cleanup_outbox(
 
     info!("Starting cleanup outbox processing");
 
-    // Get a database connection
-    let mut conn = app_state.db_pool.get()?;
-
     // Get the current time
     let current_time = Utc::now();
     let min_retry_time = current_time - chrono::Duration::seconds(MIN_RETRY_INTERVAL_SECS);
@@ -247,12 +244,19 @@ pub async fn process_cleanup_outbox(
     // 1. Less than MAX_ATTEMPTS
     // 2. Either never attempted (last_attempt is null) or last attempted more than MIN_RETRY_INTERVAL_SECS ago
     // 3. Limit to MAX_JOBS_PER_RUN to avoid overloading the system
-    let pending_jobs: Vec<crate::utils::db::models::CleanupOutboxEntry> = cleanup_outbox
-        .filter(attempts.lt(MAX_ATTEMPTS))
-        .filter(last_attempt.is_null().or(last_attempt.lt(min_retry_time)))
-        .order_by(created_at.asc())
-        .limit(MAX_JOBS_PER_RUN)
-        .load::<crate::utils::db::models::CleanupOutboxEntry>(&mut conn)?;
+    let pool = app_state.db_pool.clone();
+    let pending_jobs = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let pending_jobs: Vec<crate::utils::db::models::CleanupOutboxEntry> = cleanup_outbox
+            .filter(attempts.lt(MAX_ATTEMPTS))
+            .filter(last_attempt.is_null().or(last_attempt.lt(min_retry_time)))
+            .order_by(created_at.asc())
+            .limit(MAX_JOBS_PER_RUN)
+            .load::<crate::utils::db::models::CleanupOutboxEntry>(&mut conn)?;
+
+        Ok(pending_jobs)
+    })?;
 
     if pending_jobs.is_empty() {
         debug!("No pending cleanup jobs found");
@@ -272,7 +276,8 @@ pub async fn process_cleanup_outbox(
         );
 
         // Deserialize the transaction state
-        let tx_state: Result<TransactionState, _> = serde_json::from_value(job.state.clone());
+        let tx_state: std::result::Result<TransactionState, _> =
+            serde_json::from_value(job.state.clone());
 
         if let Err(e) = tx_state {
             error!(
@@ -280,10 +285,16 @@ pub async fn process_cleanup_outbox(
                 job.transaction_id, e
             );
 
-            // Update the job with an incremented attempt count
-            diesel::update(cleanup_outbox.find(&job.transaction_id))
-                .set((attempts.eq(job.attempts + 1), last_attempt.eq(current_time)))
-                .execute(&mut conn)?;
+            let pool = app_state.db_pool.clone();
+            let _ = run_blocking!({
+                let mut conn = pool.get()?;
+
+                // Update the job with an incremented attempt count
+                diesel::update(cleanup_outbox.find(&job.transaction_id))
+                    .set((attempts.eq(job.attempts + 1), last_attempt.eq(current_time)))
+                    .execute(&mut conn)?;
+                Ok(())
+            });
 
             continue;
         }
@@ -312,8 +323,14 @@ pub async fn process_cleanup_outbox(
                     job.transaction_id, job.entity_type, job.entity_name
                 );
 
-                // Delete the job as it's been successfully processed
-                diesel::delete(cleanup_outbox.find(&job.transaction_id)).execute(&mut conn)?;
+                let pool = app_state.db_pool.clone();
+                let _ = run_blocking!({
+                    let mut conn = pool.get()?;
+
+                    // Delete the job as it's been successfully processed
+                    diesel::delete(cleanup_outbox.find(&job.transaction_id)).execute(&mut conn)?;
+                    Ok(())
+                });
             }
             Err(e) => {
                 warn!(
@@ -321,10 +338,16 @@ pub async fn process_cleanup_outbox(
                     job.transaction_id, job.entity_type, job.entity_name, e
                 );
 
-                // Update the job with an incremented attempt count
-                diesel::update(cleanup_outbox.find(&job.transaction_id))
-                    .set((attempts.eq(job.attempts + 1), last_attempt.eq(current_time)))
-                    .execute(&mut conn)?;
+                let pool = app_state.db_pool.clone();
+                let _ = run_blocking!({
+                    let mut conn = pool.get()?;
+
+                    // Update the job with an incremented attempt count
+                    diesel::update(cleanup_outbox.find(&job.transaction_id))
+                        .set((attempts.eq(job.attempts + 1), last_attempt.eq(current_time)))
+                        .execute(&mut conn)?;
+                    Ok(())
+                });
             }
         }
     }
@@ -337,7 +360,7 @@ pub async fn process_cleanup_outbox(
 async fn process_organization_cleanup(
     app_state: &web::Data<AppState>,
     tx_state: &TransactionState,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Get an admin client for Keycloak using the token retriever
     let client = reqwest::Client::new();
 
