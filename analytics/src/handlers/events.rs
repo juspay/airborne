@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use axum::{
     extract::{ConnectInfo, State},
     http::HeaderMap,
@@ -5,7 +7,6 @@ use axum::{
 };
 use chrono::Utc;
 use serde_json::json;
-use std::net::SocketAddr;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -74,14 +75,16 @@ pub async fn ingest_event(
             Some(kafka) => {
                 if let Err(e) = kafka.send_ota_event(&event).await {
                     error!("Failed to send event to Kafka: {:?}", e);
-                    return Err(
-                        AppError::Internal("Failed to send event to Kafka".to_string()).into(),
-                    );
+                    return Err(AppError::Internal(
+                        "Failed to send event to Kafka".to_string(),
+                    ));
                 }
                 info!("Successfully queued OTA event: {:?}", event.event_id);
             }
             None => {
-                return Err(AppError::Internal("Kafka client not initialized".to_string()).into());
+                return Err(AppError::Internal(
+                    "Kafka client not initialized".to_string(),
+                ));
             }
         }
     } else if state.config.logging_infrastructure == LoggingInfra::VictoriaMetrics {
@@ -91,20 +94,20 @@ pub async fn ingest_event(
                     error!("Failed to send event to Victoria Metrics: {:?}", e);
                     return Err(AppError::Internal(
                         "Failed to send event to Victoria Metrics".to_string(),
-                    )
-                    .into());
+                    ));
                 }
                 info!("Successfully saved OTA event: {:?}", event.event_id);
             }
             None => {
                 return Err(AppError::Internal(
                     "Victoria Metrics client not initialized".to_string(),
-                )
-                .into());
+                ));
             }
         }
     } else {
-        return Err(AppError::Internal("Unsupported logging infrastructure".to_string()).into());
+        return Err(AppError::Internal(
+            "Unsupported logging infrastructure".to_string(),
+        ));
     }
 
     Ok(Json(json!({

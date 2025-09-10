@@ -1,10 +1,15 @@
+pub mod client;
+mod query_builder;
+
+use std::{collections::BTreeMap, time::Duration};
+
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Timelike, Utc};
+use futures::{stream::FuturesUnordered, StreamExt};
 use prometheus::{
     CounterVec, Encoder, GaugeVec, HistogramOpts, HistogramVec, Opts, Registry, TextEncoder,
 };
 use reqwest::Client as HttpClient;
-use std::{collections::BTreeMap, time::Duration};
 use tokio::time::interval;
 use tracing::{error, info};
 
@@ -20,12 +25,7 @@ use crate::{
     core::victoria::query_builder::VictoriaQuery,
 };
 
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use std::collections::HashMap;
-
-pub mod client;
-mod query_builder;
+const SECONDS_IN_DAY: i64 = 86400;
 
 /// Victoria Metrics client
 #[derive(Clone)]
@@ -426,6 +426,7 @@ impl Client {
     }
 
     /// Insert batch of OTA events (mirrors ClickHouse insert_ota_events_batch)
+    #[allow(dead_code)]
     pub async fn insert_ota_events_batch(&self, events: Vec<OtaEvent>) -> Result<()> {
         for event in events {
             self.insert_ota_event(&event).await?;
@@ -500,7 +501,7 @@ impl Client {
         );
 
         let end_time = Utc::now().timestamp();
-        let start_time = end_time - (days as i64 * 24 * 60 * 60);
+        let start_time = end_time - (days as i64 * SECONDS_IN_DAY);
 
         let response = self
             .query_client
@@ -514,8 +515,7 @@ impl Client {
             if let Some(values) = result.values {
                 for (timestamp, count_str) in values {
                     let count: u64 = count_str.parse().unwrap_or(0);
-                    let dt =
-                        DateTime::from_timestamp(timestamp as i64, 0).unwrap_or_else(|| Utc::now());
+                    let dt = DateTime::from_timestamp(timestamp as i64, 0).unwrap_or_else(Utc::now);
                     let date = dt.date_naive();
 
                     daily_breakdown.push(DailyActiveDevices {
@@ -641,6 +641,7 @@ impl Client {
     }
 
     /// Get adoption metrics (mirrors ClickHouse get_adoption_metrics)
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_adoption_metrics(
         &self,
         org_id: &str,
@@ -736,8 +737,9 @@ impl Client {
         release_id: &str,
         ts_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        let end_time = utils::floor_to_hour(utils::normalize_to_secs(ts_millis));
-        let start_time = end_time - 24 * 60 * 60; // last 24 h
+        let end_time = utils::try_into_hour(utils::normalize_to_secs(ts_millis))
+            .unwrap_or(Utc::now().hour() as i64 * 3600);
+        let start_time = end_time - SECONDS_IN_DAY; // last 24 h
 
         info!(
             "Getting hourly adoption metrics for org: {}, app: {}, release: {}, from: {}, to: {}",
@@ -825,7 +827,7 @@ impl Client {
             current_time += 60 * 60; // increment by one hour
         }
 
-        let mut series = map.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+        let mut series = map.into_values().collect::<Vec<_>>();
         series.sort_by_key(|s| s.time_slot.timestamp());
 
         Ok(series)
@@ -840,8 +842,10 @@ impl Client {
         start_date_millis: i64,
         end_date_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        let start_time = utils::floor_to_day(utils::normalize_to_secs(start_date_millis));
-        let end_time = utils::floor_to_day(utils::normalize_to_secs(end_date_millis));
+        let start_time = utils::try_into_date_end(utils::normalize_to_secs(start_date_millis))
+            .unwrap_or(Utc::now().timestamp());
+        let end_time = utils::try_into_date_end(utils::normalize_to_secs(end_date_millis))
+            .unwrap_or(Utc::now().timestamp());
 
         info!(
             "Getting daywise adoption metrics for org: {}, app: {}, release: {}, from: {}, to: {}",
@@ -927,10 +931,10 @@ impl Client {
                     update_available: 0,
                 });
 
-            current_time += 24 * 60 * 60; // increment by one day
+            current_time += SECONDS_IN_DAY; // increment by one day
         }
 
-        let series = map.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+        let series = map.into_values().collect::<Vec<_>>();
 
         Ok(series)
     }

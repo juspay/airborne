@@ -49,6 +49,7 @@ impl VictoriaQuery {
     }
 
     /// Set an aggregator (e.g. "sum", "avg").
+    #[allow(dead_code)]
     pub fn group_by(mut self, agg: impl Into<String>) -> Self {
         self.group_by = Some(agg.into());
         self
@@ -61,6 +62,7 @@ impl VictoriaQuery {
     }
 
     /// Add a nested child query.
+    #[allow(dead_code)]
     pub fn child(mut self, child: VictoriaQuery) -> Self {
         self.children.push(child);
         self
@@ -69,7 +71,7 @@ impl VictoriaQuery {
     /// Build the final PromQL query string.
     pub fn build(&self) -> String {
         // 1. Base: either child or metric selector
-        let base = if let Some(first) = self.children.get(0) {
+        let base = if let Some(first) = self.children.first() {
             first.build()
         } else {
             let mut sel = self.metric_name.clone();

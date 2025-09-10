@@ -28,6 +28,7 @@ pub enum AppError {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    #[allow(dead_code)]
     #[error("Not found: {0}")]
     NotFound(String),
 

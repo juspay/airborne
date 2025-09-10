@@ -1,31 +1,30 @@
+#![deny(unused_crate_dependencies)]
 mod common;
 mod core;
 mod handlers;
 
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+
 use anyhow::Result;
-use axum::error_handling::HandleErrorLayer;
 use axum::{
+    error_handling::HandleErrorLayer,
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
-use std::sync::Arc;
-use std::{net::SocketAddr, time::Duration};
 use tower::ServiceBuilder;
-use tower_http::cors::CorsLayer;
-use tower_http::timeout::TimeoutLayer;
-use tower_http::trace::TraceLayer;
+use tower_http::{cors::CorsLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::core::kafka;
-use crate::handlers::{analytics, events, health};
 use crate::{
     common::{
         config::Config,
         models::{AppState, ErrorResponse, LoggingInfra},
     },
+    core::kafka,
     core::{bootstrap_clickhouse, victoria},
+    handlers::{analytics, events, health},
 };
 
 #[tokio::main]
@@ -83,7 +82,7 @@ async fn main() -> Result<()> {
         // For now, use a default Victoria Metrics URL (this should be configurable in the future)
         let victoria_url = std::env::var("VICTORIA_METRICS_URL")
             .unwrap_or_else(|_| "http://localhost:8428".to_string());
-        match crate::core::victoria::Client::new(victoria_url).await {
+        match victoria::Client::new(victoria_url).await {
             Ok(victoria_client) => {
                 let victoria_client_arc = Arc::new(victoria_client);
                 let vm_pusher = victoria_client_arc.clone();

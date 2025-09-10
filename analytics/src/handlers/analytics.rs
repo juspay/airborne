@@ -131,7 +131,7 @@ pub async fn get_adoption_metrics(
         Ok(metrics) => Ok(Json(AnalyticsResponse::success(metrics))),
         Err(e) => {
             error!("Failed to fetch adoption metrics: {:?}", e);
-            Err(AppError::DatabaseError(e.to_string()).into())
+            Err(AppError::DatabaseError(e.to_string()))
         }
     }
 }
@@ -186,7 +186,7 @@ pub async fn get_version_distribution(
         }
         Err(e) => {
             error!("Failed to fetch version distribution: {:?}", e);
-            return Err(AppError::DatabaseError(e.to_string()).into());
+            Err(AppError::DatabaseError(e.to_string()))
         }
     }
 }
@@ -235,7 +235,7 @@ pub async fn get_active_devices(
         Ok(metrics) => Ok(Json(AnalyticsResponse::success(metrics))),
         Err(e) => {
             error!("Failed to fetch active devices metrics: {:?}", e);
-            Err(AppError::DatabaseError(e.to_string()).into())
+            Err(AppError::DatabaseError(e.to_string()))
         }
     }
 }
@@ -328,7 +328,7 @@ pub async fn get_failure_metrics(
         }
         Err(e) => {
             error!("Failed to fetch failure metrics: {:?}", e);
-            return Err(AppError::DatabaseError(e.to_string()).into());
+            Err(AppError::DatabaseError(e.to_string()))
         }
     }
 }

@@ -1,12 +1,13 @@
-use std::{fs, sync::Arc};
-
-use crate::{common::config::Config, common::utils::strip_sql_comments};
-use anyhow::Result;
-use tracing::info;
-
 pub mod clickhouse;
 pub mod kafka;
 pub mod victoria;
+
+use std::{fs, sync::Arc};
+
+use anyhow::Result;
+use tracing::info;
+
+use crate::{common::config::Config, common::utils::strip_sql_comments};
 
 pub async fn bootstrap_clickhouse(config: &Config) -> Result<Arc<clickhouse::Client>> {
     // Initialize ClickHouse client

@@ -1,15 +1,21 @@
+use std::{sync::Arc, time::Duration};
+
 use anyhow::Result;
-use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{CommitMode, StreamConsumer};
-use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::Message;
-use std::sync::Arc;
-use std::time::Duration;
+use rdkafka::{
+    config::ClientConfig,
+    consumer::{CommitMode, StreamConsumer},
+    producer::{FutureProducer, FutureRecord},
+    Message,
+};
 use tracing::{error, info, warn};
 
-use crate::common::config::KafkaConfig;
-use crate::common::models::{EventType, OtaEvent};
-use crate::core::clickhouse;
+use crate::{
+    common::{
+        config::KafkaConfig,
+        models::{EventType, OtaEvent},
+    },
+    core::clickhouse,
+};
 
 #[derive(Clone)]
 pub struct Producer {
@@ -100,6 +106,7 @@ impl Producer {
     }
 
     /// Send multiple events in a batch for better performance
+    #[allow(dead_code)]
     pub async fn send_ota_events_batch(
         &self,
         events: &[OtaEvent],
@@ -246,7 +253,7 @@ impl Consumer {
             .await
         {
             error!("Failed to insert batch to ClickHouse: {:?}", e);
-            return Err(e.into());
+            return Err(e);
         }
 
         // Process specific event types for real-time alerts and counters
