@@ -43,10 +43,9 @@ impl Config {
 
         let config = Config {
             server: ServerConfig {
-                port: env::var("SERVER_PORT")
-                    .unwrap_or_else(|_| "6400".to_string())
-                    .parse()
-                    .unwrap_or(6400),
+                port: env::var("SERVER_PORT").map_or(6400, |v| {
+                    v.parse().expect("SERVER_PORT must be a valid number")
+                }),
             },
             kafka: KafkaConfig {
                 brokers: env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string()),
@@ -67,8 +66,9 @@ impl Config {
                 password: env::var("CLICKHOUSE_PASSWORD").ok(),
             },
             logging_infrastructure: env::var("LOGGING_INFRASTRUCTURE")
-                .unwrap_or_else(|_| "victoria-metrics".to_string())
-                .parse::<LoggingInfra>()
+                .map_or(Ok(LoggingInfra::VictoriaMetrics), |v| {
+                    v.parse::<LoggingInfra>()
+                })
                 .map_err(anyhow::Error::msg)?,
         };
 

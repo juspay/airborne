@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+package.license = "MIT OR Apache-2.0"
+package.homepage = "https://juspay.io/open-source/airborne"
+package.repository = "https://github.com/juspay/airborne"
+package.readme = "README.md"
+package.authors = ["airborne@juspay.in"]
+package.version = "0.1.0"
+
+members = ["server", "analytics"]
+
+[[workspace.metadata.leptos]]
+name = "cac"
+bin-package = "juspay_superposition"
+output-name = "frontend"
+lib-package = "frontend"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+style-file = "crates/frontend/styles/style.css"
+assets-dir = "crates/frontend/assets"
+
+[workspace.dependencies]
+chrono = { version = "0.4.41" }
+dotenv = { version = "0.15" }
+futures = { version = "0.3" }
+reqwest = { version = "^0.12.5" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1" }
+thiserror = { version = "2.0.12" }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1.16.0", features = ["serde", "v7", "v4"] }
+
+[workspace.lints.clippy]
+mod_module_files = "warn"
+manual_range_contains = "allow"
