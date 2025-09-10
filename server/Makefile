@@ -215,18 +215,14 @@ endif
 	@echo "$(GREEN) ✅ Keycloak ready$(NC)"
 
 node-dependencies:
-	cd dashboard_react && npm ci
 	cd docs_react && npm ci
-	cd home_react && npm ci
-
-dashboard:
-	cd dashboard_react && npm run build:dev
+	cd dashboard_nextjs && npm ci
 
 docs:
 	cd docs_react && npm run build:dev
 
-home:
-	cd home_react && npm run build:dev
+frontend:
+	cd dashboard_nextjs && npm run dev
 
 SETUP_DEPS = env-file db superposition keycloak-db keycloak localstack node-dependencies
 # ifdef CI
@@ -277,9 +273,8 @@ kill:
 
 run: kill db superposition superposition-init keycloak-db keycloak keycloak-init localstack localstack-init
 	@trap 'kill 0' INT TERM; \
-	$(MAKE) dashboard & \
 	$(MAKE) docs & \
-	$(MAKE) home & \
+	$(MAKE) frontend & \
 	cargo watch -w src -w Cargo.toml -w Cargo.lock -s 'make airborne-server && ./target/debug/airborne-server' & \
 	wait
 
