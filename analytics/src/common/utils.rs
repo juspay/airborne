@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
+use chrono::{TimeZone, Timelike, Utc};
 
 pub fn strip_sql_comments(input: &str) -> String {
     enum State {
@@ -124,39 +124,50 @@ pub fn strip_sql_comments(input: &str) -> String {
 }
 
 /// Floor to the start of the hour (HH:00:00)
-pub fn floor_to_hour(ts_sec: i64) -> i64 {
-    let dt = Utc.timestamp(ts_sec, 0);
-    let floored = dt.date_naive().and_hms(dt.hour(), 0, 0);
-    DateTime::<Utc>::from_utc(floored, Utc).timestamp()
+pub fn try_into_hour(ts_sec: i64) -> Option<i64> {
+    let dt = Utc.timestamp_opt(ts_sec, 0).single()?;
+    let floored_ndt = dt.date_naive().and_hms_opt(dt.hour(), 0, 0)?;
+    Some(Utc.from_utc_datetime(&floored_ndt).timestamp())
 }
 
 /// Floor to midnight UTC of that day (00:00:00)
-pub fn floor_to_day(ts_sec: i64) -> i64 {
-    let dt = Utc.timestamp(ts_sec, 0);
-    let floored = dt.date_naive().and_hms(23, 59, 59);
-    DateTime::<Utc>::from_utc(floored, Utc).timestamp()
+pub fn try_into_date_end(ts_sec: i64) -> Option<i64> {
+    let dt = Utc.timestamp_opt(ts_sec, 0).single()?;
+    let ceiled_ndt = dt.date_naive().and_hms_opt(23, 59, 59)?;
+    Some(Utc.from_utc_datetime(&ceiled_ndt).timestamp())
 }
 
 /// Ceil to the next hour boundary (HH+1:00:00), unless already on an exact hour
-pub fn ceil_to_hour(ts_sec: i64) -> i64 {
-    let dt = Utc.timestamp(ts_sec, 0);
-    let floored = DateTime::<Utc>::from_utc(dt.date_naive().and_hms(dt.hour(), 0, 0), Utc);
-    if dt == floored {
-        dt.timestamp()
+#[allow(dead_code)]
+pub fn try_ceil_hour(ts_sec: i64) -> Option<i64> {
+    let dt = Utc.timestamp_opt(ts_sec, 0).single()?;
+    let needs_ceil = dt.minute() != 0 || dt.second() != 0;
+
+    let ceiled = if needs_ceil {
+        dt.date_naive().and_hms_opt(dt.hour() + 1, 0, 0)?.and_utc()
     } else {
-        (floored + Duration::hours(1)).timestamp()
-    }
+        dt
+    };
+
+    Some(ceiled.timestamp())
 }
 
 /// Ceil to next midnight UTC (00:00:00 next day), unless already at midnight
-pub fn ceil_to_day(ts_sec: i64) -> i64 {
-    let dt = Utc.timestamp(ts_sec, 0);
-    let floored = DateTime::<Utc>::from_utc(dt.date_naive().and_hms(0, 0, 0), Utc);
-    if dt == floored {
-        dt.timestamp()
+#[allow(dead_code)]
+pub fn try_ceil_date(ts_sec: i64) -> Option<i64> {
+    let dt = Utc.timestamp_opt(ts_sec, 0).single()?;
+    let is_midnight = dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0;
+
+    let next = if is_midnight {
+        dt
     } else {
-        (floored + Duration::days(1)).timestamp()
-    }
+        dt.date_naive()
+            .succ_opt()? // move to next day
+            .and_hms_opt(0, 0, 0)?
+            .and_utc()
+    };
+
+    Some(next.timestamp())
 }
 
 /// Normalize a Unix timestamp to seconds.

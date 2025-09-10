@@ -12,8 +12,8 @@ build: ## Build the application
 build-release: ## Build the application in release mode
 	cargo build --release
 
-run: ## Run the application
-	make run-dev-victoria-metrics
+## Run the application
+run: run-dev-victoria-metrics
 
 fmt: ## Format code
 	cargo fmt

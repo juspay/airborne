@@ -2,25 +2,30 @@ pub mod models;
 
 use std::collections::BTreeMap;
 
-use anyhow::{Ok, Result};
-use chrono::{Datelike, NaiveDate, TimeZone, Utc};
+use anyhow::{anyhow, Ok, Result};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use clickhouse::{Client as ClickHouseClient, Row};
 use serde::{Deserialize, Serialize};
 use time::{Date, Duration, OffsetDateTime, Time};
 use tracing::info;
 use uuid::Uuid;
 
-use crate::common::config::ClickHouseConfig;
-use crate::common::models::{
-    ActiveDevicesMetrics, AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval,
-    DailyActiveDevices, DailyFailures, ErrorFrequency, FailureAnalytics, OtaEvent,
-    VersionDistribution, VersionMetrics,
+use crate::{
+    common::{
+        config::ClickHouseConfig,
+        models::{
+            ActiveDevicesMetrics, AdoptionMetrics, AdoptionTimeSeries, AnalyticsInterval,
+            DailyActiveDevices, DailyFailures, ErrorFrequency, FailureAnalytics, OtaEvent,
+            VersionDistribution, VersionMetrics,
+        },
+    },
+    core::clickhouse::models::OtaEventRow,
 };
-use crate::core::clickhouse::models::OtaEventRow;
 
 #[derive(Clone)]
 pub struct Client {
     pub client: ClickHouseClient,
+    #[allow(dead_code)]
     pub database: String,
 }
 
@@ -58,6 +63,7 @@ impl Client {
     }
 
     /// Insert OTA event into the raw events table
+    #[allow(dead_code)]
     pub async fn insert_ota_event(&self, event: &OtaEvent) -> Result<()> {
         let row = OtaEventRow {
             org_id: event.org_id.clone(),
@@ -65,7 +71,7 @@ impl Client {
             device_id: event.device_id.clone(),
             session_id: event.session_id.clone(),
             event_type: event.event_type.to_string(),
-            event_id: event.event_id.unwrap_or_else(|| uuid::Uuid::new_v4()),
+            event_id: event.event_id.unwrap_or_else(uuid::Uuid::new_v4),
             timestamp: event.timestamp.timestamp(),
             event_date: (event.timestamp.num_days_from_ce() - 719_163) as u16, // Convert to ClickHouse date format (days since 1970-01-01),
             release_id: event.release_id.clone(),
@@ -104,14 +110,21 @@ impl Client {
         Ok(())
     }
 
+    fn try_days_from_epoch_chrono(ts_secs: i64) -> Option<u16> {
+        let dt = Utc.timestamp_opt(ts_secs, 0).single()?;
+        let epoch_ndt = NaiveDate::from_ymd_opt(1970, 1, 1)?;
+
+        Some(
+            dt.date_naive()
+                .signed_duration_since(epoch_ndt)
+                .num_days()
+                .unsigned_abs() as u16,
+        )
+    }
+
     fn days_from_epoch_chrono(ts_secs: i64) -> u16 {
-        let dt = chrono::TimeZone::timestamp(&Utc, ts_secs, 0);
-
-        let epoch_date = chrono::TimeZone::ymd(&Utc, 1970, 1, 1)
-            .and_hms(0, 0, 0)
-            .date();
-
-        dt.date().signed_duration_since(epoch_date).num_days() as u16
+        // defaulting to 1st June 2025
+        Self::try_days_from_epoch_chrono(ts_secs).unwrap_or(20_219)
     }
 
     pub async fn insert_ota_events_batch(&self, events: Vec<OtaEvent>) -> Result<()> {
@@ -129,7 +142,7 @@ impl Client {
                     device_id: event.device_id,
                     session_id: event.session_id,
                     event_type: event.event_type.to_string(),
-                    event_id: event.event_id.unwrap_or_else(|| Uuid::new_v4()),
+                    event_id: event.event_id.unwrap_or_else(Uuid::new_v4),
                     timestamp: event.timestamp.timestamp_millis(),
                     event_date: Self::days_from_epoch_chrono(event.timestamp.timestamp()), // Convert to ClickHouse date format (days since 1970-01-01)
                     release_id: event.release_id,
@@ -176,12 +189,15 @@ impl Client {
         release_id: &str,
         ts_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        fn hour_to_datetime(date_millis: i64, hour: u8) -> chrono::DateTime<chrono::Utc> {
-            let nd = Utc.timestamp_millis(date_millis);
+        fn hour_to_datetime(date_millis: i64, hour: u8) -> DateTime<Utc> {
+            let nd = Utc
+                .timestamp_millis_opt(date_millis)
+                .single()
+                .unwrap_or_else(Utc::now);
             nd.date_naive()
                 .and_hms_opt(hour as u32, 0, 0)
-                .map(|dt| chrono::DateTime::from_utc(dt, chrono::Utc))
-                .unwrap_or_else(|| Utc::now())
+                .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
+                .unwrap_or_else(Utc::now)
         }
 
         let make_fetch = |view_name: &'static str, column_alias: &'static str| {
@@ -365,19 +381,18 @@ impl Client {
             entry.update_available = cnt;
         }
 
-        let result = adoption_map.into_iter().map(|(_, v)| v).collect();
+        let result = adoption_map.into_values().collect();
         Ok(result)
     }
 
-    fn dates_between(start_ms: i64, end_ms: i64) -> Vec<Date> {
+    fn dates_between(start_ms: i64, end_ms: i64) -> Option<Vec<Date>> {
         if start_ms > end_ms {
-            return Vec::new();
+            return None;
         }
 
-        let start_dt = OffsetDateTime::from_unix_timestamp_nanos((start_ms * 1_000_000).into())
-            .expect("Invalid start_ms");
-        let end_dt = OffsetDateTime::from_unix_timestamp_nanos((end_ms * 1_000_000).into())
-            .expect("Invalid end_ms");
+        let start_dt =
+            OffsetDateTime::from_unix_timestamp_nanos((start_ms * 1_000_000).into()).ok()?;
+        let end_dt = OffsetDateTime::from_unix_timestamp_nanos((end_ms * 1_000_000).into()).ok()?;
 
         let mut current_date = start_dt.date();
         let end_date = end_dt.date();
@@ -391,7 +406,7 @@ impl Client {
             current_date = next.date();
         }
 
-        out
+        Some(out)
     }
 
     pub async fn get_adoption_metrics_daywise_parallel(
@@ -402,13 +417,16 @@ impl Client {
         start_date_millis: i64,
         end_date_millis: i64,
     ) -> Result<Vec<AdoptionTimeSeries>> {
-        fn date_millis_to_datetime(date_millis: i64) -> chrono::DateTime<chrono::Utc> {
-            let nd = Utc.timestamp_millis(date_millis);
+        fn date_millis_to_datetime(date_millis: i64) -> DateTime<Utc> {
+            let nd = Utc
+                .timestamp_millis_opt(date_millis)
+                .single()
+                .unwrap_or_else(Utc::now);
             nd.date_naive()
                 .and_hms_opt(0, 0, 0)
-                .map(|dt| chrono::DateTime::from_utc(dt, chrono::Utc))
+                .map(|dt| DateTime::from_naive_utc_and_offset(dt, Utc))
                 // fallback in the unlikely case of invalid hour
-                .unwrap_or_else(|| Utc::now())
+                .unwrap_or_else(Utc::now)
         }
 
         #[derive(Row, Serialize, Deserialize, Debug)]
@@ -508,17 +526,18 @@ impl Client {
 
         let mut adoption_map: BTreeMap<i64, AdoptionTimeSeries> = BTreeMap::new();
 
-        fn make_map_key(date: time::Date) -> i64 {
+        fn make_map_key(date: time::Date) -> Result<i64> {
             let naive_date =
-                NaiveDate::from_ymd_opt(date.year() as i32, date.month() as u32, date.day() as u32)
-                    .expect("Invalid date");
-            let dt =
-                chrono::DateTime::<chrono::Utc>::from_utc(naive_date.and_hms(0, 0, 0), chrono::Utc);
-            dt.timestamp_millis()
-        }
+                NaiveDate::from_ymd_opt(date.year(), date.month() as u32, date.day() as u32)
+                    .and_then(|d| d.and_hms_opt(0, 0, 0))
+                    .ok_or_else(|| anyhow!("Invalid date"))?;
 
-        for date in Self::dates_between(start_date_millis, end_date_millis) {
-            let key = make_map_key(date);
+            let dt =
+                chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(naive_date, chrono::Utc);
+            Ok(dt.timestamp_millis())
+        }
+        for date in Self::dates_between(start_date_millis, end_date_millis).unwrap_or_default() {
+            let key = make_map_key(date)?;
             adoption_map.insert(
                 key,
                 AdoptionTimeSeries {
@@ -537,7 +556,7 @@ impl Client {
         }
 
         for row in downloads_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -547,7 +566,7 @@ impl Client {
             entry.download_success += row.cnt;
         }
         for row in applies_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -557,7 +576,7 @@ impl Client {
             entry.apply_success += row.cnt;
         }
         for row in dl_failures_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -567,7 +586,7 @@ impl Client {
             entry.download_failures += row.cnt;
         }
         for row in ap_failures_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -577,7 +596,7 @@ impl Client {
             entry.apply_failures += row.cnt;
         }
         for row in rollback_inits_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -587,7 +606,7 @@ impl Client {
             entry.rollbacks_initiated = row.cnt;
         }
         for row in rollbacks_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -597,7 +616,7 @@ impl Client {
             entry.rollbacks_completed = row.cnt;
         }
         for row in rb_failures_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -607,7 +626,7 @@ impl Client {
             entry.rollback_failures = row.cnt;
         }
         for row in update_checks_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -617,7 +636,7 @@ impl Client {
             entry.update_checks = row.cnt;
         }
         for row in update_available_rows {
-            let key = make_map_key(row.event_date);
+            let key = make_map_key(row.event_date)?;
             let entry = adoption_map
                 .entry(key)
                 .or_insert_with(|| AdoptionTimeSeries {
@@ -627,10 +646,11 @@ impl Client {
             entry.update_available = row.cnt;
         }
 
-        let result = adoption_map.into_iter().map(|(_, v)| v).collect();
+        let result = adoption_map.into_values().collect();
         Ok(result)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_adoption_metrics(
         &self,
         org_id: &str,
@@ -771,11 +791,13 @@ impl Client {
             }
 
             let date = chrono::NaiveDate::from_ymd_opt(
-                row.event_date.year() as i32,
+                row.event_date.year(),
                 row.event_date.month() as u32,
                 row.event_date.day() as u32,
             )
-            .expect("Invalid date conversion from time::Date to chrono::NaiveDate");
+            .ok_or_else(|| {
+                anyhow!("Invalid date conversion from time::Date to chrono::NaiveDate")
+            })?;
             daily_breakdown.push(DailyActiveDevices {
                 date,
                 active_devices: row.active_devices,
@@ -791,6 +813,7 @@ impl Client {
     }
 
     /// Get active devices metrics
+    #[allow(dead_code)]
     pub async fn get_active_devices_metrics1(
         &self,
         org_id: &str,

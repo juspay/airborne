@@ -1,20 +1,20 @@
-use std::{str::FromStr, sync::Arc};
-
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use uuid::Uuid;
+use std::sync::Arc;
 
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use uuid::Uuid;
 
-use crate::{common::config::Config, kafka};
-
-use crate::core::clickhouse;
-use crate::core::victoria;
+use crate::{
+    common::config::Config,
+    core::{clickhouse, victoria},
+    kafka,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -24,31 +24,13 @@ pub struct AppState {
     pub config: Arc<Config>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, strum_macros::Display, strum_macros::EnumString,
+)]
+#[serde(rename_all = "kebab-case")]
 pub enum LoggingInfra {
     VictoriaMetrics,
     KafkaClickhouse,
-}
-
-impl ToString for LoggingInfra {
-    fn to_string(&self) -> String {
-        match self {
-            LoggingInfra::VictoriaMetrics => "victoria-metrics".to_string(),
-            LoggingInfra::KafkaClickhouse => "kafka-clickhouse".to_string(),
-        }
-    }
-}
-
-impl FromStr for LoggingInfra {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "victoria-metrics" => Ok(LoggingInfra::VictoriaMetrics),
-            "kafka-clickhouse" => Ok(LoggingInfra::KafkaClickhouse),
-            _ => Err(format!("Unknown logging infrastructure: {}", s)),
-        }
-    }
 }
 
 /// Core OTA event structure following the enterprise schema
@@ -96,8 +78,9 @@ pub struct OtaEvent {
 }
 
 /// OTA Event types as defined in the analytics requirements
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum OtaEventType {
     UpdateCheck,
     UpdateAvailable,
@@ -114,44 +97,14 @@ pub enum OtaEventType {
     RollbackFailed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::Display)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum AnalyticsInterval {
     Day,
     Hour,
     Week,
     Month,
-}
-
-impl ToString for AnalyticsInterval {
-    fn to_string(&self) -> String {
-        match self {
-            AnalyticsInterval::Day => "DAY".to_string(),
-            AnalyticsInterval::Hour => "HOUR".to_string(),
-            AnalyticsInterval::Week => "WEEK".to_string(),
-            AnalyticsInterval::Month => "MONTH".to_string(),
-        }
-    }
-}
-
-impl ToString for OtaEventType {
-    fn to_string(&self) -> String {
-        match self {
-            OtaEventType::UpdateCheck => "UPDATE_CHECK".to_string(),
-            OtaEventType::UpdateAvailable => "UPDATE_AVAILABLE".to_string(),
-            OtaEventType::UpdateNotAvailable => "UPDATE_NOT_AVAILABLE".to_string(),
-            OtaEventType::DownloadStarted => "DOWNLOAD_STARTED".to_string(),
-            OtaEventType::DownloadProgress => "DOWNLOAD_PROGRESS".to_string(),
-            OtaEventType::DownloadCompleted => "DOWNLOAD_COMPLETED".to_string(),
-            OtaEventType::DownloadFailed => "DOWNLOAD_FAILED".to_string(),
-            OtaEventType::ApplyStarted => "APPLY_STARTED".to_string(),
-            OtaEventType::ApplySuccess => "APPLY_SUCCESS".to_string(),
-            OtaEventType::ApplyFailure => "APPLY_FAILURE".to_string(),
-            OtaEventType::RollbackInitiated => "ROLLBACK_INITIATED".to_string(),
-            OtaEventType::RollbackCompleted => "ROLLBACK_COMPLETED".to_string(),
-            OtaEventType::RollbackFailed => "ROLLBACK_FAILED".to_string(),
-        }
-    }
 }
 
 /// Request structure for ingesting OTA events via API
@@ -362,6 +315,7 @@ impl ErrorResponse {
         }
     }
 
+    #[allow(dead_code)]
     pub fn bad_request<E>(err: E) -> Self
     where
         E: ToString,

@@ -1,6 +1,7 @@
+use std::env;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::env;
 
 use crate::common::models::LoggingInfra;
 
