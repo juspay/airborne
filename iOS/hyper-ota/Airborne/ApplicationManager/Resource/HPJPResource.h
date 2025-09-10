@@ -13,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, readonly, strong) NSURL *url;
 @property (nonatomic, readonly, strong) NSString *filePath;
-@property (nonatomic, readonly, strong) NSString *checksum;
+@property (nonatomic, readonly, strong) NSString * _Nullable checksum;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary error:(NSError * _Nullable *)error;
 

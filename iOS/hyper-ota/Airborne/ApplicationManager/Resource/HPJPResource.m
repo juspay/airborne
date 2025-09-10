@@ -55,11 +55,16 @@
 }
 
 - (NSDictionary *)toDictionary {
-    return @{
+    NSMutableDictionary *dict = @{
         @"url": [_url absoluteString],
-        @"file_path": _filePath,
-        @"checksum": _checksum
-    };
+        @"file_path": _filePath
+    }.mutableCopy;
+    
+    if (self.checksum) {
+        dict[@"checksum"] = _checksum;
+    }
+    
+    return dict;
 }
 
 + (BOOL)supportsSecureCoding {
@@ -82,7 +87,10 @@
         // For filePath, we expect a string
         NSSet *stringClasses = [NSSet setWithObjects:[NSString class], nil];
         _filePath = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"file_path"];
-        _checksum = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"checksum"];
+        
+        // For checksum, handle nil case
+        id checksumObj = [aDecoder decodeObjectOfClasses:stringClasses forKey:@"checksum"];
+        _checksum = [checksumObj isKindOfClass:[NSString class]] ? checksumObj : nil;
     }
     return self;
 }
@@ -90,7 +98,10 @@
 - (void)encodeWithCoder:(NSCoder *)aCoder {
     [aCoder encodeObject:_url forKey:@"url"];
     [aCoder encodeObject:_filePath forKey:@"file_path"];
-    [aCoder encodeObject:_checksum forKey:@"checksum"];
+    
+    if (_checksum) {
+        [aCoder encodeObject:_checksum forKey:@"checksum"];
+    }
 }
 
 @end
