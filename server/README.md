@@ -42,6 +42,10 @@ The Airborne Server is a robust backend system designed to power the Software-as
 
 The Airborne Server acts as the central nervous system for delivering updates to applications. It handles the complexities of storing package assets (via AWS S3), managing configurations (via Superposition and its internal database), and authenticating/authorizing users (via Keycloak). This allows development teams to focus on building features while relying on a stable platform for update distribution.
 
+**Related Systems:**
+
+- **[Airborne Analytics Server](../analytics/README.md)**: A companion analytics platform that provides comprehensive OTA update insights, tracking adoption rates, failure analysis, and performance metrics across your applications.
+
 ## API Reference
 
 All API endpoints are versioned and adhere to RESTful principles. Authentication is primarily handled through JWT Bearer tokens issued by Keycloak. Specific permissions are required for various operations, as detailed below.
@@ -325,266 +329,150 @@ Database schema changes are managed using Diesel CLI.
 
 ### Running the Server
 
-The Airborne Server uses a comprehensive Makefile for orchestrating the setup and execution of all services. The Makefile provides various commands for different development and deployment scenarios.
+The Airborne Server uses a comprehensive Makefile located at the project root for orchestrating the setup and execution of all services. The Makefile provides various commands for different development and deployment scenarios.
 
 1.  **Clone the Repository**:
 
     ```bash
     git clone <repository-url>
-    cd airborne/server
+    cd airborne
     ```
 
 2.  **Quick Start (Development Mode)**:
 
     ```bash
+    # Start the Airborne server in development mode with hot-reloading
     make run
+
+    # Or start the analytics server in development mode
+    make run-analytics
     ```
-
-    This command will:
-
-    - Set up all required services (PostgreSQL, Keycloak, LocalStack, Superposition)
-    - Initialize all services with proper configurations
-    - Start the Airborne server in development mode with hot-reloading
 
 3.  **Available Make Commands**:
 
-    **Main Commands:**
-
     ```bash
-    make run          # Run complete development environment with hot-reloading
-    make setup        # Set up all dependencies (databases, services, etc.)
-    make status       # Show current system status
-    make stop         # Stop all services gracefully
-    make cleanup      # Clean up containers and volumes
-    make test         # Run test suite
-    make help         # Show all available commands with descriptions
-    ```
-
-    **Individual Service Management:**
-
-    ```bash
-    make db           # Start PostgreSQL database
-    make keycloak     # Start Keycloak authentication service
-    make localstack   # Start LocalStack (AWS mock services)
-    make superposition # Start Superposition configuration service
-    ```
-
-    **Initialization Commands:**
-
-    ```bash
-    make keycloak-init      # Initialize Keycloak realm and client
-    make superposition-init # Initialize Superposition organization
-    make localstack-init    # Initialize LocalStack S3 buckets
-    ```
-
-    **Database Commands:**
-
-    ```bash
-    make db-migration       # Run database migrations using Diesel
-    ```
-
-    **Code Quality Commands:**
-
-    ```bash
-    make check              # Run format check and linting (CI mode)
-    make fmt                # Format Rust code using rustfmt
-    make lint               # Run Clippy linter on Rust code
-    make lint-fix           # Run Clippy with automatic fixes
-    ```
-
-    **Git Integration Commands:**
-
-    ```bash
-    make commit             # Run quality checks and commit changes
-    make amend              # Amend the last commit with quality checks
-    make amend-no-edit      # Amend the last commit without editing message
-    ```
-
-    **Server-Specific Commands:**
-
-    ```bash
-    make airborne-server    # Build the Airborne server
-    make kill               # Kill running airborne-server processes
-    # Run server in watch mode with hot-reloading:
-    cargo watch -s 'make airborne-server && ./target/debug/airborne-server'
+    # See all available commands with descriptions
+    make help
     ```
 
 4.  **Development Modes**:
 
-    **Build Mode (Default)**:
-
     ```bash
-    make setup && make airborne-server
-    ```
-
-    **Development Mode with Hot-Reloading**:
-
-    ```bash
+    # Start the complete Airborne server development environment
     make run
-    # or explicitly use cargo-watch
-    cargo watch -s 'make airborne-server && ./target/debug/airborne-server'
-    ```
 
-5.  **Environment Configuration**:
-    The Makefile will automatically create a `.env` file from `.env.example` if it doesn't exist. You can customize environment variables as described in the "Environment Variables" section.
+    # Start analytics server with Grafana + Victoria Metrics
+    make run-analytics
+
+    # Start analytics server with Kafka + ClickHouse (alternative)
+    make run-kafka-clickhouse
+
+    # Set up dependencies only
+    make setup
+
+    # Build the server without running
+    make airborne-server
+
+    # Check system status
+    make status
+
+    # Stop all services
+    make stop
+
+    # Clean up everything and start fresh
+    make cleanup
+    ```
 
 ### Services Started
 
-When running `make run` or `make setup`, the following services are started through Docker Compose:
+**Services Started by `make run`:**
 
-- **Airborne Backend API**: The core Rust application
+- **Backend API**: `http://localhost:8081`
+- **Keycloak (Authentication)**: `http://localhost:8180` (Default admin: `admin/admin`)
+- **PostgreSQL Database**: `localhost:5433`
+- **LocalStack (AWS Mock)**: `http://localhost:4566`
+- **Superposition**: `http://localhost:8080`
 
-  - **Local URL**: `http://localhost:8081`
-  - **Container Port**: 9000 (mapped to host 8081)
-  - **Health Check**: Available at `/health` endpoint
+**Services Started by `make run-analytics`:**
 
-- **Keycloak (Authentication Service)**: Identity and Access Management
-
-  - **Admin Console**: `http://localhost:8180`
-  - **Default Admin Credentials**: `admin/admin`
-  - **Realm**: `master` (configurable)
-  - **Client**: Automatically configured during initialization
-
-- **PostgreSQL Database**: Main application database
-
-  - **Host**: `localhost:5433`
-  - **Database Names**:
-    - `airborneserver` (main application)
-    - `keycloak` (for Keycloak data)
-  - **Health Check**: Automatic via `pg_isready`
-
-- **LocalStack**: AWS services emulation for local development
-
-  - **URL**: `http://localhost:4566`
-  - **Services**: S3, KMS
-  - **Health Check**: `http://localhost:4566/_localstack/health`
-  - **S3 Buckets**: Automatically created during initialization
-
-- **Superposition**: Configuration management service
-  - **URL**: `http://localhost:8080`
-  - **Health Check**: `http://localhost:8080/health`
-  - **Organization**: Automatically initialized
-
-**Service Health Monitoring:**
-Use `make status` to check the current state of all services:
-
-```bash
-make status
-```
-
-**Port Summary:**
-
-- **8081**: Airborne API Server
-- **8180**: Keycloak Admin Console
-- **5433**: PostgreSQL Database
-- **4566**: LocalStack (AWS Mock)
-- **8080**: Superposition Configuration Service
+- **Analytics Backend API**: `http://localhost:6400`
+- **Grafana**: `http://localhost:4000`
+- **Victoria Metrics**: `http://localhost:8428`
 
 ### Development Workflow
 
-**Development Mode (`make run`):**
+**Individual Service Management:**
 
-- **Hot Reloading**: Changes to the backend Rust code trigger automatic recompilation and server restart via `cargo-watch`.
-- **Service Management**: All services are orchestrated through the Makefile with proper dependency management.
-- **Automatic Initialization**: Services are automatically initialized with proper configurations (Keycloak realm, Superposition org, LocalStack buckets).
-- **Health Checks**: Built-in health monitoring ensures services are ready before proceeding.
-- **Debug Logging**: Debug-level logging is enabled for easier troubleshooting.
-- **Code Quality Integration**: Built-in formatting, linting, and commit hooks ensure code quality standards.
+```bash
+# Database services
+make db                     # Start PostgreSQL database
+make db-migration          # Run database migrations
 
-**Code Quality Workflow:**
+# Infrastructure services
+make localstack            # Start LocalStack (AWS mock)
+make superposition         # Start Superposition service
+make keycloak-db           # Start Keycloak database
+make keycloak              # Start Keycloak authentication
 
-The Makefile includes comprehensive code quality commands that integrate with the Rust toolchain:
+# Initialization (run after services are up)
+make superposition-init    # Initialize Superposition organization
+make keycloak-init         # Initialize Keycloak realm and client
+make localstack-init       # Initialize LocalStack S3 buckets
 
-- **`make fmt`**: Formats all Rust code using `rustfmt` with project-specific settings
-- **`make lint`**: Runs `clippy` linter to catch common mistakes and suggest improvements
-- **`make lint-fix`**: Runs `clippy` with automatic fixes for safe suggestions
-- **`make check`**: Comprehensive quality check (format check + linting) suitable for CI/CD
-- **`make commit`**: Runs quality checks before committing (prevents committing improperly formatted code)
-- **`make amend`**: Amends the last commit while ensuring code quality standards
+# Frontend builds
+make node-dependencies     # Install Node.js dependencies
+make dashboard             # Build dashboard React app
+make docs                  # Build docs React app
+make home                  # Build home React app
 
-These commands help maintain consistent code style and catch potential issues early in the development cycle.
+# Build servers
+make airborne-server       # Build the Airborne server
+make analytics-server      # Build the analytics server
 
-**Common Development Tasks:**
+# Code quality
+make fmt                   # Format Rust code using rustfmt
+make lint                  # Run Clippy linter on Rust code
+make lint-fix              # Run Clippy with automatic fixes
+make check                 # Run format check and linting (CI mode)
 
-1. **Start Development Environment:**
+# Git integration
+make commit                # Run quality checks and commit changes
+make amend                 # Amend the last commit with quality checks
+make amend-no-edit         # Amend the last commit without editing message
 
-   ```bash
-   make run
-   ```
+# Utility commands
+make kill                  # Kill running airborne-server processes
+make env-file              # Create .env file from .env.example
+make status                # Show current system status
+make test                  # Run test suite
+```
 
-2. **Check System Status:**
+**Complete Development Flow:**
 
-   ```bash
-   make status
-   ```
-
-3. **Stop All Services:**
-
-   ```bash
-   make stop
-   ```
-
-4. **Clean Reset (remove all data):**
-
-   ```bash
-   make cleanup
-   ```
-
-5. **Run Only Specific Services:**
-
-   ```bash
-   make setup              # Start infrastructure only
-   make airborne-server    # Start just the Airborne server
-   ```
-
-6. **Database Operations:**
+1. **First-time setup:**
 
    ```bash
-   # Apply migrations using Make (recommended)
-   make db-migration
-
-   # Apply migrations using Diesel CLI directly
-   diesel migration run --database-url <connection_string>
-
-   # Generate new migration
-   diesel migration generate <migration_name>
+   make setup              # Sets up all dependencies
    ```
 
-7. **Code Quality Operations:**
+2. **Daily development:**
 
    ```bash
-   # Format code
-   make fmt
-
-   # Run linting
-   make lint
-
-   # Run linting with automatic fixes
-   make lint-fix
-
-   # Run comprehensive quality checks (format + lint)
-   make check
-
-   # Commit with quality checks
-   make commit
-
-   # Amend last commit with quality checks
-   make amend
+   make run                # Start everything with hot-reloading
+   # Make your changes...
+   make commit             # Format, lint, and commit
    ```
 
-**Environment Variables:**
+3. **Working with specific components:**
 
-- The Makefile automatically manages environment setup from `.env.example`
-- Development-specific configurations (LocalStack endpoints, debug settings) are automatically applied
-- Use `make env-file` to manually regenerate the environment file
+   ```bash
+   make db                 # Start just the database
+   make superposition      # Start just Superposition
+   make airborne-server    # Build just the server
+   ```
 
-**Troubleshooting:**
-
-- Use `make status` to check service health
-- Use `make help` to see all available commands
-- Check individual service logs with `docker compose logs <service-name>`
-- Use `make cleanup` followed by `make run` for a fresh start
-
-## License
-
-The Airborne Server is licensed under the Apache License, Version 2.0. See the [LICENSE](../LICENSE) file for more details.
+4. **Cleanup and restart:**
+   ```bash
+   make cleanup            # Clean up containers and volumes
+   make run                # Fresh start
+   ```

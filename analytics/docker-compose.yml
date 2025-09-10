@@ -40,9 +40,9 @@ services:
         soft: 262144
         hard: 262144
     ports:
-      - "8123:8123"   # HTTP interface
-      - "9544:9000"   # Native TCP interface
-      - "9009:9009"   # Interserver HTTP (for clustering/replication)
+      - "8123:8123" # HTTP interface
+      - "9544:9000" # Native TCP interface
+      - "9009:9009" # Interserver HTTP (for clustering/replication)
     environment:
       CLICKHOUSE_DB: analytics
       CLICKHOUSE_USER: default
@@ -83,21 +83,10 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: "changeme"    # change this!
+      GF_SECURITY_ADMIN_PASSWORD: "changeme" # change this!
     depends_on:
       - victoria-metrics
     restart: unless-stopped
-
-  backend:
-    image: hyper-ota-analytics:latest
-    container_name: backend
-    ports:
-      - "6400:6400"
-    environment:
-      KAFKA_BROKER_URL:       ${KAFKA_BROKER_URL:-kafka:29092}
-      CLICKHOUSE_URL:         ${CLICKHOUSE_URL:-clickhouse-server:8123}
-      LOGGING_INFRASTRUCTURE: ${LOGGING_INFRASTRUCTURE:-victoria-metrics}  # kafka-clickhouse or victoria-metrics
-      VICTORIA_METRICS_URL:   ${VICTORIA_METRICS_URL:-victoria-metrics:8428}
 
 volumes:
   zookeeper_data:

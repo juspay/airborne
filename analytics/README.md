@@ -32,7 +32,7 @@ A high-performance, enterprise-ready Rust-based OTA analytics platform that leve
 - **📊 Multi-tenant Analytics**: Complete data isolation per tenant/organization/application
 - **⚡ Real-time Event Streaming**: Kafka-based event pipeline with automatic batching
 - **🔍 High-performance Queries**: ClickHouse-powered sub-second analytics responses
-- **📈 Comprehensive OTA Metrics**: 
+- **📈 Comprehensive OTA Metrics**:
   - Adoption rates and installation trends
   - Version distribution across devices
   - Active device tracking
@@ -46,68 +46,105 @@ A high-performance, enterprise-ready Rust-based OTA analytics platform that leve
 
 The system tracks the complete OTA update lifecycle:
 
-| Event Type | Description | Typical Payload |
-|------------|-------------|-----------------|
-| `update_started` | Update process initiated | `current_version`, `target_version` |
-| `update_downloading` | Downloading update package | `progress`, `download_speed` |
-| `update_downloaded` | Download completed | `package_size`, `download_duration` |
-| `update_installing` | Installation in progress | `install_progress` |
-| `update_installed` | Installation completed successfully | `install_duration`, `success_metrics` |
-| `update_failed` | Update process failed | `error_code`, `error_message`, `failure_stage` |
-| `update_cancelled` | Update cancelled by user | `cancellation_reason` |
-| `rollback_started` | Rollback initiated | `rollback_reason` |
-| `rollback_completed` | Rollback completed | `rollback_duration` |
+| Event Type           | Description                         | Typical Payload                                |
+| -------------------- | ----------------------------------- | ---------------------------------------------- |
+| `update_started`     | Update process initiated            | `current_version`, `target_version`            |
+| `update_downloading` | Downloading update package          | `progress`, `download_speed`                   |
+| `update_downloaded`  | Download completed                  | `package_size`, `download_duration`            |
+| `update_installing`  | Installation in progress            | `install_progress`                             |
+| `update_installed`   | Installation completed successfully | `install_duration`, `success_metrics`          |
+| `update_failed`      | Update process failed               | `error_code`, `error_message`, `failure_stage` |
+| `update_cancelled`   | Update cancelled by user            | `cancellation_reason`                          |
+| `rollback_started`   | Rollback initiated                  | `rollback_reason`                              |
+| `rollback_completed` | Rollback completed                  | `rollback_duration`                            |
 
 ## 🛠️ Quick Start
 
 ### Prerequisites
 
-- **Rust 1.70+** 
+- **Rust 1.70+** (or use Nix flake from project root)
 - **Docker & Docker Compose** (for local development)
 - **ClickHouse 23.0+**
 - **Apache Kafka 2.8+**
+- **System dependencies:** cyrus-sasl, openssl, pkg-config (automatically provided with Nix)
 
 ### 🐳 Local Development Setup
 
 1. **Start infrastructure services:**
+
    ```bash
-   cd analytics
-   docker-compose up -d
+   # From the project root directory
+   make run-analytics
    ```
 
-   This starts:
-   - ClickHouse (port 8123 HTTP, 9000 native)
-   - Kafka & Zookeeper (port 9092)
+   This starts the analytics server with Grafana + Victoria Metrics stack, providing:
+
+   - Grafana (http://localhost:4000)
+   - Victoria Metrics (http://localhost:8428)
+   - Backend API (http://localhost:6400)
+
+   **Alternative Kafka + ClickHouse stack:**
+
+   ```bash
+   # From the project root directory
+   make run-kafka-clickhouse
+   ```
+
+   This provides:
+
    - Kafka UI (http://localhost:8080)
+   - ClickHouse (http://localhost:8123)
+   - Backend API (http://localhost:6400)
 
 2. **Configure environment:**
-   ```bash
-   # Use defaults for local development
-   export CLICKHOUSE_URL="http://localhost:8123"
-   export KAFKA_BROKERS="localhost:9092"
-   export SERVER_PORT="8081"  # Avoid conflict with Kafka UI
-   ```
 
-3. **Build and run:**
+   **Note for Nix users:** All Rust dependencies (including cyrus-sasl for Kafka support) are available through the project's root-level Nix flake. Run `nix develop` from the project root to get all required dependencies.
+
+3. **Build and run manually (if needed):**
+
    ```bash
-   cargo run
+   # From project root
+   make analytics-server
    ```
 
 4. **Verify health:**
    ```bash
-   curl http://localhost:8081/health
+   curl http://localhost:6400/health
    ```
 
-### 🧪 Quick Test
+### 🧪 Testing the API
 
-Run the example script to see the system in action:
+You can test the analytics server in several ways:
+
+**Option 1: Using curl commands**
 
 ```bash
-chmod +x example.sh
-./example.sh
+# Send a sample OTA event
+curl -X POST http://localhost:6400/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": "test-tenant",
+    "org_id": "test-org",
+    "app_id": "test-app",
+    "event_type": "update_started",
+    "timestamp": "2024-01-01T00:00:00Z",
+    "device_id": "device123",
+    "current_version": "1.0.0",
+    "target_version": "1.1.0"
+  }'
+
+# Query analytics data
+curl "http://localhost:6400/analytics/adoption?tenant_id=test-tenant&days=30&app_id=test-app"
 ```
 
-This will send sample OTA events and query the analytics endpoints.
+**Option 2: Using Postman**
+
+Import the provided Postman collection for comprehensive API testing:
+
+```bash
+# The collection is located at: analytics/OTA Analytics.postman_collection.json
+# Import this file into Postman to get pre-configured requests for all endpoints
+```
 
 ## 🔌 API Endpoints
 
@@ -159,6 +196,7 @@ curl "http://localhost:8081/analytics/adoption?tenant_id=acme-corp&days=30&app_i
 ```
 
 **Response:**
+
 ```json
 {
   "data": {
@@ -167,8 +205,8 @@ curl "http://localhost:8081/analytics/adoption?tenant_id=acme-corp&days=30&app_i
     "failed_updates": 529,
     "success_rate": 96.57,
     "hourly_installs": [
-      {"hour": "2025-06-03T10:00:00Z", "installs": 142, "failures": 8},
-      {"hour": "2025-06-03T11:00:00Z", "installs": 156, "failures": 12}
+      { "hour": "2025-06-03T10:00:00Z", "installs": 142, "failures": 8 },
+      { "hour": "2025-06-03T11:00:00Z", "installs": 156, "failures": 12 }
     ]
   }
 }
@@ -183,13 +221,14 @@ curl "http://localhost:8081/analytics/versions?tenant_id=acme-corp&app_id=my-app
 ```
 
 **Response:**
+
 ```json
 {
   "data": {
     "versions": [
-      {"version": "1.1.0", "device_count": 8524, "percentage": 67.2},
-      {"version": "1.0.0", "device_count": 3891, "percentage": 30.7},
-      {"version": "0.9.8", "device_count": 265, "percentage": 2.1}
+      { "version": "1.1.0", "device_count": 8524, "percentage": 67.2 },
+      { "version": "1.0.0", "device_count": 3891, "percentage": 30.7 },
+      { "version": "0.9.8", "device_count": 265, "percentage": 2.1 }
     ],
     "total_devices": 12680
   }
@@ -229,6 +268,7 @@ curl http://localhost:8081/health
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -256,24 +296,27 @@ curl http://localhost:8081/health
 Configuration is handled through environment variables with sensible defaults:
 
 ### Server Configuration
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SERVER_PORT` | HTTP server port | `8080` |
+
+| Variable      | Description      | Default |
+| ------------- | ---------------- | ------- |
+| `SERVER_PORT` | HTTP server port | `8080`  |
 
 ### Kafka Configuration
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `KAFKA_BROKERS` | Kafka broker addresses | `localhost:9092` |
-| `KAFKA_TOPIC` | Primary OTA events topic | `ota-events` |
-| `KAFKA_CONSUMER_GROUP` | Consumer group ID | `ota-analytics-consumer` |
+
+| Variable               | Description              | Default                  |
+| ---------------------- | ------------------------ | ------------------------ |
+| `KAFKA_BROKERS`        | Kafka broker addresses   | `localhost:9092`         |
+| `KAFKA_TOPIC`          | Primary OTA events topic | `ota-events`             |
+| `KAFKA_CONSUMER_GROUP` | Consumer group ID        | `ota-analytics-consumer` |
 
 ### ClickHouse Configuration
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CLICKHOUSE_URL` | ClickHouse HTTP endpoint | `http://localhost:8123` |
-| `CLICKHOUSE_DATABASE` | Database name | `analytics` |
-| `CLICKHOUSE_USERNAME` | Database username | (none) |
-| `CLICKHOUSE_PASSWORD` | Database password | (none) |
+
+| Variable              | Description              | Default                 |
+| --------------------- | ------------------------ | ----------------------- |
+| `CLICKHOUSE_URL`      | ClickHouse HTTP endpoint | `http://localhost:8123` |
+| `CLICKHOUSE_DATABASE` | Database name            | `analytics`             |
+| `CLICKHOUSE_USERNAME` | Database username        | (none)                  |
+| `CLICKHOUSE_PASSWORD` | Database password        | (none)                  |
 
 ### Security Configuration (Production)
 
@@ -303,32 +346,32 @@ CREATE TABLE ota_events_raw (
     event_type String,
     timestamp DateTime64(3),
     event_date Date MATERIALIZED toDate(timestamp),
-    
+
     -- Device context
     device_os Nullable(String),
     device_os_version Nullable(String),
     device_model Nullable(String),
     device_manufacturer Nullable(String),
-    
+
     -- Release information
     current_version Nullable(String),
     target_version Nullable(String),
     release_notes Nullable(String),
-    
+
     -- Network context
     connection_type Nullable(String),
     bandwidth_mbps Nullable(Float64),
-    
+
     -- Performance metrics
     download_speed_mbps Nullable(Float64),
     install_duration_seconds Nullable(UInt32),
     battery_level Nullable(UInt8),
     storage_available_mb Nullable(UInt32),
-    
+
     -- Error tracking
     error_code Nullable(String),
     error_message Nullable(String),
-    
+
     ingested_at DateTime64(3) DEFAULT now64(3)
 )
 ENGINE = MergeTree
@@ -343,6 +386,7 @@ SETTINGS index_granularity = 8192;
 The system automatically creates optimized materialized views:
 
 #### 1. Hourly Installs
+
 ```sql
 CREATE TABLE hourly_installs (
     tenant_id String,
@@ -358,10 +402,11 @@ ORDER BY (tenant_id, org_id, app_id, target_version, hour_slot);
 ```
 
 #### 2. Daily Active Devices
+
 ```sql
 CREATE TABLE daily_active_devices (
     tenant_id String,
-    org_id String, 
+    org_id String,
     app_id String,
     stat_date Date,
     active_devices AggregateFunction(uniqExact, String)
@@ -372,9 +417,11 @@ ORDER BY (tenant_id, org_id, app_id, stat_date);
 ```
 
 #### 3. Version Distribution
+
 Pre-aggregated version adoption metrics for instant dashboard queries.
 
 #### 4. Failure Analysis
+
 Categorized failure tracking with error codes and failure stages.
 
 ## 🚀 Performance & Scalability
@@ -389,11 +436,13 @@ Categorized failure tracking with error codes and failure stages.
 ### Scaling Strategies
 
 #### Horizontal Scaling
+
 - **Kafka Partitioning**: Partition by `hash(tenant_id, org_id, app_id)` for load distribution
 - **Multiple Consumers**: Run multiple consumer instances for parallel processing
 - **ClickHouse Sharding**: Distribute across multiple ClickHouse nodes
 
 #### Optimization Techniques
+
 - **Batch Processing**: Configurable batch sizes (default: 1000 events)
 - **Connection Pooling**: Efficient database connection management
 - **Materialized Views**: Pre-computed aggregations for instant dashboard queries
@@ -413,28 +462,58 @@ src/
 ├── clickhouse.rs        # ClickHouse client & queries
 └── handlers/
     ├── events.rs        # Event ingestion endpoints
-    ├── analytics.rs     # Analytics query endpoints  
+    ├── analytics.rs     # Analytics query endpoints
     └── health.rs        # Health check & monitoring
 ```
 
 ### Development Workflow
 
+The analytics server is now integrated with the main project's consolidated Makefile system located at the project root. All commands should be run from the root directory:
+
 ```bash
-# Format code
-cargo fmt
+# Navigate to project root (if not already there)
+cd ..
 
-# Run linting
-cargo clippy
+# Show all available commands
+make help
 
-# Run tests
-cargo test
+# Start analytics development environment
+make run-analytics              # Grafana + Victoria Metrics
+make run-kafka-clickhouse      # Kafka + ClickHouse alternative
 
-# Build for production
-cargo build --release
+# Build analytics server
+make analytics-server
+
+# Code quality
+make fmt                       # Format code
+make lint                      # Run linting
+make check                     # Format check and linting (CI mode)
+make lint-fix                  # Run linting with automatic fixes
+
+# Infrastructure management
+make status                    # Show system status
+make stop                      # Stop all services
+make cleanup                   # Clean up containers and volumes
 
 # Run with specific log level
-RUST_LOG=debug cargo run
+RUST_LOG=debug make run-analytics
 ```
+
+**Key Make Targets for Analytics:**
+
+- `run-analytics`: Starts Grafana + Victoria Metrics stack with analytics server
+- `run-kafka-clickhouse`: Alternative stack with Kafka + ClickHouse
+- `analytics-server`: Builds the analytics server binary only
+
+**Individual Analytics Service Targets:**
+
+- `grafana`: Start Grafana dashboard service
+- `victoria-metrics`: Start Victoria Metrics time series database
+- `zookeeper`: Start Zookeeper coordination service
+- `kafka`: Start Kafka message broker
+- `clickhouse`: Start ClickHouse analytics database
+- `kafka-ui`: Start Kafka UI management interface
+- `analytics-env-file`: Create analytics environment file from template
 
 ### Adding New Analytics
 
@@ -459,7 +538,7 @@ docker build --target production -t ota-analytics:prod .
 ### Docker Compose for Production
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   analytics:
     image: ota-analytics:latest
@@ -472,14 +551,14 @@ services:
       - KAFKA_SASL_USERNAME=${KAFKA_USERNAME}
       - KAFKA_SASL_PASSWORD=${KAFKA_PASSWORD}
     restart: unless-stopped
-    
+
   clickhouse:
     image: clickhouse/clickhouse-server:23-alpine
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     environment:
       - CLICKHOUSE_DB=analytics
-      
+
 volumes:
   clickhouse_data:
 ```
@@ -502,22 +581,22 @@ spec:
         app: ota-analytics
     spec:
       containers:
-      - name: analytics
-        image: ota-analytics:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: KAFKA_BROKERS
-          value: "kafka-service:9092"
-        - name: CLICKHOUSE_URL
-          value: "http://clickhouse-service:8123"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi" 
-            cpu: "500m"
+        - name: analytics
+          image: ota-analytics:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KAFKA_BROKERS
+              value: "kafka-service:9092"
+            - name: CLICKHOUSE_URL
+              value: "http://clickhouse-service:8123"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ```
 
 ## 📊 Monitoring & Observability
@@ -534,12 +613,14 @@ The system provides comprehensive observability:
 ### Key Metrics to Monitor
 
 #### Application Metrics
+
 - Event ingestion rate (events/second)
 - Query response times (p50, p95, p99)
 - Error rates by endpoint
 - Active consumer lag
 
 #### Infrastructure Metrics
+
 - Kafka broker health and partition lag
 - ClickHouse query performance and storage usage
 - Memory and CPU utilization
@@ -551,6 +632,7 @@ For local development, Kafka UI is available at:
 **http://localhost:8080**
 
 Features:
+
 - Topic and partition management
 - Message browsing and publishing
 - Consumer group monitoring
@@ -559,40 +641,42 @@ Features:
 ### ClickHouse Monitoring
 
 #### Direct Database Access
+
 ```bash
 # Using clickhouse-client
 clickhouse-client --host localhost --port 9000
 
 # Query via HTTP API
 curl "http://localhost:8123/" -d "
-  SELECT 
+  SELECT
     count() as events,
     uniqExact(device_id) as devices,
     countIf(event_type = 'update_installed') as installs
-  FROM ota_events_raw 
+  FROM ota_events_raw
   WHERE event_date = today()
 "
 ```
 
 #### Performance Queries
+
 ```sql
 -- Check table sizes
-SELECT 
+SELECT
   database,
   table,
   formatReadableSize(sum(bytes)) as size,
   sum(rows) as rows
-FROM system.parts 
+FROM system.parts
 WHERE database = 'analytics'
 GROUP BY database, table;
 
 -- Monitor query performance
-SELECT 
+SELECT
   query_duration_ms,
   query,
   user,
   initial_query_start_time
-FROM system.query_log 
+FROM system.query_log
 WHERE event_date = today()
   AND query_duration_ms > 1000
 ORDER BY query_duration_ms DESC
@@ -602,31 +686,35 @@ LIMIT 10;
 ## 🔒 Security & Production Considerations
 
 ### Authentication & Authorization
+
 - **Kafka SASL/SSL**: Secure broker communication
 - **ClickHouse Users**: Role-based database access
 - **API Security**: Rate limiting and request validation
 - **Multi-tenant Isolation**: Complete data separation
 
 ### Data Privacy & Compliance
+
 - **Tenant Data Isolation**: Strict query-level filtering
 - **Data Retention**: Configurable TTL policies
 - **Audit Logging**: Complete request tracing
 - **GDPR Compliance**: Device ID anonymization options
 
 ### High Availability Setup
+
 - **Kafka Replication**: Minimum 3 replicas per partition
 - **ClickHouse Clustering**: Distributed tables with replicas
 - **Load Balancing**: Multiple analytics service instances
 - **Failover**: Automatic consumer group rebalancing
 
 ### Performance Tuning
+
 ```bash
 # Kafka producer optimization
 KAFKA_BATCH_SIZE=65536
 KAFKA_LINGER_MS=10
 KAFKA_COMPRESSION_TYPE=snappy
 
-# ClickHouse optimization  
+# ClickHouse optimization
 CLICKHOUSE_MAX_MEMORY_USAGE=8000000000
 CLICKHOUSE_MAX_THREADS=8
 CLICKHOUSE_MAX_EXECUTION_TIME=300
@@ -635,6 +723,7 @@ CLICKHOUSE_MAX_EXECUTION_TIME=300
 ## 📚 Use Cases & Examples
 
 ### 1. Release Adoption Tracking
+
 Monitor how quickly users adopt new OTA releases:
 
 ```bash
@@ -643,6 +732,7 @@ curl "http://localhost:8081/analytics/adoption?tenant_id=acme&target_version=2.1
 ```
 
 ### 2. Failure Analysis
+
 Identify and troubleshoot update failures:
 
 ```bash
@@ -651,6 +741,7 @@ curl "http://localhost:8081/analytics/failures?tenant_id=acme&days=30&group_by=e
 ```
 
 ### 3. Performance Monitoring
+
 Track download and installation performance:
 
 ```bash
@@ -659,6 +750,7 @@ curl "http://localhost:8081/analytics/performance?tenant_id=acme&days=30"
 ```
 
 ### 4. Device Segmentation
+
 Analyze update behavior by device characteristics:
 
 ```bash
@@ -671,19 +763,22 @@ curl "http://localhost:8081/analytics/versions?tenant_id=acme&segment=device_os"
 We welcome contributions! Here's how to get started:
 
 ### Development Setup
+
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/yourusername/hyperota-analytics.git`
+2. Clone your fork: `git clone https://github.com/yourusername/airborne.git`
 3. Create a feature branch: `git checkout -b feature/my-feature`
-4. Set up development environment: `docker-compose up -d`
-5. Run tests: `cargo test`
+4. Set up development environment: `make run-analytics` (from project root)
+5. Run tests: `make test` (from project root)
 
 ### Contribution Guidelines
-- **Code Style**: Run `cargo fmt` and `cargo clippy`
+
+- **Code Style**: Run `make fmt` and `make lint` from project root
 - **Testing**: Add tests for new functionality
 - **Documentation**: Update README and code comments
 - **Commits**: Use conventional commit format
 
 ### Areas for Contribution
+
 - Additional analytics endpoints
 - Performance optimizations
 - Monitoring and alerting improvements
@@ -699,13 +794,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🚀 Ready to Get Started?
 
 1. **Clone the repository**
-2. **Run `docker-compose up -d`** to start infrastructure
-3. **Execute `cargo run`** to start the analytics server
-4. **Try the example script**: `./example.sh`
-5. **Explore the API** with your OTA events
+2. **Run `make run-analytics`** from project root to start infrastructure and server
+3. **Test the API** with sample curl commands or import the Postman collection (`analytics/OTA Analytics.postman_collection.json`)
+4. **Explore the API** with your OTA events
 
 For questions or support, please open an issue on GitHub or refer to the [documentation](docs/).
 
 ---
 
-*Built with ❤️ for the mobile development community*
+_Built with ❤️ for the mobile development community_

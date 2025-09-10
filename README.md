@@ -1,4 +1,5 @@
 # Airborne: Seamless Over-The-Air Updates for Your Applications
+
 [![Maven Central](https://img.shields.io/maven-central/v/io.juspay/airborne.svg?label=maven:airborne)](https://central.sonatype.com/artifact/io.juspay/airborne)
 [![Maven Central](https://img.shields.io/maven-central/v/io.juspay/airborne-react.svg?label=maven:airborne-react)](https://central.sonatype.com/artifact/io.juspay/airborne-react)
 
@@ -127,14 +128,26 @@ If the resource block is not completely downloaded by the time of load, then all
 - Juspay server / Self hosted
 - Adoption Analytics
 
-### Optional Add-on: The Airborne Server
+### Optional Add-ons: The Airborne Backend Systems
 
-For developers who need a self-hosted backend solution to manage and distribute updates:
+For developers who need comprehensive backend solutions to manage updates and analytics:
 
-- **[Airborne Server](server/README.md)**: A robust backend system that can manage application versions, store update packages, and deliver them to your SDK-integrated applications.
-  - **Key functionalities**: User authentication (via Keycloak), organization/application management, package storage, release configurations, and a dashboard UI.
-  - **Technology stack**: Rust (Actix Web), PostgreSQL, Keycloak, Docker, LocalStack (for AWS emulation).
-  - **Note**: While powerful, using this server is optional. The SDKs can be configured to work with other update distribution mechanisms if preferred.
+#### **[Airborne Server](server/README.md)**
+
+A robust backend system that can manage application versions, store update packages, and deliver them to your SDK-integrated applications.
+
+- **Key functionalities**: User authentication (via Keycloak), organization/application management, package storage, release configurations, and a dashboard UI.
+- **Technology stack**: Rust (Actix Web), PostgreSQL, Keycloak, Docker, LocalStack (for AWS emulation).
+
+#### **[Airborne Analytics Server](analytics/README.md)**
+
+A high-performance analytics platform that provides comprehensive OTA update insights and monitoring.
+
+- **Key functionalities**: Real-time event streaming, adoption metrics, failure analysis, performance tracking, multi-tenant analytics.
+- **Technology stack**: Rust (Actix Web), Kafka, ClickHouse/Victoria Metrics, Grafana for visualization.
+- **Features**: Event ingestion API, real-time dashboards, adoption rates, version distribution analysis, device tracking.
+
+**Note**: While powerful, using these servers is optional. The SDKs can be configured to work with other update distribution and analytics mechanisms if preferred.
 
 ## 🏁 Getting Started with Airborne SDKs
 
@@ -172,21 +185,27 @@ If you choose to use the self-hosted Airborne Server:
   - cargo-watch (for development hot-reloading)
   - diesel-cli (for database migrations)
   - pkg-config
+  - OpenSSL development libraries
+  - Cyrus SASL (for Kafka/analytics server support)
 
 - **Optional (for Nix users):**
-  - All dependencies can be automatically provided using Nix flakes: `nix develop`
+  - All dependencies (including analytics server dependencies) can be automatically provided using Nix flakes: `nix develop`
 
-**One-Command Setup (from the `server` directory):**
+**One-Command Setup:**
 
 1.  **Clone the Repository** (if you haven't already):
     ```bash
     git clone <repository-url> # Replace <repository-url> with the actual URL
-    cd airborne/server
+    cd airborne
     ```
 2.  **Start the Server**:
-    - Development mode (with hot-reloading):
+    - **Airborne server** development mode (with hot-reloading):
       ```bash
       make run
+      ```
+    - **Analytics server** development mode (with hot-reloading):
+      ```bash
+      make run-analytics
       ```
     - Build only mode:
       ```bash
@@ -206,16 +225,73 @@ If you choose to use the self-hosted Airborne Server:
 - **LocalStack (AWS Mock)**: `http://localhost:4566`
 - **Superposition**: `http://localhost:8080`
 
+**Services Started by `make run-analytics`:**
+
+- **Analytics Backend API**: `http://localhost:6400`
+- **Grafana Dashboard**: `http://localhost:4000` (admin/admin)
+- **Victoria Metrics**: `http://localhost:8428`
+
+**Alternative Analytics Stack (`make run-kafka-clickhouse`):**
+
+- **Analytics Backend API**: `http://localhost:6400`
+- **Kafka UI**: `http://localhost:8080`
+- **ClickHouse**: `http://localhost:8123`
+- **Supporting services**: Zookeeper, Kafka
+
 **Available Make Commands:**
 
-- `make run` - Run the complete development environment with hot-reloading
+The project now uses a single consolidated Makefile at the root directory. Key commands include:
+
+**Main Development Commands:**
+
+- `make run` - Run the complete Airborne server development environment with hot-reloading
+- `make run-analytics` - Run the analytics server with Grafana + Victoria Metrics
+- `make run-kafka-clickhouse` - Run the analytics server with Kafka + ClickHouse stack
+
+**Infrastructure Services:**
+
 - `make setup` - Set up all dependencies (database, services, etc.)
+- `make db` - Start PostgreSQL database
+- `make keycloak` - Start Keycloak authentication service
+- `make localstack` - Start LocalStack (AWS mock)
+- `make superposition` - Start Superposition service
+
+**Analytics Services:**
+
+- `make grafana` - Start Grafana dashboard
+- `make victoria-metrics` - Start Victoria Metrics time series DB
+- `make kafka` - Start Kafka message broker
+- `make clickhouse` - Start ClickHouse analytics database
+- `make zookeeper` - Start Zookeeper coordination service
+- `make kafka-ui` - Start Kafka UI management interface
+
+**Utility Commands:**
+
 - `make status` - Show current system status
 - `make stop` - Stop all services gracefully
 - `make cleanup` - Clean up containers and volumes
-- `make help` - Show all available commands
+- `make help` - Show all available commands with descriptions
 
 For more detailed server setup, API routes, database schema, and ACL information, please refer to the **[Airborne Server README](server/README.md)**.
+
+## 🔧 Development & Build System
+
+Airborne uses a consolidated Makefile-based build system located at the project root. This single Makefile manages all components of the project:
+
+- **Server Development**: Full-stack Airborne server with hot-reloading
+- **Analytics Development**: Analytics server with multiple backend options
+- **Infrastructure Management**: Database, authentication, and supporting services
+- **Code Quality**: Formatting, linting, and testing across all components
+- **Frontend Builds**: React-based dashboard, docs, and home applications
+
+**Key Benefits:**
+
+- Single command interface for all project operations
+- Consistent development experience across all components
+- Integrated dependency management and service orchestration
+- Simplified CI/CD workflows
+
+Run `make help` from the project root to see all available commands and their descriptions.
 
 ## 🤝 Contributing
 
