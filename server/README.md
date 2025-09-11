@@ -42,6 +42,10 @@ The Airborne Server is a robust backend system designed to power the Software-as
 
 The Airborne Server acts as the central nervous system for delivering updates to applications. It handles the complexities of storing package assets (via AWS S3), managing configurations (via Superposition and its internal database), and authenticating/authorizing users (via Keycloak). This allows development teams to focus on building features while relying on a stable platform for update distribution.
 
+**Related Systems:**
+
+- **[Airborne Analytics Server](../analytics/README.md)**: A companion analytics platform that provides comprehensive OTA update insights, tracking adoption rates, failure analysis, and performance metrics across your applications.
+
 ## API Reference
 
 All API endpoints are versioned and adhere to RESTful principles. Authentication is primarily handled through JWT Bearer tokens issued by Keycloak. Specific permissions are required for various operations, as detailed below.
