@@ -505,6 +505,16 @@ RUST_LOG=debug make run-analytics
 - `run-kafka-clickhouse`: Alternative stack with Kafka + ClickHouse
 - `analytics-server`: Builds the analytics server binary only
 
+**Individual Analytics Service Targets:**
+
+- `grafana`: Start Grafana dashboard service
+- `victoria-metrics`: Start Victoria Metrics time series database
+- `zookeeper`: Start Zookeeper coordination service
+- `kafka`: Start Kafka message broker
+- `clickhouse`: Start ClickHouse analytics database
+- `kafka-ui`: Start Kafka UI management interface
+- `analytics-env-file`: Create analytics environment file from template
+
 ### Adding New Analytics
 
 1. **Define Query Parameters**: Add to `AnalyticsQuery` in `models.rs`
