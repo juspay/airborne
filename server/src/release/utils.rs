@@ -336,12 +336,7 @@ pub async fn invalidate_cf(
     distribution_id: &str,
 ) -> Result<(), aws_sdk_cloudfront::Error> {
     // Make this unique on each call
-    let caller_reference = format!(
-        "invalidate-{}",
-        Utc::now()
-            .timestamp_nanos_opt()
-            .unwrap_or(rand::random::<i64>())
-    );
+    let caller_reference = format!("invalidate-{}", uuid::Uuid::new_v4());
 
     let paths = aws_sdk_cloudfront::types::Paths::builder()
         .items(path)

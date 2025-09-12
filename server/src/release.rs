@@ -813,7 +813,7 @@ async fn create_release(
     )
     .await
     {
-        eprintln!("Failed to invalidate CloudFront cache: {:?}", e);
+        println!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
     Ok(Json(CreateReleaseResponse {
@@ -1193,6 +1193,18 @@ async fn ramp_release(
 
     println!("Successfully ramped experiment {}", experiment_id);
 
+    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
+
+    if let Err(e) = utils::invalidate_cf(
+        &state.cf_client,
+        path,
+        &state.env.cloudfront_distribution_id,
+    )
+    .await
+    {
+        println!("Failed to invalidate CloudFront cache: {:?}", e);
+    }
+
     Ok(Json(RampReleaseResponse {
         success: true,
         message: format!(
@@ -1324,6 +1336,18 @@ async fn conclude_release(
         "Successfully concluded experiment {} with variant {}",
         experiment_id, transformed_variant_id
     );
+
+    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
+
+    if let Err(e) = utils::invalidate_cf(
+        &state.cf_client,
+        path,
+        &state.env.cloudfront_distribution_id,
+    )
+    .await
+    {
+        println!("Failed to invalidate CloudFront cache: {:?}", e);
+    }
 
     Ok(Json(ConcludeReleaseResponse {
         success: true,

@@ -54,7 +54,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
     applications: { application: string; organisation: string }[];
   };
 
-  const { data: orgsData } = useSWR(token ? "/organisations" : null, (url) =>
+  const { data: orgsData } = useSWR(token ? "/organisations" : null, (url: string) =>
     apiFetch<Organisation[]>(url, {}, { token })
   );
   const organisations: Organisation[] = orgsData || [];
@@ -67,6 +67,11 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || ""),
           icon: Activity,
           label: "Overview",
+        },
+        {
+          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/files",
+          icon: FileText,
+          label: "Files",
         },
         {
           href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/packages",
