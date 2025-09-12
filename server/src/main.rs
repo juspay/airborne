@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #![deny(unused_crate_dependencies)]
 mod dashboard;
 mod docs;
@@ -37,7 +38,7 @@ use middleware::auth::Auth;
 use superposition_rust_sdk::config::Config as SrsConfig;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::home::index;
+use crate::{home::index, utils::migrations::{migrate_keycloak, migrate_superposition, SuperpositionMigrationStrategy}};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -81,6 +82,17 @@ async fn main() -> std::io::Result<()> {
     };
     let cf_distribution_id = std::env::var("CLOUDFRONT_DISTRIBUTION_ID").unwrap_or_default();
 
+    let superposition_migration_strategy = SuperpositionMigrationStrategy::from(
+            std::env::var("SUPERPOSITION_MIGRATION_STRATEGY")
+            .unwrap_or_else(|_| "PATCH".into())
+        );
+
+    let migrations_to_run_on_boot: Vec<String> = std::env::var("MIGRATIONS_TO_RUN_ON_BOOT")
+        .unwrap_or_else(|_| "".into())
+        .split(',')
+        .map(|s| s.trim().into())
+        .collect();
+
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
     let mut force_path_style = false;
@@ -94,8 +106,11 @@ async fn main() -> std::io::Result<()> {
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
     let mut conn = db::establish_connection(&aws_kms_client).await;
-    conn.run_pending_migrations(MIGRATIONS)
-        .expect("Failed to run pending migrations");
+    if migrations_to_run_on_boot.contains(&"db".to_string()) {
+        conn.run_pending_migrations(MIGRATIONS)
+            .expect("Failed to run pending migrations");
+        println!("Database migrations completed successfully");
+    }
     // Initialize DB pool
     let pool = db::establish_pool(&aws_kms_client).await;
     let secret = decrypt_kms(&aws_kms_client, enc_sec).await;
@@ -177,6 +192,26 @@ async fn main() -> std::io::Result<()> {
     let app_state_data = web::Data::from(app_state.clone());
     let _cleanup_handle = start_cleanup_job(app_state_data.clone());
     println!("Started transaction cleanup background job");
+
+    if migrations_to_run_on_boot.contains(&"keycloak".to_string()) {
+        let keycloak_migration = migrate_keycloak(app_state_data.clone()).await;
+        if keycloak_migration.is_err() {
+            panic!("Keycloak migration failed: {:?}", keycloak_migration.err());
+        } else {
+            println!("Keycloak migration completed successfully");
+        }
+    }
+    if migrations_to_run_on_boot.contains(&"superposition".to_string()) {
+        let superposition_migration =
+            migrate_superposition(app_state_data.clone(),
+                superposition_migration_strategy
+            ).await;
+        if superposition_migration.is_err() {
+            panic!("Superposition migration failed: {:?}", superposition_migration.err());
+        } else {
+            println!("Superposition migration completed successfully");
+        }
+    }
 
     HttpServer::new(move || {
         App::new()
