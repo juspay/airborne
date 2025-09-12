@@ -1,8 +1,8 @@
 use crate::{
     middleware::auth::AuthResponse,
-    types::{AppState, Environment},
+    types::{ABError, ABResult, AppState, Environment},
 };
-use actix_web::{error, web, HttpMessage, HttpRequest};
+use actix_web::{web, HttpMessage, HttpRequest};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, TokenData, Validation};
 use keycloak::{
     self,
@@ -59,7 +59,7 @@ pub async fn find_user_by_username(
     admin: &KeycloakAdmin,
     realm: &str,
     username: &str,
-) -> Result<Option<UserRepresentation>, actix_web::Error> {
+) -> ABResult<Option<UserRepresentation>> {
     let users = admin
         .realm_users_get(
             realm,
@@ -79,7 +79,9 @@ pub async fn find_user_by_username(
             Some(username.to_string()),
         )
         .await
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to find user by username: {}", e))
+        })?;
 
     if users.is_empty() {
         return Ok(None);
@@ -91,12 +93,12 @@ pub async fn find_user_by_username(
 pub async fn prepare_user_action(
     req: &HttpRequest,
     state: web::Data<AppState>,
-) -> Result<(KeycloakAdmin, String), actix_web::Error> {
+) -> ABResult<(KeycloakAdmin, String)> {
     let auth_response = req
         .extensions()
         .get::<AuthResponse>()
         .cloned()
-        .ok_or(error::ErrorUnauthorized("Token Parse Failed"))?;
+        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
 
     let admin_token = auth_response.admin_token.clone();
     let client = reqwest::Client::new();
@@ -110,7 +112,7 @@ pub async fn find_org_group(
     admin: &KeycloakAdmin,
     realm: &str,
     org_name: &str,
-) -> Result<Option<GroupRepresentation>, actix_web::Error> {
+) -> ABResult<Option<GroupRepresentation>> {
     let groups = admin
         .realm_groups_get(
             realm,
@@ -123,7 +125,9 @@ pub async fn find_org_group(
             Some(org_name.to_string()),
         )
         .await
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| {
+            ABError::InternalServerError(format!("Failed to find group by name: {}", org_name))
+        })?;
 
     if groups.is_empty() {
         return Ok(None);
@@ -137,11 +141,16 @@ pub async fn find_role_subgroup(
     realm: &str,
     group_id: &str,
     role: &str,
-) -> Result<Option<GroupRepresentation>, actix_web::Error> {
+) -> ABResult<Option<GroupRepresentation>> {
     let subgroups = admin
         .realm_groups_with_group_id_children_get(realm, group_id, None, None, None, None, None)
         .await
-        .map_err(error::ErrorInternalServerError)?;
+        .map_err(|_| {
+            ABError::InternalServerError(format!(
+                "Failed to find subgroups for group: {}",
+                group_id
+            ))
+        })?;
 
     for group in subgroups {
         if let Some(name) = &group.name {
