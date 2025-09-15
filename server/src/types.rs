@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::organisation::application::user::OrgAppError;
 use actix_web::http::StatusCode;
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use serde::Serialize;
 use superposition_sdk::Client;
 use thiserror::Error;
 
+use crate::organisation::user::OrgError;
 use crate::utils::db;
 
 #[derive(Clone)]
@@ -64,6 +66,12 @@ pub struct ErrorBody {
 
 #[derive(Debug, Error)]
 pub enum ABError {
+    #[error(transparent)]
+    OrgAppError(#[from] OrgAppError),
+
+    #[error(transparent)]
+    OrgError(#[from] OrgError),
+
     #[error("{0}")]
     NotFound(String),
 
@@ -92,17 +100,21 @@ impl AppError for ABError {
             ABError::Unauthorized(_) => ABErrorCodes::Unauthorized.label(),
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
+            ABError::OrgAppError(org_app_error) => org_app_error.code(),
+            ABError::OrgError(org_error) => org_error.code(),
         }
     }
 
     fn status_code(&self) -> StatusCode {
-        match *self {
+        match self {
             ABError::NotFound(_) => StatusCode::NOT_FOUND,
             ABError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
+            ABError::OrgAppError(org_app_error) => org_app_error.status_code(),
+            ABError::OrgError(org_error) => org_error.status_code(),
         }
     }
 }
@@ -111,19 +123,17 @@ impl AppError for ABError {
 macro_rules! impl_response_error {
     ( $( $err:ty ),+ $(,)? ) => {
         $(
-            use actix_web::{http::StatusCode as SC, HttpResponse as HR};
-            use actix_web::ResponseError as RE;
-            use $crate::types::{AppError as AE, ErrorBody as EB};
-            impl RE for $err {
-                fn status_code(&self) -> SC {
-                    AE::status_code(self)
+            impl actix_web::ResponseError for $err {
+                fn status_code(&self) -> actix_web::http::StatusCode {
+                    $crate::types::AppError::status_code(self)
                 }
-                fn error_response(&self) -> HR {
-                    let body = EB {
+                fn error_response(&self) -> actix_web::HttpResponse {
+                    let body = $crate::types::ErrorBody {
                         code:  self.code().to_string(),
                         error: self.message(),
                     };
-                    HR::build(AE::status_code(self)).json(body)
+                    println!("API Error occurred: {}", serde_json::json!(body));
+                    actix_web::HttpResponse::build($crate::types::AppError::status_code(self)).json(body)
                 }
             }
         )+
@@ -131,6 +141,14 @@ macro_rules! impl_response_error {
 }
 
 impl_response_error!(ABError);
+
+impl From<std::io::Error> for ABError {
+    fn from(err: std::io::Error) -> ABError {
+        ABError::InternalServerError(err.to_string())
+    }
+}
+
+pub type ABResult<T> = Result<T, ABError>;
 
 pub trait HasLabel {
     fn label(&self) -> &'static str;

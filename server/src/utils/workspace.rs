@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::utils::db::schema::hyperotaserver::workspace_names;
+use crate::{
+    types::{ABError, ABResult},
+    utils::db::schema::hyperotaserver::workspace_names,
+};
 use diesel::prelude::*;
 
 /// Get the workspace name for Superposition based on organization and application
@@ -22,7 +25,7 @@ pub async fn get_workspace_name_for_application(
     application: &str,
     organisation: &str,
     conn: &mut diesel::PgConnection,
-) -> Result<String, actix_web::Error> {
+) -> ABResult<String> {
     use crate::utils::db::models::WorkspaceName;
 
     let workspace: WorkspaceName = workspace_names::table
@@ -34,10 +37,7 @@ pub async fn get_workspace_name_for_application(
                 "Failed to get workspace name for application {}: {}",
                 application, e
             );
-            actix_web::error::ErrorInternalServerError(format!(
-                "Failed to get workspace name: {}",
-                e
-            ))
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
 
     Ok(workspace.workspace_name)
