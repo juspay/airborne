@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DndContext, DragEndEvent, DragOverEvent, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverEvent, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, pointerWithin, rectIntersection } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -203,7 +203,7 @@ function RootDropZone({ children, isActive }: { children: React.ReactNode; isAct
   return (
     <div 
       ref={setNodeRef}
-      className={`min-h-[200px] p-4 rounded-lg transition-all duration-200 ${
+      className={`min-h-[250px] p-6 rounded-lg transition-all duration-200 ${
         isActive || isOver
           ? 'bg-blue-50 border-2 border-dashed border-blue-300' 
           : 'bg-gray-50/50 border border-transparent hover:border-gray-200'
@@ -211,7 +211,7 @@ function RootDropZone({ children, isActive }: { children: React.ReactNode; isAct
     >
       {children}
       {(isOver || isActive) && (
-        <div className="flex items-center justify-center p-8 text-blue-600 bg-blue-100/50 rounded-lg mt-4 border-2 border-dashed border-blue-300">
+        <div className="flex items-center justify-center p-10 text-blue-600 bg-blue-100/50 rounded-lg mt-6 border-2 border-dashed border-blue-300">
           <div className="text-center">
             <FolderOpen className="h-8 w-8 mx-auto mb-2" />
             <p className="text-sm font-medium">Drop here to move to root level</p>
@@ -235,15 +235,15 @@ function NestedDropZone({ parentId, isActive, children }: {
   return (
     <div 
       ref={setNodeRef}
-      className={`min-h-[60px] transition-all duration-200 ${
+      className={`min-h-[80px] transition-all duration-200 ${
         isActive || isOver
-          ? 'bg-green-50 border-2 border-dashed border-green-300 rounded-lg p-3' 
+          ? 'bg-green-50 border-2 border-dashed border-green-300 rounded-lg p-4' 
           : 'min-h-0'
       }`}
     >
       {children}
       {(isOver || isActive) && !children && (
-        <div className="flex items-center justify-center p-4 text-green-600">
+        <div className="flex items-center justify-center p-6 text-green-600">
           <div className="text-center">
             <Folder className="h-6 w-6 mx-auto mb-1" />
             <p className="text-xs font-medium">Drop here to add as child field</p>
@@ -826,8 +826,26 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
   const [jsonEditMode, setJsonEditMode] = useState(false);
   const [jsonError, setJsonError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isOverDropZone, setIsOverDropZone] = useState(false);
 
   const activeField = activeId ? findFieldById(fields, activeId) : null;
+
+  // Custom collision detection that prioritizes drop zones
+  const customCollisionDetection = (args: any) => {
+    // First check for pointer intersection with drop zones
+    const pointerIntersections = pointerWithin(args);
+    const dropZoneIntersections = pointerIntersections.filter((intersection: any) => 
+      String(intersection.id).startsWith('drop-zone-') || String(intersection.id) === 'root-drop-zone'
+    );
+    
+    // If we have drop zone intersections, prioritize them
+    if (dropZoneIntersections.length > 0) {
+      return dropZoneIntersections;
+    }
+    
+    // Otherwise, use rectangle intersection for regular fields
+    return rectIntersection(args);
+  };
 
   function findFieldById(fieldsList: SchemaField[], id: string): SchemaField | null {
     for (const field of fieldsList) {
@@ -974,7 +992,14 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      setIsOverDropZone(false);
+      return;
+    }
+
+    // Check if we're over any drop zone
+    const isOverDZ = String(over.id).startsWith('drop-zone-') || String(over.id) === 'root-drop-zone';
+    setIsOverDropZone(isOverDZ);
 
     const activeField = findFieldById(fields, String(active.id));
     const overField = findFieldById(fields, String(over.id));
@@ -995,6 +1020,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     const { active, over } = event;
     setActiveId(null);
     setIsDragging(false);
+    setIsOverDropZone(false);
 
     if (!over || active.id === over.id) return;
 
@@ -1026,21 +1052,24 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
       // Move field into the target field
       moveFieldToParent(String(active.id), String(over.id));
     } else {
-      // Regular reordering at the same level
-      const activeParent = findParentField(fields, String(active.id));
-      const overParent = findParentField(fields, String(over.id));
+      // Only allow reordering if we're not trying to drop into a drop zone
+      // This prevents unwanted reordering when aiming for nested drop zones
+      if (!isOverDropZone) {
+        const activeParent = findParentField(fields, String(active.id));
+        const overParent = findParentField(fields, String(over.id));
 
-      if (activeParent?.id === overParent?.id) {
-        // Same parent, just reorder
-        const parentFields = activeParent ? activeParent.children! : fields;
-        const oldIndex = parentFields.findIndex(field => field.id === String(active.id));
-        const newIndex = parentFields.findIndex(field => field.id === String(over.id));
-        
-        if (activeParent) {
-          const newChildren = arrayMove(parentFields, oldIndex, newIndex);
-          updateField(activeParent.id, { ...activeParent, children: newChildren });
-        } else {
-          onFieldsChange(arrayMove(fields, oldIndex, newIndex));
+        if (activeParent?.id === overParent?.id) {
+          // Same parent, just reorder
+          const parentFields = activeParent ? activeParent.children! : fields;
+          const oldIndex = parentFields.findIndex(field => field.id === String(active.id));
+          const newIndex = parentFields.findIndex(field => field.id === String(over.id));
+          
+          if (activeParent) {
+            const newChildren = arrayMove(parentFields, oldIndex, newIndex);
+            updateField(activeParent.id, { ...activeParent, children: newChildren });
+          } else {
+            onFieldsChange(arrayMove(fields, oldIndex, newIndex));
+          }
         }
       }
     }
@@ -1116,6 +1145,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
           ) : (
             <DndContext 
               sensors={sensors} 
+              collisionDetection={customCollisionDetection}
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
