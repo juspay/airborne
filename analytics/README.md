@@ -62,11 +62,23 @@ The system tracks the complete OTA update lifecycle:
 
 ### Prerequisites
 
-- **Rust 1.70+** (or use Nix flake from project root)
-- **Docker & Docker Compose** (for local development)
-- **ClickHouse 23.0+**
-- **Apache Kafka 2.8+**
-- **System dependencies:** cyrus-sasl, openssl, pkg-config (automatically provided with Nix)
+**Option 1: Using Nix (Recommended)**
+- **Nix with Flakes**: All dependencies automatically provided with `nix develop` from project root
+  - This provides: Rust toolchain, cargo-watch, Docker Compose, and all required system libraries including Cyrus SASL for Kafka support
+
+**Option 2: Manual Installation**
+- **System Dependencies:**
+  - Docker & Docker Compose (for local development infrastructure)
+  - Rust 1.89.0 with cargo
+  - cargo-watch (for development hot-reloading)
+- **Analytics-Specific Dependencies:**
+  - OpenSSL development libraries
+  - Cyrus SASL libraries (for Kafka support)
+  - pkg-config
+  - cmake
+- **Platform-Specific:**
+  - **macOS**: libiconv, OpenSSL via Homebrew
+  - **Linux**: libssl-dev, libsasl2-dev, pkg-config, cmake packages
 
 ### 🐳 Local Development Setup
 

@@ -79,7 +79,7 @@ CLICKHOUSE_UP = $(shell $(call check-container,$(CLICKHOUSE_CONTAINER_NAME)))
 KAFKA_UI_CONTAINER_NAME = $(shell $(call read-container-name,analytics,kafka-ui))
 KAFKA_UI_UP = $(shell $(call check-container,$(KAFKA_UI_CONTAINER_NAME)))
 
-.PHONY: help env-file analytics-env-file db localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics frontend-check frontend-lint frontend-lint-fix frontend-format frontend-format-check
+.PHONY: help env-file analytics-env-file db localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics frontend-check frontend-lint frontend-lint-fix frontend-format
 
 default: help
 
@@ -145,7 +145,6 @@ help:
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-lint" "Run ESLint on frontend projects"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-lint-fix" "Run ESLint with automatic fixes on frontend"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-format" "Format frontend code using Prettier"
-	@printf "  $(GREEN)%-20s$(NC) %s\n" "frontend-format-check" "Check frontend code formatting with Prettier"
 	@echo ""
 	@echo "$(YELLOW)Git Integration Commands:$(NC)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "commit" "Run quality checks and commit changes"
@@ -450,7 +449,7 @@ run: kill db superposition superposition-init keycloak-db keycloak keycloak-init
 	@trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \
-	cargo watch -w server/src -w server/Cargo.toml -w Cargo.toml -w Cargo.lock -s 'make airborne-server && cd server && ../target/debug/airborne-server' & \
+	cargo watch -w server/src -w server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd server && ../target/debug/airborne-server' & \
 	wait
 
 stop:
@@ -489,9 +488,6 @@ status:
 	@$(COMPOSE) -f server/docker-compose.yml ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}" 2>/dev/null || echo "$(YELLOW)No containers running$(NC)"
 	@echo ""
 
-lint-fix: LINT_FLAGS += --fix --allow-dirty --allow-staged
-lint-fix: lint
-
 frontend-check:
 	@echo "$(YELLOW)🔍 Checking frontend code quality...$(NC)"
 	@cd server/dashboard_nextjs && npm run check
@@ -516,21 +512,18 @@ frontend-format:
 	@cd server/docs_react && npm run format
 	@echo "$(GREEN)Frontend formatting completed$(NC)"
 
-frontend-format-check:
-	@echo "$(YELLOW)🔍 Checking frontend code formatting...$(NC)"
-	@cd server/dashboard_nextjs && npm run format:check
-	@cd server/docs_react && npm run format:check
-	@echo "$(GREEN)Frontend format checks completed$(NC)"
+lint-fix: LINT_FLAGS += --fix --allow-dirty --allow-staged
+lint-fix: lint frontend-lint-fix
 
 check: FMT_FLAGS += --check
 check: LINT_FLAGS += -- -Dwarnings
 check: fmt lint frontend-check
 
-fmt:
-	cargo fmt $(FMT_FLAGS) && make frontend-format
+fmt: frontend-format
+	cargo fmt $(FMT_FLAGS) 
 
-lint:
-	cargo clippy $(LINT_FLAGS) && make frontend-lint-fix
+lint: frontend-lint
+	cargo clippy $(LINT_FLAGS)
 
 commit: check
 	git commit $(COMMIT_FLAGS)
@@ -547,7 +540,7 @@ analytics-server:
 
 run-kafka-clickhouse: analytics-env-file zookeeper kafka clickhouse kafka-ui
 	@echo "⏳ Starting dev environment: Kafka + ClickHouse"
-	@cargo watch -w analytics/src -w analytics/Cargo.toml -w Cargo.toml -w Cargo.lock -s 'make analytics-server && cd analytics && ../target/debug/analytics-server'
+	@cargo watch -w analytics/src -w analytics/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) analytics-server && cd analytics && ../target/debug/analytics-server'
 	@echo "✅ Development environment started with Kafka and ClickHouse!"
 	@echo "   • Kafka UI:     http://localhost:8080"
 	@echo "   • ClickHouse:   http://localhost:8123"
@@ -556,7 +549,7 @@ run-kafka-clickhouse: analytics-env-file zookeeper kafka clickhouse kafka-ui
 
 run-victoria-metrics: analytics-env-file grafana victoria-metrics
 	@echo "⏳ Starting dev environment: Grafana + Victoria Metrics"
-	@cargo watch -w analytics/src -w analytics/Cargo.toml -w Cargo.toml -w Cargo.lock -s 'make analytics-server && cd analytics && ../target/debug/analytics-server'
+	@cargo watch -w analytics/src -w analytics/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) analytics-server && cd analytics && ../target/debug/analytics-server'
 	@echo "✅ Development environment started with Grafana & Victoria Metrics!"
 	@echo "   • Grafana:          http://localhost:4000"
 	@echo "   • Victoria Metrics: http://localhost:8428"

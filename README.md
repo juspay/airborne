@@ -171,25 +171,28 @@ If you choose to use the self-hosted Airborne Server:
 
 **Prerequisites:**
 
+**Option 1: Using Nix (Recommended)**
+- **Nix with Flakes**: All dependencies automatically provided with `nix develop`
+  - This provides: Rust toolchain, cargo-watch, diesel-cli, Node.js, Make, Docker/Podman Compose, jq, yq, curl, AWS CLI, and all required system libraries
+
+**Option 2: Manual Installation**
 - **System Dependencies:**
   - Docker or Podman (with Docker Compose support)
   - Git
   - Make (GNU Make)
-  - PostgreSQL client tools (psql, pg_isready)
+  - Node.js 22+ (for frontend builds)
   - curl
   - jq (JSON processor)
   - yq (YAML processor)
 - **Rust Development Dependencies:**
-
   - Rust toolchain (cargo, rustc)
-  - cargo-watch (for development hot-reloading)
-  - diesel-cli (for database migrations)
-  - pkg-config
-  - OpenSSL development libraries
-  - Cyrus SASL (for Kafka/analytics server support)
-
-- **Optional (for Nix users):**
-  - All dependencies (including analytics server dependencies) can be automatically provided using Nix flakes: `nix develop`
+  - cargo-watch (for development hot-reloading): `cargo install cargo-watch`
+  - diesel-cli (for database migrations): `cargo install diesel_cli --no-default-features --features postgres`
+- **Platform-Specific Dependencies:**
+  - **For Analytics Server**: OpenSSL development libraries, Cyrus SASL libraries, pkg-config, cmake
+  - **For Main Server**: PostgreSQL client libraries, OpenSSL development libraries, pkg-config
+  - **macOS**: libiconv (usually provided by Xcode Command Line Tools)
+  - **Linux**: libssl-dev, libpq-dev, libsasl2-dev packages (Ubuntu/Debian) or equivalent
 
 **One-Command Setup:**
 
@@ -206,10 +209,6 @@ If you choose to use the self-hosted Airborne Server:
     - **Analytics server** development mode (with hot-reloading):
       ```bash
       make run-analytics
-      ```
-    - Build only mode:
-      ```bash
-      make setup && make airborne-server
       ```
     - For other available commands, see the help:
       ```bash
@@ -265,6 +264,13 @@ The project now uses a single consolidated Makefile at the root directory. Key c
 - `make zookeeper` - Start Zookeeper coordination service
 - `make kafka-ui` - Start Kafka UI management interface
 
+**Build Commands:**
+
+- `make airborne-server` - Build the Airborne server
+- `make analytics-server` - Build the analytics server
+- `make dashboard` - Build the dashboard React app
+- `make docs` - Build the docs React app
+
 **Utility Commands:**
 
 - `make status` - Show current system status
@@ -282,7 +288,7 @@ Airborne uses a consolidated Makefile-based build system located at the project 
 - **Analytics Development**: Analytics server with multiple backend options
 - **Infrastructure Management**: Database, authentication, and supporting services
 - **Code Quality**: Formatting, linting, and testing across all components
-- **Frontend Builds**: React-based dashboard, docs, and home applications
+- **Frontend Builds**: React-based dashboard and docs applications
 
 **Key Benefits:**
 

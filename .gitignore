@@ -44,5 +44,6 @@ xcuserdata/
 Package.resolved
 
 target/
+**/result
 .direnv
 .pre-commit-config.yaml
