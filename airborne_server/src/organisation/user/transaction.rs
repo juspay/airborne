@@ -83,7 +83,7 @@ pub async fn add_user_with_transaction(
     }
 
     if role_name == "admin" {
-        println!("Let's update the subgroups");
+        info!("Let's update the subgroups");
         match admin
             .realm_groups_with_group_id_children_get(
                 realm,

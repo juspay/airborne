@@ -348,6 +348,7 @@ dependencies = [
  "superposition_sdk",
  "thiserror 2.0.16",
  "tokio",
+ "tracing",
  "tracing-actix-web",
  "tracing-appender",
  "tracing-error",

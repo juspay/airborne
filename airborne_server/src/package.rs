@@ -168,30 +168,32 @@ async fn get_package(
         }),
     }?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    let package = if let Some(pkg_tag) = opt_pkg_tag {
-        packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
-            .filter(package_tag.eq(&pkg_tag))
-            .select(PackageV2Entry::as_select())
-            .first::<PackageV2Entry>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
-    } else if let Some(pkg_version) = opt_pkg_version {
-        packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
-            .filter(package_version.eq(&pkg_version))
-            .select(PackageV2Entry::as_select())
-            .first::<PackageV2Entry>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
-    } else {
-        return Err(ABError::BadRequest("Bad format for package id".to_string()));
-    };
+    let package = run_blocking!({
+        let mut conn = pool.get()?;
+
+        if let Some(pkg_tag) = opt_pkg_tag {
+            let result = packages_table
+                .filter(package_org_id.eq(&organisation))
+                .filter(package_app_id.eq(&application))
+                .filter(package_tag.eq(&pkg_tag))
+                .select(PackageV2Entry::as_select())
+                .first::<PackageV2Entry>(&mut conn)?;
+            Ok(result)
+        } else if let Some(pkg_version) = opt_pkg_version {
+            let result = packages_table
+                .filter(package_org_id.eq(&organisation))
+                .filter(package_app_id.eq(&application))
+                .filter(package_version.eq(&pkg_version))
+                .select(PackageV2Entry::as_select())
+                .first::<PackageV2Entry>(&mut conn)?;
+            Ok(result)
+        } else {
+            Err(ABError::BadRequest("Bad format for package id".to_string()))
+        }
+    })?;
+
     Ok(HttpResponse::Ok().json(utils::db_response_to_package(package)))
 }
 

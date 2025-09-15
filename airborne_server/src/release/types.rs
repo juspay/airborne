@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::utils::db::models::{FileEntry, PackageV2Entry};
 use aws_smithy_types::Document;
@@ -19,7 +19,7 @@ pub struct CreateReleaseRequest {
 pub struct ConfigRequest {
     pub boot_timeout: u64,
     pub release_config_timeout: u64,
-    pub properties: Option<serde_json::Value>,
+    pub properties: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -146,7 +146,7 @@ pub struct BuildOverrides {
     pub final_lazy: Option<Vec<String>>,
     pub final_resources: Option<Vec<String>>,
     pub config_version: String,
-    pub config_props: Document,
+    pub config_properties: BTreeMap<String, aws_smithy_types::Document>,
     pub pkg_version: i32,
     pub files: Vec<FileEntry>,
     pub final_properties: Option<Value>,

@@ -19,7 +19,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings } from "lucide-react";
+import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings, Cog } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { notFound, useParams, useRouter } from "next/navigation";
@@ -28,6 +28,17 @@ import Link from "next/link";
 import { toastWarning } from "@/hooks/use-toast";
 import useSWR from "swr";
 import { ReleasePayload } from "../page";
+import { BackendPropertiesResponse, SchemaField } from "@/types/remote-configs";
+import {
+  convertDottedToNestedObject,
+  validateAllRemoteConfigValues,
+  validateValueAgainstSchema,
+} from "@/components/remote-config/utils/helpers";
+import json from "highlight.js/lib/languages/json";
+import hljs from "highlight.js";
+import "highlight.js/styles/vs2015.css";
+
+hljs.registerLanguage("json", json);
 
 type Pkg = { index: string; tag: string; version: number; files: string[] };
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number };
@@ -53,7 +64,44 @@ type TargetingRule = {
   values: string;
 };
 
+const convertBackendDataToFields = (data: BackendPropertiesResponse): SchemaField[] => {
+  const fields: SchemaField[] = [];
+
+  Object.entries(data.properties).forEach(([key, node]) => {
+    fields.push({
+      id: key,
+      name: key,
+      type: node.schema?.type || "string",
+      required: false,
+      description: node.description || "",
+      enumValues: node.schema?.enum || undefined,
+      defaultValue: node.default_value,
+    });
+  });
+
+  return fields;
+};
+
 export default function EditReleasePage() {
+  // Helper function to convert nested object to dotted keys
+  const convertNestedToDottedKeys = (obj: Record<string, any>, prefix = ""): Record<string, any> => {
+    const result: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(obj)) {
+      const newKey = prefix ? `${prefix}.${key}` : key;
+
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        // Recursively flatten nested objects
+        Object.assign(result, convertNestedToDottedKeys(value, newKey));
+      } else {
+        // Keep the value as is for primitives and arrays
+        result[newKey] = value;
+      }
+    }
+
+    return result;
+  };
+
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
   const params = useParams();
   const releaseId = params.releaseId as string;
@@ -62,13 +110,19 @@ export default function EditReleasePage() {
   );
   const release: ReleasePayload = data;
 
-  const totalSteps = 5;
+  const totalSteps = 6;
   const [currentStep, setCurrentStep] = useState(1);
 
   // Configuration state
   const [bootTimeout, setBootTimeout] = useState<number>(4000);
   const [releaseConfigTimeout, setReleaseConfigTimeout] = useState<number>(4000);
   const [configProperties, setConfigProperties] = useState<string>("{}");
+
+  // Remote config state
+  const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
+  const [remoteConfigValues, setRemoteConfigValues] = useState<Record<string, any>>({});
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
 
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}");
 
@@ -94,6 +148,82 @@ export default function EditReleasePage() {
       notFound();
     }
   }, [loadingAccess]);
+
+  // Fetch schema for remote config
+  const fetchSchema = async () => {
+    setSchemaLoading(true);
+    setSchemaError(null);
+    try {
+      // Build dimensions header from existing release dimensions
+      const dimensionsHeader = release?.dimensions
+        ? Object.entries(release.dimensions)
+            .map(([key, value]) => `${key}=${value}`)
+            .join(";")
+        : "";
+
+      const headers: Record<string, string> = {};
+      if (dimensionsHeader) {
+        headers["x-dimension"] = dimensionsHeader;
+      }
+
+      const data = await apiFetch<BackendPropertiesResponse>(
+        `/organisations/applications/properties/schema`,
+        {
+          method: "GET",
+          headers,
+        },
+        { token, org, app }
+      );
+
+      if (data && data.properties && Object.keys(data.properties).length > 0) {
+        const convertedFields = convertBackendDataToFields(data);
+        setSchemaFields(convertedFields);
+
+        // Initialize remote config values with existing values from release or default values
+        const initialValues: Record<string, any> = {};
+
+        // First, load existing values from release if available (convert from nested to dotted format)
+        if (release?.config && (release.config as any).properties) {
+          const existingDottedValues = convertNestedToDottedKeys((release.config as any).properties);
+          Object.assign(initialValues, existingDottedValues);
+        }
+
+        // Then fill in any missing default values from schema
+        const extractDefaults = (fields: SchemaField[], prefix = "") => {
+          fields.forEach((field) => {
+            const key = prefix ? `${prefix}.${field.name}` : field.name;
+            if (field.children && field.children.length > 0) {
+              extractDefaults(field.children, key);
+            } else {
+              // Only set default if no existing value
+              if (initialValues[key] === undefined && field.defaultValue !== undefined) {
+                initialValues[key] = field.defaultValue;
+              }
+            }
+          });
+        };
+        extractDefaults(convertedFields);
+        setRemoteConfigValues(initialValues);
+      } else {
+        setSchemaFields([]);
+        setRemoteConfigValues({});
+      }
+    } catch (error) {
+      console.error("Error fetching schema:", error);
+      setSchemaError("Failed to load remote config schema");
+      setSchemaFields([]);
+      setRemoteConfigValues({});
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  // Load schema when component mounts or when stepping to remote config
+  useEffect(() => {
+    if (currentStep === 2) {
+      fetchSchema();
+    }
+  }, [currentStep, token, org, app, release]);
 
   // Load packages list
   useEffect(() => {
@@ -150,7 +280,7 @@ export default function EditReleasePage() {
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 4 ? ["/file/list", resourceSearch, resourceCurrentPage] : null,
+    token && org && app && currentStep === 5 ? ["/file/list", resourceSearch, resourceCurrentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
@@ -207,6 +337,12 @@ export default function EditReleasePage() {
         }));
         setTargetingRules(rules);
       }
+      // Load existing config properties if available
+      if ((release.config as any)?.properties) {
+        // Convert nested properties to dotted keys for the UI
+        const existingConfigValues = convertNestedToDottedKeys((release.config as any).properties);
+        setRemoteConfigValues(existingConfigValues);
+      }
     }
   }, [release]);
 
@@ -229,12 +365,19 @@ export default function EditReleasePage() {
       case 1:
         return true; // Configuration step - always can proceed
       case 2:
-        return selectedPackage !== null;
+        // Remote config step - validate all fields
+        if (schemaFields.length > 0) {
+          const validation = validateAllRemoteConfigValues(remoteConfigValues, schemaFields);
+          return validation.isValid;
+        }
+        return true; // No schema means no validation needed
       case 3:
-        return true;
+        return selectedPackage !== null;
       case 4:
         return true;
       case 5:
+        return true;
+      case 6:
         return true;
       default:
         return false;
@@ -346,6 +489,162 @@ export default function EditReleasePage() {
     return items;
   };
 
+  const renderRemoteConfigField = (field: SchemaField, path: string = "") => {
+    const fieldPath = path ? `${path}.${field.name}` : field.name;
+    const currentValue = remoteConfigValues[fieldPath];
+
+    const updateFieldValue = (value: any) => {
+      setRemoteConfigValues((prev) => ({
+        ...prev,
+        [fieldPath]: value,
+      }));
+    };
+
+    const validateField = (value: any) => {
+      const schema = {
+        type: field.type,
+        minLength: field.minLength,
+        maxLength: field.maxLength,
+        minimum: field.minValue,
+        maximum: field.maxValue,
+        pattern: field.pattern,
+        enum: field.enumValues,
+      };
+      return validateValueAgainstSchema(value, schema);
+    };
+
+    const validation = validateField(currentValue);
+
+    // For complex types, use string representation for input
+    const getInputValue = () => {
+      if (field.type === "array" || field.type === "object") {
+        if (currentValue === undefined || currentValue === null) {
+          return "";
+        }
+        return typeof currentValue === "string" ? currentValue : JSON.stringify(currentValue, null, 2);
+      }
+      return currentValue || "";
+    };
+
+    const handleComplexValueChange = (inputValue: string) => {
+      if (!inputValue.trim()) {
+        updateFieldValue(field.type === "array" ? [] : field.type === "object" ? {} : undefined);
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(inputValue);
+        // Validate that the parsed value matches the expected type
+        if (field.type === "array" && Array.isArray(parsed)) {
+          updateFieldValue(parsed);
+        } else if (field.type === "object" && parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          updateFieldValue(parsed);
+        } else {
+          // Invalid type, keep as string for now (will show validation error)
+          updateFieldValue(inputValue);
+        }
+      } catch {
+        // Invalid JSON, keep as string (will show validation error)
+        updateFieldValue(inputValue);
+      }
+    };
+
+    if (field.children && field.children.length > 0) {
+      return (
+        <Card key={field.id} className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">{field.name}</CardTitle>
+            {field.description && <CardDescription className="text-sm">{field.description}</CardDescription>}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {field.children.map((childField) => renderRemoteConfigField(childField, fieldPath))}
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <div key={field.id} className="space-y-2">
+        <Label htmlFor={fieldPath}>
+          {field.name}
+          {field.required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+
+        {field.type === "string" && field.enumValues && field.enumValues.length > 0 ? (
+          <Select value={currentValue || ""} onValueChange={(value) => updateFieldValue(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder={`Select ${field.name}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {field.enumValues.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : field.type === "boolean" ? (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={fieldPath}
+              checked={currentValue === true}
+              onCheckedChange={(checked) => updateFieldValue(checked === true)}
+            />
+            <Label htmlFor={fieldPath} className="text-sm font-normal">
+              Enable {field.name}
+            </Label>
+          </div>
+        ) : field.type === "number" ? (
+          <Input
+            id={fieldPath}
+            type="number"
+            value={currentValue || ""}
+            onChange={(e) => updateFieldValue(e.target.value ? Number(e.target.value) : "")}
+            placeholder={field.defaultValue?.toString() || "Enter number"}
+            min={field.minValue}
+            max={field.maxValue}
+          />
+        ) : field.type === "array" || field.type === "object" ? (
+          <div className="space-y-2">
+            <Textarea
+              id={fieldPath}
+              value={getInputValue()}
+              onChange={(e) => handleComplexValueChange(e.target.value)}
+              placeholder={field.type === "array" ? "[]" : "{}"}
+              rows={3}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter valid JSON for {field.type === "array" ? "array" : "object"} type
+              {field.defaultValue && ` • Default: ${JSON.stringify(field.defaultValue)}`}
+            </p>
+          </div>
+        ) : (
+          <Input
+            id={fieldPath}
+            type="text"
+            value={currentValue || ""}
+            onChange={(e) => updateFieldValue(e.target.value)}
+            placeholder={field.defaultValue?.toString() || `Enter ${field.name}`}
+            minLength={field.minLength}
+            maxLength={field.maxLength}
+            pattern={field.pattern}
+          />
+        )}
+
+        {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
+
+        {!validation.isValid && (
+          <div className="text-sm text-red-600">
+            {validation.errors.map((error, idx) => (
+              <div key={idx}>{error}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleSubmit = async () => {
     let properties: Record<string, any> = {};
     try {
@@ -355,13 +654,8 @@ export default function EditReleasePage() {
       return;
     }
 
-    let configProps: Record<string, any> = {};
-    try {
-      configProps = configProperties.trim() ? JSON.parse(configProperties) : {};
-    } catch {
-      toastWarning("Invalid JSON", "Configuration properties must be valid JSON");
-      return;
-    }
+    // Convert remote config values to dotted keys format for backend
+    const configProps: Record<string, any> = convertNestedToDottedKeys(remoteConfigValues);
 
     const dimensionsObj: Record<string, any> = {};
     targetingRules.forEach((r) => {
@@ -399,15 +693,16 @@ export default function EditReleasePage() {
     <div className="p-6">
       <div className="flex-1">
         <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Update Release</h1>
-        <p className="text-muted-foreground mt-2">Step-by-step: configure, package, files, targeting</p>
+        <p className="text-muted-foreground mt-2">Step-by-step: configure, remote config, package, files, targeting</p>
 
         <div className="flex items-center gap-4 mt-6">
           {[
             { number: 1, title: "Configure", icon: Settings },
-            { number: 2, title: "Package & Details", icon: PkgIcon },
-            { number: 3, title: "Package File Priorities", icon: Info },
-            { number: 4, title: "Resources", icon: FileText },
-            { number: 5, title: "Targeting", icon: Target },
+            { number: 2, title: "Remote Config", icon: Cog },
+            { number: 3, title: "Package & Details", icon: PkgIcon },
+            { number: 4, title: "Package File Priorities", icon: Info },
+            { number: 5, title: "Resources", icon: FileText },
+            { number: 6, title: "Targeting", icon: Target },
           ].map((step, index) => {
             const status =
               step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming";
@@ -432,7 +727,7 @@ export default function EditReleasePage() {
                     <div className="text-xs text-muted-foreground">Step {step.number}</div>
                   </div>
                 </div>
-                {index < 4 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                {index < 5 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
               </div>
             );
           })}
@@ -495,6 +790,72 @@ export default function EditReleasePage() {
         )}
 
         {currentStep === 2 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Remote Configuration</CardTitle>
+                <CardDescription>Configure values for your remote configuration schema</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {schemaLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin inline-block h-8 w-8 border-4 border-current border-t-transparent text-muted-foreground rounded-full mb-4" />
+                    <p className="text-muted-foreground">Loading schema...</p>
+                  </div>
+                ) : schemaError ? (
+                  <div className="text-center py-8">
+                    <div className="text-red-600 mb-4">{schemaError}</div>
+                    <Button onClick={fetchSchema} variant="outline">
+                      Retry
+                    </Button>
+                  </div>
+                ) : schemaFields.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Cog className="mx-auto h-8 w-8 mb-2" />
+                    <p className="text-sm mb-4">No remote configuration schema found</p>
+                    <p className="text-xs">
+                      Configure your remote config schema first to add configuration values for this release.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      <div className="text-sm text-blue-800">
+                        Configure the values for your remote configuration. These will be applied when this release is
+                        deployed.
+                        {release?.dimensions && Object.keys(release.dimensions).length > 0 && (
+                          <span className="block mt-1 text-xs">
+                            Schema loaded with targeting dimensions: {Object.keys(release.dimensions).join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {schemaFields.map((field) => renderRemoteConfigField(field))}
+
+                    <div className="mt-6 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Preview (JSON)</h4>
+                      <pre className="hljs text-xs p-3 rounded border overflow-auto max-h-48">
+                        <code
+                          className="language-json"
+                          dangerouslySetInnerHTML={{
+                            __html: hljs.highlight(
+                              JSON.stringify(convertDottedToNestedObject(remoteConfigValues), null, 2),
+                              { language: "json" }
+                            ).value,
+                          }}
+                        />
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {currentStep === 3 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -564,7 +925,7 @@ export default function EditReleasePage() {
           </div>
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 4 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -617,7 +978,7 @@ export default function EditReleasePage() {
           </div>
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -745,7 +1106,7 @@ export default function EditReleasePage() {
           </div>
         )}
 
-        {currentStep === 5 && (
+        {currentStep === 6 && (
           <div className="space-y-6">
             <Card>
               {/* <CardHeader>

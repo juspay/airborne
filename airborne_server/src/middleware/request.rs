@@ -4,6 +4,7 @@ use actix_web::{
     dev::{ServiceRequest, ServiceResponse},
     Error,
 };
+use tracing::{info_span, Instrument};
 
 pub async fn request_id_mw(
     mut req: ServiceRequest,
@@ -21,10 +22,19 @@ pub async fn request_id_mw(
         rid.parse().unwrap(),
     );
 
-    let mut res = next.call(req).await?;
-    res.headers_mut().insert(
-        actix_web::http::header::HeaderName::from_static("x-request-id"),
-        rid.parse().unwrap(),
-    );
+    let span = info_span!("http_request", request_id = %rid);
+
+    // instrument the future so all logs during it are attached to the span
+    let res = async move {
+        let mut res = next.call(req).await?;
+        // add request_id to response headers
+        res.headers_mut().insert(
+            actix_web::http::header::HeaderName::from_static("x-request-id"),
+            rid.parse().unwrap(),
+        );
+        Ok::<_, actix_web::Error>(res)
+    }
+    .instrument(span)
+    .await?;
     Ok(res)
 }

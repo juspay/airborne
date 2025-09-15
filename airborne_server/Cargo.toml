@@ -41,6 +41,7 @@ sha2 = "0.10"
 superposition_sdk = "0.89.0"
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = "=0.2.3"
 tracing-error = "=0.2.1"
