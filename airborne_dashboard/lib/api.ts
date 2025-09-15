@@ -88,7 +88,7 @@ export async function apiFetch<T>(
   } catch (err) {
     // Handle network errors and other exceptions
     const error = err as Error;
-    console.error("API Error:", error);
+    console.error("API Error in url:", url, "error:", error);
 
     if (showErrorToast && error.message !== "Unauthorized access") {
       // Don't show toast for auth errors since we handle them above

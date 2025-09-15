@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ pub struct CreateReleaseRequest {
 pub struct ConfigRequest {
     pub boot_timeout: u64,
     pub release_config_timeout: u64,
-    pub properties: Option<serde_json::Value>,
+    pub properties: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 #[derive(Debug, Deserialize)]

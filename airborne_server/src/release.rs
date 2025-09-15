@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::types::ABError;
+use crate::{types::ABError, utils::document::dotted_docs_to_nested};
 use actix_web::{
     error, get, post,
     web::{self, Json, Path},
@@ -24,7 +24,7 @@ use diesel::prelude::*;
 use http::{uri::PathAndQuery, Uri};
 use rand::Rng;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::str::FromStr;
 use superposition_sdk::types::builders::VariantBuilder;
 use url::form_urlencoded;
@@ -42,7 +42,7 @@ use crate::{
 };
 
 mod types;
-mod utils;
+pub mod utils;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -80,7 +80,6 @@ async fn get_release(
     let mut conn = state.db_pool.get().map_err(|_| {
         ABError::InternalServerError("Failed to get database connection".to_string())
     })?;
-
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
         .await
@@ -115,8 +114,22 @@ async fn get_release(
 
     let rc_properties = experimental_variant
         .and_then(|v| v.overrides.as_object())
-        .and_then(|obj| obj.get("config.properties"))
-        .and_then(utils::document_to_value)
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(k, v)| {
+                    let key = k.clone();
+                    if key.starts_with("config.properties.") {
+                        let key = key
+                            .strip_prefix("config.properties.")
+                            .unwrap_or(&key)
+                            .to_string();
+                        Some((key, v.to_owned()))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<String, Document>>()
+        })
         .unwrap_or_default();
 
     let rc_package_important =
@@ -226,6 +239,15 @@ async fn get_release(
         }
     };
 
+    let nested_config_props_result = dotted_docs_to_nested(rc_properties);
+    let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
+        println!(
+            "Failed to convert dotted docs to nested structure: {:?}",
+            err
+        );
+        Value::Object(serde_json::Map::new())
+    });
+
     let resp = GetReleaseResponse {
         id: release_key.clone(),
         created_at: DateTime::parse_from_rfc3339(&utils::dt(&exp_details.created_at))
@@ -235,7 +257,7 @@ async fn get_release(
             boot_timeout: rc_boot_timeout as u32,
             release_config_timeout: rc_release_config_timeout as u32,
             version: rc_version,
-            properties: Some(rc_properties),
+            properties: Some(nested_config_props_response),
         },
         package: ServePackage {
             name: application.clone(),
@@ -556,7 +578,41 @@ async fn create_release(
         Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
     );
 
+    let put_config_props_in_experiment = |properties: &BTreeMap<String, Document>,
+                                          overrides_map: &mut HashMap<String, Document>|
+     -> () {
+        for (key, value) in properties {
+            overrides_map.insert(format!("config.properties.{}", key), value.clone());
+        }
+    };
+
+    let opt_old_config_props = config_document.as_ref().and_then(|doc| {
+        if let Document::Object(obj) = doc {
+            Some(
+                obj.iter()
+                    .filter_map(|(k, v)| {
+                        if k.starts_with("config.properties.") {
+                            Some((
+                                k.strip_prefix("config.properties.").unwrap().to_string(),
+                                v.clone(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )
+        } else {
+            None
+        }
+    });
+    let opt_old_config_props_cloned = opt_old_config_props.clone();
+
     if let Some(Document::Object(obj)) = &config_document {
+        put_config_props_in_experiment(
+            &opt_old_config_props.unwrap_or_default(),
+            &mut control_overrides,
+        );
         if let Some(version) = obj.get("config.version") {
             control_overrides.insert("config.version".to_string(), version.clone());
         } else {
@@ -623,6 +679,10 @@ async fn create_release(
                 Document::Object(std::collections::HashMap::new()),
             );
         }
+        control_overrides.insert(
+            "config.properties".to_string(),
+            Document::Object(std::collections::HashMap::new()),
+        );
         if let Some(important) = obj.get("package.important") {
             control_overrides.insert("package.important".to_string(), important.clone());
         } else {
@@ -669,10 +729,21 @@ async fn create_release(
             req.config.release_config_timeout,
         )),
     );
+    experimental_overrides.insert(
+        "config.properties".to_string(),
+        Document::Object(std::collections::HashMap::new()),
+    );
+    let config_properties: BTreeMap<String, aws_smithy_types::Document> =
+        if let Some(ref props) = req.config.properties {
+            props
+                .iter()
+                .map(|(k, v)| (k.clone(), value_to_document(v)))
+                .collect()
+        } else {
+            opt_old_config_props_cloned.unwrap_or_default()
+        };
 
-    let config_props = value_to_document(&req.config.properties.clone().unwrap_or_default());
-
-    experimental_overrides.insert("config.properties".to_string(), config_props.clone());
+    put_config_props_in_experiment(&config_properties, &mut experimental_overrides);
     experimental_overrides.insert(
         "package.name".to_string(),
         Document::String(application.clone()),
@@ -819,6 +890,15 @@ async fn create_release(
         println!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
+    let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
+        println!(
+            "Failed to convert dotted docs to nested structure: {:?}",
+            err
+        );
+        Value::Object(serde_json::Map::new())
+    });
+
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
         created_at: now,
@@ -826,16 +906,7 @@ async fn create_release(
             boot_timeout: req.config.boot_timeout as u32,
             release_config_timeout: req.config.release_config_timeout as u32,
             version: config_version.clone(),
-            properties: config_props.clone().as_object().map(|obj| {
-                obj.iter()
-                    .map(|(k, v)| {
-                        (
-                            k.clone(),
-                            utils::document_to_value(v).unwrap_or(Value::Null),
-                        )
-                    })
-                    .collect()
-            }),
+            properties: Some(nested_config_props_response),
         },
         package: ServePackage {
             name: application.clone(),
@@ -1075,8 +1146,22 @@ async fn list_releases(
         );
         let rc_config_properties = experimental_variant
             .and_then(|v| v.overrides.as_object())
-            .and_then(|obj| obj.get("config.properties"))
-            .and_then(utils::document_to_value)
+            .map(|obj| {
+                obj.iter()
+                    .filter_map(|(k, v)| {
+                        let key = k.clone();
+                        if key.starts_with("config.properties.") {
+                            let key = key
+                                .strip_prefix("config.properties.")
+                                .unwrap_or(&key)
+                                .to_string();
+                            Some((key, v.to_owned()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashMap<String, Document>>()
+            })
             .unwrap_or_default();
 
         println!("Resources files: {:?}", rc_resources);
@@ -1183,6 +1268,15 @@ async fn list_releases(
             .unwrap_or_else(|_| Utc::now().into())
             .with_timezone(&Utc);
 
+        let nested_config_props_result = dotted_docs_to_nested(rc_config_properties);
+        let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
+            println!(
+                "Failed to convert dotted docs to nested structure: {:?}",
+                err
+            );
+            Value::Object(serde_json::Map::new())
+        });
+
         let release_response = CreateReleaseResponse {
             id: experiment.id.to_string(),
             created_at,
@@ -1190,7 +1284,7 @@ async fn list_releases(
                 boot_timeout: rc_boot_timeout as u32,
                 release_config_timeout: rc_release_config_timeout as u32,
                 version: rc_version,
-                properties: Some(rc_config_properties),
+                properties: Some(nested_config_props_response),
             },
             package: ServePackage {
                 name: application.clone(),
@@ -1547,14 +1641,30 @@ async fn serve_release(
         &config_document,
         "config.release_config_timeout",
     );
-    let opt_rc_config_properties = &config_document.as_ref().and_then(|doc| {
+    let opt_rc_config_properties = config_document.as_ref().and_then(|doc| {
         if let Document::Object(obj) = doc {
-            obj.get("config.properties")
-                .and_then(utils::document_to_value)
+            Some(
+                obj.iter()
+                    .filter_map(|(k, v)| {
+                        if k.starts_with("config.properties.") {
+                            Some((
+                                k.strip_prefix("config.properties.").unwrap().to_string(),
+                                v.clone(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )
         } else {
             None
         }
     });
+
+    if rc_version == "0.0.0" {
+        return Err(ABError::NotFound("No release yet".to_string()));
+    }
 
     let (index_file, important_files, lazy_files, resource_files) = {
         let all_files = rc_package_important
@@ -1664,13 +1774,23 @@ async fn serve_release(
         }
     });
 
+    let nested_config_props_result =
+        dotted_docs_to_nested(opt_rc_config_properties.unwrap_or_default().into_iter());
+    let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
+        println!(
+            "Failed to convert dotted docs to nested structure: {:?}",
+            err
+        );
+        Value::Object(serde_json::Map::new())
+    });
+
     let release_response = ServeReleaseResponse {
         version: "2".to_string(),
         config: Config {
             boot_timeout: rc_boot_timeout as u32,
             release_config_timeout: rc_release_config_timeout as u32,
             version: rc_version.clone(),
-            properties: opt_rc_config_properties.clone(),
+            properties: Some(nested_config_props_response),
         },
         package: ServePackage {
             name: application.clone(),
