@@ -205,13 +205,13 @@ function RootDropZone({ children, isActive }: { children: React.ReactNode; isAct
       ref={setNodeRef}
       className={`min-h-[250px] p-6 rounded-lg transition-all duration-200 ${
         isActive || isOver
-          ? 'bg-blue-50 border-2 border-dashed border-blue-300' 
-          : 'bg-gray-50/50 border border-transparent hover:border-gray-200'
+          ? 'bg-blue-50 dark:bg-blue-950 border-2 border-dashed border-blue-300 dark:border-blue-600' 
+          : 'bg-gray-50/50 dark:bg-gray-800/50 border border-transparent hover:border-gray-200 dark:hover:border-gray-600'
       }`}
     >
       {children}
       {(isOver || isActive) && (
-        <div className="flex items-center justify-center p-10 text-blue-600 bg-blue-100/50 rounded-lg mt-6 border-2 border-dashed border-blue-300">
+        <div className="flex items-center justify-center p-10 text-blue-600 dark:text-blue-400 bg-blue-100/50 dark:bg-blue-900/50 rounded-lg mt-6 border-2 border-dashed border-blue-300 dark:border-blue-600">
           <div className="text-center">
             <FolderOpen className="h-8 w-8 mx-auto mb-2" />
             <p className="text-sm font-medium">Drop here to move to root level</p>
@@ -237,13 +237,13 @@ function NestedDropZone({ parentId, isActive, children }: {
       ref={setNodeRef}
       className={`min-h-[80px] transition-all duration-200 ${
         isActive || isOver
-          ? 'bg-green-50 border-2 border-dashed border-green-300 rounded-lg p-4' 
+          ? 'bg-green-50 dark:bg-green-950 border-2 border-dashed border-green-300 dark:border-green-600 rounded-lg p-4' 
           : 'min-h-0'
       }`}
     >
       {children}
       {(isOver || isActive) && !children && (
-        <div className="flex items-center justify-center p-6 text-green-600">
+        <div className="flex items-center justify-center p-6 text-green-600 dark:text-green-400">
           <div className="text-center">
             <Folder className="h-6 w-6 mx-auto mb-1" />
             <p className="text-xs font-medium">Drop here to add as child field</p>
@@ -310,17 +310,17 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
     >
       <Card className={`mb-3 transition-all duration-200 ${
         isDragOverlay 
-          ? 'shadow-2xl border-blue-300 bg-white' 
+          ? 'shadow-2xl border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-800' 
           : isCurrentlyDragging 
             ? 'opacity-50' 
-            : 'hover:shadow-md border-transparent hover:border-gray-200'
+            : 'hover:shadow-md border-transparent hover:border-gray-200 dark:hover:border-gray-600'
       }`}>
         <CardHeader className="py-4 px-4">
           <div className="flex items-center gap-3">
             <button
               {...attributes}
               {...listeners}
-              className="cursor-grab hover:text-blue-600 active:cursor-grabbing p-1 hover:bg-blue-50 rounded transition-colors"
+              className="cursor-grab hover:text-blue-600 dark:hover:text-blue-400 active:cursor-grabbing p-1 hover:bg-blue-50 dark:hover:bg-blue-950 rounded transition-colors"
             >
               <GripVertical className="h-4 w-4" />
             </button>
@@ -328,7 +328,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
             {canHaveChildren && (
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               >
                 {isOpen ? (
                   <ChevronDown className="h-4 w-4" />
@@ -341,9 +341,9 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
             {canHaveChildren && (
               <div className="text-muted-foreground">
                 {hasChildren ? (
-                  <FolderOpen className="h-4 w-4 text-green-600" />
+                  <FolderOpen className="h-4 w-4 text-green-600 dark:text-green-400" />
                 ) : (
-                  <Folder className="h-4 w-4 text-gray-400" />
+                  <Folder className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                 )}
               </div>
             )}
@@ -351,7 +351,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
             <div className="flex-1 flex items-center gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{field.name}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{field.name}</span>
                   <Badge variant="secondary" className="text-xs">{field.type}</Badge>
                   {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
                   {field.arrayItemType && (
@@ -1152,14 +1152,6 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
             >
               <RootDropZone isActive={isDragging}>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between mb-4 px-2">
-                    <div className="text-sm text-muted-foreground">
-                      Root Level Fields ({fields.length})
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      💡 Drag fields here to move them to root level
-                    </div>
-                  </div>
                   <SortableContext items={fields.map(f => f.id)} strategy={verticalListSortingStrategy}>
                     {fields.map((field) => (
                       <SortableField
@@ -1237,7 +1229,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
               </div>
               
               {jsonError && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 p-3 rounded-md">
                   {jsonError}
                 </div>
               )}
@@ -1247,7 +1239,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
                   <strong>Tip:</strong> You can edit the JSON schema directly here and import it, or export your current visual schema to JSON.
                 </p>
                 <p>
-                  This follows the <a href="https://json-schema.org/specification" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">JSON Schema specification</a>.
+                  This follows the <a href="https://json-schema.org/specification" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">JSON Schema specification</a>.
                 </p>
               </div>
             </CardContent>
