@@ -39,6 +39,7 @@ use crate::utils::transaction_manager::TransactionManager;
 mod config;
 mod dimension;
 mod user;
+mod default_config;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
