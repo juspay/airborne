@@ -1291,24 +1291,11 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Schema Fields</h3>
-          <p className="text-sm text-muted-foreground">
-            Drag fields into objects to create nested structures. Drop fields onto the root area to move them out of containers.
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <div className="flex gap-2">
           <Button onClick={() => addField()}>
             <Plus className="h-4 w-4 mr-2" />
             Add Field
-          </Button>
-          <Button 
-            onClick={handleSubmitChanges}
-            disabled={!hasChanges}
-            variant={hasChanges ? "default" : "secondary"}
-          >
-            Submit Changes
           </Button>
         </div>
       </div>
@@ -1449,6 +1436,15 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
           </Card>
         </TabsContent>
       </Tabs>
+      <div className="flex gap-2 justify-end">
+          <Button 
+            onClick={handleSubmitChanges}
+            disabled={!hasChanges}
+            variant={hasChanges ? "default" : "secondary"}
+          >
+            Submit Changes
+          </Button>
+        </div>
     </div>
   );
 }

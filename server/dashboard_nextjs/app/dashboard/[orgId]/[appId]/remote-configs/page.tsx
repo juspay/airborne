@@ -3,7 +3,6 @@
 import { useState } from "react";
 import SharedLayout from "@/components/shared-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigSchemaBuilder } from "@/components/remote-config/config-schema-builder";
 import { ConfigValuesEditor } from "@/components/remote-config/config-values-editor";
