@@ -37,7 +37,7 @@ pub struct ServeFile {
 #[derive(Serialize)]
 pub struct ServePackage {
     pub name: String,
-    pub version: i32,
+    pub version: String,
     pub index: ServeFile,
     pub properties: Value,
     pub important: Vec<ServeFile>,

@@ -28,6 +28,7 @@ futures = { workspace = true }
 futures-util = "0.3"
 google-sheets4 = "=6.0.0"
 hex = "0.4"
+http = "0.2.12"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
 log = "0.4.27"
@@ -40,6 +41,7 @@ sha2 = "0.10"
 superposition_sdk = "0.89.0"
 thiserror = "2.0.12"
 tokio = { version = "1", features = ["full"] }
+url = "2.5.7"
 urlencoding = "2.1.2"
 uuid = { version = "1.16.0", features = ["serde", "v7", "v4"] }
 zip = "4.6.1"
