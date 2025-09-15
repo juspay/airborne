@@ -195,7 +195,7 @@ function parseJsonSchema(schema: any): SchemaField[] {
 }
 
 // Root drop zone component
-function RootDropZone({ children }: { children: React.ReactNode }) {
+function RootDropZone({ children, isActive }: { children: React.ReactNode; isActive: boolean }) {
   const { setNodeRef, isOver } = useDroppable({
     id: 'root-drop-zone',
   });
@@ -203,18 +203,50 @@ function RootDropZone({ children }: { children: React.ReactNode }) {
   return (
     <div 
       ref={setNodeRef}
-      className={`min-h-[200px] p-4 border-2 border-dashed rounded-lg transition-colors ${
-        isOver 
-          ? 'border-blue-500 bg-blue-50' 
-          : 'border-muted-foreground/20 hover:border-muted-foreground/40'
+      className={`min-h-[200px] p-4 rounded-lg transition-all duration-200 ${
+        isActive || isOver
+          ? 'bg-blue-50 border-2 border-dashed border-blue-300' 
+          : 'bg-gray-50/50 border border-transparent hover:border-gray-200'
       }`}
     >
       {children}
-      {isOver && (
-        <div className="flex items-center justify-center p-8 text-blue-600">
+      {(isOver || isActive) && (
+        <div className="flex items-center justify-center p-8 text-blue-600 bg-blue-100/50 rounded-lg mt-4 border-2 border-dashed border-blue-300">
           <div className="text-center">
             <FolderOpen className="h-8 w-8 mx-auto mb-2" />
             <p className="text-sm font-medium">Drop here to move to root level</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Drop zone for nested fields
+function NestedDropZone({ parentId, isActive, children }: { 
+  parentId: string; 
+  isActive: boolean;
+  children?: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `drop-zone-${parentId}`,
+  });
+
+  return (
+    <div 
+      ref={setNodeRef}
+      className={`min-h-[60px] transition-all duration-200 ${
+        isActive || isOver
+          ? 'bg-green-50 border-2 border-dashed border-green-300 rounded-lg p-3' 
+          : 'min-h-0'
+      }`}
+    >
+      {children}
+      {(isOver || isActive) && !children && (
+        <div className="flex items-center justify-center p-4 text-green-600">
+          <div className="text-center">
+            <Folder className="h-6 w-6 mx-auto mb-1" />
+            <p className="text-xs font-medium">Drop here to add as child field</p>
           </div>
         </div>
       )}
@@ -230,9 +262,11 @@ interface SortableFieldProps {
   onMoveToRoot?: (fieldId: string) => void;
   depth?: number;
   isDragOverlay?: boolean;
+  isDragging?: boolean;
+  globalDragState?: boolean;
 }
 
-function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, depth = 0, isDragOverlay = false }: SortableFieldProps) {
+function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, depth = 0, isDragOverlay = false, isDragging = false, globalDragState = false }: SortableFieldProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<SchemaField>(field);
@@ -243,7 +277,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
     setNodeRef,
     transform,
     transition,
-    isDragging,
+    isDragging: isCurrentlyDragging,
     isOver,
     setDroppableNodeRef,
   } = useSortable({
@@ -257,7 +291,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isCurrentlyDragging ? 0.3 : 1,
   };
 
   const handleSave = () => {
@@ -272,15 +306,21 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
     <div 
       ref={!isDragOverlay ? setNodeRef : undefined} 
       style={style} 
-      className={`${depth > 0 ? `ml-${Math.min(depth * 4, 16)}` : ""} ${isOver && canHaveChildren ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}
+      className={`${depth > 0 ? `ml-${Math.min(depth * 4, 16)}` : ""}`}
     >
-      <Card className={`mb-2 ${isDragOverlay ? 'shadow-xl' : ''} ${isOver && canHaveChildren ? 'bg-blue-50' : ''}`}>
-        <CardHeader className="py-3">
+      <Card className={`mb-3 transition-all duration-200 ${
+        isDragOverlay 
+          ? 'shadow-2xl border-blue-300 bg-white' 
+          : isCurrentlyDragging 
+            ? 'opacity-50' 
+            : 'hover:shadow-md border-transparent hover:border-gray-200'
+      }`}>
+        <CardHeader className="py-4 px-4">
           <div className="flex items-center gap-3">
             <button
               {...attributes}
               {...listeners}
-              className="cursor-grab hover:text-muted-foreground active:cursor-grabbing"
+              className="cursor-grab hover:text-blue-600 active:cursor-grabbing p-1 hover:bg-blue-50 rounded transition-colors"
             >
               <GripVertical className="h-4 w-4" />
             </button>
@@ -288,7 +328,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
             {canHaveChildren && (
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-1 hover:bg-muted rounded"
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
               >
                 {isOpen ? (
                   <ChevronDown className="h-4 w-4" />
@@ -301,9 +341,9 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
             {canHaveChildren && (
               <div className="text-muted-foreground">
                 {hasChildren ? (
-                  <FolderOpen className="h-4 w-4" />
+                  <FolderOpen className="h-4 w-4 text-green-600" />
                 ) : (
-                  <Folder className="h-4 w-4" />
+                  <Folder className="h-4 w-4 text-gray-400" />
                 )}
               </div>
             )}
@@ -311,8 +351,8 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
             <div className="flex-1 flex items-center gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{field.name}</span>
-                  <Badge variant="secondary">{field.type}</Badge>
+                  <span className="font-medium text-gray-900">{field.name}</span>
+                  <Badge variant="secondary" className="text-xs">{field.type}</Badge>
                   {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
                   {field.arrayItemType && (
                     <Badge variant="outline" className="text-xs">
@@ -326,15 +366,16 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               {canHaveChildren && (
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => onAddChild(field.id)}
+                  className="h-8 px-2"
                 >
                   <Plus className="h-3 w-3 mr-1" />
-                  Add Field
+                  Add
                 </Button>
               )}
 
@@ -344,6 +385,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
                   variant="outline"
                   onClick={() => onMoveToRoot(field.id)}
                   title="Move to root level"
+                  className="h-8 px-2"
                 >
                   <FolderOpen className="h-3 w-3" />
                 </Button>
@@ -351,7 +393,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
               
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" className="h-8 px-2">
                     <Edit className="h-3 w-3" />
                   </Button>
                 </DialogTrigger>
@@ -364,41 +406,44 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
                 </DialogContent>
               </Dialog>
 
-              <Button size="sm" variant="destructive" onClick={onDelete}>
+              <Button size="sm" variant="destructive" onClick={onDelete} className="h-8 px-2">
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
           </div>
         </CardHeader>
 
-        {canHaveChildren && hasChildren && (
+        {canHaveChildren && (
           <Collapsible open={isOpen}>
             <CollapsibleContent>
-              <CardContent className="pt-0">
-                <div 
-                  ref={setDroppableNodeRef}
-                  className="pl-4 border-l-2 border-muted space-y-2 min-h-[20px]"
-                >
-                  {field.children?.map((child) => (
-                    <SortableField
-                      key={child.id}
-                      field={child}
-                      onUpdate={(updatedChild) => {
-                        const updatedChildren = field.children?.map(c => 
-                          c.id === child.id ? updatedChild : c
-                        ) || [];
-                        onUpdate({ ...field, children: updatedChildren });
-                      }}
-                      onDelete={() => {
-                        const updatedChildren = field.children?.filter(c => c.id !== child.id) || [];
-                        onUpdate({ ...field, children: updatedChildren });
-                      }}
-                      onAddChild={onAddChild}
-                      onMoveToRoot={onMoveToRoot}
-                      depth={depth + 1}
-                    />
-                  ))}
-                </div>
+              <CardContent className="pt-0 pb-4">
+                <NestedDropZone parentId={field.id} isActive={globalDragState && !hasChildren}>
+                  {hasChildren && (
+                    <div className="space-y-2">
+                      {field.children?.map((child) => (
+                        <SortableField
+                          key={child.id}
+                          field={child}
+                          onUpdate={(updatedChild) => {
+                            const updatedChildren = field.children?.map(c => 
+                              c.id === child.id ? updatedChild : c
+                            ) || [];
+                            onUpdate({ ...field, children: updatedChildren });
+                          }}
+                          onDelete={() => {
+                            const updatedChildren = field.children?.filter(c => c.id !== child.id) || [];
+                            onUpdate({ ...field, children: updatedChildren });
+                          }}
+                          onAddChild={onAddChild}
+                          onMoveToRoot={onMoveToRoot}
+                          depth={depth + 1}
+                          isDragging={isDragging}
+                          globalDragState={globalDragState}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </NestedDropZone>
               </CardContent>
             </CollapsibleContent>
           </Collapsible>
@@ -780,6 +825,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
   const [jsonSchemaText, setJsonSchemaText] = useState("");
   const [jsonEditMode, setJsonEditMode] = useState(false);
   const [jsonError, setJsonError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
 
   const activeField = activeId ? findFieldById(fields, activeId) : null;
 
@@ -923,6 +969,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
 
   const handleDragStart = (event: any) => {
     setActiveId(String(event.active.id));
+    setIsDragging(true);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -947,45 +994,55 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setIsDragging(false);
 
     if (!over || active.id === over.id) return;
 
     const activeField = findFieldById(fields, String(active.id));
-    const overField = findFieldById(fields, String(over.id));
 
     if (!activeField) return;
 
-    // Check if we're dropping on a field or on the root area
-    if (overField) {
-      // Dropping on another field
-      const canDropInto = overField.type === "object" || 
-                         (overField.type === "array" && overField.arrayItemType === "object");
+    // Check if we're dropping on a drop zone
+    if (String(over.id).startsWith('drop-zone-')) {
+      const parentId = String(over.id).replace('drop-zone-', '');
+      moveFieldToParent(String(active.id), parentId);
+      return;
+    }
 
-      if (canDropInto) {
-        // Move field into the target field
-        moveFieldToParent(String(active.id), String(over.id));
-      } else {
-        // Regular reordering at the same level
-        const activeParent = findParentField(fields, String(active.id));
-        const overParent = findParentField(fields, String(over.id));
+    // Check if we're dropping on root drop zone
+    if (String(over.id) === 'root-drop-zone') {
+      moveFieldToParent(String(active.id), null);
+      return;
+    }
 
-        if (activeParent?.id === overParent?.id) {
-          // Same parent, just reorder
-          const parentFields = activeParent ? activeParent.children! : fields;
-          const oldIndex = parentFields.findIndex(field => field.id === String(active.id));
-          const newIndex = parentFields.findIndex(field => field.id === String(over.id));
-          
-          if (activeParent) {
-            const newChildren = arrayMove(parentFields, oldIndex, newIndex);
-            updateField(activeParent.id, { ...activeParent, children: newChildren });
-          } else {
-            onFieldsChange(arrayMove(fields, oldIndex, newIndex));
-          }
+    const overField = findFieldById(fields, String(over.id));
+    if (!overField) return;
+
+    // Check if we're dropping on a field
+    const canDropInto = overField.type === "object" || 
+                       (overField.type === "array" && overField.arrayItemType === "object");
+
+    if (canDropInto) {
+      // Move field into the target field
+      moveFieldToParent(String(active.id), String(over.id));
+    } else {
+      // Regular reordering at the same level
+      const activeParent = findParentField(fields, String(active.id));
+      const overParent = findParentField(fields, String(over.id));
+
+      if (activeParent?.id === overParent?.id) {
+        // Same parent, just reorder
+        const parentFields = activeParent ? activeParent.children! : fields;
+        const oldIndex = parentFields.findIndex(field => field.id === String(active.id));
+        const newIndex = parentFields.findIndex(field => field.id === String(over.id));
+        
+        if (activeParent) {
+          const newChildren = arrayMove(parentFields, oldIndex, newIndex);
+          updateField(activeParent.id, { ...activeParent, children: newChildren });
+        } else {
+          onFieldsChange(arrayMove(fields, oldIndex, newIndex));
         }
       }
-    } else if (String(over.id) === 'root-drop-zone') {
-      // Dropping on root area - move field to root level
-      moveFieldToParent(String(active.id), null);
     }
   };
 
@@ -1041,7 +1098,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
 
         <TabsContent value="visual" className="mt-4">
           {fields.length === 0 ? (
-            <RootDropZone>
+            <RootDropZone isActive={isDragging}>
               <Card>
                 <CardContent className="py-8 text-center">
                   <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -1063,7 +1120,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
               onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
             >
-              <RootDropZone>
+              <RootDropZone isActive={isDragging}>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between mb-4 px-2">
                     <div className="text-sm text-muted-foreground">
@@ -1082,6 +1139,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
                         onDelete={() => deleteField(field.id)}
                         onAddChild={addField}
                         onMoveToRoot={(fieldId) => moveFieldToParent(fieldId, null)}
+                        globalDragState={isDragging}
                       />
                     ))}
                   </SortableContext>
