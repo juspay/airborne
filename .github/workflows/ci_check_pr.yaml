@@ -71,6 +71,16 @@ jobs:
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          cd server/dashboard_nextjs && npm install prettier
+          cd ../docs_react && npm install prettier
+
       - name: Check formatting & linting
         shell: bash
         run: make check

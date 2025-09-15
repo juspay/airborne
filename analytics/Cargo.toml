@@ -12,7 +12,12 @@ clickhouse = { version = "0.12.2", features = ["uuid", "time"] }
 dotenv = { workspace = true }
 futures = { workspace = true }
 prometheus = { version = "0.9", features = ["process"] }
-rdkafka = { version = "0.36", features = ["ssl", "sasl", "tokio"] }
+rdkafka = { version = "0.36", features = [
+    "ssl",
+    "sasl",
+    "tokio",
+    "cmake-build",
+] }
 reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

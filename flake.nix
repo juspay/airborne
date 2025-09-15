@@ -20,6 +20,23 @@
       ];
 
       perSystem = { self', pkgs, config, ... }: {
+        rust-project.src =
+          pkgs.lib.cleanSourceWith {
+            src = inputs.self;
+            filter =
+              path: type:
+              (config.rust-project.crane-lib.filterCargoSources path type
+              && !(pkgs.lib.hasSuffix ".toml" path && !pkgs.lib.hasSuffix "Cargo.toml" path))
+              || (pkgs.lib.hasInfix "migrations" path && pkgs.lib.hasSuffix ".sql" path);
+          };
+        rust-project.crates.analytics-server.crane.args = {
+          buildInputs = [ pkgs.openssl pkgs.cyrus_sasl ];
+          nativeBuildInputs = [ pkgs.pkg-config pkgs.cmake ];
+        };
+        rust-project.crates.airborne-server.crane.args = {
+          buildInputs = [ pkgs.postgresql_15 pkgs.openssl ];
+          nativeBuildInputs = [ pkgs.pkg-config ];
+        };
         formatter = pkgs.nixpkgs-fmt;
         devShells.default = pkgs.mkShell {
           inputsFrom = [
@@ -27,19 +44,17 @@
             config.pre-commit.devShell
           ];
           packages = [
+            pkgs.cocogitto
             pkgs.podman-compose
+            pkgs.nodejs_22
             # pkgs.docker-compose
             pkgs.gnumake
             pkgs.diesel-cli
-            pkgs.postgresql_15
             pkgs.cargo-watch
             pkgs.jq
             pkgs.yq
             pkgs.curl
             pkgs.awscli2
-            pkgs.pkg-config
-            pkgs.openssl
-            pkgs.cyrus_sasl  # Required for analytics server Kafka support
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.libiconv
           ];

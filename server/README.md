@@ -261,32 +261,28 @@ The server validates incoming JWTs, extracts user identity and associated permis
 
 To set up the development environment for the Airborne Server, you will need the following software installed:
 
-**Required System Dependencies:**
+**Option 1: Using Nix (Recommended)**
+- **Nix with Flakes**: All dependencies automatically provided with `nix develop`
+  - This provides: Rust toolchain, cargo-watch, diesel-cli, Node.js, Make, Docker/Podman Compose, PostgreSQL client tools, and all required system libraries
 
-- **Docker or Podman**: Essential for running the containerized services (Keycloak, PostgreSQL, LocalStack, Superposition). Docker Compose support is required.
-- **Git**: For version control and cloning the repository.
-- **Make (GNU Make)**: Required for running the Makefile commands.
-- **PostgreSQL Client Tools**: Including `psql` and `pg_isready` for database connectivity checks.
-- **curl**: For health checks and API testing.
-- **jq**: JSON processor for parsing responses and configuration.
-- **yq**: YAML processor for parsing Docker Compose configurations.
-
-**Rust Development Dependencies:**
-
-- **Rust Toolchain**: Required for building and running the Actix-based server application. Ensure you have `cargo` and `rustc` installed.
-- **cargo-watch**: For development hot-reloading functionality (`cargo install cargo-watch`).
-- **diesel-cli**: For database migrations (`cargo install diesel_cli --no-default-features --features postgres`).
-- **pkg-config**: Required for building native dependencies.
-
-**Platform-Specific Dependencies:**
-
-- **macOS**: `libiconv` (usually provided by Xcode Command Line Tools)
-- **Linux**: `libssl-dev`, `libpq-dev` packages (Ubuntu/Debian) or equivalent for your distribution
-
-**Optional (Recommended for Nix Users):**
-
-- **Nix with Flakes**: All dependencies can be automatically provided using: `nix develop`
-  - This will set up a development shell with all required dependencies pre-installed
+**Option 2: Manual Installation**
+- **Required System Dependencies:**
+  - Docker or Podman (Essential for running containerized services)
+  - Git (For version control)
+  - Make (GNU Make - Required for running Makefile commands)
+  - Node.js 22+ (For frontend dashboard and docs builds)
+  - PostgreSQL Client Tools (including `psql` and `pg_isready`)
+  - curl (For health checks and API testing)
+  - jq (JSON processor for parsing responses)
+  - yq (YAML processor for parsing Docker Compose configurations)
+- **Rust Development Dependencies:**
+  - Rust Toolchain (cargo, rustc)
+  - cargo-watch (for development hot-reloading): `cargo install cargo-watch`
+  - diesel-cli (for database migrations): `cargo install diesel_cli --no-default-features --features postgres`
+  - pkg-config (Required for building native dependencies)
+- **Platform-Specific Dependencies:**
+  - **macOS**: libiconv (usually provided by Xcode Command Line Tools)
+  - **Linux**: libssl-dev, libpq-dev packages (Ubuntu/Debian) or equivalent for your distribution
 
 ### Environment Variables
 
@@ -423,7 +419,6 @@ make localstack-init       # Initialize LocalStack S3 buckets
 make node-dependencies     # Install Node.js dependencies
 make dashboard             # Build dashboard React app
 make docs                  # Build docs React app
-make home                  # Build home React app
 
 # Build servers
 make airborne-server       # Build the Airborne server
