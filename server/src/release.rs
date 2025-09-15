@@ -21,10 +21,13 @@ use actix_web::{
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
+use http::{uri::PathAndQuery, Uri};
 use rand::Rng;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 use superposition_sdk::types::builders::VariantBuilder;
+use url::form_urlencoded;
 
 use crate::{
     file::utils::parse_file_key,
@@ -236,7 +239,7 @@ async fn get_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: package_version as i32,
+            version: package_version.to_string(),
             index: index_file,
             properties: package_properties,
             important: important_files,
@@ -836,7 +839,7 @@ async fn create_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: pkg_version,
+            version: pkg_version.to_string(),
             index: {
                 let (file_path, _, _) = parse_file_key(&package_data.index);
                 files
@@ -911,6 +914,7 @@ async fn create_release(
 
 #[get("/list")]
 async fn list_releases(
+    req: actix_web::HttpRequest,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<ListReleaseResponse>, ABError> {
@@ -932,11 +936,79 @@ async fn list_releases(
             ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
 
+    let context: HashMap<String, Value> = req
+        .headers()
+        .get("x-dimension")
+        .and_then(|val| val.to_str().ok())
+        .map(utils::parse_kv_string)
+        .unwrap_or_default();
+
     let experiments_list = state
         .superposition_client
         .list_experiment()
         .org_id(superposition_org_id_from_env)
         .workspace_id(workspace_name)
+        .customize()
+        .mutate_request(move |req| {
+            let uri: http::Uri = match req.uri().parse() {
+                Ok(uri) => uri,
+                Err(e) => {
+                    eprintln!("Failed to parse URI from request: {:?}", e);
+                    return;
+                }
+            };
+
+            let mut parts = uri.into_parts();
+            let (path, existing_q) = match parts.path_and_query.take() {
+                Some(pq) => {
+                    let s = pq.as_str();
+                    match s.split_once('?') {
+                        Some((p, q)) => (p.to_string(), Some(q.to_string())),
+                        None => (s.to_string(), None),
+                    }
+                }
+                None => ("/".to_string(), None),
+            };
+
+            let mut ser = form_urlencoded::Serializer::new(String::new());
+            if let Some(eq) = existing_q {
+                for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
+                    ser.append_pair(&k, &v);
+                }
+            }
+            for (k, v) in &context {
+                if let Some(val_str) = v.as_str() {
+                    ser.append_pair(&format!("dimension[{k}]"), val_str);
+                }
+            }
+
+            let new_q = ser.finish();
+            let pq = if new_q.is_empty() {
+                path
+            } else {
+                format!("{path}?{new_q}")
+            };
+
+            let path_and_query = match PathAndQuery::from_str(&pq) {
+                Ok(pq) => pq,
+                Err(e) => {
+                    eprintln!("Failed to create valid path/query from '{}': {:?}", pq, e);
+                    return; // Skip URI modification on error
+                }
+            };
+
+            parts.path_and_query = Some(path_and_query);
+
+            let new_uri = match Uri::from_parts(parts) {
+                Ok(uri) => uri,
+                Err(e) => {
+                    eprintln!("Failed to create valid URI from parts: {:?}", e);
+                    return;
+                }
+            };
+
+            *req.uri_mut() = new_uri.into();
+        })
         .send()
         .await
         .map_err(|e| {
@@ -1122,7 +1194,7 @@ async fn list_releases(
             },
             package: ServePackage {
                 name: application.clone(),
-                version: package_version,
+                version: package_version.to_string(),
                 index: index_file,
                 properties: rc_package_properties,
                 important: important_files,
@@ -1593,7 +1665,7 @@ async fn serve_release(
     });
 
     let release_response = ServeReleaseResponse {
-        version: rc_version.clone(),
+        version: "2".to_string(),
         config: Config {
             boot_timeout: rc_boot_timeout as u32,
             release_config_timeout: rc_release_config_timeout as u32,
@@ -1602,7 +1674,7 @@ async fn serve_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: pkg_version as i32,
+            version: pkg_version.to_string(),
             index: index_file,
             properties: opt_rc_package_properties
                 .clone()
