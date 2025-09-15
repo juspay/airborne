@@ -21,3 +21,6 @@ yarn.lock
 
 # Cache directories
 .cache/
+
+# Markdown
+*.md

@@ -23,13 +23,9 @@ pub mod s3;
 pub mod transaction_manager;
 pub mod workspace;
 
-pub fn init_tracing() {
-    // let file_appender = rolling::daily("logs", "server.log");
-    // let (nb_writer, file_guard) = tracing_appender::non_blocking(file_appender);
+pub fn init_tracing(log_format: String) {
     let (nb_stderr, stderr_guard) = tracing_appender::non_blocking(std::io::stderr());
 
-    // Drop the guard when main exits by storing it in a static variable.
-    // This prevents premature drop and ensures logs are flushed.
     static mut STDERR_GUARD: Option<tracing_appender::non_blocking::WorkerGuard> = None;
     unsafe {
         STDERR_GUARD = Some(stderr_guard);
@@ -38,19 +34,21 @@ pub fn init_tracing() {
     let filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,actix_web=warn"));
 
-    // let json_layer = fmt::layer()
-    //     .json()                 // structured JSON
-    //     .with_current_span(true)
-    //     .with_span_list(true)
-    //     .with_thread_ids(false)
-    //     .with_writer(nb_writer);
+    if log_format == "json" {
+        let layer = fmt::layer().json().with_writer(nb_stderr);
 
-    let console_layer = fmt::layer().compact().with_writer(nb_stderr);
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_error::ErrorLayer::default())
+            .with(layer)
+            .init()
+    } else {
+        let layer = fmt::layer().compact().with_writer(nb_stderr);
 
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_error::ErrorLayer::default())
-        // .with(json_layer)
-        .with(console_layer)
-        .init();
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_error::ErrorLayer::default())
+            .with(layer)
+            .init()
+    }
 }

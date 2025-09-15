@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use aws_smithy_types::Document;
+use log::info;
 use serde_json::{json, Map, Value};
+
+use crate::types::ABError;
 
 pub fn document_to_json_value(doc: &Document) -> Value {
     match doc {
@@ -69,5 +72,81 @@ pub fn value_to_document(doc: &Value) -> Document {
                 .collect::<HashMap<_, _>>();
             Document::Object(map)
         }
+    }
+}
+
+pub fn dotted_docs_to_nested<T>(input: T) -> Result<Value, ABError>
+where
+    T: IntoIterator<Item = (String, Document)>,
+{
+    let mut root = Value::Object(Map::new());
+
+    for (key, doc) in input {
+        // Convert Smithy Document -> serde_json::Value once.
+        let val = document_to_json_value(&doc);
+
+        // Iterative descent through dotted path.
+        let mut cursor = &mut root;
+        let mut it = key.split('.');
+        let mut prefix = String::new();
+
+        // We need the last segment to insert into.
+        let Some(last) = it.next_back() else { continue };
+
+        for seg in it {
+            if !prefix.is_empty() {
+                prefix.push('.');
+            }
+            prefix.push_str(seg);
+
+            if !cursor.is_object() {
+                info!(
+                    "Path conflict at {}: found {}",
+                    prefix.clone(),
+                    type_name(cursor)
+                );
+                return Err(ABError::InternalServerError(format!(
+                    "Path conflict at {}: found {}",
+                    prefix.clone(),
+                    type_name(cursor)
+                )));
+            }
+
+            let obj = cursor.as_object_mut().unwrap();
+            cursor = obj
+                .entry(seg.to_string())
+                .or_insert_with(|| Value::Object(Map::new()));
+        }
+
+        // Insert the value at the parent object
+        if !cursor.is_object() {
+            info!(
+                "Path conflict at {}: found {}",
+                prefix.clone(),
+                type_name(cursor)
+            );
+            return Err(ABError::InternalServerError(format!(
+                "Path conflict at {}: found {}",
+                prefix.clone(),
+                type_name(cursor)
+            )));
+        }
+        cursor
+            .as_object_mut()
+            .unwrap()
+            .insert(last.to_string(), val);
+    }
+
+    Ok(root)
+}
+
+fn type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
     }
 }

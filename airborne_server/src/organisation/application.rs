@@ -39,6 +39,7 @@ use crate::utils::transaction_manager::TransactionManager;
 
 mod config;
 mod dimension;
+mod properties;
 mod user;
 
 use diesel::ExpressionMethods;
@@ -50,6 +51,7 @@ pub fn add_routes() -> Scope {
         .service(Scope::new("/config").service(config::add_routes()))
         .service(Scope::new("/dimension").service(dimension::add_routes()))
         .service(Scope::new("/user").service(user::add_routes()))
+        .service(Scope::new("/properties").service(properties::add_routes()))
 }
 
 #[derive(Serialize, Deserialize)]

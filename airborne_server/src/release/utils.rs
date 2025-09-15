@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
@@ -650,98 +650,41 @@ pub async fn build_overrides(
         Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
     );
 
+    let put_config_props_in_experiment = |properties: &BTreeMap<String, Document>,
+                                          overrides_map: &mut HashMap<String, Document>|
+     -> () {
+        for (key, value) in properties {
+            overrides_map.insert(format!("config.properties.{}", key), value.clone());
+        }
+    };
+
+    let opt_old_config_props = config_document.as_ref().and_then(|doc| {
+        if let Document::Object(obj) = doc {
+            Some(
+                obj.iter()
+                    .filter_map(|(k, v)| {
+                        if k.starts_with("config.properties.") {
+                            Some((
+                                k.strip_prefix("config.properties.").unwrap().to_string(),
+                                v.clone(),
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<BTreeMap<_, _>>(),
+            )
+        } else {
+            None
+        }
+    });
+    let opt_old_config_props_cloned = opt_old_config_props.clone();
+
     if let Some(Document::Object(obj)) = &config_document {
-        if let Some(version) = obj.get("config.version") {
-            control_overrides.insert("config.version".to_string(), version.clone());
-        } else {
-            control_overrides.insert(
-                "config.version".to_string(),
-                Document::String(config_version.clone()),
-            );
-        }
-        if let Some(boot_timeout) = obj.get("config.boot_timeout") {
-            control_overrides.insert("config.boot_timeout".to_string(), boot_timeout.clone());
-        } else {
-            control_overrides.insert(
-                "config.boot_timeout".to_string(),
-                Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout)),
-            );
-        }
-        if let Some(release_config_timeout) = obj.get("config.release_config_timeout") {
-            control_overrides.insert(
-                "config.release_config_timeout".to_string(),
-                release_config_timeout.clone(),
-            );
-        } else {
-            control_overrides.insert(
-                "config.release_config_timeout".to_string(),
-                Document::Number(aws_smithy_types::Number::PosInt(
-                    req.config.release_config_timeout,
-                )),
-            );
-        }
-        if let Some(props) = obj.get("config.properties") {
-            control_overrides.insert("config.properties".to_string(), props.clone());
-        } else {
-            control_overrides.insert(
-                "config.properties".to_string(),
-                Document::Object(std::collections::HashMap::new()),
-            );
-        }
-        if let Some(version) = obj.get("package.name") {
-            control_overrides.insert("package.name".to_string(), version.clone());
-        } else {
-            control_overrides.insert("package.name".to_string(), Document::String("".to_string()));
-        }
-        if let Some(package_idx) = obj.get("package.index") {
-            control_overrides.insert("package.index".to_string(), package_idx.clone());
-        } else {
-            control_overrides.insert(
-                "package.index".to_string(),
-                Document::String("".to_string()),
-            );
-        }
-        if let Some(version) = obj.get("package.version") {
-            control_overrides.insert("package.version".to_string(), version.clone());
-        } else {
-            control_overrides.insert(
-                "package.version".to_string(),
-                Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
-            );
-        }
-        if let Some(props) = obj.get("package.properties") {
-            control_overrides.insert("package.properties".to_string(), props.clone());
-        } else {
-            control_overrides.insert(
-                "package.properties".to_string(),
-                Document::Object(std::collections::HashMap::new()),
-            );
-        }
-        if let Some(important) = obj.get("package.important") {
-            control_overrides.insert("package.important".to_string(), important.clone());
-        } else {
-            let default_important_docs: Vec<Document> = package_data
-                .files
-                .iter()
-                .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
-                .collect();
-            control_overrides.insert(
-                "package.important".to_string(),
-                Document::Array(default_important_docs),
-            );
-        }
-        if let Some(lazy) = obj.get("package.lazy") {
-            control_overrides.insert("package.lazy".to_string(), lazy.clone());
-        } else {
-            control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
-        }
-        if let Some(resources) = obj.get("resources") {
-            control_overrides.insert("resources".to_string(), resources.clone());
-        } else {
-            control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
+        for (key, value) in obj {
+            control_overrides.insert(key.clone(), value.clone());
         }
     } else {
-        // Config is empty, throw internal error
         return Err(ABError::InternalServerError(
             "Resolved config is not an object".to_string(),
         ));
@@ -763,10 +706,21 @@ pub async fn build_overrides(
             req.config.release_config_timeout,
         )),
     );
+    experimental_overrides.insert(
+        "config.properties".to_string(),
+        Document::Object(std::collections::HashMap::new()),
+    );
+    let config_properties: BTreeMap<String, aws_smithy_types::Document> =
+        if let Some(ref props) = req.config.properties {
+            props
+                .iter()
+                .map(|(k, v)| (k.clone(), value_to_document(v)))
+                .collect()
+        } else {
+            opt_old_config_props_cloned.unwrap_or_default()
+        };
 
-    let config_props = value_to_document(&req.config.properties.clone().unwrap_or_default());
-
-    experimental_overrides.insert("config.properties".to_string(), config_props.clone());
+    put_config_props_in_experiment(&config_properties, &mut experimental_overrides);
     experimental_overrides.insert(
         "package.name".to_string(),
         Document::String(application.clone()),
@@ -814,7 +768,7 @@ pub async fn build_overrides(
         final_lazy,
         final_resources,
         config_version,
-        config_props,
+        config_properties,
         pkg_version,
         files,
         final_properties,

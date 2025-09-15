@@ -19,7 +19,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings } from "lucide-react";
+import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings, Cog } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { notFound, useRouter } from "next/navigation";
@@ -28,6 +28,17 @@ import Link from "next/link";
 import { toastWarning } from "@/hooks/use-toast";
 import { ApiRelease } from "../page";
 import useSWR from "swr";
+import { BackendPropertiesResponse, SchemaField } from "@/types/remote-configs";
+import {
+  convertDottedToNestedObject,
+  validateAllRemoteConfigValues,
+  validateValueAgainstSchema,
+} from "@/components/remote-config/utils/helpers";
+import json from "highlight.js/lib/languages/json";
+import hljs from "highlight.js";
+import "highlight.js/styles/vs2015.css";
+
+hljs.registerLanguage("json", json);
 
 type Pkg = { index: string; tag: string; version: number; files: string[] };
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number };
@@ -46,14 +57,38 @@ type TargetingRule = {
   values: string;
 };
 
+const convertBackendDataToFields = (data: BackendPropertiesResponse): SchemaField[] => {
+  const fields: SchemaField[] = [];
+
+  Object.entries(data.properties).forEach(([key, node]) => {
+    fields.push({
+      id: key,
+      name: key,
+      type: node.schema?.type || "string",
+      required: false,
+      description: node.description || "",
+      enumValues: node.schema?.enum || undefined,
+      defaultValue: node.default_value,
+    });
+  });
+
+  return fields;
+};
+
 export default function CreateReleasePage() {
-  const totalSteps = 5;
+  const totalSteps = 6;
   const [currentStep, setCurrentStep] = useState(1);
 
   // Configuration state
   const [bootTimeout, setBootTimeout] = useState<number>(4000);
   const [releaseConfigTimeout, setReleaseConfigTimeout] = useState<number>(4000);
   const [configProperties, setConfigProperties] = useState<string>("{}");
+
+  // Remote config state
+  const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
+  const [remoteConfigValues, setRemoteConfigValues] = useState<Record<string, any>>({});
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
 
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}");
 
@@ -82,6 +117,71 @@ export default function CreateReleasePage() {
       notFound();
     }
   }, [loadingAccess]);
+
+  // Fetch schema for remote config
+  const fetchSchema = async () => {
+    setSchemaLoading(true);
+    setSchemaError(null);
+    try {
+      // Build dimensions header from targeting rules
+      console.log("Targeting Rules", targetingRules);
+      const dimensionsHeader = targetingRules
+        .filter((rule) => rule.dimension && rule.values)
+        .map((rule) => `${rule.dimension}=${rule.values}`)
+        .join(";");
+
+      const headers: Record<string, string> = {};
+      if (dimensionsHeader) {
+        headers["x-dimension"] = dimensionsHeader;
+      }
+
+      const data = await apiFetch<BackendPropertiesResponse>(
+        `/organisations/applications/properties/schema`,
+        {
+          method: "GET",
+          headers,
+        },
+        { token, org, app }
+      );
+
+      if (data && data.properties && Object.keys(data.properties).length > 0) {
+        const convertedFields = convertBackendDataToFields(data);
+        setSchemaFields(convertedFields);
+
+        // Initialize remote config values with default values
+        const initialValues: Record<string, any> = {};
+        const extractDefaults = (fields: SchemaField[], prefix = "") => {
+          fields.forEach((field) => {
+            const key = prefix ? `${prefix}.${field.name}` : field.name;
+            if (field.children && field.children.length > 0) {
+              extractDefaults(field.children, key);
+            } else {
+              initialValues[key] = field.defaultValue;
+            }
+          });
+        };
+        extractDefaults(convertedFields);
+        setRemoteConfigValues(initialValues);
+      } else {
+        setSchemaFields([]);
+        setRemoteConfigValues({});
+      }
+    } catch (error) {
+      console.error("Error fetching schema:", error);
+      setSchemaError("Failed to load remote config schema");
+      setSchemaFields([]);
+      setRemoteConfigValues({});
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  // Load schema when component mounts or when stepping to remote config or when targeting rules change
+  useEffect(() => {
+    if (currentStep === 3) {
+      fetchSchema();
+    }
+  }, [currentStep, targetingRules, token, org, app]);
 
   // Load packages list
   useEffect(() => {
@@ -131,7 +231,7 @@ export default function CreateReleasePage() {
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 4 ? ["/file/list", resourceSearch, resourceCurrentPage] : null,
+    token && org && app && currentStep === 6 ? ["/file/list", resourceSearch, resourceCurrentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
@@ -187,12 +287,19 @@ export default function CreateReleasePage() {
       case 1:
         return true; // Configuration step - always can proceed
       case 2:
-        return selectedPackage !== null;
+        return true; // Targeting step - always can proceed
       case 3:
-        return true;
+        // Remote config step - validate all fields
+        if (schemaFields.length > 0) {
+          const validation = validateAllRemoteConfigValues(remoteConfigValues, schemaFields);
+          return validation.isValid;
+        }
+        return true; // No schema means no validation needed
       case 4:
-        return true;
+        return selectedPackage !== null;
       case 5:
+        return true;
+      case 6:
         return true;
       default:
         return false;
@@ -304,6 +411,162 @@ export default function CreateReleasePage() {
     return items;
   };
 
+  const renderRemoteConfigField = (field: SchemaField, path: string = "") => {
+    const fieldPath = path ? `${path}.${field.name}` : field.name;
+    const currentValue = remoteConfigValues[fieldPath];
+
+    const updateFieldValue = (value: any) => {
+      setRemoteConfigValues((prev) => ({
+        ...prev,
+        [fieldPath]: value,
+      }));
+    };
+
+    const validateField = (value: any) => {
+      const schema = {
+        type: field.type,
+        minLength: field.minLength,
+        maxLength: field.maxLength,
+        minimum: field.minValue,
+        maximum: field.maxValue,
+        pattern: field.pattern,
+        enum: field.enumValues,
+      };
+      return validateValueAgainstSchema(value, schema);
+    };
+
+    const validation = validateField(currentValue);
+
+    // For complex types, use string representation for input
+    const getInputValue = () => {
+      if (field.type === "array" || field.type === "object") {
+        if (currentValue === undefined || currentValue === null) {
+          return "";
+        }
+        return typeof currentValue === "string" ? currentValue : JSON.stringify(currentValue, null, 2);
+      }
+      return currentValue || "";
+    };
+
+    const handleComplexValueChange = (inputValue: string) => {
+      if (!inputValue.trim()) {
+        updateFieldValue(field.type === "array" ? [] : field.type === "object" ? {} : undefined);
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(inputValue);
+        // Validate that the parsed value matches the expected type
+        if (field.type === "array" && Array.isArray(parsed)) {
+          updateFieldValue(parsed);
+        } else if (field.type === "object" && parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          updateFieldValue(parsed);
+        } else {
+          // Invalid type, keep as string for now (will show validation error)
+          updateFieldValue(inputValue);
+        }
+      } catch {
+        // Invalid JSON, keep as string (will show validation error)
+        updateFieldValue(inputValue);
+      }
+    };
+
+    if (field.children && field.children.length > 0) {
+      return (
+        <Card key={field.id} className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium">{field.name}</CardTitle>
+            {field.description && <CardDescription className="text-sm">{field.description}</CardDescription>}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {field.children.map((childField) => renderRemoteConfigField(childField, fieldPath))}
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <div key={field.id} className="space-y-2">
+        <Label htmlFor={fieldPath}>
+          {field.name}
+          {field.required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+
+        {field.type === "string" && field.enumValues && field.enumValues.length > 0 ? (
+          <Select value={currentValue || ""} onValueChange={(value) => updateFieldValue(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder={`Select ${field.name}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {field.enumValues.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : field.type === "boolean" ? (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={fieldPath}
+              checked={currentValue === true}
+              onCheckedChange={(checked) => updateFieldValue(checked === true)}
+            />
+            <Label htmlFor={fieldPath} className="text-sm font-normal">
+              Enable {field.name}
+            </Label>
+          </div>
+        ) : field.type === "number" ? (
+          <Input
+            id={fieldPath}
+            type="number"
+            value={currentValue || ""}
+            onChange={(e) => updateFieldValue(e.target.value ? Number(e.target.value) : "")}
+            placeholder={field.defaultValue?.toString() || "Enter number"}
+            min={field.minValue}
+            max={field.maxValue}
+          />
+        ) : field.type === "array" || field.type === "object" ? (
+          <div className="space-y-2">
+            <Textarea
+              id={fieldPath}
+              value={getInputValue()}
+              onChange={(e) => handleComplexValueChange(e.target.value)}
+              placeholder={field.type === "array" ? "[]" : "{}"}
+              rows={3}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter valid JSON for {field.type === "array" ? "array" : "object"} type
+              {field.defaultValue && ` • Default: ${JSON.stringify(field.defaultValue)}`}
+            </p>
+          </div>
+        ) : (
+          <Input
+            id={fieldPath}
+            type="text"
+            value={currentValue || ""}
+            onChange={(e) => updateFieldValue(e.target.value)}
+            placeholder={field.defaultValue?.toString() || `Enter ${field.name}`}
+            minLength={field.minLength}
+            maxLength={field.maxLength}
+            pattern={field.pattern}
+          />
+        )}
+
+        {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
+
+        {!validation.isValid && (
+          <div className="text-sm text-red-600">
+            {validation.errors.map((error, idx) => (
+              <div key={idx}>{error}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleSubmit = async () => {
     let properties: Record<string, any> = {};
     try {
@@ -313,13 +576,8 @@ export default function CreateReleasePage() {
       return;
     }
 
-    let configProps: Record<string, any> = {};
-    try {
-      configProps = configProperties.trim() ? JSON.parse(configProperties) : {};
-    } catch {
-      toastWarning("Invalid JSON", "Configuration properties must be valid JSON");
-      return;
-    }
+    // Use remote config values as the config properties
+    const configProps: Record<string, any> = { ...remoteConfigValues };
 
     const dimensionsObj: Record<string, any> = {};
     targetingRules.forEach((r) => {
@@ -355,15 +613,16 @@ export default function CreateReleasePage() {
     <div className="p-6">
       <div className="flex-1">
         <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Create Release</h1>
-        <p className="text-muted-foreground mt-2">Step-by-step: configure, package, files, targeting</p>
+        <p className="text-muted-foreground mt-2">Step-by-step: configure, remote config, package, files, targeting</p>
 
         <div className="flex items-center gap-4 mt-6">
           {[
             { number: 1, title: "Configure", icon: Settings },
-            { number: 2, title: "Package & Details", icon: PkgIcon },
-            { number: 3, title: "Package File Priorities", icon: Info },
-            { number: 4, title: "Resources", icon: FileText },
-            { number: 5, title: "Targeting", icon: Target },
+            { number: 2, title: "Targeting", icon: Target },
+            { number: 3, title: "Remote Config", icon: Cog },
+            { number: 4, title: "Package & Details", icon: PkgIcon },
+            { number: 5, title: "File Priorities", icon: Info },
+            { number: 6, title: "Resources", icon: FileText },
           ].map((step, index) => {
             const status =
               step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming";
@@ -388,7 +647,7 @@ export default function CreateReleasePage() {
                     <div className="text-xs text-muted-foreground">Step {step.number}</div>
                   </div>
                 </div>
-                {index < 4 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                {index < 5 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
               </div>
             );
           })}
@@ -451,6 +710,165 @@ export default function CreateReleasePage() {
         )}
 
         {currentStep === 2 && (
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Targeting Rules</h4>
+                      <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
+                    </div>
+                    {releases.length > 0 && (
+                      <Button variant="outline" onClick={() => addRule()}>
+                        Add Rule
+                      </Button>
+                    )}
+                  </div>
+
+                  {targetingRules.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Target className="mx-auto h-8 w-8 mb-2" />
+                      {releases.length > 0 && (
+                        <p className="text-sm">No targeting rules set - release will go to all users</p>
+                      )}
+                      {releases.length == 0 && (
+                        <p className="text-sm">You can&lsquo;t target your first release. It goes to all users.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {targetingRules.map((rule, idx) => {
+                        return (
+                          <Card key={idx} className="p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label>Dimension</Label>
+                                <Select
+                                  value={rule.dimension}
+                                  onValueChange={(v) => updateRule(idx, { dimension: v, values: "" })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select dimension" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {dimensions.map((d) => (
+                                      <SelectItem key={d.dimension} value={d.dimension}>
+                                        {d.dimension}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Operator</Label>
+                                <Select
+                                  value={rule.operator}
+                                  onValueChange={(v: any) => updateRule(idx, { operator: v })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="equals">Equals</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Value</Label>
+                                <Input
+                                  value={rule.values || ""}
+                                  onChange={(e) => updateRule(idx, { values: e.target.value })}
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                <Button variant="outline" onClick={() => removeRule(idx)}>
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Remote Configuration</CardTitle>
+                <CardDescription>Configure values for your remote configuration schema</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {schemaLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin inline-block h-8 w-8 border-4 border-current border-t-transparent text-muted-foreground rounded-full mb-4" />
+                    <p className="text-muted-foreground">Loading schema...</p>
+                  </div>
+                ) : schemaError ? (
+                  <div className="text-center py-8">
+                    <div className="text-red-600 mb-4">{schemaError}</div>
+                    <Button onClick={fetchSchema} variant="outline">
+                      Retry
+                    </Button>
+                  </div>
+                ) : schemaFields.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Cog className="mx-auto h-8 w-8 mb-2" />
+                    <p className="text-sm mb-4">No remote configuration schema found</p>
+                    <p className="text-xs">
+                      Configure your remote config schema first to add configuration values for this release.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      <div className="text-sm text-blue-800">
+                        Configure the values for your remote configuration. These will be applied when this release is
+                        deployed.
+                        {targetingRules.length > 0 && (
+                          <span className="block mt-1 text-xs">
+                            Schema loaded with targeting dimensions:{" "}
+                            {targetingRules
+                              .map((rule) => rule.dimension)
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {schemaFields.map((field) => renderRemoteConfigField(field))}
+
+                    <div className="mt-6 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2">Preview (JSON)</h4>
+                      <pre className="hljs text-xs p-3 rounded border overflow-auto max-h-48">
+                        <code
+                          className="language-json"
+                          dangerouslySetInnerHTML={{
+                            __html: hljs.highlight(
+                              JSON.stringify(convertDottedToNestedObject(remoteConfigValues), null, 2),
+                              { language: "json" }
+                            ).value,
+                          }}
+                        />
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {currentStep === 4 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -520,7 +938,7 @@ export default function CreateReleasePage() {
           </div>
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 5 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -578,7 +996,7 @@ export default function CreateReleasePage() {
           </div>
         )}
 
-        {currentStep === 4 && (
+        {currentStep === 6 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -702,122 +1120,6 @@ export default function CreateReleasePage() {
                   </div>
                 )}
               </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {currentStep === 5 && releases.length > 0 && (
-          <div className="space-y-6">
-            <Card>
-              {/* <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
-                  <CardDescription>Control which users receive this release based on dimensions</CardDescription>
-                </CardHeader> */}
-              <CardContent className="space-y-6">
-                {/* <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="rollout">Rollout Percentage</Label>
-                      <span className="text-sm font-medium">{rolloutPercentage}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      id="rollout"
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={rolloutPercentage}
-                      onChange={(e) => setRolloutPercentage(Number(e.target.value))}
-                      className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div> */}
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">Targeting Rules</h4>
-                      <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
-                    </div>
-                    <Button variant="outline" onClick={() => addRule()}>
-                      Add Rule
-                    </Button>
-                  </div>
-
-                  {targetingRules.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Target className="mx-auto h-8 w-8 mb-2" />
-                      <p className="text-sm">No targeting rules set - release will go to all users</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {targetingRules.map((rule, idx) => {
-                        return (
-                          <Card key={idx} className="p-4">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                              <div className="space-y-2">
-                                <Label>Dimension</Label>
-                                <Select
-                                  value={rule.dimension}
-                                  onValueChange={(v) => updateRule(idx, { dimension: v, values: "" })}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select dimension" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {dimensions.map((d) => (
-                                      <SelectItem key={d.dimension} value={d.dimension}>
-                                        {d.dimension}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Operator</Label>
-                                <Select
-                                  value={rule.operator}
-                                  onValueChange={(v: any) => updateRule(idx, { operator: v })}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="equals">Equals</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Value</Label>
-                                <Input
-                                  value={rule.values || ""}
-                                  onChange={(e) => updateRule(idx, { values: e.target.value })}
-                                />
-                              </div>
-                              <div className="flex items-end">
-                                <Button variant="outline" onClick={() => removeRule(idx)}>
-                                  Remove
-                                </Button>
-                              </div>
-                            </div>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-        {currentStep == 5 && releases.length == 0 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
-                <CardDescription>
-                  You are not allowed to target or stagger your first release, this is going to be your default release.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6"></CardContent>
             </Card>
           </div>
         )}

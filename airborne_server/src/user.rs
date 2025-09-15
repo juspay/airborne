@@ -201,7 +201,10 @@ async fn login_implementation(
             &state.env.keycloak_public_key,
             &state.env.client_id,
         )
-        .map_err(|_| ABError::Unauthorized("Token has expired or is invalid".to_string()))?;
+        .map_err(|e| {
+            info!("Keycloak decode jwt error {:?}", e);
+            ABError::Unauthorized("Token has expired or is invalid".to_string())
+        })?;
         let admin_token = get_token(state.env.clone(), client)
             .await
             .map_err(|e| ABError::InternalServerError(e.to_string()))?;

@@ -47,10 +47,12 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    utils::init_tracing();
+    let log_format = std::env::var("LOG_FORMAT").unwrap_or_default();
+    utils::init_tracing(log_format);
 
     // Load Environment variables
     dotenv().ok(); // Load .env file
+
     let url = std::env::var("KEYCLOAK_URL").expect("KEYCLOAK_URL must be set");
     let keycloak_external_url = std::env::var("KEYCLOAK_EXTERNAL_URL")
         .unwrap_or_else(|_| url.replace("keycloak:8080", "localhost:8180"));
