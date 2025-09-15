@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, pointerWithin, rectIntersection } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
@@ -283,12 +283,22 @@ interface SortableFieldProps {
   isDragging?: boolean;
   globalDragState?: boolean;
   invalidDropTarget?: string | null;
+  autoOpenEditId?: string | null;
+  setAutoOpenEditId?: (id: string | null) => void;
 }
 
-function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, depth = 0, isDragOverlay = false, isDragging = false, globalDragState = false, invalidDropTarget = null }: SortableFieldProps) {
+function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, depth = 0, isDragOverlay = false, isDragging = false, globalDragState = false, invalidDropTarget = null, autoOpenEditId = null, setAutoOpenEditId }: SortableFieldProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<SchemaField>(field);
+
+  // Auto-open edit dialog for new fields
+  React.useEffect(() => {
+    if (autoOpenEditId === field.id && setAutoOpenEditId) {
+      setIsEditDialogOpen(true);
+      setAutoOpenEditId(null);
+    }
+  }, [autoOpenEditId, field.id, setAutoOpenEditId]);
 
   const {
     attributes,
@@ -463,6 +473,8 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
                           isDragging={isDragging}
                           globalDragState={globalDragState}
                           invalidDropTarget={invalidDropTarget}
+                          autoOpenEditId={autoOpenEditId}
+                          setAutoOpenEditId={setAutoOpenEditId}
                         />
                       ))}
                     </div>
@@ -852,8 +864,25 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
   const [isDragging, setIsDragging] = useState(false);
   const [isOverDropZone, setIsOverDropZone] = useState(false);
   const [invalidDropTarget, setInvalidDropTarget] = useState<string | null>(null);
+  const [autoOpenEditId, setAutoOpenEditId] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [initialFields, setInitialFields] = useState<SchemaField[]>(fields);
 
   const activeField = activeId ? findFieldById(fields, activeId) : null;
+
+  // Track changes
+  React.useEffect(() => {
+    const hasFieldsChanged = JSON.stringify(fields) !== JSON.stringify(initialFields);
+    setHasChanges(hasFieldsChanged);
+  }, [fields, initialFields]);
+
+  // Auto-populate JSON schema when switching to JSON tab
+  React.useEffect(() => {
+    if (jsonEditMode && fields.length > 0) {
+      const schema = generateJsonSchema(fields);
+      setJsonSchemaText(JSON.stringify(schema, null, 2));
+    }
+  }, [jsonEditMode, fields]);
 
   // Custom collision detection that prioritizes drop zones
   const customCollisionDetection = (args: any) => {
@@ -917,6 +946,9 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
       description: "",
       required: false,
     };
+
+    // Set this field to auto-open for editing
+    setAutoOpenEditId(newField.id);
 
     if (parentId) {
       const updateFields = (fieldsList: SchemaField[]): SchemaField[] => {
@@ -1198,6 +1230,65 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     setJsonSchemaText(JSON.stringify(schema, null, 2));
   };
 
+  // Transform schema to dot notation format
+  const transformSchemaToFlatFormat = (schema: any): Record<string, any> => {
+    const result: Record<string, any> = {};
+    
+    const traverseSchema = (obj: any, path: string = '') => {
+      if (obj.type === 'object' && obj.properties) {
+        const hasNonObjectProperties = Object.values(obj.properties).some((prop: any) => 
+          prop.type !== 'object' || !prop.properties
+        );
+        
+        if (hasNonObjectProperties) {
+          // If this object has non-object properties, add them with dot notation
+          Object.entries(obj.properties).forEach(([key, prop]: [string, any]) => {
+            const fullPath = path ? `${path}.properties.${key}` : `${key}`;
+            
+            if (prop.type === 'object' && prop.properties) {
+              // Recurse for nested objects
+              traverseSchema(prop, fullPath);
+            } else {
+              // Add leaf property
+              const cleanProp = { ...prop };
+              delete cleanProp.description; // Remove description if not needed in final format
+              result[fullPath] = cleanProp;
+            }
+          });
+        } else {
+          // If this object only has object properties, recurse into them
+          Object.entries(obj.properties).forEach(([key, prop]: [string, any]) => {
+            const fullPath = path ? `${path}.${key}` : key;
+            traverseSchema(prop, fullPath);
+          });
+        }
+      } else {
+        // This is a leaf node or non-object, add it directly
+        const cleanObj = { ...obj };
+        delete cleanObj.description; // Remove description if not needed
+        result[path] = cleanObj;
+      }
+    };
+    
+    if (schema.properties) {
+      Object.entries(schema.properties).forEach(([key, prop]: [string, any]) => {
+        traverseSchema(prop, key);
+      });
+    }
+    
+    return result;
+  };
+
+  const handleSubmitChanges = () => {
+    const schema = generateCurrentSchema();
+    const transformedSchema = transformSchemaToFlatFormat(schema);
+    console.log('Transformed Schema:', transformedSchema);
+    
+    // Reset the initial state to current state
+    setInitialFields([...fields]);
+    setHasChanges(false);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1211,6 +1302,13 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
           <Button onClick={() => addField()}>
             <Plus className="h-4 w-4 mr-2" />
             Add Field
+          </Button>
+          <Button 
+            onClick={handleSubmitChanges}
+            disabled={!hasChanges}
+            variant={hasChanges ? "default" : "secondary"}
+          >
+            Submit Changes
           </Button>
         </div>
       </div>
@@ -1265,6 +1363,8 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
                         onMoveToRoot={(fieldId) => moveFieldToParent(fieldId, null)}
                         globalDragState={isDragging}
                         invalidDropTarget={invalidDropTarget}
+                        autoOpenEditId={autoOpenEditId}
+                        setAutoOpenEditId={setAutoOpenEditId}
                       />
                     ))}
                   </SortableContext>
