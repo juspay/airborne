@@ -73,6 +73,11 @@ pub struct OrganisationRequestResponse {
     pub message: String,
 }
 
+#[derive(Serialize)]
+pub struct OrganisationListResponse {
+    pub organisations: Vec<Organisation>,
+}
+
 #[post("/request")]
 async fn request_organisation(
     req: HttpRequest,
@@ -317,7 +322,7 @@ async fn delete_organisation(
 async fn list_organisations(
     req: HttpRequest,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Vec<Organisation>>, ABError> {
+) -> actix_web::Result<Json<OrganisationListResponse>, ABError> {
     // Get Keycloak Admin Token
     let auth_response = req
         .extensions()
@@ -342,7 +347,9 @@ async fn list_organisations(
     // Parse groups into organizations
     let organizations = parse_user_organizations(group_paths);
 
-    Ok(Json(organizations))
+    Ok(Json(OrganisationListResponse {
+        organisations: organizations,
+    }))
 }
 
 // Helper function to parse Keycloak groups into organizations

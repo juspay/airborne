@@ -24,13 +24,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import SharedLayout from "@/components/shared-layout";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import json from "highlight.js/lib/languages/json";
 import hljs from "highlight.js";
 import { toastWarning } from "@/hooks/use-toast";
 import "highlight.js/styles/vs2015.css";
+import Analytics from "@/components/analytics/Analytics";
 
 hljs.registerLanguage("json", json);
 
@@ -220,426 +220,357 @@ export default function ReleaseDetailPage() {
   const highlightedCode = hljs.highlight(JSON.stringify(serveRC, null, 2), { language: "json" }).value;
 
   return (
-    <SharedLayout>
-      <div className="min-h-screen bg-background">
-        <div className="flex">
-          {/* Main Content */}
-          <main className="flex-1 p-6">
-            {/* Page Header */}
-            <div className="flex items-center gap-4 mb-8">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases`}>
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)]">
-                    Release {releaseId}
-                  </h1>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(release.experiment.status || "")}
-                    <Badge variant="secondary" className={getStatusColor(release.experiment.status || "")}>
-                      {release.experiment.status || "Unknown"}
-                    </Badge>
-                  </div>
+    <div className="min-h-screen bg-background">
+      <div className="flex">
+        {/* Main Content */}
+        <main className="flex-1 p-6">
+          {/* Page Header */}
+          <div className="flex items-center gap-4 mb-8">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases`}>
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)]">Release {releaseId}</h1>
+                <div className="flex items-center gap-2">
+                  {getStatusIcon(release.experiment.status || "")}
+                  <Badge variant="secondary" className={getStatusColor(release.experiment.status || "")}>
+                    {release.experiment.status || "Unknown"}
+                  </Badge>
                 </div>
-                <p className="text-muted-foreground">{`Package version ${release.package?.version || "N/A"}`}</p>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={rampRelease}
-                  disabled={isRamping || release.experiment.status === "CONCLUDED"}
-                >
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  {isRamping ? "Ramping..." : "Ramp"}
-                </Button>
-                <Button onClick={concludeRelease} disabled={isConcluding || release.experiment.status === "CONCLUDED"}>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {isConcluding ? "Concluding..." : "Conclude"}
-                </Button>
-              </div>
+              <p className="text-muted-foreground">{`Package version ${release.package?.version || "N/A"}`}</p>
             </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={rampRelease}
+                disabled={isRamping || release.experiment.status === "CONCLUDED"}
+              >
+                <TrendingUp className="h-4 w-4 mr-2" />
+                {isRamping ? "Ramping..." : "Ramp"}
+              </Button>
+              <Button onClick={concludeRelease} disabled={isConcluding || release.experiment.status === "CONCLUDED"}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {isConcluding ? "Concluding..." : "Conclude"}
+              </Button>
+            </div>
+          </div>
 
-            <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList>
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-                <TabsTrigger value="dimensions">Targeting</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              </TabsList>
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="files">Files</TabsTrigger>
+              <TabsTrigger value="dimensions">Targeting</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            </TabsList>
 
-              <TabsContent value="overview" className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Traffic %</p>
-                          <p className="text-2xl font-bold">{currentTrafficPercentage}%</p>
-                        </div>
-                        <Target className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Affected Users</p>
-                          <p className="text-2xl font-bold">{formatNumber(affectedUsers)}</p>
-                        </div>
-                        <Users className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Downloads</p>
-                          <p className="text-2xl font-bold">{formatNumber(totalDownloads)}</p>
-                        </div>
-                        <Download className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Errors</p>
-                          <p className="text-2xl font-bold">{errorCount}</p>
-                        </div>
-                        <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Rollout Progress */}
+            <TabsContent value="overview" className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Rollout Progress</CardTitle>
-                    <CardDescription>
-                      Max percentage you can choose for your release is capped to 50%, this is to balance traffic
-                      between your A(Control) and B(Experiment) release. To make this release live for everyone, you can
-                      conclude the release.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Traffic Percentage</span>
-                      <span className="text-sm text-muted-foreground">
-                        {currentTrafficPercentage}% of {targetPercentage}%
-                      </span>
-                    </div>
-                    <Progress value={currentTrafficPercentage * 2} className="w-full" />
-                    <div className="grid grid-cols-3 gap-4 text-sm">
                       <div>
-                        <p className="font-medium">Strategy</p>
-                        <p className="text-muted-foreground">{"Linear"}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Traffic %</p>
+                        <p className="text-2xl font-bold">{currentTrafficPercentage}%</p>
                       </div>
-                      <div>
-                        <p className="font-medium">Created</p>
-                        <p className="text-muted-foreground">
-                          {release.created_at ? new Date(release.created_at).toLocaleDateString() : "—"}
-                        </p>
-                      </div>
-                      {/* <div>
-                        <p className="font-medium">Created By</p>
-                        <p className="text-muted-foreground">{release.metadata?.created_by || "—"}</p>
-                      </div> */}
+                      <Target className="h-8 w-8 text-muted-foreground" />
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Release Info */}
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Information</CardTitle>
-                    <CardDescription>Detailed information about this release</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Release ID</p>
-                        <p className="text-sm text-muted-foreground font-mono">{releaseId}</p>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Affected Users</p>
+                        <p className="text-2xl font-bold">{formatNumber(affectedUsers)}</p>
                       </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Package Version</p>
-                        <p className="text-sm text-muted-foreground">{release.package?.version || "—"}</p>
-                      </div>
+                      <Users className="h-8 w-8 text-muted-foreground" />
                     </div>
-                    {/* {release.metadata?.notes && (
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Downloads</p>
+                        <p className="text-2xl font-bold">{formatNumber(totalDownloads)}</p>
+                      </div>
+                      <Download className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Errors</p>
+                        <p className="text-2xl font-bold">{errorCount}</p>
+                      </div>
+                      <AlertTriangle className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Rollout Progress */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Rollout Progress</CardTitle>
+                  <CardDescription>
+                    Max percentage you can choose for your release is capped to 50%, this is to balance traffic between
+                    your A(Control) and B(Experiment) release. To make this release live for everyone, you can conclude
+                    the release.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Traffic Percentage</span>
+                    <span className="text-sm text-muted-foreground">
+                      {currentTrafficPercentage}% of {targetPercentage}%
+                    </span>
+                  </div>
+                  <Progress value={currentTrafficPercentage * 2} className="w-full" />
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium">Strategy</p>
+                      <p className="text-muted-foreground">{"Linear"}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Created</p>
+                      <p className="text-muted-foreground">
+                        {release.created_at ? new Date(release.created_at).toLocaleDateString() : "—"}
+                      </p>
+                    </div>
+                    {/* <div>
+                        <p className="font-medium">Created By</p>
+                        <p className="text-muted-foreground">{release.metadata?.created_by || "—"}</p>
+                      </div> */}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Release Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Information</CardTitle>
+                  <CardDescription>Detailed information about this release</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Release ID</p>
+                      <p className="text-sm text-muted-foreground font-mono">{releaseId}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Package Version</p>
+                      <p className="text-sm text-muted-foreground">{release.package?.version || "—"}</p>
+                    </div>
+                  </div>
+                  {/* {release.metadata?.notes && (
                       <div className="space-y-2">
                         <p className="text-sm font-medium">Release Notes</p>
                         <p className="text-sm text-muted-foreground">{release.metadata.notes}</p>
                       </div>
                     )} */}
-                  </CardContent>
-                </Card>
+                </CardContent>
+              </Card>
 
-                {/* Release Config */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Config</CardTitle>
-                    <CardDescription></CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="relative">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-4 top-4 bg-white mt-5"
-                        onClick={() => navigator.clipboard.writeText(JSON.stringify(serveRC, null, 2))}
-                      >
-                        Copy
-                      </Button>
-                    </div>
-                    <pre className="hljs whitespace-pre overflow-x-auto rounded-md p-4 text-sm">
-                      <code className="language-json" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
-                    </pre>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+              {/* Release Config */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Config</CardTitle>
+                  <CardDescription></CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-4 top-4 bg-white mt-5"
+                      onClick={() => navigator.clipboard.writeText(JSON.stringify(serveRC, null, 2))}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <pre className="hljs whitespace-pre overflow-x-auto rounded-md p-4 text-sm">
+                    <code className="language-json" dangerouslySetInnerHTML={{ __html: highlightedCode }} />
+                  </pre>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <TabsContent value="files" className="space-y-6">
-                {/* Package Files */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Package Files</CardTitle>
-                    <CardDescription>Files included in this release package</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Path</TableHead>
-                          <TableHead>URL</TableHead>
-                          <TableHead>Checksum</TableHead>
-                          <TableHead>Priority</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {[...release.package.important, ...release.package.lazy].map((file, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{file.file_path}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{file.url || "Unknown"}</Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {release.package.important.findIndex((f) => f.checksum == file.checksum) !== -1
-                                ? "important"
-                                : "lazy"}
-                            </TableCell>
-                            <TableCell>
-                              {file.url && (
-                                <Button variant="ghost" size="sm" asChild>
-                                  <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-
-                {/* Resource Files */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Resource Files</CardTitle>
-                    <CardDescription>Files included in this release resources</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Path</TableHead>
-                          <TableHead>URL</TableHead>
-                          <TableHead>Checksum</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {release.resources.map((file, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{file.file_path}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{file.url || "Unknown"}</Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
-                            <TableCell>
-                              {file.url && (
-                                <Button variant="ghost" size="sm" asChild>
-                                  <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="dimensions" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Dimensions</CardTitle>
-                    <CardDescription>Targeting and configuration parameters for this release</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {release.dimensions ? (
-                      <div className="space-y-4">
-                        {Object.entries(release.dimensions).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{key}</p>
-                              <p className="text-sm text-muted-foreground">Dimension parameter</p>
+            <TabsContent value="files" className="space-y-6">
+              {/* Package Files */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Package Files</CardTitle>
+                  <CardDescription>Files included in this release package</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Path</TableHead>
+                        <TableHead>URL</TableHead>
+                        <TableHead>Checksum</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...release.package.important, ...release.package.lazy].map((file, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{file.file_path}</span>
                             </div>
-                            <div className="text-right">
-                              <p className="font-mono text-sm">{JSON.stringify(value)}</p>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{file.url || "Unknown"}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {release.package.important.findIndex((f) => f.checksum == file.checksum) !== -1
+                              ? "important"
+                              : "lazy"}
+                          </TableCell>
+                          <TableCell>
+                            {file.url && (
+                              <Button variant="ghost" size="sm" asChild>
+                                <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Resource Files */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Resource Files</CardTitle>
+                  <CardDescription>Files included in this release resources</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Path</TableHead>
+                        <TableHead>URL</TableHead>
+                        <TableHead>Checksum</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {release.resources.map((file, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{file.file_path}</span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{file.url || "Unknown"}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
+                          <TableCell>
+                            {file.url && (
+                              <Button variant="ghost" size="sm" asChild>
+                                <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="dimensions" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Dimensions</CardTitle>
+                  <CardDescription>Targeting and configuration parameters for this release</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {release.dimensions ? (
+                    <div className="space-y-4">
+                      {Object.entries(release.dimensions).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{key}</p>
+                            <p className="text-sm text-muted-foreground">Dimension parameter</p>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">No dimensions configured for this release</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Ramp Configuration */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Ramp Configuration</CardTitle>
-                    <CardDescription>Traffic ramping and rollout settings</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Current Traffic</p>
-                        <p className="text-2xl font-bold">{currentTrafficPercentage}%</p>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Target Traffic</p>
-                        <p className="text-2xl font-bold">{targetPercentage}%</p>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Rollout Strategy</p>
-                        <p className="text-sm text-muted-foreground">{"Linear"}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Status</p>
-                        <Badge variant="outline" className={getStatusColor(release.experiment.status || "")}>
-                          {release.experiment.status || "Unknown"}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="analytics" className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
-                        Performance Metrics
-                      </CardTitle>
-                      <CardDescription>Key performance indicators for this release</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Success Rate</span>
-                        <span className="font-medium">
-                          {errorCount === 0
-                            ? "100%"
-                            : `${(((totalDownloads - errorCount) / totalDownloads) * 100).toFixed(1)}%`}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Total Downloads</span>
-                        <span className="font-medium">{formatNumber(totalDownloads)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">Error Count</span>
-                        <span className="font-medium">{errorCount}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Timeline</CardTitle>
-                      <CardDescription>Important events in this release lifecycle</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-2 w-2 bg-blue-500 rounded-full" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">Release Created</p>
-                            <p className="text-xs text-muted-foreground">
-                              {release.created_at ? new Date(release.created_at).toLocaleString() : "—"}
-                            </p>
+                          <div className="text-right">
+                            <p className="font-mono text-sm">{JSON.stringify(value)}</p>
                           </div>
                         </div>
-                        {release.experiment.status === "INPROGRESS" && (
-                          <div className="flex items-center gap-3">
-                            <div className="h-2 w-2 bg-green-500 rounded-full" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">Rollout Started</p>
-                              <p className="text-xs text-muted-foreground">Currently at {currentTrafficPercentage}%</p>
-                            </div>
-                          </div>
-                        )}
-                        {release.experiment.status === "CONCLUDED" && (
-                          <div className="flex items-center gap-3">
-                            <div className="h-2 w-2 bg-purple-500 rounded-full" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">Release Concluded</p>
-                              <p className="text-xs text-muted-foreground">Deployment completed</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </main>
-        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No dimensions configured for this release</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Ramp Configuration */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Ramp Configuration</CardTitle>
+                  <CardDescription>Traffic ramping and rollout settings</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Current Traffic</p>
+                      <p className="text-2xl font-bold">{currentTrafficPercentage}%</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Target Traffic</p>
+                      <p className="text-2xl font-bold">{targetPercentage}%</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Rollout Strategy</p>
+                      <p className="text-sm text-muted-foreground">{"Linear"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Status</p>
+                      <Badge variant="outline" className={getStatusColor(release.experiment.status || "")}>
+                        {release.experiment.status || "Unknown"}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-6">
+              <Analytics releaseId={releaseId} />
+            </TabsContent>
+          </Tabs>
+        </main>
       </div>
-    </SharedLayout>
+    </div>
   );
 }

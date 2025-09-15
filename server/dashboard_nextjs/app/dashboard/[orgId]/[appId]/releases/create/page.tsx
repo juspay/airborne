@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import SharedLayout from "@/components/shared-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +42,8 @@ type ApiResponse = {
 
 type TargetingRule = {
   dimension: string;
-  operator: "equals" | "not_equals" | "in" | "not_in";
-  values: string[];
+  operator: "equals";
+  values: string;
 };
 
 export default function CreateReleasePage() {
@@ -172,7 +171,7 @@ export default function CreateReleasePage() {
     .filter(([, v]) => v === "lazy")
     .map(([k]) => k);
 
-  const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: [] }]);
+  const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: "" }]);
   const removeRule = (i: number) => setTargetingRules((r) => r.filter((_, idx) => idx !== i));
   const updateRule = (i: number, patch: Partial<TargetingRule>) =>
     setTargetingRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, ...patch } : rule)));
@@ -347,376 +346,369 @@ export default function CreateReleasePage() {
   };
 
   return (
-    <SharedLayout>
-      <div className="p-6">
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
-            Create Release
-          </h1>
-          <p className="text-muted-foreground mt-2">Step-by-step: configure, package, files, targeting</p>
+    <div className="p-6">
+      <div className="flex-1">
+        <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Create Release</h1>
+        <p className="text-muted-foreground mt-2">Step-by-step: configure, package, files, targeting</p>
 
-          <div className="flex items-center gap-4 mt-6">
-            {[
-              { number: 1, title: "Configure", icon: Settings },
-              { number: 2, title: "Package & Details", icon: PkgIcon },
-              { number: 3, title: "Package File Priorities", icon: Info },
-              { number: 4, title: "Resources", icon: FileText },
-              { number: 5, title: "Targeting", icon: Target },
-            ].map((step, index) => {
-              const status =
-                step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming";
-              const Icon = step.icon;
-              return (
-                <div key={step.number} className="flex items-center">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`
+        <div className="flex items-center gap-4 mt-6">
+          {[
+            { number: 1, title: "Configure", icon: Settings },
+            { number: 2, title: "Package & Details", icon: PkgIcon },
+            { number: 3, title: "Package File Priorities", icon: Info },
+            { number: 4, title: "Resources", icon: FileText },
+            { number: 5, title: "Targeting", icon: Target },
+          ].map((step, index) => {
+            const status =
+              step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming";
+            const Icon = step.icon;
+            return (
+              <div key={step.number} className="flex items-center">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`
                         flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
                         ${status === "completed" ? "bg-primary border-primary text-primary-foreground" : status === "current" ? "border-primary text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground"}
                       `}
+                  >
+                    {status === "completed" ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                  </div>
+                  <div className="hidden sm:block">
+                    <div
+                      className={`font-medium text-sm ${status !== "upcoming" ? "text-foreground" : "text-muted-foreground"}`}
                     >
-                      {status === "completed" ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                      {step.title}
                     </div>
-                    <div className="hidden sm:block">
-                      <div
-                        className={`font-medium text-sm ${status !== "upcoming" ? "text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {step.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Step {step.number}</div>
-                    </div>
+                    <div className="text-xs text-muted-foreground">Step {step.number}</div>
                   </div>
-                  {index < 4 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
                 </div>
-              );
-            })}
-          </div>
+                {index < 4 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+              </div>
+            );
+          })}
         </div>
+      </div>
 
-        <div className="space-y-6 mt-6">
-          {currentStep === 1 && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Configuration</CardTitle>
-                  <CardDescription>
-                    Configure timeout settings and additional properties for this release
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="bootTimeout">Boot Timeout (ms)</Label>
-                      <Input
-                        id="bootTimeout"
-                        type="number"
-                        value={bootTimeout}
-                        onChange={(e) => setBootTimeout(Number(e.target.value))}
-                        placeholder="4000"
-                        min="0"
-                        step="100"
-                      />
-                      <p className="text-xs text-muted-foreground">Maximum time to wait for application boot</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="releaseConfigTimeout">Release Config Timeout (ms)</Label>
-                      <Input
-                        id="releaseConfigTimeout"
-                        type="number"
-                        value={releaseConfigTimeout}
-                        onChange={(e) => setReleaseConfigTimeout(Number(e.target.value))}
-                        placeholder="4000"
-                        min="0"
-                        step="100"
-                      />
-                      <p className="text-xs text-muted-foreground">Maximum time to wait for release configuration</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 hidden">
-                    <Label htmlFor="configProperties">Additional Properties (JSON)</Label>
-                    <Textarea
-                      id="configProperties"
-                      rows={6}
-                      value={configProperties}
-                      onChange={(e) => setConfigProperties(e.target.value)}
-                      placeholder='{"feature_flags": {"new_ui": true}, "api_version": "v2"}'
-                      className="font-mono text-sm"
+      <div className="space-y-6 mt-6">
+        {currentStep === 1 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Configuration</CardTitle>
+                <CardDescription>Configure timeout settings and additional properties for this release</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="bootTimeout">Boot Timeout (ms)</Label>
+                    <Input
+                      id="bootTimeout"
+                      type="number"
+                      value={bootTimeout}
+                      onChange={(e) => setBootTimeout(Number(e.target.value))}
+                      placeholder="4000"
+                      min="0"
+                      step="100"
                     />
-                    <p className="text-xs text-muted-foreground">Additional configuration properties in JSON format</p>
+                    <p className="text-xs text-muted-foreground">Maximum time to wait for application boot</p>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Version</CardTitle>
-                  <CardDescription>Choose an existing package to base this release on (optional)</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search packages..."
-                        value={pkgSearch}
-                        onChange={(e) => setPkgSearch(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="releaseConfigTimeout">Release Config Timeout (ms)</Label>
+                    <Input
+                      id="releaseConfigTimeout"
+                      type="number"
+                      value={releaseConfigTimeout}
+                      onChange={(e) => setReleaseConfigTimeout(Number(e.target.value))}
+                      placeholder="4000"
+                      min="0"
+                      step="100"
+                    />
+                    <p className="text-xs text-muted-foreground">Maximum time to wait for release configuration</p>
                   </div>
+                </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50px]"></TableHead>
-                        <TableHead>Version</TableHead>
-                        <TableHead>Tag</TableHead>
-                        <TableHead>Index</TableHead>
-                        <TableHead>Files</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredPackages.map((p) => {
-                        const key = `${p.tag}:${p.version}`;
-                        const checked = selectedPackage
-                          ? `${selectedPackage.tag}:${selectedPackage.version}` === key
-                          : false;
-                        return (
-                          <TableRow key={key}>
-                            <TableCell>
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={() => setSelectedPackage(checked ? null : p)}
-                              />
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{p.version}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{p.tag}</Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{p.index}</TableCell>
-                            <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-2 hidden">
+                  <Label htmlFor="configProperties">Additional Properties (JSON)</Label>
+                  <Textarea
+                    id="configProperties"
+                    rows={6}
+                    value={configProperties}
+                    onChange={(e) => setConfigProperties(e.target.value)}
+                    placeholder='{"feature_flags": {"new_ui": true}, "api_version": "v2"}'
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">Additional configuration properties in JSON format</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-                  <div className="mt-6 space-y-2 hidden">
-                    <Label>Package Properties (JSON)</Label>
-                    <Textarea
-                      rows={4}
-                      value={propertiesJSON}
-                      onChange={(e) => setPropertiesJSON(e.target.value)}
-                      placeholder='{"featureFlag": true}'
+        {currentStep === 2 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Version</CardTitle>
+                <CardDescription>Choose an existing package to base this release on (optional)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search packages..."
+                      value={pkgSearch}
+                      onChange={(e) => setPkgSearch(e.target.value)}
+                      className="pl-10"
                     />
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                </div>
 
-          {currentStep === 3 && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
-                    Configure File Priorities
-                  </CardTitle>
-                  <CardDescription>Choose which files load immediately (important) vs on-demand (lazy)</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2 p-3 bg-blue-10 border border-blue-200 rounded-lg mb-4">
-                    <Info className="h-4 w-4 text-blue-600" />
-                    <div className="text-sm">All files default to Important. Switch to Lazy to defer loading.</div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Tag</TableHead>
+                      <TableHead>Index</TableHead>
+                      <TableHead>Files</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPackages.map((p) => {
+                      const key = `${p.tag}:${p.version}`;
+                      const checked = selectedPackage
+                        ? `${selectedPackage.tag}:${selectedPackage.version}` === key
+                        : false;
+                      return (
+                        <TableRow key={key}>
+                          <TableCell>
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={() => setSelectedPackage(checked ? null : p)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{p.version}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{p.tag}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{p.index}</TableCell>
+                          <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                <div className="mt-6 space-y-2 hidden">
+                  <Label>Package Properties (JSON)</Label>
+                  <Textarea
+                    rows={4}
+                    value={propertiesJSON}
+                    onChange={(e) => setPropertiesJSON(e.target.value)}
+                    placeholder='{"featureFlag": true}'
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {currentStep === 3 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
+                  Configure File Priorities
+                </CardTitle>
+                <CardDescription>Choose which files load immediately (important) vs on-demand (lazy)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 p-3 bg-blue-10 border border-blue-200 rounded-lg mb-4">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <div className="text-sm">All files default to Important. Switch to Lazy to defer loading.</div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>File</TableHead>
+                      <TableHead>Tag</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Priority</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {files.map((f) => {
+                      const id = f.id || `${f.file_path}@version:${f.version}`;
+                      return (
+                        <TableRow key={id}>
+                          <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                          <TableCell className="text-muted-foreground">{f.tag}</TableCell>
+                          <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={filePriority[id] || "important"}
+                              onValueChange={(val: "important" | "lazy") => {
+                                setFilePriority((prev) => ({ ...prev, [id]: val }));
+                                console.log("Updated file priorities", filePriority);
+                              }}
+                            >
+                              <SelectTrigger className="w-36">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="important">Important</SelectItem>
+                                <SelectItem value="lazy">Lazy</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {currentStep === 4 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Resources</CardTitle>
+                <CardDescription>Choose additional files to include as resources in this release</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search resources..."
+                      value={resourceSearch}
+                      onChange={(e) => handleResourceSearchChange(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>File</TableHead>
-                        <TableHead>Tag</TableHead>
-                        <TableHead>Version</TableHead>
-                        <TableHead>Priority</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {files.map((f) => {
-                        const id = f.id || `${f.file_path}@version:${f.version}`;
-                        return (
-                          <TableRow key={id}>
-                            <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                            <TableCell className="text-muted-foreground">{f.tag}</TableCell>
-                            <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                            <TableCell>
-                              <Select
-                                value={filePriority[id] || "important"}
-                                onValueChange={(val: "important" | "lazy") => {
-                                  setFilePriority((prev) => ({ ...prev, [id]: val }));
-                                  console.log("Updated file priorities", filePriority);
+                </div>
+
+                {resourceError ? (
+                  <div className="text-red-600">Failed to load resources</div>
+                ) : resourceLoading ? (
+                  <div>Loading resources...</div>
+                ) : availableResources.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="mx-auto h-8 w-8 mb-2" />
+                    <p className="text-sm">
+                      {resourceSearch ? "No resources found matching your search" : "No additional resources available"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {Math.min(perPage, availableResources.length)} available of {resourceTotal} files (Package
+                      files and index file are excluded)
+                      {resourceCurrentPage > 1 && ` (page ${resourceCurrentPage})`}
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]"></TableHead>
+                          <TableHead>File Path</TableHead>
+                          <TableHead>Tag</TableHead>
+                          <TableHead>Created</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {availableResources.map((resource) => {
+                          const isSelected = selectedResources.has(resource.id);
+                          return (
+                            <TableRow key={resource.id}>
+                              <TableCell>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => {
+                                    const newSelected = new Set(selectedResources);
+                                    if (checked) {
+                                      newSelected.add(resource.id);
+                                    } else {
+                                      newSelected.delete(resource.id);
+                                    }
+                                    setSelectedResources(newSelected);
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{resource.file_path}</TableCell>
+                              <TableCell className="text-muted-foreground">{resource.tag}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : "—"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+
+                    {/* Resources Pagination */}
+                    {resourceTotalPages > 1 && (
+                      <div className="mt-4">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (resourceCurrentPage > 1) setResourceCurrentPage(resourceCurrentPage - 1);
                                 }}
-                              >
-                                <SelectTrigger className="w-36">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="important">Important</SelectItem>
-                                  <SelectItem value="lazy">Lazy</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                                className={resourceCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                              />
+                            </PaginationItem>
 
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Resources</CardTitle>
-                  <CardDescription>Choose additional files to include as resources in this release</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search resources..."
-                        value={resourceSearch}
-                        onChange={(e) => handleResourceSearchChange(e.target.value)}
-                        className="pl-10"
-                      />
+                            {renderPaginationItems(resourceCurrentPage, resourceTotalPages, setResourceCurrentPage)}
+
+                            <PaginationItem>
+                              <PaginationNext
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (resourceCurrentPage < resourceTotalPages)
+                                    setResourceCurrentPage(resourceCurrentPage + 1);
+                                }}
+                                className={
+                                  resourceCurrentPage >= resourceTotalPages ? "pointer-events-none opacity-50" : ""
+                                }
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedResources.size > 0 && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-sm text-green-800">
+                      Selected {selectedResources.size} resource{selectedResources.size !== 1 ? "s" : ""} for this
+                      release
                     </div>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-                  {resourceError ? (
-                    <div className="text-red-600">Failed to load resources</div>
-                  ) : resourceLoading ? (
-                    <div>Loading resources...</div>
-                  ) : availableResources.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <FileText className="mx-auto h-8 w-8 mb-2" />
-                      <p className="text-sm">
-                        {resourceSearch
-                          ? "No resources found matching your search"
-                          : "No additional resources available"}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="text-sm text-muted-foreground">
-                        Showing {Math.min(perPage, availableResources.length)} available of {resourceTotal} files
-                        (Package files and index file are excluded)
-                        {resourceCurrentPage > 1 && ` (page ${resourceCurrentPage})`}
-                      </div>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>File Path</TableHead>
-                            <TableHead>Tag</TableHead>
-                            <TableHead>Created</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {availableResources.map((resource) => {
-                            const isSelected = selectedResources.has(resource.id);
-                            return (
-                              <TableRow key={resource.id}>
-                                <TableCell>
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={(checked) => {
-                                      const newSelected = new Set(selectedResources);
-                                      if (checked) {
-                                        newSelected.add(resource.id);
-                                      } else {
-                                        newSelected.delete(resource.id);
-                                      }
-                                      setSelectedResources(newSelected);
-                                    }}
-                                  />
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">{resource.file_path}</TableCell>
-                                <TableCell className="text-muted-foreground">{resource.tag}</TableCell>
-                                <TableCell className="text-muted-foreground">
-                                  {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : "—"}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-
-                      {/* Resources Pagination */}
-                      {resourceTotalPages > 1 && (
-                        <div className="mt-4">
-                          <Pagination>
-                            <PaginationContent>
-                              <PaginationItem>
-                                <PaginationPrevious
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    if (resourceCurrentPage > 1) setResourceCurrentPage(resourceCurrentPage - 1);
-                                  }}
-                                  className={resourceCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                                />
-                              </PaginationItem>
-
-                              {renderPaginationItems(resourceCurrentPage, resourceTotalPages, setResourceCurrentPage)}
-
-                              <PaginationItem>
-                                <PaginationNext
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    if (resourceCurrentPage < resourceTotalPages)
-                                      setResourceCurrentPage(resourceCurrentPage + 1);
-                                  }}
-                                  className={
-                                    resourceCurrentPage >= resourceTotalPages ? "pointer-events-none opacity-50" : ""
-                                  }
-                                />
-                              </PaginationItem>
-                            </PaginationContent>
-                          </Pagination>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedResources.size > 0 && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="text-sm text-green-800">
-                        Selected {selectedResources.size} resource{selectedResources.size !== 1 ? "s" : ""} for this
-                        release
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {currentStep === 5 && releases.length > 0 && (
-            <div className="space-y-6">
-              <Card>
-                {/* <CardHeader>
+        {currentStep === 5 && releases.length > 0 && (
+          <div className="space-y-6">
+            <Card>
+              {/* <CardHeader>
                   <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
                   <CardDescription>Control which users receive this release based on dimensions</CardDescription>
                 </CardHeader> */}
-                <CardContent className="space-y-6">
-                  {/* <div className="space-y-4">
+              <CardContent className="space-y-6">
+                {/* <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="rollout">Rollout Percentage</Label>
                       <span className="text-sm font-medium">{rolloutPercentage}%</span>
@@ -733,141 +725,123 @@ export default function CreateReleasePage() {
                     />
                   </div> */}
 
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">Targeting Rules</h4>
-                        <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
-                      </div>
-                      <Button variant="outline" onClick={() => addRule()}>
-                        Add Rule
-                      </Button>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium">Targeting Rules</h4>
+                      <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
                     </div>
-
-                    {targetingRules.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Target className="mx-auto h-8 w-8 mb-2" />
-                        <p className="text-sm">No targeting rules set - release will go to all users</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {targetingRules.map((rule, idx) => {
-                          const dimDef = dimensions.find((d) => d.dimension === rule.dimension);
-                          return (
-                            <Card key={idx} className="p-4">
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="space-y-2">
-                                  <Label>Dimension</Label>
-                                  <Select
-                                    value={rule.dimension}
-                                    onValueChange={(v) => updateRule(idx, { dimension: v, values: [] })}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select dimension" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {dimensions.map((d) => (
-                                        <SelectItem key={d.dimension} value={d.dimension}>
-                                          {d.dimension}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Operator</Label>
-                                  <Select
-                                    value={rule.operator}
-                                    onValueChange={(v: any) => updateRule(idx, { operator: v })}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="equals">Equals</SelectItem>
-                                      <SelectItem value="not_equals">Not Equals</SelectItem>
-                                      <SelectItem value="in">In</SelectItem>
-                                      <SelectItem value="not_in">Not In</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Value</Label>
-                                  <Select
-                                    value={rule.values[0] || ""}
-                                    onValueChange={(v) => updateRule(idx, { values: [v] })}
-                                    disabled={!dimDef}
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select value" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {(dimDef?.values || []).map((val) => (
-                                        <SelectItem key={val} value={String(val)}>
-                                          {String(val)}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="flex items-end">
-                                  <Button variant="outline" onClick={() => removeRule(idx)}>
-                                    Remove
-                                  </Button>
-                                </div>
-                              </div>
-                            </Card>
-                          );
-                        })}
-                      </div>
-                    )}
+                    <Button variant="outline" onClick={() => addRule()}>
+                      Add Rule
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-          {currentStep == 5 && releases.length == 0 && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
-                  <CardDescription>
-                    You are not allowed to target or stagger your first release, this is going to be your default
-                    release.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6"></CardContent>
-              </Card>
-            </div>
+
+                  {targetingRules.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Target className="mx-auto h-8 w-8 mb-2" />
+                      <p className="text-sm">No targeting rules set - release will go to all users</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {targetingRules.map((rule, idx) => {
+                        return (
+                          <Card key={idx} className="p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <div className="space-y-2">
+                                <Label>Dimension</Label>
+                                <Select
+                                  value={rule.dimension}
+                                  onValueChange={(v) => updateRule(idx, { dimension: v, values: "" })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select dimension" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {dimensions.map((d) => (
+                                      <SelectItem key={d.dimension} value={d.dimension}>
+                                        {d.dimension}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Operator</Label>
+                                <Select
+                                  value={rule.operator}
+                                  onValueChange={(v: any) => updateRule(idx, { operator: v })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="equals">Equals</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Value</Label>
+                                <Input
+                                  value={rule.values || ""}
+                                  onChange={(e) => updateRule(idx, { values: e.target.value })}
+                                />
+                              </div>
+                              <div className="flex items-end">
+                                <Button variant="outline" onClick={() => removeRule(idx)}>
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        {currentStep == 5 && releases.length == 0 && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Release Targeting</CardTitle>
+                <CardDescription>
+                  You are not allowed to target or stagger your first release, this is going to be your default release.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6"></CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between mt-8 pt-6 border-t">
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases`}>
+              Cancel
+            </Link>
+          </Button>
+          {currentStep > 1 && (
+            <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
+              Previous
+            </Button>
           )}
         </div>
-
-        <div className="flex items-center justify-between mt-8 pt-6 border-t">
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases`}>
-                Cancel
-              </Link>
+        <div className="flex gap-2">
+          {currentStep < totalSteps ? (
+            <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
+              Next Step
             </Button>
-            {currentStep > 1 && (
-              <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
-                Previous
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {currentStep < totalSteps ? (
-              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
-                Next Step
-              </Button>
-            ) : (
-              <Button onClick={handleSubmit} disabled={!canProceedToStep(1)}>
-                Create Release
-              </Button>
-            )}
-          </div>
+          ) : (
+            <Button onClick={handleSubmit} disabled={!canProceedToStep(1)}>
+              Create Release
+            </Button>
+          )}
         </div>
       </div>
-    </SharedLayout>
+    </div>
   );
 }

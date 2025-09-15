@@ -43,3 +43,5 @@ tokio = { version = "1", features = ["full"] }
 urlencoding = "2.1.2"
 uuid = { version = "1.16.0", features = ["serde", "v7", "v4"] }
 zip = "4.6.1"
+http = "0.2.12"
+url = "2.5.7"
