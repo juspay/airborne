@@ -223,30 +223,48 @@ function RootDropZone({ children, isActive }: { children: React.ReactNode; isAct
 }
 
 // Drop zone for nested fields
-function NestedDropZone({ parentId, isActive, children }: { 
+function NestedDropZone({ parentId, isActive, children, isInvalid = false }: { 
   parentId: string; 
   isActive: boolean;
   children?: React.ReactNode;
+  isInvalid?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `drop-zone-${parentId}`,
   });
 
+  const isInvalidDrop = isInvalid && isOver;
+
   return (
     <div 
       ref={setNodeRef}
       className={`min-h-[80px] transition-all duration-200 ${
-        isActive || isOver
-          ? 'bg-green-50 dark:bg-green-950 border-2 border-dashed border-green-300 dark:border-green-600 rounded-lg p-4' 
-          : 'min-h-0'
+        isInvalidDrop
+          ? 'bg-red-50 dark:bg-red-950 border-2 border-dashed border-red-300 dark:border-red-600 rounded-lg p-4'
+          : isActive || isOver
+            ? 'bg-green-50 dark:bg-green-950 border-2 border-dashed border-green-300 dark:border-green-600 rounded-lg p-4' 
+            : 'min-h-0'
       }`}
     >
       {children}
       {(isOver || isActive) && !children && (
-        <div className="flex items-center justify-center p-6 text-green-600 dark:text-green-400">
+        <div className={`flex items-center justify-center p-6 ${
+          isInvalidDrop 
+            ? 'text-red-600 dark:text-red-400' 
+            : 'text-green-600 dark:text-green-400'
+        }`}>
           <div className="text-center">
-            <Folder className="h-6 w-6 mx-auto mb-1" />
-            <p className="text-xs font-medium">Drop here to add as child field</p>
+            {isInvalidDrop ? (
+              <>
+                <Folder className="h-6 w-6 mx-auto mb-1" />
+                <p className="text-xs font-medium">⚠️ Invalid drop target</p>
+              </>
+            ) : (
+              <>
+                <Folder className="h-6 w-6 mx-auto mb-1" />
+                <p className="text-xs font-medium">Drop here to add as child field</p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -264,9 +282,10 @@ interface SortableFieldProps {
   isDragOverlay?: boolean;
   isDragging?: boolean;
   globalDragState?: boolean;
+  invalidDropTarget?: string | null;
 }
 
-function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, depth = 0, isDragOverlay = false, isDragging = false, globalDragState = false }: SortableFieldProps) {
+function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, depth = 0, isDragOverlay = false, isDragging = false, globalDragState = false, invalidDropTarget = null }: SortableFieldProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<SchemaField>(field);
@@ -417,7 +436,11 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
           <Collapsible open={isOpen}>
             <CollapsibleContent>
               <CardContent className="pt-0 pb-4">
-                <NestedDropZone parentId={field.id} isActive={globalDragState && !hasChildren}>
+                <NestedDropZone 
+                  parentId={field.id} 
+                  isActive={globalDragState && !hasChildren}
+                  isInvalid={invalidDropTarget === `drop-zone-${field.id}`}
+                >
                   {hasChildren && (
                     <div className="space-y-2">
                       {field.children?.map((child) => (
@@ -439,6 +462,7 @@ function SortableField({ field, onUpdate, onDelete, onAddChild, onMoveToRoot, de
                           depth={depth + 1}
                           isDragging={isDragging}
                           globalDragState={globalDragState}
+                          invalidDropTarget={invalidDropTarget}
                         />
                       ))}
                     </div>
@@ -827,6 +851,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
   const [jsonError, setJsonError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isOverDropZone, setIsOverDropZone] = useState(false);
+  const [invalidDropTarget, setInvalidDropTarget] = useState<string | null>(null);
 
   const activeField = activeId ? findFieldById(fields, activeId) : null;
 
@@ -869,6 +894,19 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
       }
     }
     return null;
+  }
+
+  function isAncestorOf(potentialAncestorId: string, potentialDescendantId: string): boolean {
+    const ancestor = findFieldById(fields, potentialAncestorId);
+    if (!ancestor || !ancestor.children) return false;
+    
+    // Check if potentialDescendantId is a direct child
+    if (ancestor.children.some(child => child.id === potentialDescendantId)) {
+      return true;
+    }
+    
+    // Check if potentialDescendantId is a descendant of any child
+    return ancestor.children.some(child => isAncestorOf(child.id, potentialDescendantId));
   }
 
   const addField = (parentId?: string) => {
@@ -994,6 +1032,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     const { active, over } = event;
     if (!over) {
       setIsOverDropZone(false);
+      setInvalidDropTarget(null);
       return;
     }
 
@@ -1004,15 +1043,52 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     const activeField = findFieldById(fields, String(active.id));
     const overField = findFieldById(fields, String(over.id));
 
-    if (!activeField || !overField) return;
+    if (!activeField) return;
+
+    // If we're over a drop zone, check for circular dependency
+    if (String(over.id).startsWith('drop-zone-')) {
+      const parentId = String(over.id).replace('drop-zone-', '');
+      
+      // Check if trying to drop into itself
+      if (String(active.id) === parentId) {
+        setInvalidDropTarget(String(over.id));
+        return;
+      }
+      
+      // Check for circular dependency
+      if (isAncestorOf(String(active.id), parentId)) {
+        setInvalidDropTarget(String(over.id));
+        return;
+      } else {
+        setInvalidDropTarget(null);
+      }
+    }
+
+    if (!overField) return;
 
     // Check if we can drop into this field (only objects and object arrays can have children)
     const canDropInto = overField.type === "object" || 
                        (overField.type === "array" && overField.arrayItemType === "object");
 
     if (canDropInto && active.id !== over.id) {
+      // Check if trying to drop into itself
+      if (String(active.id) === String(over.id)) {
+        setInvalidDropTarget(String(over.id));
+        return;
+      }
+      
+      // Check for circular dependency when hovering over a field
+      if (isAncestorOf(String(active.id), String(over.id))) {
+        setInvalidDropTarget(String(over.id));
+        return;
+      } else {
+        setInvalidDropTarget(null);
+      }
+      
       // We're hovering over a field that can accept children
       // This is just for visual feedback, actual moving happens in dragEnd
+    } else {
+      setInvalidDropTarget(null);
     }
   };
 
@@ -1021,6 +1097,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     setActiveId(null);
     setIsDragging(false);
     setIsOverDropZone(false);
+    setInvalidDropTarget(null);
 
     if (!over || active.id === over.id) return;
 
@@ -1031,6 +1108,19 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     // Check if we're dropping on a drop zone
     if (String(over.id).startsWith('drop-zone-')) {
       const parentId = String(over.id).replace('drop-zone-', '');
+      
+      // Prevent moving a field into itself
+      if (String(active.id) === parentId) {
+        console.warn("Cannot move a field into itself");
+        return;
+      }
+      
+      // Prevent circular dependency: don't allow dropping a field into its own descendants
+      if (isAncestorOf(String(active.id), parentId)) {
+        console.warn("Cannot move a field into its own descendant");
+        return;
+      }
+      
       moveFieldToParent(String(active.id), parentId);
       return;
     }
@@ -1049,6 +1139,18 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
                        (overField.type === "array" && overField.arrayItemType === "object");
 
     if (canDropInto) {
+      // Prevent moving a field into itself
+      if (String(active.id) === String(over.id)) {
+        console.warn("Cannot move a field into itself");
+        return;
+      }
+      
+      // Prevent circular dependency: don't allow dropping a field into its own descendants
+      if (isAncestorOf(String(active.id), String(over.id))) {
+        console.warn("Cannot move a field into its own descendant");
+        return;
+      }
+      
       // Move field into the target field
       moveFieldToParent(String(active.id), String(over.id));
     } else {
@@ -1162,6 +1264,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
                         onAddChild={addField}
                         onMoveToRoot={(fieldId) => moveFieldToParent(fieldId, null)}
                         globalDragState={isDragging}
+                        invalidDropTarget={invalidDropTarget}
                       />
                     ))}
                   </SortableContext>
