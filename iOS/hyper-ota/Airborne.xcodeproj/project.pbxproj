@@ -45,20 +45,9 @@
 		DCB6145F2E61924D0099D87E /* HPJPApplicationPackage.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614372E61924D0099D87E /* HPJPApplicationPackage.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		DC7995E42E657D00003D40F2 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = 8C3D868E2D489E08001C24DD;
-			remoteInfo = HyperCore;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
 		DC76412B2E61931B0028FCDA /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
 		DC7995DD2E657CF7003D40F2 /* HyperCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = HyperCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = HyperCore.xcodeproj; path = "/Users/balaganesh/Desktop/JUSPAY/HyperSDK_2.0/devtools-ios/hyper-core-lib-ios/HyperCore.xcodeproj"; sourceTree = "<absolute>"; };
 		DCB613FB2E6191FB0099D87E /* Airborne.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Airborne.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCB614312E61924D0099D87E /* HPJPApplicationConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HPJPApplicationConfig.h; sourceTree = "<group>"; };
 		DCB614322E61924D0099D87E /* HPJPApplicationConfig.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = HPJPApplicationConfig.m; sourceTree = "<group>"; };
@@ -101,20 +90,12 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		DC7995E22E657D00003D40F2 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		DCB613F12E6191FB0099D87E = {
 			isa = PBXGroup;
 			children = (
 				DCB6144C2E61924D0099D87E /* Airborne */,
 				DC7641262E6192BC0028FCDA /* Frameworks */,
 				DCB613FC2E6191FB0099D87E /* Products */,
-				DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -252,7 +233,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				DC7995E52E657D00003D40F2 /* PBXTargetDependency */,
 			);
 			name = Airborne;
 			packageProductDependencies = (
@@ -291,12 +271,6 @@
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DCB613FC2E6191FB0099D87E /* Products */;
 			projectDirPath = "";
-			projectReferences = (
-				{
-					ProductGroup = DC7995E22E657D00003D40F2 /* Products */;
-					ProjectRef = DC7995E12E657D00003D40F2 /* HyperCore.xcodeproj */;
-				},
-			);
 			projectRoot = "";
 			targets = (
 				DCB613FA2E6191FB0099D87E /* Airborne */,
@@ -353,14 +327,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		DC7995E52E657D00003D40F2 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = HyperCore;
-			targetProxy = DC7995E42E657D00003D40F2 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		DC76412E2E6194390028FCDA /* Debug */ = {
