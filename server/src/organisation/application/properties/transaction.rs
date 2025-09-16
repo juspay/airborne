@@ -1,0 +1,122 @@
+// Copyright 2025 Juspay Technologies
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use futures::Future;
+use std::{fmt::Debug, pin::Pin};
+use thiserror::Error;
+use tokio::task::{JoinError, JoinSet};
+
+/// Boxed async operation returning Result<R, E>.
+pub type Operation<R, E> = Box<
+    dyn FnOnce() -> Pin<Box<dyn Future<Output = Result<R, E>> + Send>> + Send,
+>;
+
+/// Helper to box an operation ergonomically.
+/// usage: op(|| async { /* ... */ -> Result<R, E> })
+pub fn op<Fut, F, R, E>(f: F) -> Operation<R, E>
+where
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: Future<Output = Result<R, E>> + Send + 'static,
+{
+    Box::new(|| Box::pin(f()))
+}
+
+#[derive(Debug, Error)]
+pub enum TxnError<E: std::error::Error + Send + Sync + 'static> {
+    #[error("operation {index} failed: {source}")]
+    Operation {
+        index: usize,
+        #[source]
+        source: E,
+    },
+    #[error("task {index} join error: {source}")]
+    Join {
+        index: usize,
+        #[source]
+        source: JoinError,
+    },
+}
+
+/// Run all operations concurrently. If any fails:
+/// 1) abort outstanding operations
+/// 2) await their termination
+/// 3) call `rollback` with indices that had completed successfully
+/// 4) return the first failure encountered
+///
+/// If all succeed, returns results in the original order.
+pub async fn run_fail_fast<R, E, Rollback, RFut>(
+    operations: Vec<Operation<R, E>>,
+    rollback: Rollback,
+) -> Result<Vec<R>, TxnError<E>>
+where
+    R: Send + 'static,
+    E: std::error::Error + Send + Sync + 'static,
+    Rollback: FnOnce(Vec<usize>) -> RFut + Send + 'static,
+    RFut: Future<Output = ()> + Send + 'static,
+{
+    let n = operations.len();
+    let mut set = JoinSet::new();
+
+    // Track success indices and store results by original index.
+    let mut successes: Vec<usize> = Vec::with_capacity(n);
+    let mut results: Vec<Option<R>> = Vec::with_capacity(n);
+    for _ in 0..n {
+        results.push(None);
+    }
+
+    // Spawn each operation as its own task, tagged with its index.
+    for (i, op) in operations.into_iter().enumerate() {
+        set.spawn(async move { (i, op().await) });
+    }
+
+    // Process completions as they finish; abort remaining on first failure.
+    let first_error: Option<TxnError<E>> = loop {
+        match set.join_next().await {
+            None => break None, // all finished
+            Some(joined) => match joined {
+                Ok((i, Ok(val))) => {
+                    results[i] = Some(val);
+                    successes.push(i);
+                }
+                Ok((i, Err(e))) => {
+                    set.abort_all();
+                    // Drain remaining tasks to ensure clean termination.
+                    while let Some(_other) = set.join_next().await {}
+                    // Call rollback with indices that had already succeeded.
+                    rollback(successes).await;
+                    break Some(TxnError::Operation { index: i, source: e });
+                }
+                Err(join_err) => {
+                    set.abort_all();
+                    while let Some(_other) = set.join_next().await {}
+                    rollback(successes).await;
+                    break Some(TxnError::Join {
+                        index: usize::MAX, // unknown which one if task panicked before tagging
+                        source: join_err,
+                    });
+                }
+            },
+        }
+    };
+
+    if let Some(err) = first_error {
+        return Err(err);
+    }
+
+    // All succeeded; unwrap in original order.
+    Ok(results
+        .into_iter()
+        .map(|o| o.expect("logic error: missing result"))
+        .collect())
+}
