@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use aws_smithy_types::Document;
-use serde_json::Value;
+use aws_smithy_types::{Number as SmithyNumber, Document};
+use serde_json::{Value};
 
 fn value_to_doc(v: &Value) -> Document {
     match v {
@@ -48,4 +48,33 @@ fn value_to_doc(v: &Value) -> Document {
             Document::Object(out)
         },
     }
+}
+
+/// Items in `existing` but NOT in `new`
+pub fn to_be_deleted(existing: &[String], new: &[String]) -> Vec<String> {
+    let new_set: HashSet<&str> = new.iter().map(|s| s.as_str()).collect();
+    existing
+        .iter()
+        .filter(|s| !new_set.contains(s.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Items present in BOTH `existing` and `new`
+pub fn to_be_updated(existing: &[String], new: &[String]) -> Vec<String> {
+    let new_set: HashSet<&str> = new.iter().map(|s| s.as_str()).collect();
+    existing
+        .iter()
+        .filter(|s| new_set.contains(s.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Items in `new` but NOT in `existing`
+pub fn to_be_created(existing: &[String], new: &[String]) -> Vec<String> {
+    let existing_set: HashSet<&str> = existing.iter().map(|s| s.as_str()).collect();
+    new.iter()
+        .filter(|s| !existing_set.contains(s.as_str()))
+        .cloned()
+        .collect()
 }
