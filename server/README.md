@@ -44,7 +44,7 @@ The Airborne Server acts as the central nervous system for delivering updates to
 
 **Related Systems:**
 
-- **[Airborne Analytics Server](../analytics/README.md)**: A companion analytics platform that provides comprehensive OTA update insights, tracking adoption rates, failure analysis, and performance metrics across your applications.
+- **[Airborne Analytics Server](../airborne_analytics_server/README.md)**: A companion analytics platform that provides comprehensive OTA update insights, tracking adoption rates, failure analysis, and performance metrics across your applications.
 
 ## API Reference
 
@@ -262,10 +262,12 @@ The server validates incoming JWTs, extracts user identity and associated permis
 To set up the development environment for the Airborne Server, you will need the following software installed:
 
 **Option 1: Using Nix (Recommended)**
+
 - **Nix with Flakes**: All dependencies automatically provided with `nix develop`
   - This provides: Rust toolchain, cargo-watch, diesel-cli, Node.js, Make, Docker/Podman Compose, PostgreSQL client tools, and all required system libraries
 
 **Option 2: Manual Installation**
+
 - **Required System Dependencies:**
   - Docker or Podman (Essential for running containerized services)
   - Git (For version control)

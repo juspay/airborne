@@ -13,8 +13,8 @@ FMT_FLAGS := --all
 LINT_FLAGS := --all-targets
 CARGO_FLAGS := --color always --no-default-features
 
-ENV_FILE_VM ?= analytics/.env.victoria-metrics
-ENV_FILE_KC    ?= analytics/.env.kafka-clickhouse
+ENV_FILE_VM ?= airborne_analytics_server/.env.victoria-metrics
+ENV_FILE_KC    ?= airborne_analytics_server/.env.kafka-clickhouse
 
 
 # ANSI color codes
@@ -61,22 +61,22 @@ KEYCLOAK_CONTAINER_NAME = $(shell $(call read-container-name,server,keycloak))
 KEYCLOAK_UP = $(shell $(call check-container,$(KEYCLOAK_CONTAINER_NAME)))
 
 
-GRAFANA_CONTAINER_NAME = $(shell $(call read-container-name,analytics,grafana))
+GRAFANA_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,grafana))
 GRAFANA_UP = $(shell $(call check-container,$(GRAFANA_CONTAINER_NAME)))
 
-VICTORIA_METRICS_CONTAINER_NAME = $(shell $(call read-container-name,analytics,victoria-metrics))
+VICTORIA_METRICS_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,victoria-metrics))
 VICTORIA_METRICS_UP = $(shell $(call check-container,$(VICTORIA_METRICS_CONTAINER_NAME)))
 
-ZOOKEEPER_CONTAINER_NAME = $(shell $(call read-container-name,analytics,zookeeper))
+ZOOKEEPER_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,zookeeper))
 ZOOKEEPER_UP = $(shell $(call check-container,$(ZOOKEEPER_CONTAINER_NAME)))
 
-KAFKA_CONTAINER_NAME = $(shell $(call read-container-name,analytics,kafka))
+KAFKA_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,kafka))
 KAFKA_UP = $(shell $(call check-container,$(KAFKA_CONTAINER_NAME)))
 
-CLICKHOUSE_CONTAINER_NAME = $(shell $(call read-container-name,analytics,clickhouse-server))
+CLICKHOUSE_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,clickhouse-server))
 CLICKHOUSE_UP = $(shell $(call check-container,$(CLICKHOUSE_CONTAINER_NAME)))
 
-KAFKA_UI_CONTAINER_NAME = $(shell $(call read-container-name,analytics,kafka-ui))
+KAFKA_UI_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,kafka-ui))
 KAFKA_UI_UP = $(shell $(call check-container,$(KAFKA_UI_CONTAINER_NAME)))
 
 .PHONY: help env-file analytics-env-file db localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics frontend-check frontend-lint frontend-lint-fix frontend-format
@@ -171,9 +171,9 @@ env-file:
 
 analytics-env-file:
 	@echo "$(YELLOW)🔧 Checking analytics environment file...$(NC)"
-	@if ! [ -e analytics/.env ]; then \
+	@if ! [ -e airborne_analytics_server/.env ]; then \
 		echo "$(YELLOW).env missing, copying .env.example as .env$(NC)" && \
-		cp analytics/.env.example analytics/.env; \
+		cp airborne_analytics_server/.env.example airborne_analytics_server/.env; \
 	fi
 	@echo "$(GREEN)✅ Analytics environment file ready$(NC)"
 
@@ -277,7 +277,7 @@ grafana:
 ifndef CI
 ifeq ($(GRAFANA_UP),1)
 	@echo "$(YELLOW)📊 Starting Grafana container...$(NC)"
-	$(COMPOSE) -f analytics/docker-compose.yml --env-file $(ENV_FILE_VM) up -d grafana
+	$(COMPOSE) -f airborne_analytics_server/docker-compose.yml --env-file $(ENV_FILE_VM) up -d grafana
 endif
 else
 	@echo "$(YELLOW)Skipping grafana container-setup in CI.$(NC)"
@@ -297,7 +297,7 @@ victoria-metrics:
 ifndef CI
 ifeq ($(VICTORIA_METRICS_UP),1)
 	@echo "$(YELLOW)📊 Starting Victoria Metrics container...$(NC)"
-	$(COMPOSE) -f analytics/docker-compose.yml --env-file $(ENV_FILE_VM) up -d victoria-metrics
+	$(COMPOSE) -f airborne_analytics_server/docker-compose.yml --env-file $(ENV_FILE_VM) up -d victoria-metrics
 endif
 else
 	@echo "$(YELLOW)Skipping victoria-metrics container-setup in CI.$(NC)"
@@ -316,7 +316,7 @@ zookeeper:
 ifndef CI
 ifeq ($(ZOOKEEPER_UP),1)
 	@echo "$(YELLOW)🐝 Starting Zookeeper container...$(NC)"
-	$(COMPOSE) -f analytics/docker-compose.yml --env-file $(ENV_FILE_KC) up -d zookeeper
+	$(COMPOSE) -f airborne_analytics_server/docker-compose.yml --env-file $(ENV_FILE_KC) up -d zookeeper
 endif
 else
 	@echo "$(YELLOW)Skipping zookeeper container-setup in CI.$(NC)"
@@ -335,7 +335,7 @@ kafka:
 ifndef CI
 ifeq ($(KAFKA_UP),1)
 	@echo "$(YELLOW)🍄 Starting Kafka container...$(NC)"
-	$(COMPOSE) -f analytics/docker-compose.yml --env-file $(ENV_FILE_KC) up -d kafka
+	$(COMPOSE) -f airborne_analytics_server/docker-compose.yml --env-file $(ENV_FILE_KC) up -d kafka
 endif
 else
 	@echo "$(YELLOW)Skipping kafka container-setup in CI.$(NC)"
@@ -354,7 +354,7 @@ clickhouse:
 ifndef CI
 ifeq ($(CLICKHOUSE_UP),1)
 	@echo "$(YELLOW)🍒 Starting ClickHouse container...$(NC)"
-	$(COMPOSE) -f analytics/docker-compose.yml --env-file $(ENV_FILE_KC) up -d clickhouse-server
+	$(COMPOSE) -f airborne_analytics_server/docker-compose.yml --env-file $(ENV_FILE_KC) up -d clickhouse-server
 endif
 else
 	@echo "$(YELLOW)Skipping clickhouse container-setup in CI.$(NC)"
@@ -373,7 +373,7 @@ kafka-ui:
 ifndef CI
 ifeq ($(KAFKA_UI_UP),1)
 	@echo "$(YELLOW)🧑‍💻 Starting Kafka UI container...$(NC)"
-	$(COMPOSE) -f analytics/docker-compose.yml --env-file $(ENV_FILE_KC) up -d kafka-ui
+	$(COMPOSE) -f airborne_analytics_server/docker-compose.yml --env-file $(ENV_FILE_KC) up -d kafka-ui
 endif
 else
 	@echo "$(YELLOW)Skipping kafka-ui container-setup in CI.$(NC)"
@@ -536,11 +536,11 @@ amend-no-edit: amend
 
 analytics-server:
 	@echo "$(YELLOW)Building analytics-server...$(NC)"
-	@cd analytics && cargo build $(CARGO_FLAGS) --bin analytics-server
+	@cd airborne_analytics_server && cargo build $(CARGO_FLAGS) --bin airborne_analytics_server
 
 run-kafka-clickhouse: analytics-env-file zookeeper kafka clickhouse kafka-ui
 	@echo "⏳ Starting dev environment: Kafka + ClickHouse"
-	@cargo watch -w analytics/src -w analytics/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) analytics-server && cd analytics && ../target/debug/analytics-server'
+	@cargo watch -w airborne_analytics_server/src -w airborne_analytics_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) analytics-server && cd airborne_analytics_server && ../target/debug/airborne_analytics_server'
 	@echo "✅ Development environment started with Kafka and ClickHouse!"
 	@echo "   • Kafka UI:     http://localhost:8080"
 	@echo "   • ClickHouse:   http://localhost:8123"
@@ -549,7 +549,7 @@ run-kafka-clickhouse: analytics-env-file zookeeper kafka clickhouse kafka-ui
 
 run-victoria-metrics: analytics-env-file grafana victoria-metrics
 	@echo "⏳ Starting dev environment: Grafana + Victoria Metrics"
-	@cargo watch -w analytics/src -w analytics/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) analytics-server && cd analytics && ../target/debug/analytics-server'
+	@cargo watch -w airborne_analytics_server/src -w airborne_analytics_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) analytics-server && cd airborne_analytics_server && ../target/debug/airborne_analytics_server'
 	@echo "✅ Development environment started with Grafana & Victoria Metrics!"
 	@echo "   • Grafana:          http://localhost:4000"
 	@echo "   • Victoria Metrics: http://localhost:8428"

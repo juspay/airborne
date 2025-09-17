@@ -139,7 +139,7 @@ A robust backend system that can manage application versions, store update packa
 - **Key functionalities**: User authentication (via Keycloak), organization/application management, package storage, release configurations, and a dashboard UI.
 - **Technology stack**: Rust (Actix Web), PostgreSQL, Keycloak, Docker, LocalStack (for AWS emulation).
 
-#### **[Airborne Analytics Server](analytics/README.md)**
+#### **[Airborne Analytics Server](airborne_analytics_server/README.md)**
 
 A high-performance analytics platform that provides comprehensive OTA update insights and monitoring.
 
@@ -172,10 +172,12 @@ If you choose to use the self-hosted Airborne Server:
 **Prerequisites:**
 
 **Option 1: Using Nix (Recommended)**
+
 - **Nix with Flakes**: All dependencies automatically provided with `nix develop`
   - This provides: Rust toolchain, cargo-watch, diesel-cli, Node.js, Make, Docker/Podman Compose, jq, yq, curl, AWS CLI, and all required system libraries
 
 **Option 2: Manual Installation**
+
 - **System Dependencies:**
   - Docker or Podman (with Docker Compose support)
   - Git

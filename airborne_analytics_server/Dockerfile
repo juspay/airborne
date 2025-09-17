@@ -42,11 +42,11 @@ RUN useradd -r -s /bin/false analytics
 WORKDIR /app
 
 # Copy the binary from builder stage
-COPY --from=builder /app/target/release/analytics-server .
+COPY --from=builder /app/target/release/airborne_analytics_server .
 COPY --from=builder /app/init-clickhouse.sql .
 
 # Change ownership to app user
-RUN chown analytics:analytics analytics-server
+RUN chown analytics:analytics airborne_analytics_server
 
 # Switch to app user
 USER analytics
@@ -59,4 +59,4 @@ EXPOSE 6400
 #     CMD curl -f http://localhost:6400/health || exit 1
 
 # Run the application
-CMD ["./analytics-server"]
+CMD ["./airborne_analytics_server"]
