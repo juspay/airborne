@@ -12,53 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 use actix_web::{
     put, web::{Data, Json, ReqData}, Scope
 };
-use serde::{Deserialize, Serialize};
+use aws_smithy_types::Document;
 use serde_json::Value;
 use superposition_sdk::Client;
 
-use crate::{middleware::auth::{validate_user, AuthResponse, WRITE}, types::{ABError, AppState}, utils::{document::{document_to_json_value, value_to_document}, workspace::get_workspace_name_for_application}};
+use crate::{middleware::auth::{validate_user, AuthResponse, WRITE}, types::{ABError, AppState}, utils::{document::{document_to_json_value, get_scheme, value_to_document}, workspace::get_workspace_name_for_application}};
 
 mod utils;
 mod transaction;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-struct SchemaNode {
-    description: String,
-    default_value: Value,
-    schema: Value,
-}
-
-#[derive(Deserialize)]
-struct PutPropertiesSchemaRequest {
-    properties: BTreeMap<String, SchemaNode>,
-}
-
-#[derive(Serialize)]
-struct PutPropertiesSchemaResponse {
-    properties: BTreeMap<String, SchemaNode>,
-}
-
-#[derive(Clone, Debug)]
-struct PutPropertiesSchemaTaskMetadata {
-    key: String,
-    schema_new: Option<SchemaNode>,
-    schema_old: Option<SchemaNode>,
-    action: PutPropertiesSchemaTaskAction,
-    org_id: String,
-    workspace_id: String,
-}
-
-#[derive(Clone, Debug)]
-enum PutPropertiesSchemaTaskAction {
-    Create,
-    Update,
-    Delete,
-}
+mod types;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -67,10 +34,10 @@ pub fn add_routes() -> Scope {
 
 #[put("/schema")]
 async fn put_properties_schema_api(
-    req: Json<PutPropertiesSchemaRequest>,
+    req: Json<types::PutPropertiesSchemaRequest>,
     auth_response: ReqData<AuthResponse>,
     state: Data<AppState>,
-) -> actix_web::Result<Json<PutPropertiesSchemaResponse>> {
+) -> actix_web::Result<Json<types::PutPropertiesSchemaResponse>> {
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
@@ -91,7 +58,7 @@ async fn put_properties_schema_api(
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let mut tasks = Vec::with_capacity(properties.len());
-    let mut task_metadata: Vec<PutPropertiesSchemaTaskMetadata> = Vec::with_capacity(properties.len());
+    let mut task_metadata: Vec<types::PutPropertiesSchemaTaskMetadata> = Vec::with_capacity(properties.len());
 
     let all_configs = state.superposition_client
         .list_default_configs()
@@ -112,7 +79,7 @@ async fn put_properties_schema_api(
     let existing_config_schemas = all_configs.data().iter().filter_map(|config| {
         if config.key.starts_with("config.properties.") {
             let schema = document_to_json_value(&config.schema());
-            let schema_node = SchemaNode {
+            let schema_node = types::SchemaNode {
                 description: config.description().to_string(),
                 default_value: document_to_json_value(&config.value()),
                 schema,
@@ -121,7 +88,7 @@ async fn put_properties_schema_api(
         } else {
             None
         }
-    }).collect::<BTreeMap<String, SchemaNode>>();
+    }).collect::<BTreeMap<String, types::SchemaNode>>();
 
     let mut removed_config_properties_object = false;
 
@@ -171,11 +138,11 @@ async fn put_properties_schema_api(
             let default_value = value.default_value.clone();
             let schema = value.schema.clone();
             
-            task_metadata.push(PutPropertiesSchemaTaskMetadata {
+            task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
                 key: key_for_api.clone(),
                 schema_new: Some(value.clone()),
                 schema_old: None,
-                action: PutPropertiesSchemaTaskAction::Create,
+                action: types::PutPropertiesSchemaTaskAction::Create,
                 org_id: org.clone(),
                 workspace_id: workspace.clone(),
             });
@@ -217,11 +184,11 @@ async fn put_properties_schema_api(
             let default_value = value.default_value.clone();
             let schema = value.schema.clone();
             
-            task_metadata.push(PutPropertiesSchemaTaskMetadata {
+            task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
                 key: key_for_api.clone(),
                 schema_new: Some(value.clone()),
                 schema_old: Some(existing_value.clone()),
-                action: PutPropertiesSchemaTaskAction::Update,
+                action: types::PutPropertiesSchemaTaskAction::Update,
                 org_id: org.clone(),
                 workspace_id: workspace.clone(),
             });
@@ -253,11 +220,11 @@ async fn put_properties_schema_api(
                 existing_value.unwrap()
             };
 
-            task_metadata.push(PutPropertiesSchemaTaskMetadata {
+            task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
                 key: key_for_api.clone(),
                 schema_new: None,
                 schema_old: Some(existing_value.clone()),
-                action: PutPropertiesSchemaTaskAction::Delete,
+                action: types::PutPropertiesSchemaTaskAction::Delete,
                 org_id: org.clone(),
                 workspace_id: workspace.clone(),
             });
@@ -297,7 +264,7 @@ async fn put_properties_schema_api(
                     .value(value_to_document(&Value::Object(serde_json::Map::new())))
                     .description("Restored config.properties object".to_string())
                     .change_reason("Rollback restore config.properties".to_string())
-                    .schema(value_to_document(&Value::Object(serde_json::Map::new())))
+                    .schema(get_scheme::<HashMap<String, Document>>(HashMap::new()))
                     .send()
                     .await.map_err(|e| println!("Failed to restore config.properties object during rollback: {}", e)).ok();
             }
@@ -314,14 +281,14 @@ async fn put_properties_schema_api(
         }
     }
 
-    Ok(Json(PutPropertiesSchemaResponse {
+    Ok(Json(types::PutPropertiesSchemaResponse {
         properties: req.properties.clone(),
     }))
 }
 
 async fn rollback_config_update(
     success_indices: Vec<usize>,
-    metadata: Vec<PutPropertiesSchemaTaskMetadata>,
+    metadata: Vec<types::PutPropertiesSchemaTaskMetadata>,
     superposition_client: &Client,
 ) {
     println!("Rolling back operations at indices: {:?}", success_indices);
@@ -329,7 +296,7 @@ async fn rollback_config_update(
     for &index in &success_indices {
         if let Some(task_meta) = metadata.get(index) {
             let result: Result<String, String> = match &task_meta.action {
-                PutPropertiesSchemaTaskAction::Create => {
+                types::PutPropertiesSchemaTaskAction::Create => {
                     // Rollback Create: Delete the created config
                     println!("Rolling back CREATE for key: {}", task_meta.key);
                     superposition_client
@@ -342,7 +309,7 @@ async fn rollback_config_update(
                         .map(|_| format!("Rolled back create for key: {} with schema: {:#?}", task_meta.key, task_meta.schema_new))
                         .map_err(|e| format!("Failed to rollback create for {}: {}", task_meta.key, e))
                 },
-                PutPropertiesSchemaTaskAction::Update => {
+                types::PutPropertiesSchemaTaskAction::Update => {
                     // Rollback Update: Restore the old value
                     if let Some(old_schema) = &task_meta.schema_old {
                         println!("Rolling back UPDATE for key: {}", task_meta.key);
@@ -363,7 +330,7 @@ async fn rollback_config_update(
                         Err(format!("No old schema available for rollback of {}", task_meta.key))
                     }
                 },
-                PutPropertiesSchemaTaskAction::Delete => {
+                types::PutPropertiesSchemaTaskAction::Delete => {
                     // Rollback Delete: Recreate the deleted config
                     if let Some(old_schema) = &task_meta.schema_old {
                         println!("Rolling back DELETE for key: {}", task_meta.key);

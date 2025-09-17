@@ -12,43 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{HashMap, HashSet};
-
-use aws_smithy_types::{Number as SmithyNumber, Document};
-use serde_json::{Value};
-
-fn value_to_doc(v: &Value) -> Document {
-    match v {
-        Value::String(s) => Document::String(s.clone()),
-        Value::Bool(b) => Document::Bool(*b),
-        Value::Number(n) => {
-            if serde_json::Number::is_u64(n) {
-                Document::from(n.as_u64().unwrap())
-            } else if serde_json::Number::is_i64(n) {
-                Document::from(n.as_i64().unwrap())
-            } else if serde_json::Number::is_f64(n) {
-                Document::from(n.as_f64().unwrap())
-            } else {
-                Document::Null
-            }
-        }
-        Value::Array(items) => {
-            let mut out = Vec::with_capacity(items.len());
-            for item in items {
-                out.push(value_to_doc(item));
-            }
-            Document::Array(out)
-        }
-        Value::Null => Document::Null,
-        Value::Object(obj) => {
-            let mut out: HashMap<String, Document> = HashMap::with_capacity(obj.len());
-            for (k, v) in obj {
-                out.insert(k.clone(), value_to_doc(v));
-            }
-            Document::Object(out)
-        },
-    }
-}
+use std::collections::{HashSet};
 
 /// Items in `existing` but NOT in `new`
 pub fn to_be_deleted(existing: &[String], new: &[String]) -> Vec<String> {

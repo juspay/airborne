@@ -71,3 +71,41 @@ pub fn value_to_document(doc: &Value) -> Document {
         }
     }
 }
+
+pub fn get_scheme<T>(v: T) -> Document
+where
+    Document: From<T>,
+{
+    let v = Document::from(v);
+    Document::Object(match v {
+        // Don't use JSON macro. It is too heavy
+        // Change this to Value::Object + Map
+        Document::String(_) => {
+            let mut map = HashMap::new();
+            map.insert("pattern".to_string(), Document::String(String::from(".*")));
+            map.insert("type".to_string(), Document::String(String::from("string")));
+            map
+        }
+        Document::Number(_) => {
+            let mut map = HashMap::new();
+            map.insert(
+                "type".to_string(),
+                Document::String(String::from("integer")),
+            );
+            map
+        }
+        Document::Array(_) => {
+            let mut map = HashMap::new();
+            map.insert("type".to_string(), Document::String(String::from("array")));
+            let mut submap = HashMap::new();
+            submap.insert("type".to_string(), Document::String(String::from("string")));
+            map.insert("items".to_string(), Document::Object(submap));
+            map
+        }
+        _ => {
+            let mut map = HashMap::new();
+            map.insert("type".to_string(), Document::String(String::from("object")));
+            map
+        }
+    })
+}
