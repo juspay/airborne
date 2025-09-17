@@ -63,10 +63,12 @@ The system tracks the complete OTA update lifecycle:
 ### Prerequisites
 
 **Option 1: Using Nix (Recommended)**
+
 - **Nix with Flakes**: All dependencies automatically provided with `nix develop` from project root
   - This provides: Rust toolchain, cargo-watch, Docker Compose, and all required system libraries including Cyrus SASL for Kafka support
 
 **Option 2: Manual Installation**
+
 - **System Dependencies:**
   - Docker & Docker Compose (for local development infrastructure)
   - Rust 1.89.0 with cargo
@@ -807,7 +809,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 1. **Clone the repository**
 2. **Run `make run-analytics`** from project root to start infrastructure and server
-3. **Test the API** with sample curl commands or import the Postman collection (`analytics/OTA Analytics.postman_collection.json`)
+3. **Test the API** with sample curl commands or import the Postman collection (`airborne_analytics_server/OTA Analytics.postman_collection.json`)
 4. **Explore the API** with your OTA events
 
 For questions or support, please open an issue on GitHub or refer to the [documentation](docs/).

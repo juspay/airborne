@@ -7,17 +7,7 @@ package.readme = "README.md"
 package.authors = ["airborne@juspay.in"]
 package.version = "0.1.0"
 
-members = ["server", "analytics"]
-
-[[workspace.metadata.leptos]]
-name = "cac"
-bin-package = "juspay_superposition"
-output-name = "frontend"
-lib-package = "frontend"
-site-root = "target/site"
-site-pkg-dir = "pkg"
-style-file = "crates/frontend/styles/style.css"
-assets-dir = "crates/frontend/assets"
+members = ["server", "airborne_analytics_server"]
 
 [workspace.dependencies]
 chrono = { version = "0.4.41" }

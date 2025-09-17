@@ -29,7 +29,7 @@
               && !(pkgs.lib.hasSuffix ".toml" path && !pkgs.lib.hasSuffix "Cargo.toml" path))
               || (pkgs.lib.hasInfix "migrations" path && pkgs.lib.hasSuffix ".sql" path);
           };
-        rust-project.crates.analytics-server.crane.args = {
+        rust-project.crates.airborne_analytics_server.crane.args = {
           buildInputs = [ pkgs.openssl pkgs.cyrus_sasl ];
           nativeBuildInputs = [ pkgs.pkg-config pkgs.cmake ];
         };
