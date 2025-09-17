@@ -25,3 +25,4 @@ authors = []
 
 [packages]
 airborne_analytics_server = { path = "airborne_analytics_server" }
+airborne_dashboard = { path = "airborne_dashboard" }

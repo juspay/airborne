@@ -389,11 +389,11 @@ endif
 	@echo "$(GREEN) ✅ Kafka UI ready$(NC)"
 
 node-dependencies:
-	cd server/dashboard_nextjs && npm ci
+	cd airborne_dashboard && npm ci
 	cd server/docs_react && npm ci
 
 dashboard:
-	cd server/dashboard_nextjs && npm run dev
+	cd airborne_dashboard && npm run dev
 
 docs:
 	cd server/docs_react && npm run build:dev
@@ -490,25 +490,25 @@ status:
 
 frontend-check:
 	@echo "$(YELLOW)🔍 Checking frontend code quality...$(NC)"
-	@cd server/dashboard_nextjs && npm run check
+	@cd airborne_dashboard && npm run check
 	@cd server/docs_react && npm run check
 	@echo "$(GREEN)Frontend checks completed$(NC)"
 
 frontend-lint:
 	@echo "$(YELLOW)🔍 Linting frontend code...$(NC)"
-	@cd server/dashboard_nextjs && npm run lint
+	@cd airborne_dashboard && npm run lint
 	@cd server/docs_react && npm run lint
 	@echo "$(GREEN)Frontend linting completed$(NC)"
 
 frontend-lint-fix:
 	@echo "$(YELLOW)🔧 Fixing frontend lint issues...$(NC)"
-	@cd server/dashboard_nextjs && npm run lint:fix
+	@cd airborne_dashboard && npm run lint:fix
 	@cd server/docs_react && npm run lint:fix
 	@echo "$(GREEN)Frontend lint fixes completed$(NC)"
 
 frontend-format:
 	@echo "$(YELLOW)✨ Formatting frontend code...$(NC)"
-	@cd server/dashboard_nextjs && npm run format
+	@cd airborne_dashboard && npm run format
 	@cd server/docs_react && npm run format
 	@echo "$(GREEN)Frontend formatting completed$(NC)"
 
