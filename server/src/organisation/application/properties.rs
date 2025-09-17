@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
 
 use actix_web::{
     put, web::{Data, Json, ReqData}, Scope
 };
-use aws_smithy_types::Document;
-use serde_json::Value;
 use superposition_sdk::Client;
 
-use crate::{middleware::auth::{validate_user, AuthResponse, WRITE}, types::{ABError, AppState}, utils::{document::{document_to_json_value, get_scheme, value_to_document}, workspace::get_workspace_name_for_application}};
+use crate::{middleware::auth::{validate_user, AuthResponse, WRITE}, types::{ABError, AppState}, utils::{document::{document_to_json_value, value_to_document}, workspace::get_workspace_name_for_application}};
 
 mod utils;
 mod transaction;
@@ -45,6 +43,9 @@ async fn put_properties_schema_api(
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let properties = req.properties.clone();
+    let properties = properties.iter().map(|(k, v)| {
+        (format!("config.properties.{}", k), v.to_owned())
+    }).collect::<BTreeMap<String, types::SchemaNode>>();
 
     let mut conn = state.db_pool.get().map_err(|_| {
         ABError::InternalServerError("Failed to get database connection".to_string())
@@ -56,6 +57,8 @@ async fn put_properties_schema_api(
             ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    println!("Using org and workspace: {} / {}", superposition_org_id_from_env, workspace_name);
 
     let mut tasks = Vec::with_capacity(properties.len());
     let mut task_metadata: Vec<types::PutPropertiesSchemaTaskMetadata> = Vec::with_capacity(properties.len());
@@ -89,24 +92,6 @@ async fn put_properties_schema_api(
             None
         }
     }).collect::<BTreeMap<String, types::SchemaNode>>();
-
-    let mut removed_config_properties_object = false;
-
-    if existing_config_properties.is_empty() {
-        println!("No existing config properties found.");
-        let config_properties_object = all_configs.data().iter().find(|config| config.key == "config.properties").map(|config| document_to_json_value(&config.value()));
-        if !config_properties_object.is_none() {
-            println!("Setting config.properties for the first time, found config.properties: {:?}", config_properties_object);
-            state.superposition_client
-                .delete_default_config()
-                .org_id(superposition_org_id_from_env.clone())
-                .workspace_id(workspace_name.clone())
-                .key("config.properties".to_string())
-                .send()
-                .await.map_err(|e| ABError::InternalServerError(format!("Failed to delete default config.properties object: {}", e)))?;
-            removed_config_properties_object = true;
-        }
-    }
 
     let to_be_deleted = utils::to_be_deleted(&existing_config_properties, &properties.keys().cloned().collect::<Vec<String>>());
     let to_be_created = utils::to_be_created(&existing_config_properties, &properties.keys().cloned().collect::<Vec<String>>());
@@ -253,21 +238,6 @@ async fn put_properties_schema_api(
         tasks, 
         move |success_indices| async move {
             rollback_config_update(success_indices, metadata_for_rollback, &state.superposition_client).await;
-
-            if removed_config_properties_object {
-                println!("Restoring config.properties object as part of rollback");
-                state.superposition_client
-                    .create_default_config()
-                    .org_id(superposition_org_id_from_env.clone())
-                    .workspace_id(workspace_name.clone())
-                    .key("config.properties".to_string())
-                    .value(value_to_document(&Value::Object(serde_json::Map::new())))
-                    .description("Restored config.properties object".to_string())
-                    .change_reason("Rollback restore config.properties".to_string())
-                    .schema(get_scheme::<HashMap<String, Document>>(HashMap::new()))
-                    .send()
-                    .await.map_err(|e| println!("Failed to restore config.properties object during rollback: {}", e)).ok();
-            }
         }
     ).await {
         Ok(values) => println!("All good: {:?}", values),
