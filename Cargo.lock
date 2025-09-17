@@ -288,7 +288,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "airborne-server"
+name = "airborne_analytics_server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clickhouse",
+ "dotenv",
+ "futures",
+ "prometheus",
+ "rdkafka",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "strum",
+ "strum_macros",
+ "thiserror 2.0.16",
+ "time",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "airborne_server"
 version = "0.1.0"
 dependencies = [
  "actix-files",
@@ -325,33 +352,6 @@ dependencies = [
  "urlencoding",
  "uuid",
  "zip",
-]
-
-[[package]]
-name = "airborne_analytics_server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clickhouse",
- "dotenv",
- "futures",
- "prometheus",
- "rdkafka",
- "reqwest",
- "serde",
- "serde_json",
- "strum",
- "strum_macros",
- "thiserror 2.0.16",
- "time",
- "tokio",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

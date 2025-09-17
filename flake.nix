@@ -33,7 +33,7 @@
           buildInputs = [ pkgs.openssl pkgs.cyrus_sasl ];
           nativeBuildInputs = [ pkgs.pkg-config pkgs.cmake ];
         };
-        rust-project.crates.airborne-server.crane.args = {
+        rust-project.crates.airborne_server.crane.args = {
           buildInputs = [ pkgs.postgresql_15 pkgs.openssl ];
           nativeBuildInputs = [ pkgs.pkg-config ];
         };
@@ -59,7 +59,7 @@
             pkgs.libiconv
           ];
         };
-        packages.default = self'.packages.airborne-server;
+        packages.default = self'.packages.airborne_server;
       };
     };
 }

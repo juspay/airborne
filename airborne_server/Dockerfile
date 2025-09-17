@@ -15,10 +15,10 @@
 # Build frontend
 FROM node:22 as frontend-builder
 WORKDIR /app
-COPY server/docs_react/package*.json ./docs_react/
+COPY airborne_server/docs_react/package*.json ./docs_react/
 WORKDIR /app/docs_react
 RUN npm install
-COPY server/docs_react/ ./
+COPY airborne_server/docs_react/ ./
 
 # Run the build
 RUN npm run build
@@ -31,7 +31,7 @@ WORKDIR /app
 COPY . .
 RUN echo "Building with cargo" && ls -la
 
-WORKDIR /app/server
+WORKDIR /app/airborne_server
 RUN cargo install diesel_cli --no-default-features --features postgres
 
 RUN cargo build --release
@@ -43,7 +43,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl libpq5 && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=builder /app/target/release/airborne-server /app/airborne-server
+COPY --from=builder /app/target/release/airborne_server /app/airborne_server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
 COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
-CMD ["/app/airborne-server"]
+CMD ["/app/airborne_server"]

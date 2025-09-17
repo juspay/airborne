@@ -24,5 +24,6 @@ authors = []
 [bump_profiles]
 
 [packages]
+airborne_server = { path = "airborne_server" }
 airborne_analytics_server = { path = "airborne_analytics_server" }
 airborne_dashboard = { path = "airborne_dashboard" }

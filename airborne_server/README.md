@@ -288,7 +288,7 @@ To set up the development environment for the Airborne Server, you will need the
 
 ### Environment Variables
 
-The server relies on a set of environment variables for its configuration. These are typically managed in a `.env` file at the root of the `server/` directory. Critical variables include:
+The server relies on a set of environment variables for its configuration. These are typically managed in a `.env` file at the root of the `airborne_server/` directory. Critical variables include:
 
 - `KEYCLOAK_URL`: URL of the Keycloak instance.
 - `KEYCLOAK_CLIENT_ID`: Client ID for the Airborne Server in Keycloak.
