@@ -79,7 +79,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd airborne_dashboard && npm install prettier
-          cd ../server/docs_react && npm install prettier
+          cd ../airborne_server/docs_react && npm install prettier
 
       - name: Check formatting & linting
         shell: bash

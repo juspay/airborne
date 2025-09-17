@@ -132,7 +132,7 @@ If the resource block is not completely downloaded by the time of load, then all
 
 For developers who need comprehensive backend solutions to manage updates and analytics:
 
-#### **[Airborne Server](server/README.md)**
+#### **[Airborne Server](airborne_server/README.md)**
 
 A robust backend system that can manage application versions, store update packages, and deliver them to your SDK-integrated applications.
 
@@ -216,7 +216,7 @@ If you choose to use the self-hosted Airborne Server:
       ```bash
       make help
       ```
-    - For detailed setup options, see the [Airborne Server README](server/README.md).
+    - For detailed setup options, see the [Airborne Server README](airborne_server/README.md).
 
 **Services Started by `make run`:**
 
@@ -280,7 +280,7 @@ The project now uses a single consolidated Makefile at the root directory. Key c
 - `make cleanup` - Clean up containers and volumes
 - `make help` - Show all available commands with descriptions
 
-For more detailed server setup, API routes, database schema, and ACL information, please refer to the **[Airborne Server README](server/README.md)**.
+For more detailed server setup, API routes, database schema, and ACL information, please refer to the **[Airborne Server README](airborne_server/README.md)**.
 
 ## 🔧 Development & Build System
 

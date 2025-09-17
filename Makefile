@@ -45,19 +45,19 @@ define check-container
 	$(DOCKER) ps | grep $(1) 2>&1 > /dev/null; echo $$?
 endef
 
-DB_CONTAINER_NAME = $(shell $(call read-container-name,server,postgres))
+DB_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,postgres))
 DB_UP = $(shell $(call check-container,$(DB_CONTAINER_NAME)))
 
-LSTACK_CONTAINER_NAME = $(shell $(call read-container-name,server,localstack))
+LSTACK_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,localstack))
 LSTACK_UP = $(shell $(call check-container,$(LSTACK_CONTAINER_NAME)))
 
-SUPERPOSITION_CONTAINER_NAME = $(shell $(call read-container-name,server,superposition))
+SUPERPOSITION_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,superposition))
 SUPERPOSITION_UP = $(shell $(call check-container,$(SUPERPOSITION_CONTAINER_NAME)))
 
-KEYCLOAK_DB_CONTAINER_NAME = $(shell $(call read-container-name,server,keycloak-db))
+KEYCLOAK_DB_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,keycloak-db))
 KEYCLOAK_DB_UP = $(shell $(call check-container,$(KEYCLOAK_DB_CONTAINER_NAME)))
 
-KEYCLOAK_CONTAINER_NAME = $(shell $(call read-container-name,server,keycloak))
+KEYCLOAK_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,keycloak))
 KEYCLOAK_UP = $(shell $(call check-container,$(KEYCLOAK_CONTAINER_NAME)))
 
 
@@ -162,10 +162,10 @@ help:
 
 env-file:
 	@echo "$(YELLOW)🔧 Checking environment file...$(NC)"
-	@if ! [ -e server/.env ]; then \
+	@if ! [ -e airborne_server/.env ]; then \
 		echo "$(YELLOW).env missing, copying .env.example as .env$(NC)" && \
-		cp server/.env.example server/.env; \
-		cat server/.env.docker.extra >> server/.env; \
+		cp airborne_server/.env.example airborne_server/.env; \
+		cat airborne_server/.env.docker.extra >> airborne_server/.env; \
 	fi
 	@echo "$(GREEN)✅ Environment file ready$(NC)"
 
@@ -182,7 +182,7 @@ db:
 ifndef CI
 ifeq ($(DB_UP),1)
 	@echo "$(YELLOW)🐘 Starting PostgreSQL container...$(NC)"
-	$(COMPOSE) -f server/docker-compose.yml up -d postgres
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d postgres
 endif
 else
 	@echo "$(YELLOW)Skipping postgres container-setup in CI.$(NC)"
@@ -198,7 +198,7 @@ localstack:
 ifndef CI
 ifeq ($(LSTACK_UP),1)
 	@echo "$(YELLOW)☁️  Starting LocalStack container...$(NC)"
-	$(COMPOSE) -f server/docker-compose.yml up -d localstack
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d localstack
 endif
 else
 	@echo "$(YELLOW)Skipping localstack container-setup in CI.$(NC)"
@@ -218,7 +218,7 @@ superposition:
 ifndef CI
 ifeq ($(SUPERPOSITION_UP),1)
 	@echo "$(YELLOW)📊 Starting Superposition container...$(NC)"
-	$(COMPOSE) -f server/docker-compose.yml up -d superposition
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d superposition
 endif
 else
 	@echo "$(YELLOW)Skipping superposition container-setup in CI.$(NC)"
@@ -238,7 +238,7 @@ keycloak-db:
 ifndef CI
 ifeq ($(KEYCLOAK_DB_UP),1)
 	@echo "$(YELLOW)🔑 Starting Keycloak DB container...$(NC)"
-	$(COMPOSE) -f server/docker-compose.yml up -d keycloak-db
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d keycloak-db
 endif
 else
 	@echo "$(YELLOW)Skipping keycloak-db container-setup in CI.$(NC)"
@@ -258,7 +258,7 @@ keycloak:
 ifndef CI
 ifeq ($(KEYCLOAK_UP),1)
 	@echo "$(YELLOW)🔑 Starting Keycloak container...$(NC)"
-	$(COMPOSE) -f server/docker-compose.yml up -d keycloak
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d keycloak
 endif
 else
 	@echo "$(YELLOW)Skipping keycloak container-setup in CI.$(NC)"
@@ -390,13 +390,13 @@ endif
 
 node-dependencies:
 	cd airborne_dashboard && npm ci
-	cd server/docs_react && npm ci
+	cd airborne_server/docs_react && npm ci
 
 dashboard:
 	cd airborne_dashboard && npm run dev
 
 docs:
-	cd server/docs_react && npm run build:dev
+	cd airborne_server/docs_react && npm run build:dev
 
 SETUP_DEPS = env-file db superposition keycloak-db keycloak localstack node-dependencies
 # ifdef CI
@@ -405,26 +405,26 @@ SETUP_DEPS = env-file db superposition keycloak-db keycloak localstack node-depe
 setup: $(SETUP_DEPS)
 
 airborne-server:
-	@echo "$(YELLOW)Building airborne-server...$(NC)"
-	@cd server && cargo build $(CARGO_FLAGS) --bin airborne-server
+	@echo "$(YELLOW)Building airborne_server...$(NC)"
+	@cd airborne_server && cargo build $(CARGO_FLAGS) --bin airborne_server
 
 superposition-init:
 	@echo "$(YELLOW)📊 Initializing Superposition...$(NC)"
-	@cd server && ./scripts/init-superposition.sh
+	@cd airborne_server && ./scripts/init-superposition.sh
 
 keycloak-init:
 	@echo "$(YELLOW)🔑 Initializing Keycloak...$(NC)"
-	@cd server && ./scripts/init-keycloak.sh
+	@cd airborne_server && ./scripts/init-keycloak.sh
 
 localstack-init:
 	@echo "$(YELLOW)☁️  Initializing LocalStack...$(NC)"
-	@cd server && ./scripts/init-localstack.sh
+	@cd airborne_server && ./scripts/init-localstack.sh
 
 db-migration:
 	@echo "$(YELLOW)🗄️  Running database migrations...$(NC)"
-	@if [ -f server/.env ]; then \
+	@if [ -f airborne_server/.env ]; then \
 		set -a; \
-		. server/.env; \
+		. airborne_server/.env; \
 		set +a; \
 	fi; \
 	if [ -z "$$DATABASE_URL" ] && [ -z "$$DB_URL" ]; then \
@@ -433,7 +433,7 @@ db-migration:
 	elif [ -n "$$DB_URL" ]; then \
 		export DATABASE_URL="$$DB_URL"; \
 	fi; \
-	if (cd server && diesel migration run); then \
+	if (cd airborne_server && diesel migration run); then \
 		echo "$(GREEN)✅ Database migrations completed$(NC)"; \
 	else \
 		echo "$(RED)❌ Database migrations failed$(NC)"; \
@@ -442,26 +442,26 @@ db-migration:
 
 kill:
 	@echo "$(YELLOW)🔪 Killing existing airborne-server processes...$(NC)"
-	-@pkill -f server/target/debug/airborne-server 2>/dev/null || true
+	-@pkill -f airborne_server/target/debug/airborne_server 2>/dev/null || true
 	@echo "$(GREEN)✅ Process cleanup completed$(NC)"
 
 run: kill db superposition superposition-init keycloak-db keycloak keycloak-init localstack localstack-init
 	@trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \
-	cargo watch -w server/src -w server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd server && ../target/debug/airborne-server' & \
+	cargo watch -w airborne_server/src -w airborne_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd airborne_server && ../target/debug/airborne_server' & \
 	wait
 
 stop:
 	@echo "$(YELLOW)🛑 Stopping all services...$(NC)"
-	@$(COMPOSE) -f server/docker-compose.yml down 2>/dev/null || true
+	@$(COMPOSE) -f airborne_server/docker-compose.yml down 2>/dev/null || true
 	@echo "$(GREEN)✅ All services stopped.$(NC)"
 
 cleanup:
 	@echo "$(YELLOW)🧹 Cleaning up containers and volumes...$(NC)"
-	@$(COMPOSE) -f server/docker-compose.yml down -v --remove-orphans 2>/dev/null || true
+	@$(COMPOSE) -f airborne_server/docker-compose.yml down -v --remove-orphans 2>/dev/null || true
 	@echo "$(YELLOW)🗑️  Removing environment file...$(NC)"
-	@rm -f server/.env
+	@rm -f airborne_server/.env
 	@echo "$(GREEN)✅ Cleanup completed$(NC)"
 
 test:
@@ -482,34 +482,34 @@ status:
 	$(call service_status_simple,LocalStack,localstack)
 	@echo ""
 	@echo "$(YELLOW)🔧 Initialization Status:$(NC)"
-	$(call init_status_simple,Environment,server/.env)
+	$(call init_status_simple,Environment,airborne_server/.env)
 	@echo ""
 	@echo "$(YELLOW)🐳 Container Status:$(NC)"
-	@$(COMPOSE) -f server/docker-compose.yml ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}" 2>/dev/null || echo "$(YELLOW)No containers running$(NC)"
+	@$(COMPOSE) -f airborne_server/docker-compose.yml ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}" 2>/dev/null || echo "$(YELLOW)No containers running$(NC)"
 	@echo ""
 
 frontend-check:
 	@echo "$(YELLOW)🔍 Checking frontend code quality...$(NC)"
 	@cd airborne_dashboard && npm run check
-	@cd server/docs_react && npm run check
+	@cd airborne_server/docs_react && npm run check
 	@echo "$(GREEN)Frontend checks completed$(NC)"
 
 frontend-lint:
 	@echo "$(YELLOW)🔍 Linting frontend code...$(NC)"
 	@cd airborne_dashboard && npm run lint
-	@cd server/docs_react && npm run lint
+	@cd airborne_server/docs_react && npm run lint
 	@echo "$(GREEN)Frontend linting completed$(NC)"
 
 frontend-lint-fix:
 	@echo "$(YELLOW)🔧 Fixing frontend lint issues...$(NC)"
 	@cd airborne_dashboard && npm run lint:fix
-	@cd server/docs_react && npm run lint:fix
+	@cd airborne_server/docs_react && npm run lint:fix
 	@echo "$(GREEN)Frontend lint fixes completed$(NC)"
 
 frontend-format:
 	@echo "$(YELLOW)✨ Formatting frontend code...$(NC)"
 	@cd airborne_dashboard && npm run format
-	@cd server/docs_react && npm run format
+	@cd airborne_server/docs_react && npm run format
 	@echo "$(GREEN)Frontend formatting completed$(NC)"
 
 lint-fix: LINT_FLAGS += --fix --allow-dirty --allow-staged

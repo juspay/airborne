@@ -7,7 +7,7 @@ package.readme = "README.md"
 package.authors = ["airborne@juspay.in"]
 package.version = "0.1.0"
 
-members = ["server", "airborne_analytics_server"]
+members = ["airborne_server", "airborne_analytics_server"]
 
 [workspace.dependencies]
 chrono = { version = "0.4.41" }
