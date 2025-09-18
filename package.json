@@ -2,9 +2,9 @@
     "private": true,
     "name": "hyper-ota-monorepo",
     "workspaces": [
-        "react-plugin",
+        "airborne-react-plugin",
         "airborne_cli",
-        "react-plugin/example",
-        "react-plugin/ExampleOldArch"
+        "airborne-react-plugin/example",
+        "airborne-react-plugin/ExampleOldArch"
     ]
 }

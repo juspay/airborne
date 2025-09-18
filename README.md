@@ -23,7 +23,7 @@ Airborne is primarily about enabling your applications with powerful update mech
 
 - **[Airborne Android SDK](android/README.md)**: Integrate OTA update capabilities directly into your native Android applications. This lightweight SDK provides the tools to check for, download, and apply updates seamlessly. (Further details in its README).
 - **[Airborne iOS SDK](iOS/README.md)**: Similarly, equip your native iOS applications with OTA functionality using our dedicated iOS SDK. (Further details in its README).
-- **[Airborne React Native Plugin](react-plugin/README.md)**: The ideal solution for React Native developers. This plugin allows you to manage OTA updates across both Android and iOS platforms with a unified JavaScript API. (Further details in its README).
+- **[Airborne React Native Plugin](airborne-react-plugin/README.md)**: The ideal solution for React Native developers. This plugin allows you to manage OTA updates across both Android and iOS platforms with a unified JavaScript API. (Further details in its README).
 - **[Airborne React Native Example](react-example/README.md)**: A practical example application demonstrating how to use the Airborne React Native Plugin and integrate it with an update source. (Further details in its README).
 
 ## SDK Configuration and Download Flow Details
@@ -157,7 +157,7 @@ Integrating OTA updates into your application is straightforward:
 
     - For **native Android** applications: Use the [Airborne Android SDK](android/README.md).
     - For **native iOS** applications: Use the [Airborne iOS SDK](iOS/README.md).
-    - For **React Native** applications: Use the [Airborne React Native Plugin](react-plugin/README.md). Refer to the [Airborne React Native Example](react-example/README.md) for a practical guide.
+    - For **React Native** applications: Use the [Airborne React Native Plugin](airborne-react-plugin/README.md). Refer to the [Airborne React Native Example](react-example/README.md) for a practical guide.
 
 2.  **Integrate into Your Project**: Follow the specific installation and setup instructions provided in the README of your chosen SDK/plugin.
 
