@@ -79,16 +79,22 @@ export default function LoginPage() {
         {/* Logo and Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
-            <div className="h-12 w-12 rounded-xl flex items-center justify-center">
+            <div className="h-20 rounded-xl flex items-center justify-center">
               <Image
-                src="/airborne-cube-logo.png"
+                src="/airborne-logo-light.svg"
                 alt="Airborne Logo"
-                width={16}
-                height={16}
-                className="h-8 w-8 text-primary-foreground"
-              ></Image>
+                width={28}
+                height={12}
+                className="w-28 mr-2 text-primary-foreground dark:hidden"
+              />
+              <Image
+                src="/airborne-logo-dark.svg"
+                alt="Airborne Logo"
+                width={28}
+                height={12}
+                className="w-28 mr-2 text-primary-foreground hidden dark:block"
+              />
             </div>
-            <span className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)]">Airborne</span>
           </div>
           <h1 className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance mb-2">
             Welcome back
@@ -222,11 +228,11 @@ export default function LoginPage() {
         <div className="text-center mt-8 text-xs text-muted-foreground">
           <p>
             By signing in, you agree to our{" "}
-            <Link href="/terms" className="hover:underline">
-              Terms of Service
+            <Link href="/terms-of-use" className="hover:underline">
+              Terms of Use
             </Link>{" "}
             and{" "}
-            <Link href="/privacy" className="hover:underline">
+            <Link href="/privacy-policy" className="hover:underline">
               Privacy Policy
             </Link>
           </p>

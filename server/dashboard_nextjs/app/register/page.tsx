@@ -95,16 +95,22 @@ export default function RegisterPage() {
         <div className="hidden lg:block space-y-6">
           <div>
             <div className="inline-flex items-center gap-3 mb-6">
-              <div className="h-12 w-12 rounded-xl flex items-center justify-center">
+              <div className="h-20 rounded-xl flex items-center justify-center">
                 <Image
-                  src="/airborne-cube-logo.png"
+                  src="/airborne-logo-light.svg"
                   alt="Airborne Logo"
-                  width={16}
-                  height={16}
-                  className="h-8 w-8 mr-2 text-primary-foreground"
-                ></Image>
+                  width={28}
+                  height={12}
+                  className="w-28 mr-2 text-primary-foreground dark:hidden"
+                />
+                <Image
+                  src="/airborne-logo-dark.svg"
+                  alt="Airborne Logo"
+                  width={28}
+                  height={12}
+                  className="w-28 mr-2 text-primary-foreground hidden dark:block"
+                />
               </div>
-              <span className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)]">Airborne</span>
             </div>
             <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance mb-4">
               Ship updates without app store delays
@@ -130,9 +136,6 @@ export default function RegisterPage() {
 
           <div className="flex items-center gap-4 pt-4">
             <Badge variant="secondary" className="text-xs">
-              SOC 2 Compliant
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
               99.9% Uptime
             </Badge>
             <Badge variant="secondary" className="text-xs">
@@ -145,16 +148,22 @@ export default function RegisterPage() {
         <div className="w-full max-w-md mx-auto">
           <div className="text-center mb-6 lg:hidden">
             <div className="inline-flex items-center gap-3 mb-4">
-              <div className="h-12 w-12 rounded-xl flex items-center justify-center">
+              <div className="h-20 rounded-xl flex items-center justify-center">
                 <Image
-                  src="/airborne-cube-logo.png"
+                  src="/airborne-logo-light.svg"
                   alt="Airborne Logo"
-                  width={16}
-                  height={16}
-                  className="h-8 w-8 mr-2 text-primary-foreground"
-                ></Image>
+                  width={28}
+                  height={12}
+                  className="w-28 mr-2 text-primary-foreground dark:hidden"
+                />
+                <Image
+                  src="/airborne-logo-dark.svg"
+                  alt="Airborne Logo"
+                  width={28}
+                  height={12}
+                  className="w-28 mr-2 text-primary-foreground hidden dark:block"
+                />
               </div>
-              <span className="text-2xl font-bold font-[family-name:var(--font-space-grotesk)]">Airborne</span>
             </div>
           </div>
 
