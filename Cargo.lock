@@ -320,6 +320,7 @@ dependencies = [
  "superposition_sdk",
  "thiserror 2.0.16",
  "tokio",
+ "url",
  "urlencoding",
  "uuid",
  "zip",

@@ -109,3 +109,69 @@ where
         }
     })
 }
+
+/// Error when the existing JSON shape conflicts with the path you’re inserting.
+#[derive(Debug)]
+pub enum NestError {
+    /// You tried to descend into a non-object (e.g., a string) at `at`.
+    PathConflict { at: String, found: &'static str },
+}
+
+pub fn dotted_docs_to_nested(input: &HashMap<String, Document>) -> Result<Value, NestError> {
+    let mut root = Value::Object(Map::new());
+
+    for (key, doc) in input {
+        // Convert Smithy Document -> serde_json::Value once.
+        let val = document_to_json_value(&doc);
+
+        // Iterative descent through dotted path.
+        let mut cursor = &mut root;
+        let mut it = key.split('.');
+        let mut prefix = String::new();
+
+        // We need the last segment to insert into.
+        let Some(last) = it.next_back() else { continue };
+
+        for seg in it {
+            if !prefix.is_empty() { prefix.push('.'); }
+            prefix.push_str(seg);
+
+            if !cursor.is_object() {
+                return Err(NestError::PathConflict {
+                    at: prefix.clone(),
+                    found: type_name(cursor),
+                });
+            }
+
+            let obj = cursor.as_object_mut().unwrap();
+            cursor = obj
+                .entry(seg.to_string())
+                .or_insert_with(|| Value::Object(Map::new()));
+        }
+
+        // Insert the value at the parent object
+        if !cursor.is_object() {
+            return Err(NestError::PathConflict {
+                at: prefix,
+                found: type_name(cursor),
+            });
+        }
+        cursor
+            .as_object_mut()
+            .unwrap()
+            .insert(last.to_string(), val);
+    }
+
+    Ok(root)
+}
+
+fn type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}

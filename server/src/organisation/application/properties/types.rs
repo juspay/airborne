@@ -52,3 +52,16 @@ pub enum PutPropertiesSchemaTaskAction {
     Update,
     Delete,
 }
+
+#[derive(Serialize, Default)]
+pub struct ConfigProperty {
+    pub dimensions: BTreeMap<String, Value>,
+    pub experiment_id: String,
+    pub status: String,
+    pub properties: Value,
+}
+
+#[derive(Serialize)]
+pub struct ListPropertiesResponse {
+    pub properties: Vec<ConfigProperty>
+}

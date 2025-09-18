@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 use actix_web::{
-    put, get, web::{Data, Json, ReqData}, Scope
+    get, http::{self}, put, web::{Data, Json, ReqData}, Scope
 };
-use superposition_sdk::Client;
-
-use crate::{middleware::auth::{validate_user, AuthResponse, WRITE}, types::{ABError, AppState}, utils::{document::{document_to_json_value, value_to_document}, workspace::get_workspace_name_for_application}};
+use aws_smithy_types::Document;
+use serde_json::Value;
+use superposition_sdk::{types::{ExperimentStatusType, VariantType}, Client};
+use http::{uri::PathAndQuery, Uri};
+use std::str::FromStr;
+use url::form_urlencoded;
+use crate::{middleware::auth::{validate_user, AuthResponse, READ, WRITE}, organisation::application::properties::types::ConfigProperty, release::utils::parse_kv_string, types::{ABError, AppState}, utils::{document::{document_to_json_value, dotted_docs_to_nested, value_to_document}, workspace::get_workspace_name_for_application}};
 
 mod utils;
 mod transaction;
@@ -29,6 +33,7 @@ pub fn add_routes() -> Scope {
     Scope::new("")
         .service(put_properties_schema_api)
         .service(get_properties_schema_api)
+        .service(list_properties_api)
 }
 
 #[put("/schema")]
@@ -47,6 +52,8 @@ async fn put_properties_schema_api(
     let properties = properties.iter().map(|(k, v)| {
         (format!("config.properties.{}", k), v.to_owned())
     }).collect::<BTreeMap<String, types::SchemaNode>>();
+
+    println!("Properties to be updated: {:?}", properties);
 
     let mut conn = state.db_pool.get().map_err(|_| {
         ABError::InternalServerError("Failed to get database connection".to_string())
@@ -340,9 +347,9 @@ async fn get_properties_schema_api(
     state: Data<AppState>
 ) -> actix_web::Result<Json<types::GetPropertiesSchemaResponse>> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
+    let organisation = validate_user(auth_response.organisation, READ)
         .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
+    let application = validate_user(auth_response.application, READ)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
     let mut conn = state.db_pool.get().map_err(|_| {
@@ -383,5 +390,180 @@ async fn get_properties_schema_api(
 
     Ok(Json(types::GetPropertiesSchemaResponse {
         properties: existing_config_schemas,
+    }))
+}
+
+#[get("/list")]
+async fn list_properties_api(
+    auth_response: ReqData<AuthResponse>,
+    req: actix_web::HttpRequest,
+    state: Data<AppState>
+) -> actix_web::Result<Json<types::ListPropertiesResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation = validate_user(auth_response.organisation, READ)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, READ)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+
+    let mut conn = state.db_pool.get().map_err(|_| {
+        ABError::InternalServerError("Failed to get database connection".to_string())
+    })?;
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let context: HashMap<String, Value> = req
+        .headers()
+        .get("x-dimension")
+        .and_then(|val| val.to_str().ok())
+        .map(parse_kv_string)
+        .unwrap_or_default();
+
+    println!("Using org and workspace: {} / {}", superposition_org_id_from_env, workspace_name);
+
+    let default_configs = state.superposition_client
+        .list_default_configs()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .all(true)
+        .send()
+        .await.map_err(|e| ABError::InternalServerError(format!("Failed to get current config properties: {}", e)))?;
+
+    let default_config_version = default_configs.data().iter().find(|config| config.key == "config.version").map(|config| config.value().as_string().unwrap_or_default().to_string()).unwrap_or_default();
+
+    let experiments_list = state
+        .superposition_client
+        .list_experiment()
+        .org_id(superposition_org_id_from_env)
+        .workspace_id(workspace_name)
+        .customize()
+        .mutate_request(move |req| {
+            if context.len() < 1 {
+                return;
+            }
+            let uri: http::Uri = match req.uri().parse() {
+                Ok(uri) => uri,
+                Err(e) => {
+                    println!("Failed to parse URI from request: {:?}", e);
+                    return;
+                }
+            };
+
+            let mut parts = uri.into_parts();
+            let (path, existing_q) = match parts.path_and_query.take() {
+                Some(pq) => {
+                    let s = pq.as_str();
+                    match s.split_once('?') {
+                        Some((p, q)) => (p.to_string(), Some(q.to_string())),
+                        None => (s.to_string(), None),
+                    }
+                }
+                None => ("/".to_string(), None),
+            };
+
+            let mut ser = form_urlencoded::Serializer::new(String::new());
+            if let Some(eq) = existing_q {
+                for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
+                    ser.append_pair(&k, &v);
+                }
+            }
+            for (k, v) in &context {
+                if let Some(val_str) = v.as_str() {
+                    ser.append_pair(&format!("dimension[{k}]"), val_str);
+                }
+            }
+
+            let new_q = ser.finish();
+            let pq = if new_q.is_empty() {
+                path
+            } else {
+                format!("{path}?{new_q}")
+            };
+
+            let path_and_query = match PathAndQuery::from_str(&pq) {
+                Ok(pq) => pq,
+                Err(e) => {
+                    println!("Failed to create valid path/query from '{}': {:?}", pq, e);
+                    return; // Skip URI modification on error
+                }
+            };
+
+            parts.path_and_query = Some(path_and_query);
+
+            let new_uri = match Uri::from_parts(parts) {
+                Ok(uri) => uri,
+                Err(e) => {
+                    println!("Failed to create valid URI from parts: {:?}", e);
+                    return;
+                }
+            };
+
+            *req.uri_mut() = new_uri.into();
+        })
+        .send()
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("Failed to get experiments list: {}", e)))?;
+
+    let mut config_properties: Vec<ConfigProperty> = vec![];
+
+    for exp in experiments_list.data() {
+
+        let variant = if *exp.status() == ExperimentStatusType::Concluded {
+            if exp.chosen_variant().is_none() {
+                None
+            } else {
+                exp.variants().iter().filter(|&variant| variant.id == exp.chosen_variant().unwrap()).last()
+            }
+        } else {
+            exp.variants().iter().filter(|&variant| *variant.variant_type() == VariantType::Experimental).last()
+        };
+
+        if variant.is_none() {
+            continue;
+        }
+
+        let variant_overrides = variant.unwrap().overrides.as_object();
+        if variant_overrides.is_none() {
+            continue;
+        }
+
+        let variant_overrides = variant_overrides.unwrap().iter().filter_map(|(k, v)| {
+            if k.starts_with("config.properties.") {
+                let key = k.strip_prefix("config.properties.").unwrap_or(k).to_string();
+                println!("Found variant override for {}: {:?}", key, v);
+                Some((key, v.clone()))
+            } else {
+                None
+            }
+        }).collect::<HashMap<String, Document>>();
+
+        println!("Variant overrides {:?}", variant_overrides);
+
+        let mut exp = ConfigProperty {
+            dimensions: exp.context().iter().map(|(k, v)| (k.clone(), document_to_json_value(v))).collect::<BTreeMap<String, Value>>(),
+            experiment_id: exp.id().to_string(),
+            status: exp.status().to_string(),
+            properties: dotted_docs_to_nested(&variant_overrides).map_err(|e| {
+                println!("Error in app properties: {:?}", e);
+                ABError::InternalServerError("Error in app properties".to_string())
+            })?,
+        };
+
+        if !variant_overrides.get("config.version").is_none() {
+            let config_version = variant_overrides.get("config.version").and_then(|v| v.as_string()).unwrap_or_default().to_string();
+            if config_version == default_config_version {
+                exp.status = "DEFAULT".to_string();
+            }
+        }
+
+        config_properties.push(exp);
+    }
+
+    Ok(Json(types::ListPropertiesResponse {
+        properties: config_properties,
     }))
 }

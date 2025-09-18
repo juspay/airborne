@@ -39,7 +39,7 @@ use crate::{
 };
 
 mod types;
-mod utils;
+pub mod utils;
 
 pub fn add_routes() -> Scope {
     Scope::new("")

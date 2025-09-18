@@ -1431,10 +1431,8 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
 
     sortedKeys.forEach(key => {
       const node = properties[key];
-      const pathParts = key.replace('config.properties.', '').split('.');
+      const cleanPath = key.split('.');
       
-      // Remove 'properties' parts from the path for internal representation
-      const cleanPath = pathParts.filter(part => part !== 'properties');
       const fieldName = cleanPath[cleanPath.length - 1];
       const fieldType = (node.schema.type || 'string') as SchemaField['type'];
       
@@ -1923,7 +1921,7 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
         if (hasNonObjectProperties) {
           // If this object has non-object properties, add them with dot notation
           Object.entries(obj.properties).forEach(([key, prop]: [string, any]) => {
-            const fullPath = path ? `${path}.properties.${key}` : `${key}`;
+            const fullPath = path ? `${path}.${key}` : `${key}`;
             
             if (prop.type === 'object' && prop.properties) {
               // Recurse for nested objects
@@ -1955,7 +1953,9 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
         traverseSchema(prop, key);
       });
     }
-    
+
+    console.log("Transformed schema", result);
+
     return result;
   };
 
@@ -1968,9 +1968,8 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
     const validationErrors: string[] = [];
     
     Object.entries(transformedSchema).forEach(([key, schemaData]) => {
-      const fullKey = key.startsWith('config.properties.') ? key : `config.properties.${key}`;
       const field = findFieldByPath(fields, key);
-      
+
       if (field) {
         // Ensure default value is provided and valid
         let defaultValue = field.defaultValue;
@@ -1989,7 +1988,7 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
         // Ensure description is provided
         const description = field.description || generateDescription(field.name);
         
-        backendSchema[fullKey] = {
+        backendSchema[key] = {
           description: description,
           default_value: defaultValue,
           schema: schemaData,
@@ -1997,7 +1996,7 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
       } else {
         // Fallback for fields not found (shouldn't happen but safety)
         const fieldName = key.split('.').pop() || key;
-        backendSchema[fullKey] = {
+        backendSchema[key] = {
           description: generateDescription(fieldName),
           default_value: generateDefaultValue(schemaData.type || 'string', schemaData),
           schema: schemaData,

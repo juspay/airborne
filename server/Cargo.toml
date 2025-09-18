@@ -41,5 +41,6 @@ superposition_sdk = "0.89.0"
 thiserror = "2.0.12"
 tokio = { version = "1", features = ["full"] }
 urlencoding = "2.1.2"
+url = "2.5.7"
 uuid = { version = "1.16.0", features = ["serde", "v7", "v4"] }
 zip = "4.6.1"
