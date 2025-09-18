@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, pointerWithin, rectIntersection } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
@@ -620,33 +620,96 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
     onChange({ ...field, ...updates });
   };
 
-  // Validate and parse default value
-  const validateAndSetDefaultValue = () => {
+  // Validate default value without setting it (for real-time validation)
+  const validateDefaultValue = useCallback((value: string): string | null => {
+    if (!value.trim()) {
+      return null; // Empty is valid, will use auto-generated default
+    }
+
+    try {
+      // Handle different field types
+      switch (field.type) {
+        case "string":
+          // For string type, check enum values if they exist
+          if (field.enumValues && field.enumValues.length > 0) {
+            if (!field.enumValues.includes(value)) {
+              return `Value must be one of: ${field.enumValues.join(', ')}`;
+            }
+          }
+          // Check pattern if exists
+          if (field.pattern) {
+            const regex = new RegExp(field.pattern);
+            if (!regex.test(value)) {
+              return `Value must match pattern: ${field.pattern}`;
+            }
+          }
+          // Check length constraints
+          if (field.minLength !== undefined && value.length < field.minLength) {
+            return `Minimum length is ${field.minLength}`;
+          }
+          if (field.maxLength !== undefined && value.length > field.maxLength) {
+            return `Maximum length is ${field.maxLength}`;
+          }
+          break;
+        case "number":
+          const numValue = parseFloat(value);
+          if (isNaN(numValue)) {
+            return "Invalid number format";
+          }
+          if (field.minValue !== undefined && numValue < field.minValue) {
+            return `Minimum value is ${field.minValue}`;
+          }
+          if (field.maxValue !== undefined && numValue > field.maxValue) {
+            return `Maximum value is ${field.maxValue}`;
+          }
+          break;
+        case "boolean":
+          const lowerText = value.toLowerCase().trim();
+          if (lowerText !== "true" && lowerText !== "false") {
+            return "Boolean must be 'true' or 'false'";
+          }
+          break;
+        case "array":
+        case "object":
+          JSON.parse(value); // This will throw if invalid JSON
+          break;
+      }
+      return null; // No error
+    } catch (error) {
+      if (field.type === "array") {
+        return "Invalid JSON array format";
+      } else if (field.type === "object") {
+        return "Invalid JSON object format";
+      }
+      return error instanceof Error ? error.message : "Invalid value format";
+    }
+  }, [field.type, field.enumValues, field.pattern, field.minLength, field.maxLength, field.minValue, field.maxValue]);
+
+  // Update the field's default value (called when user stops typing)
+  const updateDefaultValue = useCallback(() => {
     if (!defaultValueText.trim()) {
       updateField({ defaultValue: undefined });
-      setDefaultValueError("");
       return;
+    }
+
+    const validationError = validateDefaultValue(defaultValueText);
+    if (validationError) {
+      return; // Don't update if there's an error
     }
 
     try {
       let parsedValue;
       
-      // Handle different field types
       switch (field.type) {
         case "string":
           parsedValue = defaultValueText;
           break;
         case "number":
           parsedValue = parseFloat(defaultValueText);
-          if (isNaN(parsedValue)) {
-            throw new Error("Invalid number format");
-          }
           break;
         case "boolean":
           const lowerText = defaultValueText.toLowerCase().trim();
-          if (lowerText === "true") parsedValue = true;
-          else if (lowerText === "false") parsedValue = false;
-          else throw new Error("Boolean must be 'true' or 'false'");
+          parsedValue = lowerText === "true";
           break;
         case "array":
         case "object":
@@ -657,11 +720,24 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
       }
 
       updateField({ defaultValue: parsedValue });
-      setDefaultValueError("");
     } catch (error) {
-      setDefaultValueError(error instanceof Error ? error.message : "Invalid value format");
+      // This shouldn't happen since we validated above, but just in case
+      console.error("Unexpected validation error:", error);
     }
-  };
+  }, [defaultValueText, field.type, validateDefaultValue, updateField]);
+
+  // Debounced validation effect
+  useEffect(() => {
+    const validationError = validateDefaultValue(defaultValueText);
+    setDefaultValueError(validationError || "");
+
+    // Debounce the actual field update
+    const timeoutId = setTimeout(() => {
+      updateDefaultValue();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [defaultValueText, validateDefaultValue, updateDefaultValue]);
 
   // Helper functions for managing options
   const addOption = (value: string) => {
@@ -1023,10 +1099,10 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
                   value={defaultValueText}
                   onChange={(e) => {
                     setDefaultValueText(e.target.value);
-                    validateAndSetDefaultValue();
                   }}
                   placeholder={`Enter default ${field.type} value... (auto-generated if empty)`}
                   rows={4}
+                  className={defaultValueError ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
                 {defaultValueError && (
                   <p className="text-sm text-red-600">
@@ -1099,7 +1175,12 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
       </Tabs>
 
       <div className="flex justify-end gap-2 pt-4">
-        <Button onClick={onSave}>Save Changes</Button>
+        <Button 
+          onClick={onSave}
+          disabled={!!defaultValueError}
+        >
+          Save Changes
+        </Button>
       </div>
     </div>
   );
