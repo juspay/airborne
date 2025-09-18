@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, pointerWithin, rectIntersection } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
@@ -602,17 +602,79 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
   const [defaultValueText, setDefaultValueText] = useState("");
   const [defaultValueError, setDefaultValueError] = useState("");
   const [newOptionValue, setNewOptionValue] = useState(""); // New state for option input
+  
+  // Ref for the default value textarea to preserve cursor position
+  const defaultValueTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Function to preserve cursor position when formatting JSON
+  const preserveCursorPosition = useCallback((oldText: string, newText: string) => {
+    const textarea = defaultValueTextareaRef.current;
+    if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
+    
+    // If the text hasn't actually changed (same content, just formatting), preserve position
+    if (oldText.replace(/\s/g, '') === newText.replace(/\s/g, '')) {
+      // Find the closest character in the new formatted text
+      let newPos = cursorPos;
+      
+      // If cursor was at the end, keep it at the end
+      if (cursorPos >= oldText.length) {
+        newPos = newText.length;
+      } else {
+        // Try to find equivalent position by counting non-whitespace characters
+        let nonWhitespaceCount = 0;
+        for (let i = 0; i < cursorPos && i < oldText.length; i++) {
+          if (oldText[i] !== ' ' && oldText[i] !== '\n' && oldText[i] !== '\t') {
+            nonWhitespaceCount++;
+          }
+        }
+        
+        // Find the same position in the new text
+        let currentNonWhitespace = 0;
+        for (let i = 0; i < newText.length; i++) {
+          if (newText[i] !== ' ' && newText[i] !== '\n' && newText[i] !== '\t') {
+            currentNonWhitespace++;
+          }
+          if (currentNonWhitespace > nonWhitespaceCount) {
+            newPos = i;
+            break;
+          }
+          newPos = i + 1;
+        }
+      }
+      
+      // Set the cursor position after the next render
+      setTimeout(() => {
+        if (textarea) {
+          textarea.setSelectionRange(newPos, newPos);
+        }
+      }, 0);
+    }
+  }, []);
 
   // Initialize default value text when field changes
   useEffect(() => {
+    let newText = "";
+    
     if (field.defaultValue !== undefined && field.defaultValue !== null) {
       if (typeof field.defaultValue === 'string') {
-        setDefaultValueText(field.defaultValue);
+        newText = field.defaultValue;
       } else {
-        setDefaultValueText(JSON.stringify(field.defaultValue, null, 2));
+        newText = JSON.stringify(field.defaultValue, null, 2);
       }
-    } else {
-      setDefaultValueText("");
+    }
+    
+    const oldText = defaultValueText;
+    
+    // Only update if the content is actually different (avoid infinite loops)
+    if (oldText !== newText) {
+      setDefaultValueText(newText);
+      
+      // Preserve cursor position if this is a formatting change
+      if (oldText && newText) {
+        preserveCursorPosition(oldText, newText);
+      }
     }
   }, [field.defaultValue]);
 
@@ -1095,6 +1157,7 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
               <CollapsibleContent className="space-y-2">
                 <Label htmlFor="defaultValue">Default Value</Label>
                 <Textarea
+                  ref={defaultValueTextareaRef}
                   id="defaultValue"
                   value={defaultValueText}
                   onChange={(e) => {
