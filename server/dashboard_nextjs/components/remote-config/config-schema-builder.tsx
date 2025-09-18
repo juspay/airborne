@@ -597,9 +597,95 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
   const [editMode, setEditMode] = useState<"visual" | "json">("visual");
   const [jsonSchema, setJsonSchema] = useState("");
   const [jsonError, setJsonError] = useState("");
+  const [validationRulesOpen, setValidationRulesOpen] = useState(false);
+  const [defaultValueOpen, setDefaultValueOpen] = useState(false);
+  const [defaultValueText, setDefaultValueText] = useState("");
+  const [defaultValueError, setDefaultValueError] = useState("");
+  const [newOptionValue, setNewOptionValue] = useState(""); // New state for option input
+
+  // Initialize default value text when field changes
+  useEffect(() => {
+    if (field.defaultValue !== undefined && field.defaultValue !== null) {
+      if (typeof field.defaultValue === 'string') {
+        setDefaultValueText(field.defaultValue);
+      } else {
+        setDefaultValueText(JSON.stringify(field.defaultValue, null, 2));
+      }
+    } else {
+      setDefaultValueText("");
+    }
+  }, [field.defaultValue]);
 
   const updateField = (updates: Partial<SchemaField>) => {
     onChange({ ...field, ...updates });
+  };
+
+  // Validate and parse default value
+  const validateAndSetDefaultValue = () => {
+    if (!defaultValueText.trim()) {
+      updateField({ defaultValue: undefined });
+      setDefaultValueError("");
+      return;
+    }
+
+    try {
+      let parsedValue;
+      
+      // Handle different field types
+      switch (field.type) {
+        case "string":
+          parsedValue = defaultValueText;
+          break;
+        case "number":
+          parsedValue = parseFloat(defaultValueText);
+          if (isNaN(parsedValue)) {
+            throw new Error("Invalid number format");
+          }
+          break;
+        case "boolean":
+          const lowerText = defaultValueText.toLowerCase().trim();
+          if (lowerText === "true") parsedValue = true;
+          else if (lowerText === "false") parsedValue = false;
+          else throw new Error("Boolean must be 'true' or 'false'");
+          break;
+        case "array":
+        case "object":
+          parsedValue = JSON.parse(defaultValueText);
+          break;
+        default:
+          parsedValue = defaultValueText;
+      }
+
+      updateField({ defaultValue: parsedValue });
+      setDefaultValueError("");
+    } catch (error) {
+      setDefaultValueError(error instanceof Error ? error.message : "Invalid value format");
+    }
+  };
+
+  // Helper functions for managing options
+  const addOption = (value: string) => {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) return;
+    
+    const currentOptions = field.enumValues || [];
+    if (!currentOptions.includes(trimmedValue)) {
+      updateField({ enumValues: [...currentOptions, trimmedValue] });
+    }
+    setNewOptionValue("");
+  };
+
+  const removeOption = (valueToRemove: string) => {
+    const currentOptions = field.enumValues || [];
+    const updatedOptions = currentOptions.filter(option => option !== valueToRemove);
+    updateField({ enumValues: updatedOptions.length > 0 ? updatedOptions : undefined });
+  };
+
+  const handleOptionKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addOption(newOptionValue);
+    }
   };
 
   // Generate JSON schema for this specific field
@@ -802,101 +888,161 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
           )}
 
           {(field.type === "string" || field.type === "number") && (
-            <div className="space-y-4">
-              <Separator />
-              <h4 className="font-medium">Validation Rules</h4>
-              
-              {field.type === "string" && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="minLength">Min Length</Label>
-                      <Input
-                        id="minLength"
-                        type="number"
-                        value={field.minLength || ""}
-                        onChange={(e) => updateField({ minLength: parseInt(e.target.value) || undefined })}
-                      />
+            <Collapsible open={validationRulesOpen} onOpenChange={setValidationRulesOpen}>
+              <div className="space-y-4">
+                <Separator />
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent">
+                    {validationRulesOpen ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    Validation Rules
+                  </Button>
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent className="space-y-4">
+                  {field.type === "string" && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="minLength">Min Length</Label>
+                          <Input
+                            id="minLength"
+                            type="number"
+                            value={field.minLength || ""}
+                            onChange={(e) => updateField({ minLength: parseInt(e.target.value) || undefined })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="maxLength">Max Length</Label>
+                          <Input
+                            id="maxLength"
+                            type="number"
+                            value={field.maxLength || ""}
+                            onChange={(e) => updateField({ maxLength: parseInt(e.target.value) || undefined })}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pattern">Pattern (regex)</Label>
+                        <Input
+                          id="pattern"
+                          value={field.pattern || ""}
+                          onChange={(e) => updateField({ pattern: e.target.value })}
+                          placeholder="^[a-zA-Z0-9]+$"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="enumValues">Options</Label>
+                        
+                        {/* Display existing options as chips */}
+                        {field.enumValues && field.enumValues.length > 0 && (
+                          <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/50 min-h-[2.5rem]">
+                            {field.enumValues.map((option, index) => (
+                              <Badge 
+                                key={index} 
+                                variant="secondary" 
+                                className="flex items-center gap-1 px-2 py-1"
+                              >
+                                {option}
+                                <button
+                                  type="button"
+                                  onClick={() => removeOption(option)}
+                                  className="ml-1 text-muted-foreground hover:text-foreground"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Input for new options */}
+                        <Input
+                          id="enumValues"
+                          value={newOptionValue}
+                          onChange={(e) => setNewOptionValue(e.target.value)}
+                          onKeyDown={handleOptionKeyDown}
+                          placeholder="Type an option and press Enter to add"
+                        />
+                        
+                        <p className="text-xs text-muted-foreground">
+                          Press Enter to add options. These will be the only allowed values.
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  
+                  {field.type === "number" && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="minValue">Min Value</Label>
+                        <Input
+                          id="minValue"
+                          type="number"
+                          value={field.minValue || ""}
+                          onChange={(e) => updateField({ minValue: parseFloat(e.target.value) || undefined })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxValue">Max Value</Label>
+                        <Input
+                          id="maxValue"
+                          type="number"
+                          value={field.maxValue || ""}
+                          onChange={(e) => updateField({ maxValue: parseFloat(e.target.value) || undefined })}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="maxLength">Max Length</Label>
-                      <Input
-                        id="maxLength"
-                        type="number"
-                        value={field.maxLength || ""}
-                        onChange={(e) => updateField({ maxLength: parseInt(e.target.value) || undefined })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pattern">Pattern (regex)</Label>
-                    <Input
-                      id="pattern"
-                      value={field.pattern || ""}
-                      onChange={(e) => updateField({ pattern: e.target.value })}
-                      placeholder="^[a-zA-Z0-9]+$"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="enumValues">Enum Values (comma-separated)</Label>
-                    <Input
-                      id="enumValues"
-                      value={field.enumValues?.join(", ") || ""}
-                      onChange={(e) => updateField({ 
-                        enumValues: e.target.value.split(",").map(v => v.trim()).filter(v => v.length > 0)
-                      })}
-                      placeholder="option1, option2, option3"
-                    />
-                  </div>
-                </>
-              )}
-              
-              {field.type === "number" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="minValue">Min Value</Label>
-                    <Input
-                      id="minValue"
-                      type="number"
-                      value={field.minValue || ""}
-                      onChange={(e) => updateField({ minValue: parseFloat(e.target.value) || undefined })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxValue">Max Value</Label>
-                    <Input
-                      id="maxValue"
-                      type="number"
-                      value={field.maxValue || ""}
-                      onChange={(e) => updateField({ maxValue: parseFloat(e.target.value) || undefined })}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+                  )}
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
           )}
 
-          <Separator />
-          <div className="space-y-2">
-            <Label htmlFor="defaultValue">Default Value</Label>
-            <Input
-              id="defaultValue"
-              value={field.defaultValue ? JSON.stringify(field.defaultValue) : ""}
-              onChange={(e) => {
-                try {
-                  const value = e.target.value ? JSON.parse(e.target.value) : undefined;
-                  updateField({ defaultValue: value });
-                } catch {
-                  // Invalid JSON, keep as string for now
-                  updateField({ defaultValue: e.target.value });
-                }
-              }}
-              placeholder={`Default ${field.type} value... (auto-generated if empty)`}
-            />
-            <p className="text-xs text-muted-foreground">
-              If left empty, a schema-compliant default value will be auto-generated
-            </p>
-          </div>
+          <Collapsible open={defaultValueOpen} onOpenChange={setDefaultValueOpen}>
+            <div className="space-y-4">
+              <Separator />
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent">
+                  {defaultValueOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  Default Value
+                </Button>
+              </CollapsibleTrigger>
+              
+              <CollapsibleContent className="space-y-2">
+                <Label htmlFor="defaultValue">Default Value</Label>
+                <Textarea
+                  id="defaultValue"
+                  value={defaultValueText}
+                  onChange={(e) => {
+                    setDefaultValueText(e.target.value);
+                    validateAndSetDefaultValue();
+                  }}
+                  placeholder={`Enter default ${field.type} value... (auto-generated if empty)`}
+                  rows={4}
+                />
+                {defaultValueError && (
+                  <p className="text-sm text-red-600">
+                    {defaultValueError}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {field.type === "string" && "Enter a string value"}
+                  {field.type === "number" && "Enter a numeric value"}
+                  {field.type === "boolean" && "Enter 'true' or 'false'"}
+                  {(field.type === "array" || field.type === "object") && "Enter valid JSON"}
+                  {" • If left empty, a schema-compliant default value will be auto-generated"}
+                </p>
+              </CollapsibleContent>
+            </div>
+          </Collapsible>
         </TabsContent>
 
         <TabsContent value="json" className="space-y-4">
