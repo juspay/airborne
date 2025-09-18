@@ -1,13 +1,13 @@
 "use client";
 
+import { useParams } from "next/navigation";
 import { useState } from "react";
 import SharedLayout from "@/components/shared-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigSchemaBuilder } from "@/components/remote-config/config-schema-builder";
-import { ConfigValuesEditor } from "@/components/remote-config/config-values-editor";
 import { ConfigPreview } from "@/components/remote-config/config-preview";
-import { Plus, Settings, FileJson } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 
 export type SchemaField = {
   id: string;
@@ -26,37 +26,16 @@ export type SchemaField = {
   pattern?: string;
 };
 
-export type ConfigValue = {
-  [key: string]: any;
-};
-
 export default function RemoteConfigsPage() {
+  const params = useParams();
+  const orgId = params.orgId as string;
+  const appId = params.appId as string;
   const [activeTab, setActiveTab] = useState("schema");
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
-  const [configValues, setConfigValues] = useState<ConfigValue[]>([]);
-  const [currentConfig, setCurrentConfig] = useState<ConfigValue>({});
 
-  const handleSchemaChange = (fields: SchemaField[]) => {
-    setSchemaFields(fields);
-    // Reset config values when schema changes
-    setConfigValues([]);
-    setCurrentConfig({});
-  };
-
-  const handleAddConfigValue = (values: ConfigValue) => {
-    setConfigValues([...configValues, values]);
-    setCurrentConfig({});
-  };
-
-  const handleUpdateConfigValue = (index: number, values: ConfigValue) => {
-    const updated = [...configValues];
-    updated[index] = values;
-    setConfigValues(updated);
-  };
-
-  const handleDeleteConfigValue = (index: number) => {
-    const updated = configValues.filter((_, i) => i !== index);
-    setConfigValues(updated);
+  const handleSchemaSave = () => {
+    // Handle successful save if needed
+    console.log("Schema saved successfully");
   };
 
   return (
@@ -74,14 +53,10 @@ export default function RemoteConfigsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="schema" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               Schema Builder
-            </TabsTrigger>
-            <TabsTrigger value="values" className="flex items-center gap-2" disabled={schemaFields.length === 0}>
-              <FileJson className="h-4 w-4" />
-              Configuration Values
             </TabsTrigger>
             <TabsTrigger value="preview" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
@@ -100,31 +75,9 @@ export default function RemoteConfigsPage() {
               </CardHeader>
               <CardContent>
                 <ConfigSchemaBuilder
-                  fields={schemaFields}
-                  onFieldsChange={handleSchemaChange}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="values">
-            <Card>
-              <CardHeader>
-                <CardTitle>Configuration Values</CardTitle>
-                <CardDescription>
-                  Create different sets of values that conform to your schema. Each configuration can be used in
-                  different environments or scenarios.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ConfigValuesEditor
-                  schema={schemaFields}
-                  values={configValues}
-                  currentConfig={currentConfig}
-                  onCurrentConfigChange={setCurrentConfig}
-                  onAddConfig={handleAddConfigValue}
-                  onUpdateConfig={handleUpdateConfigValue}
-                  onDeleteConfig={handleDeleteConfigValue}
+                  orgId={orgId}
+                  appId={appId}
+                  onSave={handleSchemaSave}
                 />
               </CardContent>
             </Card>
@@ -135,14 +88,14 @@ export default function RemoteConfigsPage() {
               <CardHeader>
                 <CardTitle>Preview & Export</CardTitle>
                 <CardDescription>
-                  Review your JSON schema and configuration values. You can copy the JSON schema or export your
+                  Review your JSON schema. You can copy the JSON schema or export your
                   configurations.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ConfigPreview
                   schema={schemaFields}
-                  values={configValues}
+                  values={[]}
                 />
               </CardContent>
             </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DndContext, DragEndEvent, DragOverEvent, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, pointerWithin, rectIntersection } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
@@ -41,6 +41,8 @@ import {
   FolderOpen,
   Folder,
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { useAppContext } from "@/providers/app-context";
 
 export type SchemaField = {
   id: string;
@@ -59,9 +61,21 @@ export type SchemaField = {
   pattern?: string;
 };
 
+// Backend types
+type BackendSchemaNode = {
+  description: string;
+  default_value: any;
+  schema: any;
+};
+
+type BackendPropertiesResponse = {
+  properties: Record<string, BackendSchemaNode>;
+};
+
 interface ConfigSchemaBuilderProps {
-  fields: SchemaField[];
-  onFieldsChange: (fields: SchemaField[]) => void;
+  orgId: string;
+  appId: string;
+  onSave?: (transformedSchema: Record<string, any>) => void;
 }
 
 // Generate proper JSON Schema v7 compliant schema
@@ -855,8 +869,10 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
   );
 }
 
-export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuilderProps) {
+export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilderProps) {
+  const { token, org, app } = useAppContext();
   const sensors = useSensors(useSensor(PointerSensor));
+  const [fields, setFields] = useState<SchemaField[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [jsonSchemaText, setJsonSchemaText] = useState("");
   const [jsonEditMode, setJsonEditMode] = useState(false);
@@ -866,9 +882,108 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
   const [invalidDropTarget, setInvalidDropTarget] = useState<string | null>(null);
   const [autoOpenEditId, setAutoOpenEditId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [initialFields, setInitialFields] = useState<SchemaField[]>(fields);
+  const [initialFields, setInitialFields] = useState<SchemaField[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const activeField = activeId ? findFieldById(fields, activeId) : null;
+
+  // API functions
+  const fetchSchema = async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiFetch<BackendPropertiesResponse>(
+        `/organisations/applications/properties/schema`,
+        { method: 'GET' },
+        { token, org, app }
+      );
+      
+      const convertedFields = convertBackendDataToFields(data.properties);
+      setFields(convertedFields);
+      setInitialFields([...convertedFields]);
+    } catch (error) {
+      console.error('Error fetching schema:', error);
+      // If there's no schema yet, start with empty fields
+      setFields([]);
+      setInitialFields([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveSchema = async (transformedSchema: Record<string, any>) => {
+    setSaveLoading(true);
+    try {
+      await apiFetch(
+        `/organisations/applications/properties/schema`,
+        {
+          method: 'PUT',
+          body: { properties: transformedSchema }
+        },
+        { token, org, app }
+      );
+      
+      // Reset the initial state to current state
+      setInitialFields([...fields]);
+      setHasChanges(false);
+      if (onSave) {
+        onSave(transformedSchema);
+      }
+    } catch (error) {
+      console.error('Error saving schema:', error);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  // Convert backend data to internal field format
+  const convertBackendDataToFields = (properties: Record<string, BackendSchemaNode>): SchemaField[] => {
+    const fieldMap = new Map<string, SchemaField>();
+    const rootFields: SchemaField[] = [];
+
+    // Sort keys to ensure proper hierarchy building
+    const sortedKeys = Object.keys(properties).sort();
+
+    sortedKeys.forEach(key => {
+      const node = properties[key];
+      const pathParts = key.replace('config.properties.', '').split('.');
+      
+      // Remove 'properties' parts from the path for internal representation
+      const cleanPath = pathParts.filter(part => part !== 'properties');
+      
+      const field: SchemaField = {
+        id: key,
+        name: cleanPath[cleanPath.length - 1],
+        type: (node.schema.type || 'string') as any,
+        description: node.description,
+        defaultValue: node.default_value,
+        required: false, // Default value, can be enhanced based on schema
+        children: [],
+      };
+
+      // Add additional schema properties
+      if (node.schema.minLength) field.minLength = node.schema.minLength;
+      if (node.schema.maxLength) field.maxLength = node.schema.maxLength;
+      if (node.schema.minimum) field.minValue = node.schema.minimum;
+      if (node.schema.maximum) field.maxValue = node.schema.maximum;
+      if (node.schema.pattern) field.pattern = node.schema.pattern;
+      if (node.schema.enum) field.enumValues = node.schema.enum;
+      if (node.schema.items && node.schema.items.type) field.arrayItemType = node.schema.items.type;
+
+      if (cleanPath.length === 1) {
+        rootFields.push(field);
+      }
+      
+      fieldMap.set(key, field);
+    });
+
+    return rootFields;
+  };
+
+  // Load initial data
+  useEffect(() => {
+    fetchSchema();
+  }, [orgId, appId]);
 
   // Track changes
   React.useEffect(() => {
@@ -968,9 +1083,9 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
           return field;
         });
       };
-      onFieldsChange(updateFields(fields));
+      setFields(updateFields(fields));
     } else {
-      onFieldsChange([...fields, newField]);
+      setFields([...fields, newField]);
     }
   };
 
@@ -989,7 +1104,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
         return field;
       });
     };
-    onFieldsChange(updateFields(fields));
+    setFields(updateFields(fields));
   };
 
   const deleteField = (fieldId: string) => {
@@ -1001,7 +1116,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
           children: field.children ? removeField(field.children) : undefined,
         }));
     };
-    onFieldsChange(removeField(fields));
+    setFields(removeField(fields));
   };
 
   const moveFieldToParent = (fieldId: string, newParentId: string | null) => {
@@ -1052,7 +1167,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
       }
     }
 
-    onFieldsChange(updatedFields);
+    setFields(updatedFields);
   };
 
   const handleDragStart = (event: any) => {
@@ -1202,7 +1317,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
             const newChildren = arrayMove(parentFields, oldIndex, newIndex);
             updateField(activeParent.id, { ...activeParent, children: newChildren });
           } else {
-            onFieldsChange(arrayMove(fields, oldIndex, newIndex));
+            setFields(arrayMove(fields, oldIndex, newIndex));
           }
         }
       }
@@ -1213,7 +1328,7 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     try {
       const parsed = JSON.parse(jsonSchemaText);
       const importedFields = parseJsonSchema(parsed);
-      onFieldsChange(importedFields);
+      setFields(importedFields);
       setJsonError("");
       setJsonEditMode(false);
     } catch (error) {
@@ -1279,18 +1394,61 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
     return result;
   };
 
-  const handleSubmitChanges = () => {
+  const handleSubmitChanges = async () => {
     const schema = generateCurrentSchema();
     const transformedSchema = transformSchemaToFlatFormat(schema);
-    console.log('Transformed Schema:', transformedSchema);
     
-    // Reset the initial state to current state
-    setInitialFields([...fields]);
-    setHasChanges(false);
+    // Convert to backend format
+    const backendSchema: Record<string, BackendSchemaNode> = {};
+    Object.entries(transformedSchema).forEach(([key, schemaData]) => {
+      const fullKey = key.startsWith('config.properties.') ? key : `config.properties.${key}`;
+      backendSchema[fullKey] = {
+        description: findFieldDescriptionByPath(key) || '',
+        default_value: findFieldDefaultValueByPath(key) || null,
+        schema: schemaData,
+      };
+    });
+
+    await saveSchema(backendSchema);
+  };
+
+  // Helper functions to find field data by path
+  const findFieldDescriptionByPath = (path: string): string => {
+    const field = findFieldByPath(fields, path);
+    return field?.description || '';
+  };
+
+  const findFieldDefaultValueByPath = (path: string): any => {
+    const field = findFieldByPath(fields, path);
+    return field?.defaultValue || null;
+  };
+
+  const findFieldByPath = (fieldsList: SchemaField[], path: string): SchemaField | null => {
+    const pathParts = path.split('.').filter(part => part !== 'properties');
+    
+    for (const field of fieldsList) {
+      if (pathParts.length === 1 && field.name === pathParts[0]) {
+        return field;
+      } else if (pathParts.length > 1 && field.name === pathParts[0] && field.children) {
+        const remainingPath = pathParts.slice(1).join('.');
+        const found = findFieldByPath(field.children, remainingPath);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
   return (
     <div className="space-y-4">
+      {isLoading ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <div className="animate-spin inline-block h-8 w-8 border-4 border-current border-t-transparent text-muted-foreground rounded-full mb-4" />
+            <p className="text-muted-foreground">Loading schema...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
       <div className="flex items-center justify-end">
         <div className="flex gap-2">
           <Button onClick={() => addField()}>
@@ -1439,12 +1597,14 @@ export function ConfigSchemaBuilder({ fields, onFieldsChange }: ConfigSchemaBuil
       <div className="flex gap-2 justify-end">
           <Button 
             onClick={handleSubmitChanges}
-            disabled={!hasChanges}
+            disabled={!hasChanges || saveLoading}
             variant={hasChanges ? "default" : "secondary"}
           >
-            Submit Changes
+            {saveLoading ? 'Saving...' : 'Submit Changes'}
           </Button>
         </div>
+        </>
+      )}
     </div>
   );
 }
