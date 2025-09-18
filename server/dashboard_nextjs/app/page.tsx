@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Target, Zap, Shield, BarChart3, Users, Globe, ArrowRight, Play, Star, ChevronRight } from "lucide-react";
+import { Target, Zap, Shield, BarChart3, Users, Globe, ArrowRight, Star, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -66,34 +66,33 @@ export default function LandingPage() {
     },
   ];
 
-  const stats = [
-    { value: "99.9%", label: "Uptime" },
-    { value: "10M+", label: "Updates Delivered" },
-    { value: "500+", label: "Companies Trust Us" },
-    { value: "< 1s", label: "Average Deploy Time" },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Image
-              src="/airborne-cube-logo.png"
+              src="/airborne-logo-light.svg"
               alt="Airborne Logo"
-              width={16}
-              height={16}
-              className="h-8 w-8 mr-2 text-primary-foreground"
-            ></Image>
-            <span className="font-bold text-lg font-[family-name:var(--font-space-grotesk)]">Airborne</span>
+              width={28}
+              height={12}
+              className="w-28 mr-2 text-primary-foreground dark:hidden"
+            />
+            <Image
+              src="/airborne-logo-dark.svg"
+              alt="Airborne Logo"
+              width={28}
+              height={12}
+              className="w-28 mr-2 text-primary-foreground hidden dark:block"
+            />
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
             <Link href="#features" className="text-sm hover:text-primary transition-colors">
               Features
             </Link>
-            <Link href="/docs/" target="_blank" className="text-sm hover:text-primary transition-colors">
+            <Link href="/docs/home" target="_blank" className="text-sm hover:text-primary transition-colors">
               Docs
             </Link>
             <Link href="https://juspay.io" target="_blank" className="text-sm hover:text-primary transition-colors">
@@ -120,7 +119,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-6 py-20 text-center">
+      <section className="container mx-auto px-6 pt-20 text-center">
         <div className="max-w-4xl mx-auto">
           <Badge variant="secondary" className="mb-6">
             🚀 Now supporting React Native and any JS based updates
@@ -139,24 +138,10 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <Button size="lg" className="h-12 px-8" asChild>
               <Link href="/register">
-                Start free trial
+                Start for free
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-            <Button variant="outline" size="lg" className="h-12 px-8 bg-transparent">
-              <Play className="mr-2 h-4 w-4" />
-              Watch demo
-            </Button>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-2xl mx-auto">
-            {stats.map((stat, index) => (
-              <div key={stat.label + index} className="text-center">
-                <div className="text-2xl font-bold text-primary">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -280,7 +265,7 @@ export default function LandingPage() {
               </Link>
             </Button>
             <Button
-              onClick={() => (window.location.href = "mailto:pp-sdk@juspay.in")}
+              onClick={() => (window.location.href = "mailto:superposition@juspay.in")}
               size="lg"
               variant="outline"
               className="h-12 px-8 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 bg-transparent"
@@ -297,16 +282,22 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg flex items-center justify-center">
+                <div className="h-20 rounded-lg flex items-center justify-center">
                   <Image
-                    src="/airborne-cube-logo.png"
+                    src="/airborne-logo-light.svg"
                     alt="Airborne Logo"
-                    width={16}
-                    height={16}
-                    className="h-8 w-8"
-                  ></Image>
+                    width={28}
+                    height={12}
+                    className="w-28 mr-2 text-primary-foreground dark:hidden"
+                  />
+                  <Image
+                    src="/airborne-logo-dark.svg"
+                    alt="Airborne Logo"
+                    width={28}
+                    height={12}
+                    className="w-28 mr-2 text-primary-foreground hidden dark:block"
+                  />
                 </div>
-                <span className="font-bold text-lg font-[family-name:var(--font-space-grotesk)]">Airborne</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 The fastest way to deploy over-the-air updates to your mobile and web applications.
@@ -344,7 +335,7 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Resources</h4>
               <div className="space-y-2 text-sm">
-                <Link href="/docs/" target="_blank" className="block text-muted-foreground hover:text-foreground">
+                <Link href="/docs/home" target="_blank" className="block text-muted-foreground hover:text-foreground">
                   Documentation
                 </Link>
                 {/* <Link href="#" className="block text-muted-foreground hover:text-foreground">
