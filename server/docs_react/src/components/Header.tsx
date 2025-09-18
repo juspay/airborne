@@ -1,6 +1,6 @@
 import { User, LogOut } from "lucide-react";
 import { useState } from "react";
-import smallLogoImage from "../assets/airborne-cube-logo.png";
+import smallLogoImage from "../assets/airborne-logo-dark.svg";
 
 interface HeaderProps {
   userName?: string;
@@ -10,13 +10,11 @@ interface HeaderProps {
 
 export default function Header({ userName, userEmail, onLogout }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const WIP = "{Work In Progress}";
   return (
     <header className="bg-gradient-to-r from-slate-900 via-neutral-800 to-slate-900 text-slate-200 py-4 px-6 shadow-lg font-sans">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <img src={smallLogoImage} alt="Airborne Logo" className="w-7 h-7" />
-          <h1 className="text-xl font-semibold">Airborne {WIP}</h1>
+          <img src={smallLogoImage} alt="Airborne Logo" className="w-20" />
         </div>
         {userName && userEmail && onLogout && (
           <div className="relative">
