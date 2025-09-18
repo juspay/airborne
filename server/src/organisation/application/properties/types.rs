@@ -34,6 +34,8 @@ pub struct PutPropertiesSchemaResponse {
     pub properties: BTreeMap<String, SchemaNode>,
 }
 
+pub type GetPropertiesSchemaResponse = PutPropertiesSchemaResponse;
+
 #[derive(Clone, Debug)]
 pub struct PutPropertiesSchemaTaskMetadata {
     pub key: String,

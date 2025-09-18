@@ -15,7 +15,7 @@
 use std::collections::{BTreeMap};
 
 use actix_web::{
-    put, web::{Data, Json, ReqData}, Scope
+    put, get, web::{Data, Json, ReqData}, Scope
 };
 use superposition_sdk::Client;
 
@@ -28,6 +28,7 @@ mod types;
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(put_properties_schema_api)
+        .service(get_properties_schema_api)
 }
 
 #[put("/schema")]
@@ -331,4 +332,55 @@ async fn rollback_config_update(
             return println!("No metadata found for task index: {}", index);
         }
     }
+}
+
+#[get("/schema")]
+async fn get_properties_schema_api(
+    auth_response: ReqData<AuthResponse>,
+    state: Data<AppState>
+) -> actix_web::Result<Json<types::GetPropertiesSchemaResponse>> {
+    let auth_response = auth_response.into_inner();
+    let organisation = validate_user(auth_response.organisation, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+    let application = validate_user(auth_response.application, WRITE)
+        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+
+    let mut conn = state.db_pool.get().map_err(|_| {
+        ABError::InternalServerError("Failed to get database connection".to_string())
+    })?;
+
+    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    println!("Using org and workspace: {} / {}", superposition_org_id_from_env, workspace_name);
+
+    let all_configs = state.superposition_client
+        .list_default_configs()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .all(true)
+        .send()
+        .await.map_err(|e| ABError::InternalServerError(format!("Failed to get current config properties: {}", e)))?;
+
+    let existing_config_schemas = all_configs.data().iter().filter_map(|config| {
+        if config.key.starts_with("config.properties.") {
+            let schema = document_to_json_value(&config.schema());
+            let schema_node = types::SchemaNode {
+                description: config.description().to_string(),
+                default_value: document_to_json_value(&config.value()),
+                schema,
+            };
+            Some((config.key.clone(), schema_node))
+        } else {
+            None
+        }
+    }).collect::<BTreeMap<String, types::SchemaNode>>();
+
+    Ok(Json(types::GetPropertiesSchemaResponse {
+        properties: existing_config_schemas,
+    }))
 }
