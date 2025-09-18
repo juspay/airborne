@@ -86,6 +86,10 @@ async fn main() -> std::io::Result<()> {
     let server_path_prefix =
         std::env::var("SERVER_PATH_PREFIX").unwrap_or_else(|_| "api".to_string());
 
+    let num_workers = std::env::var("ACTIX_WORKERS").map_or(4, |v| {
+        v.parse().expect("ACTIX_WORKERS must be a valid number")
+    });
+
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
     let mut force_path_style = false;
@@ -239,6 +243,7 @@ async fn main() -> std::io::Result<()> {
                     ),
             )
     })
+    .workers(num_workers)
     .bind(("0.0.0.0", port))? // Listen on all interfaces
     .run()
     .await
