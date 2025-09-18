@@ -892,7 +892,7 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
               <div className="space-y-4">
                 <Separator />
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent">
+                  <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto font-medium w-full justify-start hover:bg-transparent">
                     {validationRulesOpen ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
@@ -1006,7 +1006,7 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
             <div className="space-y-4">
               <Separator />
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto font-medium hover:bg-transparent">
+                <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto font-medium w-full justify-start hover:bg-white">
                   {defaultValueOpen ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
@@ -1105,6 +1105,96 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
   );
 }
 
+// Add Field Form Component
+interface AddFieldFormProps {
+  onSave: (fieldData: Partial<SchemaField>) => void;
+  onCancel: () => void;
+}
+
+function AddFieldForm({ onSave, onCancel }: AddFieldFormProps) {
+  const [formData, setFormData] = useState<Partial<SchemaField>>({
+    name: "",
+    type: "string",
+    description: "",
+    required: false,
+  });
+
+  const handleSave = () => {
+    if (!formData.name?.trim()) {
+      alert("Field name is required");
+      return;
+    }
+    onSave(formData);
+  };
+
+  const updateFormData = (updates: Partial<SchemaField>) => {
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="fieldName">Field Name *</Label>
+          <Input
+            id="fieldName"
+            value={formData.name || ""}
+            onChange={(e) => updateFormData({ name: e.target.value })}
+            placeholder="fieldName"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="fieldType">Type</Label>
+          <Select 
+            value={formData.type || "string"} 
+            onValueChange={(value) => updateFormData({ type: value as SchemaField['type'] })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="string">String</SelectItem>
+              <SelectItem value="number">Number</SelectItem>
+              <SelectItem value="boolean">Boolean</SelectItem>
+              <SelectItem value="array">Array</SelectItem>
+              <SelectItem value="object">Object</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="fieldDescription">Description</Label>
+        <Textarea
+          id="fieldDescription"
+          value={formData.description || ""}
+          onChange={(e) => updateFormData({ description: e.target.value })}
+          placeholder="Describe what this field is for..."
+          rows={2}
+        />
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="required"
+          checked={formData.required || false}
+          onCheckedChange={(checked) => updateFormData({ required: checked as boolean })}
+        />
+        <Label htmlFor="required">Required field</Label>
+      </div>
+      
+      <div className="flex gap-2 justify-end pt-4">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave}>
+          Add Field
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilderProps) {
   const { token, org, app } = useAppContext();
   const sensors = useSensors(useSensor(PointerSensor));
@@ -1121,6 +1211,10 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
   const [initialFields, setInitialFields] = useState<SchemaField[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
+  
+  // Add Field modal state
+  const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
+  const [newFieldParentId, setNewFieldParentId] = useState<string | undefined>(undefined);
 
   const activeField = activeId ? findFieldById(fields, activeId) : null;
 
@@ -1352,23 +1446,25 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
   }
 
   const addField = (parentId?: string) => {
-    const fieldName = `field${Date.now()}`;
+    setNewFieldParentId(parentId);
+    setIsAddFieldModalOpen(true);
+  };
+
+  const createNewField = (fieldData: Partial<SchemaField>) => {
     const newField: SchemaField = {
       id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: fieldName,
-      type: "string",
-      description: generateDescription(fieldName),
-      defaultValue: generateDefaultValue("string", { type: "string" }),
-      required: false,
+      name: fieldData.name || `field${Date.now()}`,
+      type: fieldData.type || "string",
+      description: fieldData.description || generateDescription(fieldData.name || `field${Date.now()}`),
+      defaultValue: fieldData.defaultValue || generateDefaultValue(fieldData.type || "string", { type: fieldData.type || "string" }),
+      required: fieldData.required || false,
+      ...fieldData
     };
 
-    // Set this field to auto-open for editing
-    setAutoOpenEditId(newField.id);
-
-    if (parentId) {
+    if (newFieldParentId) {
       const updateFields = (fieldsList: SchemaField[]): SchemaField[] => {
         return fieldsList.map(field => {
-          if (field.id === parentId) {
+          if (field.id === newFieldParentId) {
             return {
               ...field,
               children: [...(field.children || []), newField],
@@ -1387,6 +1483,13 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
     } else {
       setFields([...fields, newField]);
     }
+
+    // Set this field to auto-open for further editing
+    setAutoOpenEditId(newField.id);
+
+    // Close modal and reset state
+    setIsAddFieldModalOpen(false);
+    setNewFieldParentId(undefined);
   };
 
   const updateField = (fieldId: string, updatedField: SchemaField) => {
@@ -1959,6 +2062,22 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
         </div>
         </>
       )}
+      
+      {/* Add Field Modal */}
+      <Dialog open={isAddFieldModalOpen} onOpenChange={setIsAddFieldModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Field</DialogTitle>
+            <DialogDescription>
+              Configure the properties for your new field.
+            </DialogDescription>
+          </DialogHeader>
+          <AddFieldForm 
+            onSave={(fieldData) => createNewField(fieldData)}
+            onCancel={() => setIsAddFieldModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
