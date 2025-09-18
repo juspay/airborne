@@ -1484,6 +1484,10 @@ async fn serve_release(
         }
     });
 
+    if rc_version == "0.0.0" {
+        return Err(ABError::NotFound("No release yet".to_string()))
+    }
+
     let (index_file, important_files, lazy_files, resource_files) = {
         let all_files = rc_package_important
             .iter()

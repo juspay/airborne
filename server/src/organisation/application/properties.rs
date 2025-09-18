@@ -153,9 +153,10 @@ async fn put_properties_schema_api(
                         .schema(value_to_document(&schema))
                         .send()
                         .await
-                        .map_err(|e| ABError::InternalServerError(
-                            format!("Failed to update property schema: {e}")
-                        ))?;
+                        .map_err(|e| {
+                            println!("Error in create: {:?}", e.as_service_error());
+                            ABError::InternalServerError(format!("Failed to create: {}", key_for_msg))
+                        })?;
 
                     Ok::<_, ABError>(format!("Added config {key_for_msg}"))
                 })
@@ -199,9 +200,10 @@ async fn put_properties_schema_api(
                         .schema(value_to_document(&schema))
                         .send()
                         .await
-                        .map_err(|e| ABError::InternalServerError(
-                            format!("Failed to update property schema: {e}")
-                        ))?;
+                        .map_err(|e| {
+                            println!("Error in update: {:?}", e.as_service_error());
+                            ABError::InternalServerError(format!("Could not modify {} as it is being used in releases", key_for_msg))
+                        })?;
 
                     Ok::<_, ABError>(format!("Updated config {key_for_msg}"))
                 })
@@ -231,9 +233,10 @@ async fn put_properties_schema_api(
                         .key(key_for_api)
                         .send()
                         .await
-                        .map_err(|e| ABError::InternalServerError(
-                            format!("Failed to update property schema: {e}")
-                        ))?;
+                        .map_err(|e| {
+                            println!("Error in delete: {:?}", e.as_service_error());
+                            ABError::InternalServerError(format!("Could not modify {} as it is being used in releases", key_for_msg))
+                        })?;
 
                     Ok::<_, ABError>(format!("Deleted config {key_for_msg}"))
                 })
@@ -242,7 +245,7 @@ async fn put_properties_schema_api(
     }
 
     let metadata_for_rollback = task_metadata.clone();
-    match transaction::run_fail_fast(
+    match transaction::run_fail_end(
         tasks, 
         move |success_indices| async move {
             rollback_config_update(success_indices, metadata_for_rollback, &state.superposition_client).await;
