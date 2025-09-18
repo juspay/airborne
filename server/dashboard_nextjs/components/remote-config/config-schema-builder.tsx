@@ -78,6 +78,90 @@ interface ConfigSchemaBuilderProps {
   onSave?: (transformedSchema: Record<string, any>) => void;
 }
 
+// Helper function to generate unique IDs
+function generateId(): string {
+  return `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Helper function to generate default values based on schema type
+function generateDefaultValue(type: string, schema: any): any {
+  switch (type) {
+    case "string":
+      if (schema.enum && schema.enum.length > 0) {
+        return schema.enum[0];
+      }
+      return "";
+    case "number":
+      if (schema.minimum !== undefined) {
+        return schema.minimum;
+      }
+      return 0;
+    case "boolean":
+      return false;
+    case "array":
+      return [];
+    case "object":
+      return {};
+    default:
+      return null;
+  }
+}
+
+// Helper function to generate description from field name
+function generateDescription(fieldName: string): string {
+  // Convert camelCase or snake_case to readable format
+  const readable = fieldName
+    .replace(/([A-Z])/g, ' $1') // Add space before uppercase letters
+    .replace(/_/g, ' ') // Replace underscores with spaces
+    .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+    .trim();
+  
+  return readable;
+}
+
+// Schema validation function
+function validateValueAgainstSchema(value: any, schema: any): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (value === null || value === undefined) {
+    return { isValid: true, errors: [] }; // Allow null/undefined values
+  }
+  
+  // Type validation
+  const actualType = Array.isArray(value) ? 'array' : typeof value;
+  if (schema.type && actualType !== schema.type) {
+    errors.push(`Expected type ${schema.type}, but got ${actualType}`);
+  }
+  
+  // String validations
+  if (schema.type === 'string' && typeof value === 'string') {
+    if (schema.minLength && value.length < schema.minLength) {
+      errors.push(`String length ${value.length} is less than minimum ${schema.minLength}`);
+    }
+    if (schema.maxLength && value.length > schema.maxLength) {
+      errors.push(`String length ${value.length} exceeds maximum ${schema.maxLength}`);
+    }
+    if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
+      errors.push(`String does not match pattern ${schema.pattern}`);
+    }
+    if (schema.enum && !schema.enum.includes(value)) {
+      errors.push(`Value "${value}" is not in allowed enum values: ${schema.enum.join(', ')}`);
+    }
+  }
+  
+  // Number validations
+  if (schema.type === 'number' && typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      errors.push(`Number ${value} is less than minimum ${schema.minimum}`);
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      errors.push(`Number ${value} exceeds maximum ${schema.maximum}`);
+    }
+  }
+  
+  return { isValid: errors.length === 0, errors };
+}
+
 // Generate proper JSON Schema v7 compliant schema
 function generateJsonSchema(fields: SchemaField[]): any {
   const properties: any = {};
@@ -680,9 +764,12 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
               id="description"
               value={field.description || ""}
               onChange={(e) => updateField({ description: e.target.value })}
-              placeholder="Describe what this field is for..."
+              placeholder="Describe what this field is for... (auto-generated if empty)"
               rows={2}
             />
+            <p className="text-xs text-muted-foreground">
+              If left empty, a description will be auto-generated from the field name
+            </p>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -804,8 +891,11 @@ function FieldEditor({ field, onChange, onSave }: FieldEditorProps) {
                   updateField({ defaultValue: e.target.value });
                 }
               }}
-              placeholder={`Default ${field.type} value...`}
+              placeholder={`Default ${field.type} value... (auto-generated if empty)`}
             />
+            <p className="text-xs text-muted-foreground">
+              If left empty, a schema-compliant default value will be auto-generated
+            </p>
           </div>
         </TabsContent>
 
@@ -892,15 +982,25 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
   const fetchSchema = async () => {
     setIsLoading(true);
     try {
+      console.log(`Fetching schema for org: ${orgId}, app: ${appId}`);
       const data = await apiFetch<BackendPropertiesResponse>(
         `/organisations/applications/properties/schema`,
         { method: 'GET' },
         { token, org, app }
       );
       
-      const convertedFields = convertBackendDataToFields(data.properties);
-      setFields(convertedFields);
-      setInitialFields([...convertedFields]);
+      console.log('Backend schema data:', data);
+      
+      if (data && data.properties && Object.keys(data.properties).length > 0) {
+        const convertedFields = convertBackendDataToFields(data.properties);
+        console.log('Converted fields:', convertedFields);
+        setFields(convertedFields);
+        setInitialFields([...convertedFields]);
+      } else {
+        console.log('No schema data found, starting with empty fields');
+        setFields([]);
+        setInitialFields([]);
+      }
     } catch (error) {
       console.error('Error fetching schema:', error);
       // If there's no schema yet, start with empty fields
@@ -937,6 +1037,7 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
   };
 
   // Convert backend data to internal field format
+  // Convert backend data to internal field format
   const convertBackendDataToFields = (properties: Record<string, BackendSchemaNode>): SchemaField[] => {
     const fieldMap = new Map<string, SchemaField>();
     const rootFields: SchemaField[] = [];
@@ -950,31 +1051,82 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
       
       // Remove 'properties' parts from the path for internal representation
       const cleanPath = pathParts.filter(part => part !== 'properties');
+      const fieldName = cleanPath[cleanPath.length - 1];
+      const fieldType = (node.schema.type || 'string') as SchemaField['type'];
+      
+      // Generate default value if not provided
+      const defaultValue = node.default_value !== null && node.default_value !== undefined 
+        ? node.default_value 
+        : generateDefaultValue(fieldType, node.schema);
+      
+      // Generate description if not provided
+      const description = node.description || generateDescription(fieldName);
       
       const field: SchemaField = {
-        id: key,
-        name: cleanPath[cleanPath.length - 1],
-        type: (node.schema.type || 'string') as any,
-        description: node.description,
-        defaultValue: node.default_value,
-        required: false, // Default value, can be enhanced based on schema
+        id: generateId(),
+        name: fieldName,
+        type: fieldType,
+        description: description,
+        defaultValue: defaultValue,
+        required: false, // Can be enhanced based on schema.required array
         children: [],
       };
 
       // Add additional schema properties
-      if (node.schema.minLength) field.minLength = node.schema.minLength;
-      if (node.schema.maxLength) field.maxLength = node.schema.maxLength;
-      if (node.schema.minimum) field.minValue = node.schema.minimum;
-      if (node.schema.maximum) field.maxValue = node.schema.maximum;
+      if (node.schema.minLength !== undefined) field.minLength = node.schema.minLength;
+      if (node.schema.maxLength !== undefined) field.maxLength = node.schema.maxLength;
+      if (node.schema.minimum !== undefined) field.minValue = node.schema.minimum;
+      if (node.schema.maximum !== undefined) field.maxValue = node.schema.maximum;
       if (node.schema.pattern) field.pattern = node.schema.pattern;
       if (node.schema.enum) field.enumValues = node.schema.enum;
       if (node.schema.items && node.schema.items.type) field.arrayItemType = node.schema.items.type;
 
+      // Handle nested objects by building hierarchy
       if (cleanPath.length === 1) {
         rootFields.push(field);
+        fieldMap.set(key, field);
+      } else {
+        // This is a nested field, need to find or create parent structure
+        let currentPath = 'config.properties';
+        let currentParent: SchemaField | null = null;
+        
+        for (let i = 0; i < cleanPath.length - 1; i++) {
+          currentPath += '.' + cleanPath[i];
+          let parentField = fieldMap.get(currentPath);
+          
+          if (!parentField) {
+            // Create parent field if it doesn't exist
+            parentField = {
+              id: generateId(),
+              name: cleanPath[i],
+              type: 'object',
+              description: generateDescription(cleanPath[i]),
+              defaultValue: {},
+              required: false,
+              children: [],
+            };
+            
+            if (i === 0) {
+              rootFields.push(parentField);
+            } else if (currentParent) {
+              currentParent.children = currentParent.children || [];
+              currentParent.children.push(parentField);
+            }
+            
+            fieldMap.set(currentPath, parentField);
+          }
+          
+          currentParent = parentField;
+        }
+        
+        // Add the field to its parent
+        if (currentParent) {
+          currentParent.children = currentParent.children || [];
+          currentParent.children.push(field);
+        }
+        
+        fieldMap.set(key, field);
       }
-      
-      fieldMap.set(key, field);
     });
 
     return rootFields;
@@ -1054,11 +1206,13 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
   }
 
   const addField = (parentId?: string) => {
+    const fieldName = `field${Date.now()}`;
     const newField: SchemaField = {
       id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: `field${Date.now()}`,
+      name: fieldName,
       type: "string",
-      description: "",
+      description: generateDescription(fieldName),
+      defaultValue: generateDefaultValue("string", { type: "string" }),
       required: false,
     };
 
@@ -1093,7 +1247,25 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
     const updateFields = (fieldsList: SchemaField[]): SchemaField[] => {
       return fieldsList.map(field => {
         if (field.id === fieldId) {
-          return updatedField;
+          // Ensure default value and description are set when updating
+          const finalField = { ...updatedField };
+          
+          // Set default value if not provided
+          if (finalField.defaultValue === null || finalField.defaultValue === undefined || finalField.defaultValue === '') {
+            finalField.defaultValue = generateDefaultValue(finalField.type, {
+              type: finalField.type,
+              enum: finalField.enumValues,
+              minimum: finalField.minValue,
+              maximum: finalField.maxValue,
+            });
+          }
+          
+          // Set description if not provided
+          if (!finalField.description || finalField.description.trim() === '') {
+            finalField.description = generateDescription(finalField.name);
+          }
+          
+          return finalField;
         }
         if (field.children) {
           return {
@@ -1398,16 +1570,52 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
     const schema = generateCurrentSchema();
     const transformedSchema = transformSchemaToFlatFormat(schema);
     
-    // Convert to backend format
+    // Convert to backend format with validation and defaults
     const backendSchema: Record<string, BackendSchemaNode> = {};
+    const validationErrors: string[] = [];
+    
     Object.entries(transformedSchema).forEach(([key, schemaData]) => {
       const fullKey = key.startsWith('config.properties.') ? key : `config.properties.${key}`;
-      backendSchema[fullKey] = {
-        description: findFieldDescriptionByPath(key) || '',
-        default_value: findFieldDefaultValueByPath(key) || null,
-        schema: schemaData,
-      };
+      const field = findFieldByPath(fields, key);
+      
+      if (field) {
+        // Ensure default value is provided and valid
+        let defaultValue = field.defaultValue;
+        if (defaultValue === null || defaultValue === undefined) {
+          defaultValue = generateDefaultValue(field.type, schemaData);
+        }
+        
+        // Validate default value against schema
+        const validation = validateValueAgainstSchema(defaultValue, schemaData);
+        if (!validation.isValid) {
+          validationErrors.push(`Field "${field.name}": ${validation.errors.join(', ')}`);
+          // Use generated default if validation fails
+          defaultValue = generateDefaultValue(field.type, schemaData);
+        }
+        
+        // Ensure description is provided
+        const description = field.description || generateDescription(field.name);
+        
+        backendSchema[fullKey] = {
+          description: description,
+          default_value: defaultValue,
+          schema: schemaData,
+        };
+      } else {
+        // Fallback for fields not found (shouldn't happen but safety)
+        const fieldName = key.split('.').pop() || key;
+        backendSchema[fullKey] = {
+          description: generateDescription(fieldName),
+          default_value: generateDefaultValue(schemaData.type || 'string', schemaData),
+          schema: schemaData,
+        };
+      }
     });
+
+    // Show validation errors if any (optional - you might want to show these as warnings)
+    if (validationErrors.length > 0) {
+      console.warn('Schema validation warnings:', validationErrors);
+    }
 
     await saveSchema(backendSchema);
   };

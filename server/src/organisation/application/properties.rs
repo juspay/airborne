@@ -368,13 +368,14 @@ async fn get_properties_schema_api(
 
     let existing_config_schemas = all_configs.data().iter().filter_map(|config| {
         if config.key.starts_with("config.properties.") {
+            let key = config.key.strip_prefix("config.properties.").unwrap_or(&config.key);
             let schema = document_to_json_value(&config.schema());
             let schema_node = types::SchemaNode {
                 description: config.description().to_string(),
                 default_value: document_to_json_value(&config.value()),
                 schema,
             };
-            Some((config.key.clone(), schema_node))
+            Some((key.to_string(), schema_node))
         } else {
             None
         }
