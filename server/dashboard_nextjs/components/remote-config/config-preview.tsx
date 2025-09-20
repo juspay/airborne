@@ -544,9 +544,9 @@ export function ConfigPreview({ schema, values }: ConfigPreviewProps) {
     linkElement.click();
   };
 
-  if (schema.length === 0) {
-    return (
-      <div className="space-y-6">
+  return (
+    <div className="space-y-6">
+      {schema.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
             <Eye className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -556,307 +556,282 @@ export function ConfigPreview({ schema, values }: ConfigPreviewProps) {
             </p>
           </CardContent>
         </Card>
-        
-        {/* Still show Properties tab even when schema is empty */}
-        <Tabs defaultValue="properties">
-          <TabsList className="grid w-full grid-cols-1">
-            <TabsTrigger value="properties">Properties</TabsTrigger>
-          </TabsList>
+      ) : (
+        <>
+          <ConfigSummary schema={schema} values={values} />
           
-          <TabsContent value="properties">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
-                  Properties Overview ({properties.length})
-                </CardTitle>
-                <p className="text-muted-foreground mt-2">
-                  View and manage application properties across different releases and contexts
-                </p>
-              </CardHeader>
-              <CardContent>
-                {propertiesError ? (
-                  <div className="text-center py-8">
-                    <XCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-                    <p className="text-red-600">Failed to load properties. Please try again.</p>
-                  </div>
-                ) : properties.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No Properties Found</h3>
-                    <p className="text-muted-foreground">
-                      No property configurations are currently active for this application.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {properties.map((property, index) => (
-                      <PropertyCard
-                        key={`${property.experiment_id}-${index}`}
-                        property={property}
-                        index={index}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  }
+          <Tabs value={activeView} onValueChange={setActiveView}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="schema">JSON Schema</TabsTrigger>
+              <TabsTrigger value="visual">Visual Schema</TabsTrigger>
+              <TabsTrigger value="values">Config Values</TabsTrigger>
+            </TabsList>
 
-  return (
-    <div className="space-y-6">
-      <ConfigSummary schema={schema} values={values} />
-      
-      <Tabs value={activeView} onValueChange={setActiveView}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="schema">JSON Schema</TabsTrigger>
-          <TabsTrigger value="visual">Visual Schema</TabsTrigger>
-          <TabsTrigger value="values">Config Values</TabsTrigger>
-          <TabsTrigger value="properties">Properties</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="summary">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Configuration Summary</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyToClipboard(JSON.stringify({
-                      schema: jsonSchema,
-                      values: values
-                    }, null, 2), "Complete configuration")}
-                  >
-                    <Copy className="h-3 w-3 mr-2" />
-                    Copy All
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => downloadJson({
-                      schema: jsonSchema,
-                      values: values
-                    }, "remote-config-complete.json")}
-                  >
-                    <Download className="h-3 w-3 mr-2" />
-                    Export All
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-2">Schema Fields ({schema.length})</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {schema.map(field => (
-                      <div key={field.id} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                        <Badge variant="outline">{field.type}</Badge>
-                        <span className="font-medium">{field.name}</span>
-                        {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                <Separator />
-                
-                <div>
-                  <h4 className="font-medium mb-2">Configuration Values ({values.length})</h4>
-                  {values.length === 0 ? (
-                    <p className="text-muted-foreground">No configuration values created yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {values.map((config, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm">Config #{index + 1}</span>
-                            <Badge variant="secondary">{Object.keys(config).length} fields</Badge>
-                            <Badge variant={Object.keys(config).length > 0 ? "default" : "destructive"}>
-                              {Object.keys(config).length > 0 ? (
-                                <><CheckCircle className="h-3 w-3 mr-1" />Valid</>
-                              ) : (
-                                <><XCircle className="h-3 w-3 mr-1" />Empty</>
-                              )}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+            <TabsContent value="summary">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Configuration Summary</span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(JSON.stringify({
+                          schema: jsonSchema,
+                          values: values
+                        }, null, 2), "Complete configuration")}
+                      >
+                        <Copy className="h-3 w-3 mr-2" />
+                        Copy All
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => downloadJson({
+                          schema: jsonSchema,
+                          values: values
+                        }, "remote-config-complete.json")}
+                      >
+                        <Download className="h-3 w-3 mr-2" />
+                        Export All
+                      </Button>
                     </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="schema">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>JSON Schema</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyToClipboard(JSON.stringify(jsonSchema, null, 2), "JSON Schema")}
-                  >
-                    <Copy className="h-3 w-3 mr-2" />
-                    Copy Schema
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => downloadJson(jsonSchema, "remote-config-schema.json")}
-                  >
-                    <Download className="h-3 w-3 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-96 w-full">
-                <pre className="text-sm p-4 bg-muted rounded-lg overflow-auto">
-                  {JSON.stringify(jsonSchema, null, 2)}
-                </pre>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="visual">
-          <Card>
-            <CardHeader>
-              <CardTitle>Visual Schema Structure</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-96 w-full">
-                <SchemaVisualizer fields={schema} />
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="values">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Configuration Values</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyToClipboard(JSON.stringify(values, null, 2), "Configuration values")}
-                    disabled={values.length === 0}
-                  >
-                    <Copy className="h-3 w-3 mr-2" />
-                    Copy Values
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => downloadJson(values, "remote-config-values.json")}
-                    disabled={values.length === 0}
-                  >
-                    <Download className="h-3 w-3 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {values.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileJson className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No configuration values to display.</p>
-                </div>
-              ) : (
-                <ScrollArea className="h-96 w-full">
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-4">
-                    {values.map((config, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">Configuration #{index + 1}</h4>
-                          <Badge variant="secondary">{Object.keys(config).length} fields</Badge>
-                        </div>
-                        <pre className="text-sm bg-muted p-3 rounded overflow-auto">
-                          {JSON.stringify(config, null, 2)}
-                        </pre>
+                    <div>
+                      <h4 className="font-medium mb-2">Schema Fields ({schema.length})</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {schema.map(field => (
+                          <div key={field.id} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                            <Badge variant="outline">{field.type}</Badge>
+                            <span className="font-medium">{field.name}</span>
+                            {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <h4 className="font-medium mb-2">Configuration Values ({values.length})</h4>
+                      {values.length === 0 ? (
+                        <p className="text-muted-foreground">No configuration values created yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {values.map((config, index) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm">Config #{index + 1}</span>
+                                <Badge variant="secondary">{Object.keys(config).length} fields</Badge>
+                                <Badge variant={Object.keys(config).length > 0 ? "default" : "destructive"}>
+                                  {Object.keys(config).length > 0 ? (
+                                    <><CheckCircle className="h-3 w-3 mr-1" />Valid</>
+                                  ) : (
+                                    <><XCircle className="h-3 w-3 mr-1" />Empty</>
+                                  )}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        <TabsContent value="properties">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-[family-name:var(--font-space-grotesk)]">
-                    Properties Overview ({properties.length})
-                  </h3>
-                  <p className="text-muted-foreground mt-1">
-                    Application property configurations from active releases and experiments
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => copyToClipboard(JSON.stringify(properties, null, 2), "All properties")}
-                    disabled={properties.length === 0}
-                  >
-                    <Copy className="h-3 w-3 mr-2" />
-                    Copy All
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => downloadJson(properties, "properties.json")}
-                    disabled={properties.length === 0}
-                  >
-                    <Download className="h-3 w-3 mr-2" />
-                    Download
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {propertiesError ? (
-                <div className="text-center py-8">
-                  <XCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-                  <p className="text-red-600">Failed to load properties. Please try again.</p>
-                </div>
-              ) : properties.length === 0 ? (
-                <div className="text-center py-8">
-                  <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Properties Found</h3>
-                  <p className="text-muted-foreground">
-                    No property configurations are currently active for this application.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {properties.map((property, index) => (
-                    <PropertyCard
-                      key={`${property.experiment_id}-${index}`}
-                      property={property}
-                      index={index}
-                    />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="schema">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>JSON Schema</span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(JSON.stringify(jsonSchema, null, 2), "JSON Schema")}
+                      >
+                        <Copy className="h-3 w-3 mr-2" />
+                        Copy Schema
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => downloadJson(jsonSchema, "remote-config-schema.json")}
+                      >
+                        <Download className="h-3 w-3 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-96 w-full">
+                    <pre className="text-sm p-4 bg-muted rounded-lg overflow-auto">
+                      {JSON.stringify(jsonSchema, null, 2)}
+                    </pre>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="visual">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Visual Schema Structure</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-96 w-full">
+                    <SchemaVisualizer fields={schema} />
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="values">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Configuration Values</span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(JSON.stringify(values, null, 2), "Configuration values")}
+                        disabled={values.length === 0}
+                      >
+                        <Copy className="h-3 w-3 mr-2" />
+                        Copy Values
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => downloadJson(values, "remote-config-values.json")}
+                        disabled={values.length === 0}
+                      >
+                        <Download className="h-3 w-3 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {values.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FileJson className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No configuration values to display.</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-96 w-full">
+                      <div className="space-y-4">
+                        {values.map((config, index) => (
+                          <div key={index} className="border rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium">Configuration #{index + 1}</h4>
+                              <Badge variant="secondary">{Object.keys(config).length} fields</Badge>
+                            </div>
+                            <pre className="text-sm bg-muted p-3 rounded overflow-auto">
+                              {JSON.stringify(config, null, 2)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+      
+      {/* Separate Properties Card - Always show */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-[family-name:var(--font-space-grotesk)]">
+                Properties Overview ({properties.length})
+              </h3>
+              <p className="text-muted-foreground mt-1">
+                Application property configurations from active releases and experiments
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copyToClipboard(JSON.stringify(properties, null, 2), "All properties")}
+                disabled={properties.length === 0}
+              >
+                <Copy className="h-3 w-3 mr-2" />
+                Copy All
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => downloadJson(properties, "properties.json")}
+                disabled={properties.length === 0}
+              >
+                <Download className="h-3 w-3 mr-2" />
+                Download
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Schema Overview Section */}
+          {schema.length > 0 && (
+            <div className="mb-6">
+              <h4 className="font-medium mb-3 flex items-center gap-2">
+                <FileCode className="h-4 w-4" />
+                Current Schema ({schema.length} fields)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+                {schema.map(field => (
+                  <div key={field.id} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <Badge variant="outline">{field.type}</Badge>
+                    <span className="font-medium">{field.name}</span>
+                    {field.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                    {field.description && (
+                      <span className="text-xs text-muted-foreground truncate">
+                        - {field.description}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Separator className="my-4" />
+            </div>
+          )}
+          
+          {propertiesError ? (
+            <div className="text-center py-8">
+              <XCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
+              <p className="text-red-600">Failed to load properties. Please try again.</p>
+            </div>
+          ) : properties.length === 0 ? (
+            <div className="text-center py-8">
+              <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No Properties Found</h3>
+              <p className="text-muted-foreground">
+                No property configurations are currently active for this application.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {properties.map((property, index) => (
+                <PropertyCard
+                  key={`${property.experiment_id}-${index}`}
+                  property={property}
+                  index={index}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
