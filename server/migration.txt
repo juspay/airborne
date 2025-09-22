@@ -1,0 +1,27 @@
+ id | organization_id | workspace_name 
+----+-----------------+----------------
+  1 | Juspay1         | workspace1
+  2 | Juspay1         | workspace2
+  3 | Juspay1         | workspace3
+  4 | Juspay1         | workspace4
+  5 | driver          | workspace5 -> nammayatri
+  6 | movingtech      | workspace6 -> nammayatriconsumer
+  7 | org             | workspace7 
+  8 | org1            | workspace8
+  9 | yuvraj_org      | workspace9
+ 10 | axisbank        | workspace10 -> mfa-android
+ 11 | axisbank        | workspace11 -> mfa-ios
+ 12 | axisbank        | workspace12 -> ibmb-android
+ 13 | movingtech      | workspace13 -> chennaione
+ 14 | Yuvraj-org      | workspace14
+ 15 | axisbank        | workspace15 -> ibmb-ios
+ 16 | yuvraj_org1     | workspace16
+
+ -- Update specific rows
+UPDATE hyperotaserver.workspace_names SET application_id = 'nammayatri' WHERE id = 5;
+UPDATE hyperotaserver.workspace_names SET application_id = 'nammayatriconsumer' WHERE id = 6;
+UPDATE hyperotaserver.workspace_names SET application_id = 'mfa-android' WHERE id = 10;
+UPDATE hyperotaserver.workspace_names SET application_id = 'mfa-ios' WHERE id = 11;
+UPDATE hyperotaserver.workspace_names SET application_id = 'ibmb-android' WHERE id = 12;
+UPDATE hyperotaserver.workspace_names SET application_id = 'chennaione' WHERE id = 13;
+UPDATE hyperotaserver.workspace_names SET application_id = 'ibmb-ios' WHERE id = 15;

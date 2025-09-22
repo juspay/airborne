@@ -132,19 +132,25 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   return (
     <div className="min-h-screen bg-background h-full">
       <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
-        <div className="flex h-16 items-center px-6">
+        <div className="flex h-20 items-center px-6">
           <div className="flex items-center gap-4">
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="h-8 w-16 rounded-lg flex items-center justify-center">
+              <div className="h-20 rounded-lg flex items-center justify-center">
                 <Image
-                  src="/airborne-cube-logo.png"
+                  src="/airborne-logo-light.svg"
                   alt="Airborne Logo"
-                  width={8}
-                  height={8}
-                  className="h-8 w-8 mr-2 text-primary-foreground"
-                ></Image>
+                  width={28}
+                  height={12}
+                  className="w-28 mr-2 text-primary-foreground dark:hidden"
+                />
+                <Image
+                  src="/airborne-logo-dark.svg"
+                  alt="Airborne Logo"
+                  width={28}
+                  height={12}
+                  className="w-28 mr-2 text-primary-foreground hidden dark:block"
+                />
               </div>
-              <span className="font-bold text-lg font-[family-name:var(--font-space-grotesk)]">Airborne</span>
             </Link>
             {organisations.length > 0 && (
               <div className="flex items-center gap-2 text-sm">
