@@ -8,19 +8,19 @@ Our primary focus is to provide robust, easy-to-use SDKs and plugins that stream
                        DESC
 
   s.homepage         = 'https://github.com/juspay/airborne'
-  s.license          = { :type => 'Apache 2.0', :file => 'iOS/hyper-ota/LICENSE' }
+  s.license          = { :type => 'Apache 2.0', :file => 'airborne_sdk_iOS/hyper-ota/LICENSE' }
   s.author           = { 
     'Juspay Technologies' => 'pp-sdk@juspay.in'
   }
   
   s.source = {
     :git  => 'https://github.com/juspay/airborne.git',
-    :tag  => "ios/#{s.version}"
+    :tag  => "v#{s.version}"
   }
 
-  s.source_files       = 'iOS/hyper-ota/Airborne/Classes/**/*.{h,m,swift}'
-  s.module_map         = 'iOS/hyper-ota/Airborne.modulemap'
-  s.public_header_files = 'iOS/hyper-ota/Airborne/Classes/**/*.h'
+  s.source_files       = 'airborne_sdk_iOS/hyper-ota/Airborne/Classes/**/*.{h,m,swift}'
+  s.module_map         = 'airborne_sdk_iOS/hyper-ota/Airborne.modulemap'
+  s.public_header_files = 'airborne_sdk_iOS/hyper-ota/Airborne/Classes/**/*.h'
 
   s.platform     = :ios, "12.0"
   s.dependency 'HyperCore', '0.1.4'
