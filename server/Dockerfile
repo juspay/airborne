@@ -13,12 +13,12 @@
 # limitations under the License.
 
 # Build frontend
-FROM node:18 as frontend-builder
+FROM node:22 as frontend-builder
 WORKDIR /app
-COPY docs_react/package*.json ./docs_react/
+COPY server/docs_react/package*.json ./docs_react/
 WORKDIR /app/docs_react
 RUN npm install
-COPY docs_react/ ./
+COPY server/docs_react/ ./
 
 # Run the build
 RUN npm run build
@@ -31,6 +31,7 @@ WORKDIR /app
 COPY . .
 RUN echo "Building with cargo" && ls -la
 
+WORKDIR /app/server
 RUN cargo install diesel_cli --no-default-features --features postgres
 
 RUN cargo build --release

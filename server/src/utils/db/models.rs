@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    cleanup_outbox, configs, files, packages, packages_v2, releases, workspace_names,
+    cleanup_outbox, configs, files, packages, packages_v2, release_views, releases, workspace_names,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -147,4 +147,15 @@ pub struct NewPackageV2Entry {
     pub version: i32,
     pub tag: String,
     pub files: Vec<Option<String>>,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable)]
+#[diesel(table_name = release_views)]
+pub struct ReleaseViewEntry {
+    pub id: uuid::Uuid,
+    pub app_id: String,
+    pub org_id: String,
+    pub name: String,
+    pub dimensions: serde_json::Value,
+    pub created_at: DateTime<Utc>,
 }

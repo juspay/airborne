@@ -26,12 +26,15 @@ import {
   Users2,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAppContext } from "@/providers/app-context";
 import { FileCreationModal } from "@/components/file-creation-modal";
 import { apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Label } from "./ui/label";
+import { OrganisationsList } from "@/app/dashboard/page";
 
 interface SharedLayoutProps {
   children: React.ReactNode;
@@ -41,7 +44,10 @@ interface SharedLayoutProps {
 type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, setOrg: setOrganisation, setApp: setApplication, logout } = useAppContext();
+  const { org, app, user, token, logout } = useAppContext();
+  const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
+  const [orgName, setOrgName] = useState<string>("");
+  const router = useRouter();
   const [createFileOpen, setCreateFileOpen] = useState(false);
   // pathname is used in the useIsActive function below
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -49,15 +55,13 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
   const appIdPath = useParams().appId as string;
 
-  type Organisation = {
+  const { data: orgsData } = useSWR(token ? "/organisations" : null, (url) =>
+    apiFetch<OrganisationsList>(url, {}, { token })
+  );
+  const organisations: {
     name: string;
     applications: { application: string; organisation: string }[];
-  };
-
-  const { data: orgsData } = useSWR(token ? "/organisations" : null, (url: string) =>
-    apiFetch<Organisation[]>(url, {}, { token })
-  );
-  const organisations: Organisation[] = orgsData || [];
+  }[] = orgsData?.organisations || [];
 
   const appsForOrg = organisations.find((o) => o.name === org)?.applications?.map((a) => a.application) || [];
 
@@ -117,10 +121,17 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   }
 
   const isActive = useIsActive(navigationItems);
+  const onCreateOrg = async () => {
+    await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token, logout });
+    const createdOrg = orgName;
+    setOrgName("");
+    router.push(`/dashboard/${createdOrg}`);
+    setIsOrgCreateModelOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-background h-full">
-      <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+      <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
         <div className="flex h-16 items-center px-6">
           <div className="flex items-center gap-4">
             <Link href="/dashboard" className="flex items-center gap-2">
@@ -135,50 +146,37 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
               </div>
               <span className="font-bold text-lg font-[family-name:var(--font-space-grotesk)]">Airborne</span>
             </Link>
-
-            <div className="flex items-center gap-2 text-sm">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-                    {org || "Select Org"} <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {organisations.map((o) => (
+            {organisations.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-foreground">
+                      {org || "Select Org"} <ChevronDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
                     <DropdownMenuItem
-                      key={o.name}
-                      onClick={() => {
-                        setOrganisation(o.name);
-                        setApplication("");
-                      }}
+                      onClick={() => setIsOrgCreateModelOpen(true)}
+                      className="my-1 cursor-pointer rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 focus:bg-primary/90"
                     >
-                      {o.name}
+                      + Create Organisation
                     </DropdownMenuItem>
-                  ))}
-                  {organisations.length === 0 && <DropdownMenuItem disabled>No organisations</DropdownMenuItem>}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <span className="text-muted-foreground">›</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                    disabled={!org}
-                  >
-                    {app || "Select App"} <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {appsForOrg.map((a) => (
-                    <DropdownMenuItem key={a} onClick={() => setApplication(a)}>
-                      {a}
-                    </DropdownMenuItem>
-                  ))}
-                  {org && appsForOrg.length === 0 && <DropdownMenuItem disabled>No applications</DropdownMenuItem>}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+                    {organisations.map((o) => (
+                      <DropdownMenuItem
+                        key={o.name}
+                        onClick={() => {
+                          router.push("/dashboard/" + o.name);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        {o.name}
+                      </DropdownMenuItem>
+                    ))}
+                    {organisations.length === 0 && <DropdownMenuItem disabled>No organisations</DropdownMenuItem>}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 max-w-md mx-8">
@@ -242,36 +240,89 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
       </header>
 
       <div className="flex">
-        <aside className="min-h-screen w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50">
-          <nav className="p-4 space-y-2">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Application</div>
-            {navigationItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              return (
-                <Button
-                  key={item.href}
-                  variant="ghost"
-                  className={`w-full justify-start gap-3 ${
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                  asChild
-                >
-                  <Link href={item.href}>
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                </Button>
-              );
-            })}
-          </nav>
-        </aside>
+        {org && (
+          <aside className="sticky top-16 h-[calc(100vh-4rem)] w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50 overflow-y-auto">
+            <nav className="p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                      disabled={!org}
+                    >
+                      {app || "Select App"} <ChevronDown className="ml-1 h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {appsForOrg.map((a) => (
+                      <DropdownMenuItem key={a} onClick={() => router.push("/dashboard/" + org + "/" + a)}>
+                        {a}
+                      </DropdownMenuItem>
+                    ))}
+                    {org && appsForOrg.length === 0 && <DropdownMenuItem disabled>No applications</DropdownMenuItem>}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              {navigationItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+                return (
+                  <Button
+                    key={item.href}
+                    variant="ghost"
+                    className={`w-full justify-start gap-3 ${
+                      active
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    }`}
+                    asChild
+                  >
+                    <Link href={item.href}>
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </Button>
+                );
+              })}
+            </nav>
+          </aside>
+        )}
         <main className="flex-1">{children}</main>
       </div>
 
       <FileCreationModal open={createFileOpen} onOpenChange={setCreateFileOpen} />
+      {isOrgCreateModelOpen && (
+        <Dialog open={isOrgCreateModelOpen} onOpenChange={setIsOrgCreateModelOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create Organisation</DialogTitle>
+              <DialogDescription>Please enter the name of your organisation.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="orgName">Organisation Name</Label>
+                <Input
+                  id="orgName"
+                  placeholder="Acme Corp"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsOrgCreateModelOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={onCreateOrg} disabled={!orgName.trim()}>
+                Create
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
