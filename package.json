@@ -1,6 +1,6 @@
 {
     "private": true,
-    "name": "hyper-ota-monorepo",
+    "name": "airborne",
     "workspaces": [
         "airborne-react-plugin",
         "airborne_cli",

@@ -85,23 +85,23 @@ jobs:
         shell: bash
         run: make check
 
-      # - name: install cocogitto
-      #   uses: baptiste0928/cargo-install@v2.2.0
-      #   with:
-      #     crate: cocogitto
+      - name: install cocogitto
+        uses: baptiste0928/cargo-install@v2.2.0
+        with:
+          crate: cocogitto
 
-      # - name: Check conventional commit
-      #   shell: bash
-      #   run: |
-      #     if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-      #       git config --global user.name "${{ github.event.pull_request.user.login }}"
-      #       commit=$(git log --format=%B -n 1 ${{ github.event.pull_request.head.sha }})
-      #     else
-      #       git config --global user.name "${{ github.event.pusher.name }}"
-      #       commit=$(git log --format=%B -n 1 ${{ github.sha }})
-      #     fi
-      #     git config --global user.email "temp_email@juspay.in"
-      #     cog verify "$commit"
+      - name: Check conventional commit
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git config --global user.name "${{ github.event.pull_request.user.login }}"
+            commit=$(git log --format=%B -n 1 ${{ github.event.pull_request.head.sha }})
+          else
+            git config --global user.name "${{ github.event.pusher.name }}"
+            commit=$(git log --format=%B -n 1 ${{ github.sha }})
+          fi
+          git config --global user.email "temp_email@juspay.in"
+          cog verify "$commit"
 
   # test:
   #   name: Testing
