@@ -1,0 +1,283 @@
+name: Create a superposition release
+
+on: workflow_dispatch
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.git_tag.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AIRBORNE_TOKEN }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.89.0
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: install cargo-edit to perform set-version
+        uses: baptiste0928/cargo-install@v2.2.0
+        with:
+          crate: cargo-edit
+          version: "0.13.6"
+
+      - name: install cocogitto
+        uses: baptiste0928/cargo-install@v2.2.0
+        with:
+          crate: cocogitto
+          version: "6.3.0"
+
+      - name: Semver release
+        shell: bash
+        run: |
+          git config user.email "airborne_bot@juspay.in"
+          git config user.name "Airborne Bot"
+          cog bump --auto --skip-ci-override
+
+      - name: Push code to main
+        shell: bash
+        run: |
+          git push origin main
+          git push origin --tags
+
+  server-docker-build:
+    needs: tag-release
+    permissions:
+      contents: read
+      packages: write
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      max-parallel: 5
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag: linux-amd64
+            os: ubuntu-latest
+          - platform: linux/arm64
+            tag: linux-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AIRBORNE_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push production image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: .
+          file: airborne_server/Dockerfile
+          tags: ghcr.io/${{ github.repository }}-server:${{ needs.tag-release.outputs.version }}-${{ matrix.tag }}
+
+  server-create-manifest:
+    needs: [tag-release, server-docker-build]
+    permissions:
+      contents: read
+      packages: write
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AIRBORNE_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest for multi-arch image
+        run: |
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-server:${{ needs.tag-release.outputs.version }} \
+              ghcr.io/${{ github.repository }}-server:${{ needs.tag-release.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-server:${{ needs.tag-release.outputs.version }}-linux-arm64
+
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-server:latest \
+              ghcr.io/${{ github.repository }}-server:${{ needs.tag-release.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-server:${{ needs.tag-release.outputs.version }}-linux-arm64
+
+  analytics-docker-build:
+    needs: [tag-release, server-create-manifest]
+    permissions:
+      contents: read
+      packages: write
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      max-parallel: 5
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag: linux-amd64
+            os: ubuntu-latest
+          - platform: linux/arm64
+            tag: linux-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AIRBORNE_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push production image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: .
+          file: airborne_analytics_server/Dockerfile
+          tags: ghcr.io/${{ github.repository }}-analytics-server:${{ needs.tag-release.outputs.version }}-${{ matrix.tag }}
+
+  analytics-create-manifest:
+    needs: [tag-release, analytics-docker-build]
+    permissions:
+      contents: read
+      packages: write
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.AIRBORNE_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest for multi-arch image
+        run: |
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-analytics-server:${{ needs.tag-release.outputs.version }} \
+              ghcr.io/${{ github.repository }}-analytics-server:${{ needs.tag-release.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-analytics-server:${{ needs.tag-release.outputs.version }}-linux-arm64
+
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-analytics-server:latest \
+              ghcr.io/${{ github.repository }}-analytics-server:${{ needs.tag-release.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-analytics-server:${{ needs.tag-release.outputs.version }}-linux-arm64
+
+  publish-to-maven-central:
+    needs: [tag-release]
+    permissions:
+      contents: read
+      id-token: write
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.tag-release.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            hyper_ota:
+              - 'android/hyper-ota/**'
+            hyper_eta_react:
+              - 'android/hyper-eta-react/**'
+
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
+      - name: Grant execute for Gradle wrapper
+        run: chmod +x gradlew
+        working-directory: android
+
+      - name: Import GPG
+        run: |
+          echo "VERSION=${{ env.VERSION }}" >> $GITHUB_ENV
+          echo "${SIGNING_KEY}" | base64 -d > /tmp/key.asc
+          gpg --batch --import /tmp/key.asc
+          # Export the decoded key for Gradle
+          echo "DECODED_SIGNING_KEY<<EOF" >> $GITHUB_ENV
+          echo "${SIGNING_KEY}" | base64 -d >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+
+      # Publish aggregation (both modules). nmcp builds a single ZIP and uploads to Portal API
+      - name: Publish to Maven Central (Central Portal)
+        working-directory: android
+        run: ./gradlew --no-daemon publishAggregationToCentralPortal
+        env:
+          # Central Portal token (username/password pair)
+          SONATYPE_MAVEN_USERNAME: ${{ secrets.SONATYPE_MAVEN_USERNAME }}
+          SONATYPE_MAVEN_PASSWORD: ${{ secrets.SONATYPE_MAVEN_PASSWORD }}
+
+          # Gradle signing properties (nmcp uses existing publications)
+          ORG_GRADLE_PROJECT_signingKey: ${{ env.DECODED_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+
+  release:
+    needs:
+      [
+        tag-release,
+        server-create-manifest,
+        analytics-create-manifest,
+        publish-to-maven-central,
+      ]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        # if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true

@@ -51,6 +51,7 @@
             pkgs.gnumake
             pkgs.diesel-cli
             pkgs.cargo-watch
+            pkgs.cargo-edit
             pkgs.jq
             pkgs.yq
             pkgs.curl
