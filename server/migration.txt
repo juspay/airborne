@@ -25,3 +25,4 @@ UPDATE hyperotaserver.workspace_names SET application_id = 'mfa-ios' WHERE id = 
 UPDATE hyperotaserver.workspace_names SET application_id = 'ibmb-android' WHERE id = 12;
 UPDATE hyperotaserver.workspace_names SET application_id = 'chennaione' WHERE id = 13;
 UPDATE hyperotaserver.workspace_names SET application_id = 'ibmb-ios' WHERE id = 15;
+UPDATE hyperotaserver.workspace_names SET application_id = 'nammayatri' WHERE id = 17;
