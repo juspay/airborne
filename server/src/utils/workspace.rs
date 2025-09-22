@@ -27,7 +27,9 @@ pub async fn get_workspace_name_for_application(
 
     let workspace: WorkspaceName = workspace_names::table
         .filter(workspace_names::organization_id.eq(organisation))
+        .filter(workspace_names::application_id.eq(application))
         .order(workspace_names::id.desc())
+        .select(WorkspaceName::as_select())
         .first(conn)
         .map_err(|e| {
             println!(
@@ -39,6 +41,11 @@ pub async fn get_workspace_name_for_application(
                 e
             ))
         })?;
+
+    println!(
+        "Using Workspace name for org {} and app {}: {:?}",
+        organisation, application, workspace
+    );
 
     Ok(workspace.workspace_name)
 }

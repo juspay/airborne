@@ -100,6 +100,7 @@ pub mod hyperotaserver {
             id -> Int4,
             organization_id -> Text,
             workspace_name -> Text,
+            application_id -> Text,
         }
     }
 
