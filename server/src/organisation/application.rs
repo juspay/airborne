@@ -29,7 +29,7 @@ use superposition_sdk::Client;
 use crate::middleware::auth::{validate_user, AuthResponse, WRITE};
 use crate::types::{ABError, AppState};
 use crate::utils::document::value_to_document;
-use diesel::RunQueryDsl;
+use diesel::{RunQueryDsl, SelectableHelper};
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
 use crate::utils::db::schema::hyperotaserver::workspace_names;
@@ -311,6 +311,7 @@ async fn add_application(
         // Store workspace name in our database with a placeholder, then update to "workspace{id}"
         let new_workspace_name = NewWorkspaceName {
             organization_id: &organisation,
+            application_id: &application,
             workspace_name: "pending",
         };
 
@@ -322,6 +323,7 @@ async fn add_application(
         // Insert and get the inserted row (to get the id)
         let inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
             .values(&new_workspace_name)
+            .returning(WorkspaceName::as_select())
             .get_result(&mut conn)
             .map_err(|e| {
                 ABError::InternalServerError(format!("Failed to store workspace name: {}", e))

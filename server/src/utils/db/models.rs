@@ -77,6 +77,7 @@ pub struct ReleaseEntry {
 pub struct WorkspaceName {
     pub id: i32,
     pub organization_id: String,
+    pub application_id: String,
     pub workspace_name: String,
     // pub created_at: DateTime<Utc>,
 }
@@ -85,6 +86,7 @@ pub struct WorkspaceName {
 #[diesel(table_name = workspace_names)]
 pub struct NewWorkspaceName<'a> {
     pub organization_id: &'a str,
+    pub application_id: &'a str,
     pub workspace_name: &'a str,
 }
 
