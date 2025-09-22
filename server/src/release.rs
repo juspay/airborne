@@ -239,7 +239,7 @@ async fn get_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: package_version as i32,
+            version: package_version.to_string(),
             index: index_file,
             properties: package_properties,
             important: important_files,
@@ -839,7 +839,7 @@ async fn create_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: pkg_version,
+            version: pkg_version.to_string(),
             index: {
                 let (file_path, _, _) = parse_file_key(&package_data.index);
                 files
@@ -1194,7 +1194,7 @@ async fn list_releases(
             },
             package: ServePackage {
                 name: application.clone(),
-                version: package_version,
+                version: package_version.to_string(),
                 index: index_file,
                 properties: rc_package_properties,
                 important: important_files,
@@ -1665,7 +1665,7 @@ async fn serve_release(
     });
 
     let release_response = ServeReleaseResponse {
-        version: rc_version.clone(),
+        version: "2".to_string(),
         config: Config {
             boot_timeout: rc_boot_timeout as u32,
             release_config_timeout: rc_release_config_timeout as u32,
@@ -1674,7 +1674,7 @@ async fn serve_release(
         },
         package: ServePackage {
             name: application.clone(),
-            version: pkg_version as i32,
+            version: pkg_version.to_string(),
             index: index_file,
             properties: opt_rc_package_properties
                 .clone()

@@ -29,7 +29,7 @@ export default function ApplicationDetailPage() {
           {/* Page Header */}
           <div className="flex items-center gap-4 mb-8">
             <Button variant="ghost" size="sm" asChild>
-              <Link href={"/dashboard/" + org}>
+              <Link href={"/dashboard/" + encodeURIComponent(org || "")}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
@@ -40,7 +40,9 @@ export default function ApplicationDetailPage() {
             </div>
             <div className="flex gap-2">
               <Button asChild>
-                <Link href={`/dashboard/${org}/${app}/releases/create`}>
+                <Link
+                  href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
+                >
                   <Rocket className="h-4 w-4 mr-2" />
                   Create Release
                 </Link>
@@ -98,11 +100,15 @@ export default function ApplicationDetailPage() {
                     {releases.slice(0, 5).map((r) => (
                       <TableRow
                         key={r.id}
-                        onClick={() => router.push(`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`)}
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`
+                          )
+                        }
                       >
                         <TableCell className="font-mono text-sm">
                           <Link
-                            href={`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`}
+                            href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`}
                             className="hover:text-primary"
                           >
                             {r.id}

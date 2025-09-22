@@ -72,11 +72,15 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
             {releases.map((r) => (
               <TableRow
                 key={r.id}
-                onClick={() => router.push(`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`)}
+                onClick={() =>
+                  router.push(
+                    `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`
+                  )
+                }
               >
                 <TableCell className="font-mono text-sm">
                   <Link
-                    href={`/dashboard/${org}/${app}/releases/${encodeURIComponent(r.id)}`}
+                    href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`}
                     className="hover:text-primary"
                   >
                     {r.id}

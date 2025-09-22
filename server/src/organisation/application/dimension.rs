@@ -21,16 +21,26 @@ use release_views::dsl::{app_id, created_at, dimensions as dimensions_col, id, n
 use serde_json::Value;
 use uuid::Uuid;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
 enum DimensionSchema {
-    #[serde(rename = "string")]
+    #[default]
     String,
+}
+
+impl DimensionSchema {
+    // Method that returns the JSON representation
+    fn to_json(&self) -> Value {
+        match self {
+            Self::String => serde_json::json!({ "type": "string" }),
+        }
+    }
 }
 
 #[derive(Deserialize)]
 struct CreateDimensionRequest {
     dimension: String,
-    #[serde(default = "default_dimension_schema")]
+    #[serde(default)]
     schema: DimensionSchema,
     description: String,
     // function_name: Option<String>,
@@ -151,9 +161,7 @@ async fn create_dimension_api(
         None => 0,
     };
 
-    let dim_schema = match req.schema {
-        DimensionSchema::String => serde_json::json!({ "type": "string" }),
-    };
+    let dim_schema = req.schema.to_json();
 
     let dimension = state
         .superposition_client
