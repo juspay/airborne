@@ -311,6 +311,7 @@ async fn add_application(
         // Store workspace name in our database with a placeholder, then update to "workspace{id}"
         let new_workspace_name = NewWorkspaceName {
             organization_id: &organisation,
+            application_id: &application,
             workspace_name: "pending",
         };
 
