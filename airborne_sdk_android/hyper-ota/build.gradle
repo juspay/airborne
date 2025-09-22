@@ -106,7 +106,7 @@ afterEvaluate {
                     scm {
                         connection = 'scm:git:github.com/juspay/airborne.git'
                         developerConnection = 'scm:git:ssh://github.com/juspay/airborne.git'
-                        url = 'https://github.com/juspay/airborne/tree/main/android/hyper-ota'
+                        url = 'https://github.com/juspay/airborne/tree/main/airborne_sdk_android/hyper-ota'
                     }
                 }
             }
