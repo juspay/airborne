@@ -84,6 +84,9 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
 @property (nonatomic, strong) HPJPFileUtil* fileUtil;
 @property (nonatomic, strong) HPJPRemoteFileUtil* remoteFileUtil;
 
+// Helper method to check if a resource already exists in package important splits
+- (BOOL)isResourceExistingInPackageImportantSplits:(HPJPResource *)resource package:(HPJPApplicationPackage *)package;
+
 @end
 
 @implementation HPJPApplicationManager
@@ -665,7 +668,8 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     self.resourceDownloadStatus = DOWNLOADING;
     [self fetchReleaseConfigWithCompletionHandler:^(HPJPApplicationManifest* manifest,NSError* error) {
         if (error==nil && manifest != nil) {
-            self.downloadedApplicationManifest = manifest;
+            HPJPApplicationManifest *transformedManifest = [self transformDownloadedManifest:manifest];
+            self.downloadedApplicationManifest = transformedManifest ?: manifest;
             self.releaseConfigDownloadStatus = COMPLETED;
             [self cleanUpUnwantedFiles];
             [self updateConfig:manifest.config];
@@ -936,6 +940,75 @@ static NSMutableDictionary<NSString*,HPJPApplicationManager*>* managers;
     }];
 
     [manifestDataTask resume];
+}
+
+- (BOOL)isResourceExistingInPackageImportantSplits:(HPJPResource *)resource package:(HPJPApplicationPackage *)package {
+    if (!resource || !package) {
+        return NO;
+    }
+    
+    NSArray<HPJPResource *> *allImportantSplits = [package allImportantSplits];
+    for (HPJPResource *existingResource in allImportantSplits) {
+        if ([existingResource.filePath isEqualToString:resource.filePath]) {
+            return YES;
+        }
+    }
+    
+    return NO;
+}
+
+- (HPJPApplicationManifest *)transformDownloadedManifest:(HPJPApplicationManifest *)downloadedManifest {
+    if (!downloadedManifest) {
+        return nil;
+    }
+    
+    HPJPApplicationManifest *localManifest = [self getCurrentApplicationManifest];
+    
+    HPJPApplicationPackage *transformedPackage = [[HPJPApplicationPackage alloc] init];
+    transformedPackage.version = downloadedManifest.package.version;
+    transformedPackage.name = downloadedManifest.package.name;
+    transformedPackage.important = [downloadedManifest.package.important mutableCopy];
+    transformedPackage.lazy = [downloadedManifest.package.lazy mutableCopy];
+    
+    HPJPApplicationResources *transformedResources = [[HPJPApplicationResources alloc] init];
+    transformedResources.resources = [downloadedManifest.resources.resources mutableCopy];
+    
+    NSDictionary<NSString*, HPJPResource*> *localResources = localManifest.resources.resources;
+    NSMutableDictionary<NSString*, HPJPResource*> *newResources = [transformedResources.resources mutableCopy];
+    
+    NSMutableArray<HPJPResource*> *resourcesToMoveToImportant = [NSMutableArray array];
+    
+    for (NSString *resourceKey in newResources) {
+        HPJPResource *newResource = newResources[resourceKey];
+        HPJPResource *localResource = localResources[resourceKey];
+        
+        // Check if resource is new or updated AND not already in local package important splits
+        if ((!localResource || ![newResource.url.absoluteString isEqualToString:localResource.url.absoluteString]) &&
+            ![self isResourceExistingInPackageImportantSplits:newResource package:localManifest.package]) {
+            [resourcesToMoveToImportant addObject:newResource];
+        }
+    }
+    
+    if (resourcesToMoveToImportant.count > 0) {
+        NSMutableArray<HPJPResource*> *updatedImportantSplits = [transformedPackage.important mutableCopy];
+        [updatedImportantSplits addObjectsFromArray:resourcesToMoveToImportant];
+        transformedPackage.important = updatedImportantSplits;
+        
+        for (HPJPResource *resource in resourcesToMoveToImportant) {
+            [newResources removeObjectForKey:resource.filePath];
+        }
+        transformedResources.resources = newResources;
+        
+        [self.tracker trackInfo:@"manifest_transformation"
+                          value:[@{@"resources_moved_to_important": @(resourcesToMoveToImportant.count)} mutableCopy]];
+    }
+    
+    HPJPApplicationManifest *transformedManifest = [[HPJPApplicationManifest alloc]
+                                                   initWithPackage:transformedPackage
+                                                   config:downloadedManifest.config
+                                                   resources:transformedResources];
+    
+    return transformedManifest;
 }
 
 # pragma mark - Config
