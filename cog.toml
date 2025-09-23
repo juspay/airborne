@@ -12,8 +12,8 @@ pre_bump_hooks = [
     "cargo set-version --workspace {{version}}",
     "npm version {{version}} --workspaces",
     "cd airborne_dashboard && npm version {{version}}",
-    "sed -i \"s|^  s.version *=.*|  s.version          = '{{version}}'|\" iOS/hyper-ota/Airborne.podspec",
-    "sed -i 's|^hyperVersion=.*|hyperVersion={{version}}|' android/version.properties",
+    "sed -i \"s|^  s.version *=.*|  s.version          = '{{version}}'|\" airborne_sdk_iOS/hyper-ota/Airborne.podspec",
+    "sed -i 's|^hyperVersion=.*|hyperVersion={{version}}|' airborne_sdk_android/version.properties",
 ]
 post_bump_hooks = []
 pre_package_bump_hooks = []
