@@ -1,4 +1,4 @@
-name: Create a superposition release
+name: Create a airborne release
 
 on: workflow_dispatch
 
@@ -46,7 +46,7 @@ jobs:
         run: |
           git config user.email "airborne_bot@juspay.in"
           git config user.name "Airborne Bot"
-          cog bump --auto --skip-ci-override "[skip ci]"
+          cog bump --auto --skip-ci
 
       - name: Push code to main
         shell: bash
