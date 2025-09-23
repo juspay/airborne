@@ -31,10 +31,14 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
         firstTimeCleanup()
     }
 
+    // Flag to track if this is the first time setup
+    private var firstCleanUp = false
+
     private fun firstTimeCleanup() {
         val prevBuildId = workspace.getFromSharedPreference(OTAConstants.OTA_BUILD_ID, "__failed")
 
         if (prevBuildId != cleanUpValue) {
+            firstCleanUp = true
             trackerCallback.track(
                 LogCategory.LIFECYCLE,
                 LogSubCategory.LifeCycle.HYPER_OTA,
@@ -67,6 +71,10 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
                 )
             }
         }
+    }
+
+    fun isFirstCleanUp(): Boolean {
+        return firstCleanUp
     }
 
     companion object {
