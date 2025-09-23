@@ -51,6 +51,7 @@ import java.io.InterruptedIOException
 import java.net.HttpURLConnection.HTTP_OK
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.util.Queue
 import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
@@ -567,7 +568,7 @@ internal class UpdateTask(
                         if (it.isDownloaded == true) {
                             Result.Ok(Unit)
                         } else {
-                            downloadFile(tw, it.url, it.filePath)
+                            downloadFile(tw, it.url, it.filePath, it.checksum)
                         }
                     }
                 }
@@ -627,7 +628,7 @@ internal class UpdateTask(
                         val result = if (it.isDownloaded == true) {
                             Result.Ok(Unit)
                         } else {
-                            downloadFile(tw, it.url, it.filePath)
+                            downloadFile(tw, it.url, it.filePath, it.checksum)
                         }
                         downloadCallback(tw, it.filePath, result is Result.Ok)
                         result
@@ -733,7 +734,8 @@ internal class UpdateTask(
     private fun downloadFile(
         tempWriter: TempWriter,
         url: URL,
-        filePathToSaveIn: String
+        filePathToSaveIn: String,
+        checksum: String
     ): Result<Unit> {
         Log.d(TAG, "downloadFile $url")
         val startTime = System.currentTimeMillis()
@@ -746,11 +748,22 @@ internal class UpdateTask(
                         return Result.Error()
                     }
                     val bytes = body.bytes()
-                    if (tempWriter.write(filePathToSaveIn, bytes)) {
-                        Log.d(TAG, "File $filePathToSaveIn written to disk")
-                        Result.Ok(Unit)
+
+                    val calculatedChecksum = MessageDigest.getInstance("SHA-256")
+                        .digest(bytes)
+                        .joinToString("") { "%02x".format(it) }
+                    
+                    if (calculatedChecksum.equals(checksum, ignoreCase = true)) {
+                        
+                        if (tempWriter.write(filePathToSaveIn, bytes)) {
+                            Log.d(TAG, "File $filePathToSaveIn written to disk")
+                            Result.Ok(Unit)
+                        } else {
+                            Log.e(TAG, "Write to disk failed while downloading: $filePathToSaveIn")
+                            Result.Error()
+                        }
                     } else {
-                        Log.e(TAG, "Write to disk failed while downloading: $filePathToSaveIn")
+                        Log.e(TAG, "Checksum mismatch for $filePathToSaveIn")
                         Result.Error()
                     }
                 } catch (e: IOException) {
@@ -983,7 +996,7 @@ internal class UpdateTask(
                         Result.Ok(Pair(resource, savedResourcesInfo.first))
                     } else {
                         Log.d(TAG, "Downloading resource: ${resource.filePath}")
-                        val result = downloadFile(tempWriter, resource.url, resource.filePath)
+                        val result = downloadFile(tempWriter, resource.url, resource.filePath, resource.checksum)
                         if (result is Result.Ok) {
                             Result.Ok(Pair(resource, tempWriter))
                         } else {

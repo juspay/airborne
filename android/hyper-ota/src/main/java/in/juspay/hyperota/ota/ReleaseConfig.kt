@@ -41,9 +41,16 @@ internal data class ReleaseConfig(
         private fun JSONArray.getSplit(i: Int) =
             try {
                 val json = this.getJSONObject(i)
-                Split(json.getURL("url"), json.getString("filePath"), if (json.has("isDownloaded")) json.getBoolean("isDownloaded") else null)
+                Split(json.getURL("url"), json.getString("filePath"), if (json.has("isDownloaded")) json.getBoolean("isDownloaded") else null,json.getString("checksum"))
             } catch (e: JSONException) {
                 throw JSONException("JSON at index '$i' is not a valid Split")
+            }
+
+        private fun JSONObject.getSplit(json: JSONObject) =
+            try {
+                Split(json.getURL("url"), json.getString("filePath"), if (json.has("isDownloaded")) json.getBoolean("isDownloaded") else null,json.getString("checksum"))
+            } catch (e: JSONException) {
+                throw JSONException("JSON: '$json' is not a valid Split")
             }
 
         fun deSerialize(serialized: String): Result<ReleaseConfig> =
@@ -87,7 +94,7 @@ internal data class ReleaseConfig(
                 json.getString("name"),
                 json.getString("version"),
                 json.getJSONObject("properties"),
-                Split(json.getURL("index")),
+                json.getSplit(json.getJSONObject("index")),
                 json.getJSONArray("important").let {
                     List(it.length()) { i -> it.getSplit(i) }
                 },
@@ -134,10 +141,10 @@ internal data class ReleaseConfig(
                 .put("properties", properties)
     }
 
-    data class Split(val url: URL, var filePath: String, var isDownloaded: Boolean?) {
+    data class Split(val url: URL, var filePath: String, var isDownloaded: Boolean?,var checksum: String) {
         val fileName = url.path.split("/").last()
 
-        constructor(url: URL) : this(url, url.path.split("/").last(), null)
+        constructor(url: URL,checksum: String) : this(url, url.path.split("/").last(), null,checksum)
 
         override fun equals(other: Any?): Boolean {
             return other is Split &&
