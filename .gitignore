@@ -42,6 +42,8 @@ node_modules/
 xcuserdata/
 .build
 Package.resolved
+Airborne.xcframework
+Airborne.zip
 
 target/
 **/result
