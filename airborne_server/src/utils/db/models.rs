@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
     builds, cleanup_outbox, configs, files, packages, packages_v2, release_views, releases,
-    workspace_names,
+    user_credentials, workspace_names,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -179,4 +179,15 @@ pub struct NewBuildEntry {
     pub organisation: String,
     pub application: String,
     pub release_id: String,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable, Serialize)]
+#[diesel(table_name = user_credentials)]
+pub struct UserCredentialsEntry {
+    pub client_id: uuid::Uuid,
+    pub username: String,
+    pub password: String,
+    pub organisation: String,
+    pub application: String,
+    pub created_at: DateTime<Utc>,
 }

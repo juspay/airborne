@@ -96,6 +96,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.user_credentials (client_id) {
+            client_id -> Uuid,
+            username -> Text,
+            password -> Text,
+            organisation -> Text,
+            application -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.workspace_names (id) {
             id -> Int4,
             organization_id -> Text,
@@ -124,6 +135,7 @@ pub mod hyperotaserver {
         packages_v2,
         release_views,
         releases,
+        user_credentials,
         workspace_names,
     );
 }

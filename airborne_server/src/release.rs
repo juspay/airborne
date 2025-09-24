@@ -27,7 +27,7 @@ use superposition_sdk::types::VariantType::Experimental;
 
 use crate::{
     file::utils::parse_file_key,
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
     release::types::*,
     types::{ABError, AppState},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
@@ -36,15 +36,17 @@ use crate::{
 mod types;
 pub mod utils;
 
-pub fn add_routes() -> Scope {
-    Scope::new("")
-        .service(create_release)
-        .service(list_releases)
-        .service(ramp_release)
-        .service(conclude_release)
-        .service(serve_release)
-        .service(get_release)
-        .service(update_release)
+pub fn add_routes(path: &str) -> Scope {
+    Scope::new(path).service(serve_release).service(
+        Scope::new("")
+            .wrap(Auth)
+            .service(create_release)
+            .service(list_releases)
+            .service(ramp_release)
+            .service(conclude_release)
+            .service(get_release)
+            .service(update_release),
+    )
 }
 
 pub fn add_public_routes() -> Scope {

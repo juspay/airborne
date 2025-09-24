@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
+use crate::{
+    middleware::auth::{Auth, AuthResponse},
+    organisation::{application::Application, Organisation},
+    types::{ABError, AppState},
+    utils::keycloak::{decode_jwt_token, get_token},
+};
 use actix_web::{
     get, post,
     web::{self, Json},
-    HttpMessage, HttpRequest, Scope,
+    HttpRequest, Scope,
 };
 use keycloak::{
     types::{CredentialRepresentation, UserRepresentation},
@@ -26,24 +30,16 @@ use keycloak::{
 use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 
-use crate::{
-    middleware::auth::AuthResponse,
-    organisation::application::Application,
-    organisation::Organisation,
-    types::ABError,
-    types::AppState,
-    utils::keycloak::{decode_jwt_token, get_token},
-};
-
-pub fn add_routes() -> Scope {
-    web::scope("")
+pub fn add_routes(path: &str) -> Scope {
+    Scope::new(path)
         .service(create_user)
         .service(login)
-        .service(get_user)
         .service(oauth_login)
         .service(get_oauth_url)
-        .service(oauth_signup) // Add the new signup endpoint
+        .service(oauth_signup)
+        .service(Scope::new("").wrap(Auth).service(get_user))
 }
 
 /*
@@ -64,9 +60,9 @@ pub fn add_routes() -> Scope {
  */
 
 #[derive(Serialize, Deserialize)]
-struct UserCredentials {
-    name: String,
-    password: String,
+pub struct UserCredentials {
+    pub name: String,
+    pub password: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -158,12 +154,10 @@ async fn login(
     login_implementation(req.into_inner(), state).await
 }
 
-async fn login_implementation(
+pub async fn login_implementation(
     req: UserCredentials,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
-    info!("[LOGIN] Login attempt for user: {}", req.name);
-
     // Move ENVs to App State
     let url = state.env.keycloak_url.clone();
     let client_id = state.env.client_id.clone();
@@ -191,7 +185,6 @@ async fn login_implementation(
         .map_err(|e| ABError::InternalServerError(e.to_string()))?; // Handle request failure
 
     if response.status().is_success() {
-        info!("[LOGIN] Login successful for user: {}", req.name);
         let token: UserToken = response
             .json()
             .await
@@ -214,6 +207,7 @@ async fn login_implementation(
                 admin_token,
                 organisation: None,
                 application: None,
+                username: req.name.clone(),
             },
             state,
         )
@@ -222,8 +216,6 @@ async fn login_implementation(
 
         user_resp.user_token = Some(token);
         return Ok(user_resp);
-    } else {
-        info!("[LOGIN] Login failed for user: {}", req.name);
     }
 
     // If response is not successful, extract error message
@@ -239,7 +231,7 @@ async fn login_implementation(
 }
 
 #[derive(Serialize, Deserialize)]
-struct User {
+pub struct User {
     user_id: String,
     organisations: Vec<Organisation>,
     user_token: Option<UserToken>,
@@ -247,16 +239,10 @@ struct User {
 
 #[get("")]
 async fn get_user(
-    req: HttpRequest,
+    auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
-    let auth = req
-        .extensions()
-        .get::<AuthResponse>()
-        .cloned()
-        .ok_or(ABError::Unauthorized(
-            "Authorization missing or Invalid".to_string(),
-        ))?;
+    let auth = auth_response.into_inner();
     get_user_impl(auth, state).await
 }
 
@@ -526,6 +512,11 @@ async fn oauth_login(
             admin_token,
             organisation: None,
             application: None,
+            username: token_data
+                .claims
+                .preferred_username
+                .clone()
+                .ok_or_else(|| ABError::Unauthorized("No email in token".to_string()))?,
         },
         state,
     )
@@ -593,6 +584,11 @@ async fn oauth_signup(
             admin_token,
             organisation: None,
             application: None,
+            username: token_data
+                .claims
+                .preferred_username
+                .clone()
+                .ok_or_else(|| ABError::Unauthorized("No email in token".to_string()))?,
         },
         state,
     )

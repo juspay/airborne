@@ -20,9 +20,9 @@ mod middleware;
 mod organisation;
 mod package;
 mod release;
-mod user;
-
+mod token;
 mod types;
+mod user;
 mod utils;
 
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -243,35 +243,23 @@ async fn main() -> std::io::Result<()> {
                     )
                     .service(
                         web::scope("/organisations")
-                            .wrap(Auth { env: env.clone() })
+                            .wrap(Auth)
                             .service(organisation::add_routes()),
                     )
                     .service(
                         web::scope("/organisation/user")
-                            .wrap(Auth { env: env.clone() })
+                            .wrap(Auth)
                             .service(organisation::user::add_routes()),
                     )
-                    .service(
-                        web::scope("/user")
-                            .wrap(Auth { env: env.clone() })
-                            .service(user::get_user),
-                    )
-                    .service(web::scope("/users").service(user::add_routes()))
-                    .service(
-                        web::scope("/file")
-                            .wrap(Auth { env: env.clone() })
-                            .service(file::add_routes()),
-                    )
+                    .service(user::add_routes("users"))
+                    .service(token::add_scopes("token"))
+                    .service(web::scope("/file").wrap(Auth).service(file::add_routes()))
                     .service(
                         web::scope("/packages")
-                            .wrap(Auth { env: env.clone() })
+                            .wrap(Auth)
                             .service(package::add_routes()),
                     )
-                    .service(
-                        web::scope("/releases")
-                            .wrap(Auth { env: env.clone() })
-                            .service(release::add_routes()),
-                    ),
+                    .service(release::add_routes("releases")),
             )
     })
     .workers(num_workers)

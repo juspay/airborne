@@ -19,6 +19,7 @@ use std::{
 
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
+    web::Data,
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
@@ -26,7 +27,7 @@ use keycloak::{KeycloakAdmin, KeycloakAdminToken};
 use reqwest::Client;
 
 use crate::{
-    types::Environment,
+    types::AppState,
     utils::keycloak::{decode_jwt_token, get_token},
 };
 
@@ -36,9 +37,7 @@ use crate::types::ABError;
 // 1. Middleware initialization, middleware factory gets called with
 //    next service in chain as parameter.
 // 2. Middleware's call method gets called with normal request.
-pub struct Auth {
-    pub env: Environment,
-}
+pub struct Auth;
 
 // Middleware factory is `Transform` trait
 // `S` - type of the next service
@@ -58,14 +57,12 @@ where
     fn new_transform(&self, service: S) -> Self::Future {
         ready(Ok(AuthMiddleware {
             service: Rc::new(service),
-            env: self.env.clone(),
         }))
     }
 }
 
 pub struct AuthMiddleware<S> {
     service: Rc<S>,
-    env: Environment,
 }
 
 #[derive(Clone, Debug)]
@@ -80,6 +77,7 @@ pub struct AuthResponse {
     pub admin_token: KeycloakAdminToken, // This is holding token and not admin since admin deos not have clone
     pub organisation: Option<AccessLevel>,
     pub application: Option<AccessLevel>,
+    pub username: String,
 }
 
 #[derive(Copy, Clone)]
@@ -131,9 +129,15 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = self.service.clone();
-        let env = self.env.clone();
 
         Box::pin(async move {
+            let env = match req.app_data::<Data<AppState>>() {
+                Some(val) => val.env.clone(),
+                None => {
+                    log::error!("app state not set");
+                    Err(ABError::InternalServerError("Env not found".to_string()))?
+                }
+            };
             let header_value = req.headers().clone();
             let auth_header = header_value.get("Authorization");
             let org_header = header_value.get("x-organisation");
@@ -216,11 +220,21 @@ where
                                         }
                                     };
                                 }
+
                                 req.extensions_mut().insert(AuthResponse {
                                     sub: token_data.claims.sub,
                                     admin_token: token,
                                     organisation,
                                     application,
+                                    username: token_data
+                                        .claims
+                                        .preferred_username
+                                        .clone()
+                                        .ok_or_else(|| {
+                                            ABError::Unauthorized(
+                                                "No username in token".to_string(),
+                                            )
+                                        })?,
                                 });
                                 service.call(req).await
                             }
