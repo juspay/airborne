@@ -1,4 +1,4 @@
-name: Create a airborne release
+name: Create an airborne release
 
 on: workflow_dispatch
 
@@ -63,6 +63,13 @@ jobs:
           git config user.email "airborne_bot@juspay.in"
           git config user.name "Airborne Bot"
           cog bump --auto --skip-ci
+
+      - name: Set latest tag
+        id: git_tag
+        shell: bash
+        run: |
+          version=`git tag -l --sort=-creatordate | grep "^v" | head -n 1 | sed 's/^v//'`
+          echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Push code to main
         shell: bash
@@ -236,9 +243,9 @@ jobs:
         with:
           filters: |
             hyper_ota:
-              - 'android/hyper-ota/**'
+              - 'airborne_sdk_android/hyper-ota/**'
             hyper_eta_react:
-              - 'android/hyper-eta-react/**'
+              - 'airborne_sdk_android/hyper-eta-react/**'
 
       - name: Set up Temurin JDK 17
         uses: actions/setup-java@v4
@@ -249,7 +256,7 @@ jobs:
 
       - name: Grant execute for Gradle wrapper
         run: chmod +x gradlew
-        working-directory: android
+        working-directory: airborne_sdk_android
 
       - name: Import GPG
         run: |
@@ -265,7 +272,7 @@ jobs:
 
       # Publish aggregation (both modules). nmcp builds a single ZIP and uploads to Portal API
       - name: Publish to Maven Central (Central Portal)
-        working-directory: android
+        working-directory: airborne_sdk_android
         run: ./gradlew --no-daemon publishAggregationToCentralPortal
         env:
           # Central Portal token (username/password pair)
