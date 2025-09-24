@@ -14,6 +14,7 @@
 
 pub mod db;
 pub mod document;
+pub mod encryption;
 pub mod keycloak;
 pub mod kms;
 pub mod s3;

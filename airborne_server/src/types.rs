@@ -157,3 +157,8 @@ impl HasLabel for ABErrorCodes {
         }
     }
 }
+
+#[derive(Serialize)]
+pub struct ListResponse<T> {
+    pub data: T,
+}
