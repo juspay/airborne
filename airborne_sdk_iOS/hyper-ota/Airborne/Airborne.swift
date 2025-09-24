@@ -68,7 +68,7 @@ import Foundation
      * @note Boot completion occurs even if some downloads failed or timed out.
      *       Check the release configuration for actual status.
      */
-    @objc optional func onBootComplete(indexBundleURL: URL?) -> Void
+    @objc optional func startApp(indexBundleURL: URL?) -> Void
     
     /**
      * Called when significant events occur during the OTA update process.
@@ -187,7 +187,7 @@ import Foundation
         self.applicationManager = AJPApplicationManager.getSharedInstance(withWorkspace: self.namespace, delegate: self, logger: self)
         self.applicationManager?.waitForPackagesAndResources { [weak self] _ in
             if let indexBundlePath = self?.getIndexBundlePath() {
-                self?.delegate?.onBootComplete?(indexBundleURL: indexBundlePath)
+                self?.delegate?.startApp?(indexBundleURL: indexBundlePath)
             }
         }
     }
@@ -249,7 +249,7 @@ extension AirborneServices {
      *         This is either the OTA-updated version or the fallback bundled version.
      *
      * @note The path is guaranteed to be valid, falling back to bundled assets if needed.
-     * @note Call this method after `onBootComplete` for the most up-to-date bundle.
+     * @note Call this method after `startApp` for the most up-to-date bundle.
      */
     @objc public func getIndexBundlePath() -> URL {
         guard
