@@ -7,16 +7,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE},
+    run_blocking,
     types::{ABError, AppState},
     utils::{
         db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
         document::{document_to_json_value, value_to_document},
-        workspace::get_workspace_name_for_application,
     },
 };
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
-use diesel::result::Error as DieselError;
 use release_views::dsl::{app_id, created_at, dimensions as dimensions_col, id, name, org_id};
 use serde_json::Value;
 use uuid::Uuid;
@@ -131,16 +130,14 @@ async fn create_dimension_api(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
-    // Get database connection
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
     // Get workspace name for this application
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let current_dimensions = state
         .superposition_client
@@ -211,16 +208,14 @@ async fn list_dimensions_api(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
-    // Get database connection
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
     // Get workspace name for this application
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let dimensionsreq = state
         .superposition_client
@@ -274,16 +269,14 @@ async fn update_dimension_api(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
-    // Get database connection
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
     // Get workspace name for this application
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let update_dimension = state
         .superposition_client
@@ -324,16 +317,14 @@ async fn delete_dimension_api(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
-    // Get database connection
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
     // Get workspace name for this application
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     state
         .superposition_client
@@ -360,14 +351,13 @@ async fn create_release_view_api(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let existing_dimensions = state
         .superposition_client
@@ -417,17 +407,24 @@ async fn create_release_view_api(
     }
 
     let view_id = Uuid::new_v4();
+    let pool = state.db_pool.clone();
+    let req_name = req.name.clone();
+    let req_dimensions = req.dimensions.clone();
 
-    let created_view = diesel::insert_into(release_views::table)
-        .values((
-            id.eq(view_id),
-            app_id.eq(application),
-            org_id.eq(organisation),
-            name.eq(req.name.clone()),
-            dimensions_col.eq(req.dimensions.clone()),
-        ))
-        .get_result::<ReleaseViewEntry>(&mut conn)
-        .map_err(|e| ABError::InternalServerError(format!("DB insert failed: {}", e)))?;
+    let created_view = run_blocking!({
+        let mut conn = pool.get()?;
+        let result = diesel::insert_into(release_views::table)
+            .values((
+                id.eq(view_id),
+                app_id.eq(application),
+                org_id.eq(organisation),
+                name.eq(req_name),
+                dimensions_col.eq(req_dimensions),
+            ))
+            .get_result::<ReleaseViewEntry>(&mut conn)
+            .map_err(|e| ABError::InternalServerError(format!("DB insert failed: {}", e)))?;
+        Ok(result)
+    })?;
 
     Ok(Json(ReleaseView {
         id: created_view.id,
@@ -449,30 +446,30 @@ async fn list_release_views_api(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to app".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
     let page = query.page.unwrap_or(1).max(1);
     let count = query.count.unwrap_or(20);
     let offset = (page - 1) * count;
+    let pool = state.db_pool.clone();
 
-    let total_items: i64 = release_views::table
-        .filter(app_id.eq(&application))
-        .filter(org_id.eq(&organisation))
-        .count()
-        .get_result(&mut conn)
-        .map_err(|e| ABError::InternalServerError(format!("Failed to count views: {}", e)))?;
+    let (total_items, rows) = run_blocking!({
+        let mut conn = pool.get()?;
 
-    let rows = release_views::table
-        .filter(app_id.eq(&application))
-        .filter(org_id.eq(&organisation))
-        .order(created_at.desc())
-        .offset(offset.into())
-        .limit(count.into())
-        .load::<ReleaseViewEntry>(&mut conn)
-        .map_err(|e| ABError::InternalServerError(format!("Failed to load views: {}", e)))?;
+        let total_items: i64 = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .count()
+            .get_result(&mut conn)?;
+
+        let rows = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .order(created_at.desc())
+            .offset(offset.into())
+            .limit(count.into())
+            .load::<ReleaseViewEntry>(&mut conn)?;
+
+        Ok((total_items, rows))
+    })?;
 
     let total_pages = ((total_items as f64) / (count as f64)).ceil() as i64;
 
@@ -507,20 +504,23 @@ async fn get_release_view_api(
     let view_id = Uuid::parse_str(&view_id_str)
         .map_err(|_| ABError::BadRequest("Invalid view_id format".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    let view = release_views::table
-        .filter(app_id.eq(&application))
-        .filter(org_id.eq(&organisation))
-        .filter(id.eq(&view_id))
-        .first::<ReleaseViewEntry>(&mut conn)
-        .map_err(|err| match err {
-            DieselError::NotFound => ABError::NotFound("View not found".to_string()),
-            _ => ABError::InternalServerError(format!("Failed to fetch view: {}", err)),
-        })?;
+    let view = run_blocking!({
+        let mut conn = pool.get()?;
+        release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .filter(id.eq(&view_id))
+            .first::<ReleaseViewEntry>(&mut conn)
+            .map_err(|e| {
+                if e.to_string().contains("NotFound") {
+                    ABError::NotFound("View not found".to_string())
+                } else {
+                    ABError::InternalServerError(format!("Failed to fetch view: {}", e))
+                }
+            })
+    })?;
 
     Ok(Json(ReleaseView {
         id: view.id,
@@ -547,14 +547,13 @@ async fn update_release_view_api(
     let view_id = Uuid::parse_str(&view_id_str)
         .map_err(|_| ABError::BadRequest("Invalid view_id format".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
-
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
     let existing_dimensions = state
         .superposition_client
@@ -601,19 +600,30 @@ async fn update_release_view_api(
         }
     }
 
-    let updated_view = diesel::update(
-        release_views::table.filter(
-            app_id
-                .eq(&application)
-                .and(org_id.eq(&organisation))
-                .and(id.eq(&view_id)),
-        ),
-    )
-    .set((dimensions_col.eq(&req.dimensions), name.eq(&req.name)))
-    .get_result::<ReleaseViewEntry>(&mut conn)
-    .map_err(|err| match err {
-        DieselError::NotFound => ABError::NotFound("View not found".to_string()),
-        _ => ABError::InternalServerError(format!("Failed to fetch view: {}", err)),
+    let pool = state.db_pool.clone();
+    let req_dimensions = req.dimensions.clone();
+    let req_name = req.name.clone();
+
+    let updated_view = run_blocking!({
+        let mut conn = pool.get()?;
+        let result = diesel::update(
+            release_views::table.filter(
+                app_id
+                    .eq(&application)
+                    .and(org_id.eq(&organisation))
+                    .and(id.eq(&view_id)),
+            ),
+        )
+        .set((dimensions_col.eq(&req_dimensions), name.eq(&req_name)))
+        .get_result::<ReleaseViewEntry>(&mut conn)
+        .map_err(|e| {
+            if e.to_string().contains("NotFound") {
+                ABError::NotFound("View not found".to_string())
+            } else {
+                ABError::InternalServerError(format!("Failed to update view: {}", e))
+            }
+        })?;
+        Ok(result)
     })?;
 
     Ok(Json(ReleaseView {
@@ -640,21 +650,22 @@ async fn delete_release_view_api(
     let view_id = Uuid::parse_str(&view_id_str)
         .map_err(|_| ABError::BadRequest("Invalid view_id format".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    let deleted_rows = diesel::delete(
-        release_views::table.filter(
-            app_id
-                .eq(&application)
-                .and(org_id.eq(&organisation))
-                .and(id.eq(&view_id)),
-        ),
-    )
-    .execute(&mut conn)
-    .map_err(|e| ABError::InternalServerError(format!("Failed to delete view: {}", e)))?;
+    let deleted_rows = run_blocking!({
+        let mut conn = pool.get()?;
+        let rows = diesel::delete(
+            release_views::table.filter(
+                app_id
+                    .eq(&application)
+                    .and(org_id.eq(&organisation))
+                    .and(id.eq(&view_id)),
+            ),
+        )
+        .execute(&mut conn)
+        .map_err(|e| ABError::InternalServerError(format!("Failed to delete view: {}", e)))?;
+        Ok(rows)
+    })?;
 
     if deleted_rows == 0 {
         return Err(ABError::NotFound("View not found".to_string()));

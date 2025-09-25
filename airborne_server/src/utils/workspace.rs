@@ -12,40 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::utils::db::schema::hyperotaserver::workspace_names;
+use crate::utils::db::{models::WorkspaceName, schema::hyperotaserver::workspace_names, DbPool};
+use crate::{run_blocking, types::ABError};
+use actix_web::error;
 use diesel::prelude::*;
 
 /// Get the workspace name for Superposition based on organization and application
 /// This retrieves the workspace name that was created during application setup
 /// which follows the format: {application_name}{generated_id}
 pub async fn get_workspace_name_for_application(
-    application: &str,
-    organisation: &str,
-    conn: &mut diesel::PgConnection,
+    pool: DbPool,
+    application: String,
+    organisation: String,
 ) -> Result<String, actix_web::Error> {
-    use crate::utils::db::models::WorkspaceName;
+    let workspace_result = run_blocking!({
+        let mut conn = pool.get()?;
+        let result = workspace_names::table
+            .filter(workspace_names::organization_id.eq(organisation))
+            .filter(workspace_names::application_id.eq(application))
+            .order(workspace_names::id.desc())
+            .select(WorkspaceName::as_select())
+            .first(&mut conn)?;
+        Ok(result)
+    });
 
-    let workspace: WorkspaceName = workspace_names::table
-        .filter(workspace_names::organization_id.eq(organisation))
-        .filter(workspace_names::application_id.eq(application))
-        .order(workspace_names::id.desc())
-        .select(WorkspaceName::as_select())
-        .first(conn)
-        .map_err(|e| {
-            println!(
-                "Failed to get workspace name for application {}: {}",
-                application, e
-            );
-            actix_web::error::ErrorInternalServerError(format!(
-                "Failed to get workspace name: {}",
-                e
-            ))
-        })?;
-
-    println!(
-        "Using Workspace name for org {} and app {}: {:?}",
-        organisation, application, workspace
-    );
-
-    Ok(workspace.workspace_name)
+    match workspace_result {
+        Ok(name) => Ok(name.workspace_name),
+        Err(ABError::NotFound(_)) => Err(error::ErrorNotFound("workspace not found")),
+        Err(e) => Err(error::ErrorInternalServerError(e.to_string())),
+    }
 }
