@@ -9,7 +9,7 @@ import `in`.juspay.airborne.constants.LogLevel
 import org.json.JSONObject
 
 @Keep
-class Airborne (
+class Airborne(
     context: Context,
     releaseConfigUrl: String,
     private val airborneInterface: AirborneInterface
@@ -56,7 +56,7 @@ class Airborne (
     private val applicationManager = hyperOTAServices.createApplicationManager(airborneInterface.getDimensions())
 
     init {
-        initializer = { this }
+        airborneObjectMap.put(airborneInterface.getNamespace(), this)
         applicationManager.loadApplication(airborneInterface.getNamespace(), airborneInterface.getLazyDownloadCallback())
     }
 
@@ -92,16 +92,46 @@ class Airborne (
     }
 
     companion object {
-        private var initializer: (() -> Airborne)? = null
+//        private var initializer: (() -> Airborne)? = null
+//
+//        /**
+//         * Lazily initialized singleton instance.
+//         */
+//        @JvmStatic
+//        val instance: Airborne by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+//            initializer?.invoke()
+//                ?: throw IllegalStateException("AirborneReact initializer not set. Call init() first.")
+//        }
+//
+//        /**
+//         * Initializes the AirborneReact singleton.
+//         */
+//        @JvmStatic
+//        fun init(
+//            context: Context,
+//            appId: String,
+//            indexFileName: String,
+//            appVersion: String,
+//            releaseConfigTemplateUrl: String,
+//            headers: Map<String, String>? = null,
+//            lazyDownloadCallback: LazyDownloadCallback? = null,
+//            trackerCallback: TrackerCallback? = null
+//        ) {
+//            initializer = {
+//                Airborne(
+//                    context,
+//                    appId,
+//                    indexFileName,
+//                    appVersion,
+//                    releaseConfigTemplateUrl,
+//                    headers,
+//                    lazyDownloadCallback ?: defaultLazyCallback,
+//                    trackerCallback ?: defaultTrackerCallback
+//                )
+//            }
+//        }
 
-        /**
-         * Lazily initialized singleton instance.
-         */
-        @JvmStatic
-        val instance: Airborne by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-            initializer?.invoke()
-                ?: throw IllegalStateException("Airborne initializer not set. Call init() first.")
-        }
+        public val airborneObjectMap: MutableMap<String, Airborne> = mutableMapOf()
 
         /**
          * Default LazyDownloadCallback implementation.
@@ -110,18 +140,18 @@ class Airborne (
             override fun fileInstalled(filePath: String, success: Boolean) {
                 // Default implementation: log the file installation status
                 if (success) {
-                    println("HyperOTAReact: File installed successfully: $filePath")
+                    println("AirborneReact: File installed successfully: $filePath")
                 } else {
-                    println("HyperOTAReact: File installation failed: $filePath")
+                    println("AirborneReact: File installation failed: $filePath")
                 }
             }
 
             override fun lazySplitsInstalled(success: Boolean) {
                 // Default implementation: log the lazy splits installation status
                 if (success) {
-                    println("HyperOTAReact: Lazy splits installed successfully")
+                    println("AirborneReact: Lazy splits installed successfully")
                 } else {
-                    println("HyperOTAReact: Lazy splits installation failed")
+                    println("AirborneReact: Lazy splits installation failed")
                 }
             }
         }

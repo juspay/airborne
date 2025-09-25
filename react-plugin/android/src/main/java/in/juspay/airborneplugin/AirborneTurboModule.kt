@@ -14,19 +14,19 @@ class AirborneTurboModule(reactContext: ReactApplicationContext) :
     return NAME
   }
 
-  override fun readReleaseConfig(promise: Promise) {
-    implementation.readReleaseConfig(promise)
+  override fun readReleaseConfig(nameSpace: String, promise: Promise) {
+    implementation.readReleaseConfig(nameSpace, promise)
   }
 
-  override fun getFileContent(filePath: String, promise: Promise) {
-    implementation.getFileContent(filePath, promise)
+  override fun getFileContent(nameSpace: String, filePath: String, promise: Promise) {
+    implementation.getFileContent(nameSpace, filePath, promise)
   }
 
-  override fun getBundlePath(promise: Promise) {
-    implementation.getBundlePath(promise)
+  override fun getBundlePath(nameSpace: String, promise: Promise) {
+    implementation.getBundlePath(nameSpace, promise)
   }
 
   companion object {
-    const val NAME = "HyperOta"
+    const val NAME = "AirborneReact"
   }
 }

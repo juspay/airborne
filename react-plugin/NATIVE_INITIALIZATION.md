@@ -189,15 +189,15 @@ After native initialization, you can use Airborne in your React Native code:
 import { readReleaseConfig, getFileContent, getBundlePath } from 'airborne-react-native';
 
 // Read release configuration
-const config = await readReleaseConfig();
+const config = await readReleaseConfig(namespace/appId);
 console.log('Release config:', JSON.parse(config));
 
 // Get file content from OTA bundle
-const content = await getFileContent('path/to/file.json');
+const content = await getFileContent(namespace/appId, 'path/to/file.json');
 console.log('File content:', content);
 
 // Get bundle path
-const bundlePath = await getBundlePath();
+const bundlePath = await getBundlePath(namespace/appId);
 console.log('Bundle path:', bundlePath);
 ```
 
@@ -219,7 +219,7 @@ All methods return promises that can be rejected with error codes:
 
 ```typescript
 try {
-    const config = await readReleaseConfig();
+    const config = await readReleaseConfig(namespace/appId);
     // Use config
 } catch (error) {
     console.error('Failed to read config:', error.message);

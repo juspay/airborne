@@ -64,6 +64,10 @@ class MainApplication : Application(), ReactApplication {
                 "https://airborne.sandbox.juspay.in/release/airborne-react-example/android",
                 object : AirborneInterface() {
 
+                    override fun getNamespace(): String {
+                        return "airborne-example"
+                    }
+
                     override fun getDimensions(): HashMap<String, String> {
                         val map = HashMap<String, String>()
                         return map

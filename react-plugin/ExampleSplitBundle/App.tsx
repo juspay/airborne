@@ -44,7 +44,7 @@ const App: React.FC = () => {
 
   const handleReadReleaseConfig = async () => {
     try {
-      const config = await readReleaseConfig();
+      const config = await readReleaseConfig("airborne-example");
       setReleaseConfig(config);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to read release config');
@@ -53,7 +53,7 @@ const App: React.FC = () => {
 
   const handleGetBundlePath = async () => {
     try {
-      const path = await getBundlePath();
+      const path = await getBundlePath("airborne-example");
       setBundlePath(path);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to get bundle path');
@@ -62,7 +62,7 @@ const App: React.FC = () => {
 
   const handleGetFileContent = async () => {
     try {
-      const content = await getFileContent('test.js');
+      const content = await getFileContent("airborne-example", 'test.js');
       setFileContent(content);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to get file content');

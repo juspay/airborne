@@ -16,9 +16,9 @@ import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
 export interface Spec extends TurboModule {
-  readReleaseConfig(): Promise<string>;
-  getFileContent(filePath: string): Promise<string>;
-  getBundlePath(): Promise<string>;
+  readReleaseConfig(nameSpace: string): Promise<string>;
+  getFileContent(nameSpace: string, filePath: string): Promise<string>;
+  getBundlePath(nameSpace: string): Promise<string>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('Airborne');

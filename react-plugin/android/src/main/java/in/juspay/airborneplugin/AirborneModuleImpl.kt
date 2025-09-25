@@ -42,27 +42,27 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
 //        }
     }
 
-    fun readReleaseConfig(promise: Promise) {
+    fun readReleaseConfig(namespace: String, promise: Promise) {
         try {
-            val config = Airborne.instance.getReleaseConfig()
+            val config = Airborne.airborneObjectMap[namespace]?.getReleaseConfig()
             promise.resolve(config)
         } catch (e: Exception) {
             promise.reject("AIRBORNE_ERROR", "Failed to read release config: ${e.message}", e)
         }
     }
 
-    fun getFileContent(filePath: String, promise: Promise) {
+    fun getFileContent(namespace: String, filePath: String, promise: Promise) {
         try {
-            val content = Airborne.instance.getFileContent(filePath)
+            val content = Airborne.airborneObjectMap[namespace]?.getFileContent(filePath)
             promise.resolve(content)
         } catch (e: Exception) {
             promise.reject("AIRBORNE_ERROR", "Failed to read file content: ${e.message}", e)
         }
     }
 
-    fun getBundlePath(promise: Promise) {
+    fun getBundlePath(namespace: String, promise: Promise) {
         try {
-            val path = Airborne.instance.getBundlePath()
+            val path = Airborne.airborneObjectMap[namespace]?.getBundlePath()
             promise.resolve(path)
         } catch (e: Exception) {
             promise.reject("AIRBORNE_ERROR", "Failed to get bundle path: ${e.message}", e)
