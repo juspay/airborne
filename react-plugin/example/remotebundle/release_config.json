@@ -1,0 +1,21 @@
+{
+    "version": "1",
+    "config": {
+      "version": "1.0.1",
+      "release_config_timeout": 10000,
+      "boot_timeout": 10000,
+      "properties": {}
+    },
+    "package": {
+      "name": "hyperpay",
+      "version": "24",
+      "properties": {},
+      "index": {
+        "url": "https://d07ebfe065b2.ngrok-free.app/remotebundle/main.jsbundle",
+        "file_path": "main.jsbundle"
+      },
+      "important": [],
+      "lazy": []
+    },
+    "resources": []
+  }
