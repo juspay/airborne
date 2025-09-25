@@ -53,9 +53,9 @@ This implementation provides a React Native module for Airborne that:
 
 ## API Methods
 
-1. **readReleaseConfig()** - Returns the release configuration as a stringified JSON
-2. **getFileContent(filePath)** - Reads content from a file in the OTA bundle
-3. **getBundlePath()** - Returns the path to the JavaScript bundle
+1. **readReleaseConfig(namespace/appId)** - Returns the release configuration as a stringified JSON
+2. **getFileContent(namespace/appId, filePath)** - Reads content from a file in the OTA bundle
+3. **getBundlePath(namespace/appId)** - Returns the path to the JavaScript bundle
 
 ## Usage
 
@@ -68,13 +68,13 @@ This implementation provides a React Native module for Airborne that:
 import { readReleaseConfig, getFileContent, getBundlePath } from 'airborne-react-native';
 
 // Read configuration
-const config = await readReleaseConfig();
+const config = await readReleaseConfig(namespace/appId);
 
 // Get file content
-const content = await getFileContent('path/to/file.json');
+const content = await getFileContent(namespace/appId, 'path/to/file.json');
 
 // Get bundle path
-const bundlePath = await getBundlePath();
+const bundlePath = await getBundlePath(namespace/appId);
 ```
 
 ## Implementation Notes

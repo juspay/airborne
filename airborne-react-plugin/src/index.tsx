@@ -38,16 +38,16 @@ const Airborne = AirborneModule
       }
     );
 
-export function readReleaseConfig(): Promise<string> {
-  return Airborne.readReleaseConfig();
+export function readReleaseConfig(nameSpace: string): Promise<string> {
+  return Airborne.readReleaseConfig(nameSpace);
 }
 
-export function getFileContent(filePath: string): Promise<string> {
-  return Airborne.getFileContent(filePath);
+export function getFileContent(nameSpace: string, filePath: string): Promise<string> {
+  return Airborne.getFileContent(nameSpace, filePath);
 }
 
-export function getBundlePath(): Promise<string> {
-  return Airborne.getBundlePath();
+export function getBundlePath(nameSpace: string): Promise<string> {
+  return Airborne.getBundlePath(nameSpace);
 }
 
 export default Airborne;

@@ -17,14 +17,14 @@ export default function App() {
 
   useEffect(() => {
     // Test if Airborne is initialized by trying to get the bundle path
-    getBundlePath()
+    getBundlePath("airborne-example")
       .then(() => setIsInitialized(true))
       .catch(() => setIsInitialized(false));
   }, []);
 
   const handleReadReleaseConfig = async () => {
     try {
-      const config = await readReleaseConfig();
+      const config = await readReleaseConfig("airborne-example");
       setReleaseConfig(config);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to read release config');
@@ -33,7 +33,7 @@ export default function App() {
 
   const handleGetBundlePath = async () => {
     try {
-      const path = await getBundlePath();
+      const path = await getBundlePath("airborne-example");
       setBundlePath(path);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to get bundle path');
@@ -42,7 +42,7 @@ export default function App() {
 
   const handleGetFileContent = async () => {
     try {
-      const content = await getFileContent('test.js');
+      const content = await getFileContent("airborne-example", 'test.js');
       setFileContent(content);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to get file content');

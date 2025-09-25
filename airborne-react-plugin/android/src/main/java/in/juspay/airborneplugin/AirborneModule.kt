@@ -17,18 +17,18 @@ class AirborneModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
-  fun readReleaseConfig(promise: Promise) {
-    implementation.readReleaseConfig(promise)
+  fun readReleaseConfig(namespace: String, promise: Promise) {
+    implementation.readReleaseConfig(namespace, promise)
   }
 
   @ReactMethod
-  fun getFileContent(filePath: String, promise: Promise) {
-    implementation.getFileContent(filePath, promise)
+  fun getFileContent(namespace: String, filePath: String, promise: Promise) {
+    implementation.getFileContent(namespace, filePath, promise)
   }
 
   @ReactMethod
-  fun getBundlePath(promise: Promise) {
-    implementation.getBundlePath(promise)
+  fun getBundlePath(namespace: String, promise: Promise) {
+    implementation.getBundlePath(namespace, promise)
   }
 
   companion object {

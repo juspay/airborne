@@ -24,56 +24,65 @@ allprojects {
 
 ### 2. Initialize Airborne in MainApplication
 
-In your `MainApplication.kt` (or `.java`), initialize Airborne in the `onCreate` method and override `getJSBundleFile` method of `ReactNativeHost` adnd return `airborneInstance.getBundlePath()` from there.
+In your `MainApplication.kt` (or `.java`), initialize Airborne in the `onCreate` method.
+And extend the `AirborneReactNativeHost` and assign it to the `ReactNativeHost`'s object in your `MainApplication` and override `getJSBundleFile` method of `AirborneReactNativeHost` and return `airborne.getBundlePath()` from there.
 
 ```kotlin
 import android.app.Application
 import `in`.juspay.airborneplugin.Airborne
 import `in`.juspay.airborneplugin.AirborneInterface
 import `in`.juspay.airborne.LazyDownloadCallback
+import `in`.juspay.airborneplugin.AirborneReactNativeHost
 
 class MainApplication : Application(), ReactApplication {
 
-    private lateinit var airborneInstance: Airborne
+    private var bundlePath: String? = null
+    var isBootComplete = false
+    var bootCompleteListener: (() -> Unit)? = null
+    private lateinit var airborne: Airborne
     override val reactNativeHost: ReactNativeHost =
-        object : DefaultReactNativeHost(this) {
+        object : AirborneReactNativeHost(this@MainApplication) {
+            override fun getPackages(): List<ReactPackage> =
+                PackageList(this).packages.apply {
+                    // Packages that cannot be autolinked yet can be added manually here, for example:
+                    // add(MyReactNativePackage())
+                }
 
             override fun getJSBundleFile(): String? {
-                return airborneInstance.getBundlePath()
+                // This is delayed until mainActivity is created.
+                // Make sure react is not booted until after bundlePath is created
+                return airborne.getBundlePath()
             }
-            // Other overridden methods
+
+            override fun getJSMainModuleName(): String = "index"
+
+            override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
+
+            override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
+            override val isHermesEnabled: Boolean = BuildConfig.IS_HERMES_ENABLED
         }
 
     override val reactHost: ReactHost
-        get() = getDefaultReactHost(applicationContext, reactNativeHost)
+        get() = AirborneReactNativeHost.getReactHost(applicationContext, reactNativeHost)
 
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Airborne before React Native
-        initializeAirborne()
-
-        // Rest of your code in onCreate
-    }
-
-    private fun initializeAirborne() {
+        // Initialize Airborne
         try {
-            airborneInstance = Airborne(
+            airborne = Airborne(
                 this.applicationContext,
-                "https://example.com/airborne/release-config",
+                "https://airborne.sandbox.juspay.in/release/airborne-react-example/android",
                 object : AirborneInterface() {
+
                     override fun getNamespace(): String {
-                        return "example-new" // return your app's package name or some identifier of your app.
+                        return "airborne-example" // Your app id
                     }
 
                     override fun getDimensions(): HashMap<String, String> {
                         val map = HashMap<String, String>()
                         map.put("city", "bangalore")
                         return map
-                    }
-
-                    override fun getIndexBundlePath(): String {
-                        return "index.android.bundle" // return your react app's bundled index file name.
                     }
 
                     override fun getLazyDownloadCallback(): LazyDownloadCallback {
@@ -88,10 +97,6 @@ class MainApplication : Application(), ReactApplication {
                         }
                     }
 
-                    override fun startApp() {
-                        super.startApp()
-                    }
-
                     override fun onEvent(
                         level: String,
                         label: String,
@@ -100,15 +105,79 @@ class MainApplication : Application(), ReactApplication {
                         category: String,
                         subCategory: String
                     ) {
-                        // Logic to process ota events, for logging/analytics purpose.
+                        // Log the event
+                    }
+
+                    override fun startApp(indexPath: String) {
+                        isBootComplete = true
+                        bundlePath = indexPath
+                        bootCompleteListener?.invoke()
                     }
                 })
             Log.i("Airborne", "Airborne initialized successfully")
         } catch (e: Exception) {
             Log.e("Airborne", "Failed to initialize Airborne", e)
         }
+
+        SoLoader.init(this, OpenSourceMergedSoMapping)
     }
 }
+
+```
+
+### 3. Use AirborneReactActivityDelegate in MainActivity
+Return instance of AirborneReactActivityDelegate in the createReactActivityDelegate function.
+
+```kotlin
+import `in`.juspay.airborneplugin.AirborneReactActivityDelegate
+
+class MainActivity : ReactActivity() {
+
+  /**
+   * Returns the name of the main component registered from JavaScript. This is used to schedule
+   * rendering of the component.
+   */
+  override fun getMainComponentName(): String = "AirborneExample"
+
+  /**
+   * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]
+   * which allows you to enable New Architecture with a single boolean flags [fabricEnabled]
+   */
+  override fun createReactActivityDelegate(): ReactActivityDelegate =
+      AirborneReactActivityDelegate(this, mainComponentName, fabricEnabled)
+}
+```
+
+### Note: If your app has a native SplashActivity.
+If your app has a native `SplashActivity` before the `ReactActivity(MainActivity)` then you can listen to the `startApp` callback from the `AirborneInterface` to start the `ReactActivity`, In this case you have to listen to the `startApp` function from the `MainApplication` and start the `MainActivity` as shown in the below code snippet.
+Note that this step is applicable only if your has a splash activity in native.
+```kotlin
+class SplashActivity : AppCompatActivity() {
+    var hasBootCompleted = false
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.splash_screen)
+
+        if (applicationContext is MainApplication) {
+            (applicationContext as MainApplication).bootCompleteListener = {
+                startMainActivity()
+            }
+            if ((applicationContext as MainApplication).isBootComplete) {
+                startMainActivity()
+            }
+        }
+    }
+
+    private fun startMainActivity() {
+        synchronized(this) {
+            if (hasBootCompleted) return
+            hasBootCompleted = true
+        }
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
+    }
+}
+
 ```
 
 ## iOS Setup
@@ -189,15 +258,15 @@ After native initialization, you can use Airborne in your React Native code:
 import { readReleaseConfig, getFileContent, getBundlePath } from 'airborne-react-native';
 
 // Read release configuration
-const config = await readReleaseConfig();
+const config = await readReleaseConfig(namespace/appId);
 console.log('Release config:', JSON.parse(config));
 
 // Get file content from OTA bundle
-const content = await getFileContent('path/to/file.json');
+const content = await getFileContent(namespace/appId, 'path/to/file.json');
 console.log('File content:', content);
 
 // Get bundle path
-const bundlePath = await getBundlePath();
+const bundlePath = await getBundlePath(namespace/appId);
 console.log('Bundle path:', bundlePath);
 ```
 
@@ -219,7 +288,7 @@ All methods return promises that can be rejected with error codes:
 
 ```typescript
 try {
-    const config = await readReleaseConfig();
+    const config = await readReleaseConfig(namespace/appId);
     // Use config
 } catch (error) {
     console.error('Failed to read config:', error.message);

@@ -18,12 +18,13 @@ class SplashActivity : AppCompatActivity() {
                 startMainActivity()
             }
         }
-
     }
 
     private fun startMainActivity() {
-        if (hasBootCompleted) return
-        hasBootCompleted = true
+        synchronized(this) {
+            if (hasBootCompleted) return
+            hasBootCompleted = true
+        }
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
