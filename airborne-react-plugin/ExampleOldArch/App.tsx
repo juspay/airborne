@@ -20,7 +20,7 @@ function App(): React.JSX.Element {
     try {
       setLoading(true);
       setError('');
-      const config = await Airborne.readReleaseConfig();
+      const config = await Airborne.readReleaseConfig("airborne-example");
       setReleaseConfig(JSON.stringify(config, null, 2));
     } catch (e) {
       setError(`Failed to load release config: ${e}`);
@@ -33,7 +33,7 @@ function App(): React.JSX.Element {
     try {
       setLoading(true);
       setError('');
-      const path = await Airborne.getBundlePath();
+      const path = await Airborne.getBundlePath("airborne-example");
       setBundlePath(path);
     } catch (e) {
       setError(`Failed to get bundle path: ${e}`);

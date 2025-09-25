@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 abstract class AirborneInterface {
     open fun getNamespace(): String {
-        return "default"
+        return "airborne-example"
     }
 
     open fun getDimensions(): HashMap<String, String> {
