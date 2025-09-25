@@ -27,6 +27,7 @@ import {
 import { FileCreationModal } from "@/components/file-creation-modal";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
+import { hasAppAccess } from "@/lib/utils";
 
 type ApiFile = {
   id: string;
@@ -48,7 +49,7 @@ type ApiResponse = {
 };
 
 export default function FilesPage() {
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -193,9 +194,11 @@ export default function FilesPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Files</h1>
           <p className="text-muted-foreground mt-2">Manage your application assets and resources</p>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
-          Create File
-        </Button>
+        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+          <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
+            Create File
+          </Button>
+        )}
       </div>
 
       <Card className="mb-6">
@@ -283,19 +286,21 @@ export default function FilesPage() {
                         {f.created_at ? new Date(f.created_at).toLocaleString() : "—"}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => updateTag(f)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Update Tag
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => updateTag(f)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Update Tag
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

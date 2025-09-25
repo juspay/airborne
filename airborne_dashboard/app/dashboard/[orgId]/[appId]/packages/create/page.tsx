@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
+import { hasAppAccess } from "@/lib/utils";
+import { notFound } from "next/navigation";
 
 type ApiFile = { id?: string; file_path: string; url: string; version: number; tag?: string; size?: number };
 
@@ -34,7 +36,7 @@ type ApiResponse = {
 };
 
 export default function CreatePackagePage() {
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
   const totalSteps = 2;
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -53,6 +55,11 @@ export default function CreatePackagePage() {
   const router = useRouter();
 
   const perPage = 10;
+  useEffect(() => {
+    if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
+      notFound();
+    }
+  }, [loadingAccess]);
 
   // Data fetching for file lists
   const {

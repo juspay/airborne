@@ -26,7 +26,7 @@ use thiserror::Error;
 
 use crate::{
     middleware::auth::{
-        validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
+        validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ,
     },
     types::AppState,
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
@@ -88,11 +88,28 @@ pub fn add_routes() -> Scope {
 }
 
 // Request and Response Types
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+enum AccessLvl {
+    Admin,
+    Write,
+    Read,
+}
+
+impl AccessLvl {
+    fn as_str(&self) -> String {
+        match self {
+            Self::Admin => "admin".to_string(),
+            Self::Write => "write".to_string(),
+            Self::Read => "read".to_string(),
+        }
+    }
+}
 
 #[derive(Deserialize)]
 struct UserRequest {
     user: String,
-    access: String,
+    access: AccessLvl,
 }
 
 #[derive(Deserialize)]
@@ -129,7 +146,6 @@ struct UserContext {
 struct AppContext {
     org_name: String,
     app_name: String,
-    org_group_id: String,
     app_group_id: String,
 }
 
@@ -149,13 +165,19 @@ async fn get_app_context(
     // 1. User has some access to the organization (at least READ)
     // 2. User has the required access level to the application
 
-    // Ensure user has at least read access to the organization
-    let org_name = validate_user(auth.organisation.clone(), READ)
-        .map_err(|e| AppError::Unauthorized(e.to_string()))?;
-
-    // Check if user has the required application-level access
-    let app_name = validate_user(auth.application.clone(), required_level)
-        .map_err(|e| AppError::Unauthorized(e.to_string()))?;
+    let (org_name, app_name) = match validate_user(auth.organisation.clone(), ADMIN) {
+        Ok(org_name) => auth
+            .application
+            .clone()
+            .ok_or_else(|| AppError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth.organisation.clone(), READ)
+            .and_then(|org_name| {
+                validate_user(auth.application.clone(), required_level)
+                    .map(|app_name| (org_name, app_name))
+            })
+            .map_err(|e| AppError::Unauthorized(e.to_string())),
+    }?;
 
     // For application admin operations, application-level permissions take precedence
     // over organization-level permissions
@@ -166,7 +188,6 @@ async fn get_app_context(
                 AppContext {
                     org_name: org_name.clone(),
                     app_name: app_name.clone(),
-                    org_group_id: String::new(), // Will be filled by find_application
                     app_group_id: String::new(), // Will be filled by find_application
                 },
                 auth,
@@ -183,7 +204,6 @@ async fn get_app_context(
         AppContext {
             org_name: org_name.clone(),
             app_name: app_name.clone(),
-            org_group_id: String::new(), // Will be filled by find_application
             app_group_id: String::new(), // Will be filled by find_application
         },
         auth,
@@ -264,7 +284,6 @@ async fn find_application(
     Ok(AppContext {
         org_name: org_name.to_string(),
         app_name: app_name.to_string(),
-        org_group_id,
         app_group_id,
     })
 }
@@ -278,7 +297,7 @@ async fn application_add_user(
     let body = body.into_inner();
 
     // Get application context and validate requester's permissions
-    let (mut app_context, auth) = get_app_context(&req, WRITE, "add user").await?;
+    let (mut app_context, auth) = get_app_context(&req, ADMIN, "add user").await?;
     let requester_id = &auth.sub;
 
     // Prepare Keycloak admin client
@@ -287,21 +306,7 @@ async fn application_add_user(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Validate access level (only admin, write, read for applications)
-    let (role_name, role_level) = validate_access_level(&body.access)?;
-
-    // Additional permission check for admin assignments
-    if role_level >= ADMIN.access {
-        if let Some(app_access) = &auth.application {
-            if app_access.level < ADMIN.access {
-                return Err(AppError::PermissionDenied(
-                    "Admin permission required to assign admin roles".into(),
-                )
-                .into());
-            }
-        } else {
-            return Err(AppError::Unauthorized("No application access".to_string()).into());
-        }
-    }
+    let (role_name, _role_level) = validate_access_level(&body.access.as_str())?;
 
     // Find target user and application in parallel
     let (target_user, filled_app_context) = tokio::join!(
@@ -360,7 +365,7 @@ async fn application_update_user(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Validate the requested access level
-    let (role_name, _access_level) = validate_access_level(&request.access)?;
+    let (role_name, _access_level) = validate_access_level(&request.access.as_str())?;
 
     // Find target user and application
     let target_user = find_target_user(&admin, &realm, &request.user).await?;

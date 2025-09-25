@@ -12,6 +12,7 @@ import { Search, Edit, Filter, PlugIcon as PkgIcon, Rocket, Plus } from "lucide-
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
+import { hasAppAccess } from "@/lib/utils";
 
 type ApiPackage = {
   index: string;
@@ -23,7 +24,7 @@ type ApiPackage = {
 export default function PackagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
 
   const { data } = useSWR(token && org && app ? ["/packages/list", searchQuery] : null, async () =>
     apiFetch<any>("/packages/list", { query: { offset: 0, limit: 50 } }, { token, org, app })
@@ -42,12 +43,14 @@ export default function PackagesPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Packages</h1>
           <p className="text-muted-foreground mt-2">Bundle files together with properties and metadata</p>
         </div>
-        <Button asChild className="gap-2">
-          <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}>
-            <Plus className="h-4 w-4" />
-            Create Package
-          </Link>
-        </Button>
+        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+          <Button asChild className="gap-2">
+            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}>
+              <Plus className="h-4 w-4" />
+              Create Package
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

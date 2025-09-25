@@ -11,9 +11,10 @@ import { useAppContext } from "@/providers/app-context";
 import useSWR from "swr";
 import { apiFetch } from "@/lib/api";
 import { ApiRelease } from "./releases/page";
+import { hasAppAccess } from "@/lib/utils";
 
 export default function ApplicationDetailPage() {
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
   const { data } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
     apiFetch<any>("/releases/list", {}, { token, org, app })
   );
@@ -38,16 +39,18 @@ export default function ApplicationDetailPage() {
                 <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)]">{app}</h1>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button asChild>
-                <Link
-                  href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
-                >
-                  <Rocket className="h-4 w-4 mr-2" />
-                  Create Release
-                </Link>
-              </Button>
-            </div>
+            {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+              <div className="flex gap-2">
+                <Button asChild>
+                  <Link
+                    href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
+                  >
+                    <Rocket className="h-4 w-4 mr-2" />
+                    Create Release
+                  </Link>
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Stats Cards */}

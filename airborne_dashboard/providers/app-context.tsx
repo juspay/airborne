@@ -3,7 +3,16 @@
 import { apiFetch } from "@/lib/api";
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 
+interface Organisations {
+  name: string;
+  applications: { application: string; organisation: string; access: string[] }[];
+  access: string[];
+}
+interface OrganisationsList {
+  organisations: Organisations[];
+}
 type User = { name: string; user_id?: string } | null;
 
 type AppContextType = {
@@ -19,6 +28,11 @@ type AppContextType = {
   logout: () => void;
   signOut: () => void; // add alias for compatibility
   config: Configuration | null;
+  organisations: Organisations[];
+  getOrgAccess: (orgName: string | null) => string[];
+  getAppAccess: (orgName: string | null, appName: string | null) => string[];
+  updateOrgs: () => Promise<OrganisationsList | undefined>;
+  loadingAccess: boolean;
 };
 
 interface Configuration {
@@ -40,11 +54,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<User>(null);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<Configuration | null>(null);
-
   const fetchConfig = async () => {
     const res: Configuration = await apiFetch("/dashboard/configuration");
     setConfig(res);
   };
+
+  const fetchOrganisations = async () => {
+    if (!token) return { organisations: [] };
+    return await apiFetch<OrganisationsList>("/organisations", {}, { token });
+  };
+
+  const { data, mutate, isLoading } = useSWR<OrganisationsList>(token ? "/organisations" : null, fetchOrganisations);
+
+  const organisations = data?.organisations || [];
 
   useEffect(() => {
     setTokenState(localStorage.getItem(LS_TOKEN));
@@ -86,6 +108,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") window.location.href = "/login";
   };
 
+  const getOrgAccess = (orgName: string | null) => {
+    if (!orgName) return [];
+    const orgObj = organisations.find((o) => o.name === orgName);
+    return orgObj ? orgObj.access : [];
+  };
+
+  const getAppAccess = (orgName: string | null, appName: string | null) => {
+    if (!orgName || !appName) return [];
+    const orgObj = organisations.find((o) => o.name === orgName);
+    if (!orgObj) return [];
+    const appObj = orgObj.applications.find((a) => a.application === appName);
+    return appObj ? appObj.access : [];
+  };
+
   const value = useMemo(
     () => ({
       loading,
@@ -100,8 +136,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logout,
       signOut: logout, // add alias for compatibility
       config,
+      organisations,
+      getOrgAccess,
+      getAppAccess,
+      updateOrgs: mutate,
+      loadingAccess: isLoading,
     }),
-    [token, org, app, user, loading, config]
+    [token, org, app, user, loading, config, organisations, mutate, isLoading]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
