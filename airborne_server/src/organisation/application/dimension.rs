@@ -6,7 +6,7 @@ use actix_web::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    middleware::auth::{validate_user, AuthResponse, WRITE},
+    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     run_blocking,
     types::{ABError, AppState},
     utils::{
@@ -125,10 +125,17 @@ async fn create_dimension_api(
     state: web::Data<AppState>,
 ) -> Result<Json<CreateDimensionResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -203,10 +210,17 @@ async fn list_dimensions_api(
     state: web::Data<AppState>,
 ) -> Result<Json<ListDimensionsResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -264,10 +278,17 @@ async fn update_dimension_api(
     state: web::Data<AppState>,
 ) -> Result<Json<Dimension>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -312,10 +333,17 @@ async fn delete_dimension_api(
     state: web::Data<AppState>,
 ) -> Result<Json<()>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -346,10 +374,17 @@ async fn create_release_view_api(
     state: web::Data<AppState>,
 ) -> Result<Json<ReleaseView>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
@@ -441,10 +476,17 @@ async fn list_release_views_api(
     state: web::Data<AppState>,
 ) -> Result<Json<ListReleaseViewsResponse>, actix_web::Error> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to app".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let page = query.page.unwrap_or(1).max(1);
     let count = query.count.unwrap_or(20);
@@ -495,10 +537,17 @@ async fn get_release_view_api(
     state: web::Data<AppState>,
 ) -> Result<Json<ReleaseView>, actix_web::Error> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to app".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
     let view_id_str = path.into_inner();
 
     let view_id = Uuid::parse_str(&view_id_str)
@@ -538,10 +587,17 @@ async fn update_release_view_api(
     state: web::Data<AppState>,
 ) -> Result<Json<ReleaseView>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to app".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
     let view_id_str = path.into_inner();
 
     let view_id = Uuid::parse_str(&view_id_str)
@@ -641,10 +697,17 @@ async fn delete_release_view_api(
     state: web::Data<AppState>,
 ) -> Result<Json<DeleteReleaseViewResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
     let view_id_str = path.into_inner();
 
     let view_id = Uuid::parse_str(&view_id_str)

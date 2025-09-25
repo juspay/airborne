@@ -103,10 +103,27 @@ pub fn add_routes() -> Scope {
 
 // Request and Response Types
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+enum AccessLvl {
+    Admin,
+    Write,
+    Read,
+}
+
+impl AccessLvl {
+    fn as_str(&self) -> String {
+        match self {
+            Self::Admin => "admin".to_string(),
+            Self::Write => "write".to_string(),
+            Self::Read => "read".to_string(),
+        }
+    }
+}
 #[derive(Deserialize)]
 struct UserRequest {
     user: String,
-    access: String,
+    access: AccessLvl,
 }
 
 #[derive(Deserialize)]
@@ -260,7 +277,7 @@ async fn organisation_add_user(
         .map_err(|e| OrgError::Internal(e.to_string()))?;
 
     // Validate access level
-    let (role_name, role_level) = validate_access_level(&body.access)?;
+    let (role_name, role_level) = validate_access_level(&body.access.as_str())?;
 
     // Additional permission check for admin/owner assignments
     if role_level >= ADMIN.access {
@@ -332,7 +349,7 @@ async fn organisation_update_user(
         .map_err(|e| OrgError::Internal(e.to_string()))?;
 
     // Validate the requested access level
-    let (role_name, _access_level) = validate_access_level(&request.access)?;
+    let (role_name, _access_level) = validate_access_level(&request.access.as_str())?;
 
     // Find target user and organization
     let target_user = find_target_user(&admin, &realm, &request.user).await?;

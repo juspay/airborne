@@ -9,6 +9,7 @@ import { useAppContext } from "@/providers/app-context";
 import EditReleaseView from "@/components/releaseViews/EditReleaseView";
 import DeleteReleaseView from "@/components/releaseViews/DeleteReleaseView";
 import ViewReleaseInfo from "@/components/releaseViews/ViewReleaseInfo";
+import { hasAppAccess } from "@/lib/utils";
 
 export type View = {
   id: string;
@@ -26,7 +27,7 @@ type ReleaseViewListResponse = {
 };
 
 export default function ViewsPage() {
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
 
   const [viewsList, setViewsList] = useState<View[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -133,7 +134,9 @@ export default function ViewsPage() {
               </h1>
               <p className="text-muted-foreground mt-2">Create and manage custom filtered views for your dashboard</p>
             </div>
-            <CreateReleaseView onViewCreated={onViewCreated} />
+            {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+              <CreateReleaseView onViewCreated={onViewCreated} />
+            )}
           </div>
 
           <Card>

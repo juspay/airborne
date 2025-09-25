@@ -22,8 +22,8 @@ import {
 import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
-import { useRouter } from "next/navigation";
-import { parseFileRef } from "@/lib/utils";
+import { notFound, useRouter } from "next/navigation";
+import { hasAppAccess, parseFileRef } from "@/lib/utils";
 import Link from "next/link";
 import { toastWarning } from "@/hooks/use-toast";
 import { ApiRelease } from "../page";
@@ -72,10 +72,16 @@ export default function CreateReleasePage() {
   const [resourceSearch, setResourceSearch] = useState("");
   const [resourceCurrentPage, setResourceCurrentPage] = useState(1);
 
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
 
   const router = useRouter();
   const perPage = 50;
+
+  useEffect(() => {
+    if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
+      notFound();
+    }
+  }, [loadingAccess]);
 
   // Load packages list
   useEffect(() => {

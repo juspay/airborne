@@ -27,7 +27,7 @@ use superposition_sdk::operation::create_default_config::CreateDefaultConfigOutp
 use superposition_sdk::types::WorkspaceStatus;
 use superposition_sdk::Client;
 
-use crate::middleware::auth::{validate_user, AuthResponse, WRITE};
+use crate::middleware::auth::{validate_user, AuthResponse, ADMIN};
 use crate::types::{ABError, AppState};
 use crate::utils::document::value_to_document;
 use diesel::RunQueryDsl;
@@ -143,10 +143,10 @@ async fn add_application(
     let organisation = auth_response.organisation;
 
     info!("Validating organisation: {:?}", organisation);
-    let organisation = validate_user(organisation, WRITE).map_err(|e| {
+    let organisation = validate_user(organisation, ADMIN).map_err(|e| {
         info!("Error validating organisation: {:?}", e);
         ABError::Unauthorized(format!(
-            "User does not have WRITE access to organisation: {}",
+            "User does not have ADMIN access to organisation: {}",
             e
         ))
     })?;

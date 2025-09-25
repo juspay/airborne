@@ -12,6 +12,7 @@ import { Search, Filter, Plus } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
+import { hasAppAccess } from "@/lib/utils";
 
 export type ApiRelease = {
   id: string;
@@ -27,7 +28,7 @@ export type ApiRelease = {
 export default function ReleasesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
 
   const { data } = useSWR(token && org && app ? ["/releases/list", searchQuery] : null, async () =>
     apiFetch<any>("/releases/list", {}, { token, org, app })
@@ -40,12 +41,14 @@ export default function ReleasesPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Releases</h1>
           <p className="text-muted-foreground mt-2">Deploy packages to your users with controlled rollouts</p>
         </div>
-        <Button asChild className="gap-2">
-          <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}>
-            <Plus className="h-4 w-4" />
-            New Release
-          </Link>
-        </Button>
+        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+          <Button asChild className="gap-2">
+            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}>
+              <Plus className="h-4 w-4" />
+              New Release
+            </Link>
+          </Button>
+        )}
       </div>
 
       <Card className="mb-6">

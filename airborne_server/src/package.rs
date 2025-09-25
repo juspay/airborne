@@ -1,6 +1,5 @@
 pub mod utils;
 use crate::{
-    middleware::auth::READ,
     package::{types::*, utils::parse_package_key},
     run_blocking,
     types::ABError,
@@ -26,7 +25,7 @@ use actix_web::{
 
 use crate::{
     file::utils::parse_file_key,
-    middleware::auth::{validate_user, AuthResponse, WRITE},
+    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     types::AppState,
 };
 use diesel::expression::BoxableExpression;
@@ -51,10 +50,17 @@ async fn create_package(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -150,36 +156,42 @@ async fn get_package(
     }
 
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
-    let pool = state.db_pool.clone();
+    let mut conn = state
+        .db_pool
+        .get()
+        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
 
-    let package = run_blocking!({
-        let mut conn = pool.get()?;
-
-        if let Some(pkg_tag) = opt_pkg_tag {
-            let result = packages_table
-                .filter(package_org_id.eq(&organisation))
-                .filter(package_app_id.eq(&application))
-                .filter(package_tag.eq(&pkg_tag))
-                .select(PackageV2Entry::as_select())
-                .first::<PackageV2Entry>(&mut conn)?;
-            Ok(result)
-        } else if let Some(pkg_version) = opt_pkg_version {
-            let result = packages_table
-                .filter(package_org_id.eq(&organisation))
-                .filter(package_app_id.eq(&application))
-                .filter(package_version.eq(&pkg_version))
-                .select(PackageV2Entry::as_select())
-                .first::<PackageV2Entry>(&mut conn)?;
-            Ok(result)
-        } else {
-            Err(ABError::BadRequest("Bad format for package id".to_string()))
-        }
-    })?;
+    let package = if let Some(pkg_tag) = opt_pkg_tag {
+        packages_table
+            .filter(package_org_id.eq(&organisation))
+            .filter(package_app_id.eq(&application))
+            .filter(package_tag.eq(&pkg_tag))
+            .select(PackageV2Entry::as_select())
+            .first::<PackageV2Entry>(&mut conn)
+            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
+    } else if let Some(pkg_version) = opt_pkg_version {
+        packages_table
+            .filter(package_org_id.eq(&organisation))
+            .filter(package_app_id.eq(&application))
+            .filter(package_version.eq(&pkg_version))
+            .select(PackageV2Entry::as_select())
+            .first::<PackageV2Entry>(&mut conn)
+            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
+    } else {
+        return Err(ABError::BadRequest("Bad format for package id".to_string()));
+    };
     Ok(HttpResponse::Ok().json(utils::db_response_to_package(package)))
 }
 
@@ -190,11 +202,19 @@ async fn list_packages(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let ListPackagesInput { offset, limit } = input.into_inner();
-    let auth = auth_response.into_inner();
-    let organisation = validate_user(auth.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth.application, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
+
     // sanitize / defaults
     let offset_val = offset.unwrap_or(0).max(0) as i64;
     let limit_val = limit.unwrap_or(10).clamp(1, 100) as i64; // default 10, max 100
