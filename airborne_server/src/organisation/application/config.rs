@@ -26,6 +26,7 @@ use serde_json::json;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, WRITE},
+    run_blocking,
     types::{ABError, AppState},
     utils::db::{
         models::ConfigEntry, schema::hyperotaserver::configs::dsl::configs as configs_table,
@@ -78,63 +79,66 @@ async fn create_config_json_v1(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
+    let pool = state.db_pool.clone();
+    let request = req.into_inner();
 
-    // Find the package version to associate with the config
-    let latest_version = crate::utils::db::schema::hyperotaserver::packages::dsl::packages
-        .filter(
-            crate::utils::db::schema::hyperotaserver::packages::dsl::org_id
-                .eq(&organisation)
-                .and(
-                    crate::utils::db::schema::hyperotaserver::packages::dsl::app_id
-                        .eq(&application),
-                ),
-        )
-        .select(diesel::dsl::max(
-            crate::utils::db::schema::hyperotaserver::packages::dsl::version,
-        ))
-        .first::<Option<i32>>(&mut conn)
-        .map_err(|_| ABError::DbError("".to_string()))?;
+    let (ver, config_version) = run_blocking!({
+        let mut conn = pool.get()?;
 
-    let ver = latest_version.unwrap_or(0);
+        // Find the package version to associate with the config
+        let latest_version = crate::utils::db::schema::hyperotaserver::packages::dsl::packages
+            .filter(
+                crate::utils::db::schema::hyperotaserver::packages::dsl::org_id
+                    .eq(&organisation)
+                    .and(
+                        crate::utils::db::schema::hyperotaserver::packages::dsl::app_id
+                            .eq(&application),
+                    ),
+            )
+            .select(diesel::dsl::max(
+                crate::utils::db::schema::hyperotaserver::packages::dsl::version,
+            ))
+            .first::<Option<i32>>(&mut conn)?;
 
-    // Extract tenant_info, either from specific field or from properties
-    let tenant_info = req
-        .tenant_info
-        .clone()
-        .or_else(|| {
-            req.config
-                .properties
-                .get("tenant_info")
-                .and_then(|v| v.as_object())
-                .map(|obj| json!(obj))
-        })
-        .unwrap_or_else(|| json!({}));
+        let ver = latest_version.unwrap_or(0);
 
-    // Extract properties
-    let properties = req.properties.clone().unwrap_or_else(|| json!({}));
+        // Extract tenant_info, either from specific field or from properties
+        let tenant_info = request
+            .tenant_info
+            .clone()
+            .or_else(|| {
+                request
+                    .config
+                    .properties
+                    .get("tenant_info")
+                    .and_then(|v| v.as_object())
+                    .map(|obj| json!(obj))
+            })
+            .unwrap_or_else(|| json!({}));
 
-    // Store config data
-    diesel::insert_into(configs_table)
-        .values(ConfigEntry {
-            org_id: organisation,
-            app_id: application,
-            version: ver,
-            config_version: req.config.version.clone(),
-            release_config_timeout: req.config.release_config_timeout,
-            package_timeout: req.config.boot_timeout,
-            tenant_info,
-            properties,
-        })
-        .execute(&mut conn)
-        .map_err(|_| ABError::DbError("".to_string()))?;
+        // Extract properties
+        let properties = request.properties.clone().unwrap_or_else(|| json!({}));
+
+        // Store config data
+        diesel::insert_into(configs_table)
+            .values(ConfigEntry {
+                org_id: organisation.clone(),
+                app_id: application.clone(),
+                version: ver,
+                config_version: request.config.version.clone(),
+                release_config_timeout: request.config.release_config_timeout,
+                package_timeout: request.config.boot_timeout,
+                tenant_info,
+                properties,
+            })
+            .execute(&mut conn)?;
+
+        Ok((ver, request.config.version.clone()))
+    })?;
 
     Ok(Json(Response {
         version: ver,
-        config_version: req.config.version.clone(),
+        config_version,
     }))
 }
 
@@ -154,10 +158,7 @@ async fn create_config_json_v1_multipart(
     let req: ConfigJsonV1Request = serde_json::from_str(&form.json.into_inner())
         .map_err(|e| ABError::BadRequest(format!("Invalid JSON: {}", e)))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::DbError("Connection failure".to_string()))?;
+    let mut conn = state.db_pool.get()?;
 
     // Find the package version to associate with the config
     let latest_version = crate::utils::db::schema::hyperotaserver::packages::dsl::packages
@@ -172,8 +173,7 @@ async fn create_config_json_v1_multipart(
         .select(diesel::dsl::max(
             crate::utils::db::schema::hyperotaserver::packages::dsl::version,
         ))
-        .first::<Option<i32>>(&mut conn)
-        .map_err(|_| ABError::DbError("".to_string()))?;
+        .first::<Option<i32>>(&mut conn)?;
 
     let ver = latest_version.unwrap_or(0);
 
@@ -205,8 +205,7 @@ async fn create_config_json_v1_multipart(
             tenant_info,
             properties,
         })
-        .execute(&mut conn)
-        .map_err(|_| ABError::DbError("".to_string()))?;
+        .execute(&mut conn)?;
 
     Ok(Json(Response {
         version: ver,

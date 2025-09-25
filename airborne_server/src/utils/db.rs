@@ -7,6 +7,7 @@ use diesel::Connection;
 use crate::utils::kms::decrypt_kms;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool};
+use log::info;
 use std::env;
 use urlencoding::encode;
 
@@ -49,7 +50,7 @@ pub async fn establish_pool(kms_client: &Client) -> DbPool {
         .parse()
         .expect("DATABASE_POOL_SIZE must be a valid number");
 
-    println!(
+    info!(
         "Creating database pool with max_connections: {}",
         max_connections
     );
@@ -60,8 +61,8 @@ pub async fn establish_pool(kms_client: &Client) -> DbPool {
         Ok(pool) => {
             // Test the connection
             match pool.get() {
-                Ok(_) => println!("Successfully connected to the database"),
-                Err(e) => println!("Warning: Could not get a test connection: {}", e),
+                Ok(_) => info!("Successfully connected to the database"),
+                Err(e) => info!("Warning: Could not get a test connection: {}", e),
             }
             pool
         }

@@ -21,6 +21,7 @@ use actix_web::{post, web};
 use aws_smithy_types::Document;
 use keycloak::types::GroupRepresentation;
 use keycloak::KeycloakAdmin;
+use log::info;
 use serde::{Deserialize, Serialize};
 use superposition_sdk::operation::create_default_config::CreateDefaultConfigOutput;
 use superposition_sdk::types::WorkspaceStatus;
@@ -141,32 +142,29 @@ async fn add_application(
 
     let organisation = auth_response.organisation;
 
-    println!("Validating organisation: {:?}", organisation);
+    info!("Validating organisation: {:?}", organisation);
     let organisation = validate_user(organisation, WRITE).map_err(|e| {
-        println!("Error validating organisation: {:?}", e);
+        info!("Error validating organisation: {:?}", e);
         ABError::Unauthorized(format!(
             "User does not have WRITE access to organisation: {}",
             e
         ))
     })?;
-    println!("Organisation validated successfully.");
+    info!("Organisation validated successfully.");
 
     // Create a transaction manager to track resources
     let transaction = TransactionManager::new(&application, "application_create");
 
     // Get DB connection
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|e| ABError::DbError(format!("Failed to get database connection: {}", e)))?;
+    let mut conn = state.db_pool.get()?;
 
     // Get Keycloak Admin Token
     let client = reqwest::Client::new();
     let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
-        println!("Error retrieving Keycloak admin token: {:?}", e);
+        info!("Error retrieving Keycloak admin token: {:?}", e);
         ABError::Unauthorized(format!("Error retrieving Keycloak admin token: {}", e))
     })?;
-    println!("Admin token retrieved successfully.");
+    info!("Admin token retrieved successfully.");
     let client = reqwest::Client::new();
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
     let realm = state.env.realm.clone();
@@ -226,7 +224,7 @@ async fn add_application(
                 let group_id = id.unwrap_or_default();
                 // Record this resource in the transaction
                 transaction.add_keycloak_group(&group_id);
-                println!("Created application group with ID: {}", group_id);
+                info!("Created application group with ID: {}", group_id);
                 group_id
             }
             Err(e) => {
@@ -256,7 +254,7 @@ async fn add_application(
                     let role_group_id = id.unwrap_or_default();
                     // Record this resource in the transaction
                     transaction.add_keycloak_group(&role_group_id);
-                    println!("Created role group {} with ID: {}", role, role_group_id);
+                    info!("Created role group {} with ID: {}", role, role_group_id);
 
                     // Add the user to the role-specific group
                     match admin
@@ -273,7 +271,7 @@ async fn add_application(
                                 "user_group_membership",
                                 &format!("{}:{}", sub, role_group_id),
                             );
-                            println!("Added user to role group: {}", role);
+                            info!("Added user to role group: {}", role);
                         }
                         Err(e) => {
                             // Handle rollback and return error
@@ -281,7 +279,7 @@ async fn add_application(
                                 .handle_rollback_if_needed(&admin, &realm, &state)
                                 .await
                             {
-                                println!("Rollback failed: {}", rollback_err);
+                                info!("Rollback failed: {}", rollback_err);
                             }
 
                             return Err(ABError::InternalServerError(format!(
@@ -297,7 +295,7 @@ async fn add_application(
                         .handle_rollback_if_needed(&admin, &realm, &state)
                         .await
                     {
-                        println!("Rollback failed: {}", rollback_err);
+                        info!("Rollback failed: {}", rollback_err);
                     }
 
                     return Err(ABError::InternalServerError(format!(
@@ -316,7 +314,7 @@ async fn add_application(
         };
 
         let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-        println!(
+        info!(
             "Using Superposition Org ID from environment: {}",
             superposition_org_id_from_env
         );
@@ -356,7 +354,7 @@ async fn add_application(
             Ok(workspace) => {
                 // Record Superposition resource using workspace name as the ID
                 transaction.set_superposition_resource(&workspace.workspace_name);
-                println!("Created workspace in Superposition: {:?}", workspace);
+                info!("Created workspace in Superposition: {:?}", workspace);
                 workspace
             }
             Err(e) => {
@@ -365,7 +363,7 @@ async fn add_application(
                     .handle_rollback_if_needed(&admin, &realm, &state)
                     .await
                 {
-                    println!("Rollback failed: {}", rollback_err);
+                    info!("Rollback failed: {}", rollback_err);
                 }
 
                 return Err(ABError::InternalServerError(format!(
@@ -411,7 +409,7 @@ async fn add_application(
         {
             match create_fn.await {
                 Ok(result) => {
-                    println!("Created configuration for key: {}", key);
+                    info!("Created configuration for key: {}", key);
                     Ok(result)
                 }
                 Err(e) => {
@@ -420,7 +418,7 @@ async fn add_application(
                         .handle_rollback_if_needed(admin, realm, state)
                         .await
                     {
-                        println!("Rollback failed: {}", rollback_err);
+                        info!("Rollback failed: {}", rollback_err);
                     }
 
                     Err(error::ErrorInternalServerError(format!(
@@ -492,7 +490,7 @@ async fn add_application(
         .await
         .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
 
-        println!(
+        info!(
             "Creating default configuration (string): key=package.name, value={}",
             generated_workspace_name
         );

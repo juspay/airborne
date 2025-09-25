@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::types::ABError;
+use crate::{run_blocking, types::ABError, utils::workspace::get_workspace_name_for_application};
 use actix_web::{
     error, get, post,
     web::{self, Json, Path},
@@ -22,6 +22,7 @@ use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use http::{uri::PathAndQuery, Uri};
+use log::info;
 use rand::Rng;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -35,10 +36,7 @@ use crate::{
     package::utils::parse_package_key,
     release::{types::*, utils::value_to_document},
     types::AppState,
-    utils::{
-        db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
-        workspace::get_workspace_name_for_application,
-    },
+    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
 };
 
 mod types;
@@ -77,14 +75,14 @@ async fn get_release(
     let application = validate_user(auth_response.application, READ)
         .map_err(|_| ABError::Unauthorized("".to_string()))?;
 
-    let mut conn = state.db_pool.get().map_err(|_| {
-        ABError::InternalServerError("Failed to get database connection".to_string())
-    })?;
-
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|_| ABError::InternalServerError("Failed to get workspace name".to_string()))?;
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|_| ABError::InternalServerError("Failed to get workspace name".to_string()))?;
 
     let exp_details = state
         .superposition_client
@@ -95,7 +93,7 @@ async fn get_release(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("Failed to get experiment details: {:?}", e);
+            info!("Failed to get experiment details: {:?}", e);
             ABError::NotFound("Release/Experiment not found".to_string())
         })?;
 
@@ -142,8 +140,13 @@ async fn get_release(
             .cloned()
             .collect::<Vec<String>>();
 
-        let files_result =
-            utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
+        let files_result = utils::get_files_by_file_keys_async(
+            state.db_pool.clone(),
+            organisation.clone(),
+            application.clone(),
+            all_files,
+        )
+        .await;
 
         if let Ok(files) = files_result {
             let important_files: Vec<ServeFile> = rc_package_important
@@ -160,7 +163,7 @@ async fn get_release(
                         })
                 })
                 .collect();
-            println!("Important files: {:?}", important_files);
+            info!("Important files: {:?}", important_files);
 
             let lazy_files: Vec<ServeFile> = rc_package_lazy
                 .iter()
@@ -209,7 +212,7 @@ async fn get_release(
                     })
             };
 
-            println!("Lazy files: {:?}", lazy_files);
+            info!("Lazy files: {:?}", lazy_files);
 
             (index_file, important_files, lazy_files, resource_files)
         } else {
@@ -293,20 +296,18 @@ async fn create_release(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("".to_string()))?;
 
-    let mut conn = state.db_pool.get().map_err(|_| {
-        ABError::InternalServerError("Failed to get database connection".to_string())
-    })?;
-
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
     let dims1 = dimensions.clone();
-    println!("Dimensions: {:?}", serde_json::json!(dimensions));
+    info!("Dimensions: {:?}", serde_json::json!(dimensions));
 
     let resolved_config_builder = dims1.iter().fold(
         state
@@ -324,15 +325,15 @@ async fn create_release(
     );
 
     let resolved_config = resolved_config_builder.send().await;
-    println!("resolved config result: {:?}", resolved_config);
+    info!("resolved config result: {:?}", resolved_config);
 
     let config_document = match resolved_config {
         Ok(config) => {
-            println!("config from superposition: {:?}", config);
+            info!("config from superposition: {:?}", config);
             config.config
         }
         Err(e) => {
-            println!("Failed to get resolved config: {}", e);
+            info!("Failed to get resolved config: {}", e);
             None
         }
     };
@@ -373,18 +374,25 @@ async fn create_release(
             ));
         }
         if !opt_pkg_version_from_config.is_some() {
-            packages_dsl::packages_v2
-                .filter(
-                    packages_dsl::org_id
-                        .eq(&organisation)
-                        .and(packages_dsl::app_id.eq(&application)),
-                )
-                .order_by(packages_dsl::version.desc())
-                .select(packages_dsl::version)
-                .first::<i32>(&mut conn)
-                .map_err(|_| {
-                    ABError::NotFound("No packages found for this application".to_string())
-                })?
+            let pool = state.db_pool.clone();
+            let org = organisation.clone();
+            let app = application.clone();
+
+            run_blocking!({
+                let mut conn = pool.get()?;
+                packages_dsl::packages_v2
+                    .filter(
+                        packages_dsl::org_id
+                            .eq(&org)
+                            .and(packages_dsl::app_id.eq(&app)),
+                    )
+                    .order_by(packages_dsl::version.desc())
+                    .select(packages_dsl::version)
+                    .first::<i32>(&mut conn)
+                    .map_err(|_| {
+                        ABError::NotFound("No packages found for this application".to_string())
+                    })
+            })?
         } else {
             let version = opt_pkg_version_from_config
                 .as_ref()
@@ -397,16 +405,27 @@ async fn create_release(
         }
     };
 
-    let package_data = packages_dsl::packages_v2
-        .filter(
-            packages_dsl::org_id
-                .eq(&organisation)
-                .and(packages_dsl::app_id.eq(&application))
-                .and(packages_dsl::version.eq(pkg_version)),
-        )
-        .select(PackageV2Entry::as_select())
-        .first::<PackageV2Entry>(&mut conn)
-        .map_err(|_| ABError::NotFound(format!("Package version {} not found", pkg_version)))?;
+    let package_data = {
+        let pool = state.db_pool.clone();
+        let org = organisation.clone();
+        let app = application.clone();
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            packages_dsl::packages_v2
+                .filter(
+                    packages_dsl::org_id
+                        .eq(&org)
+                        .and(packages_dsl::app_id.eq(&app))
+                        .and(packages_dsl::version.eq(pkg_version)),
+                )
+                .select(PackageV2Entry::as_select())
+                .first::<PackageV2Entry>(&mut conn)
+                .map_err(|_| {
+                    ABError::NotFound(format!("Package version {} not found", pkg_version))
+                })
+        })?
+    };
 
     // check any resources don't overlap with important or lazy
     let check_resource_duplicacy = |resources: &Vec<String>| -> bool {
@@ -518,7 +537,7 @@ async fn create_release(
             )
         };
 
-    println!(
+    info!(
         "Final: {:?}",
         (
             final_important.clone(),
@@ -535,11 +554,14 @@ async fn create_release(
         .chain(vec![package_data.index.clone()])
         .collect::<Vec<String>>();
 
-    let files =
-        utils::get_files_by_file_keys(&mut conn, &organisation, &application, &combined_files)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to get files by keys: {}", e))
-            })?;
+    let files = utils::get_files_by_file_keys_async(
+        state.db_pool.clone(),
+        organisation.clone(),
+        application.clone(),
+        combined_files.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get files by keys: {}", e)))?;
 
     if files.len() != combined_files.len() {
         return Err(ABError::InternalServerError(
@@ -710,8 +732,8 @@ async fn create_release(
         experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
     }
 
-    println!("Control overrides: {:?}", control_overrides);
-    println!("Experimental overrides: {:?}", experimental_overrides);
+    info!("Control overrides: {:?}", control_overrides);
+    info!("Experimental overrides: {:?}", experimental_overrides);
 
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
@@ -757,7 +779,7 @@ async fn create_release(
     ));
 
     let created_experiment_response = created_experiment_response.send().await.map_err(|e| {
-        eprintln!("Failed to create experiment: {:?}", e);
+        info!("Failed to create experiment: {:?}", e);
         ABError::InternalServerError("Failed to create experiment in Superposition".to_string())
     })?;
 
@@ -774,7 +796,7 @@ async fn create_release(
     if is_first_release {
         // For first ever release -> Directly conclude the experiment to make it live
         let transformed_variant_id = format!("{}-experimental_1", experiment_id_for_ramping);
-        println!(
+        info!(
             "Concluding first release experiment with variant id: {}",
             transformed_variant_id
         );
@@ -798,7 +820,7 @@ async fn create_release(
             .send()
             .await
             .map_err(|e| {
-                eprintln!("Failed to conclude first release experiment: {:?}", e);
+                info!("Failed to conclude first release experiment: {:?}", e);
                 error::ErrorInternalServerError("Failed to conclude experiment".to_string())
             });
     }
@@ -816,7 +838,7 @@ async fn create_release(
     )
     .await
     {
-        println!("Failed to invalidate CloudFront cache: {:?}", e);
+        info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
     Ok(Json(CreateReleaseResponse {
@@ -924,17 +946,14 @@ async fn list_releases(
     let application = validate_user(auth_response.application, READ)
         .map_err(|_| ABError::Unauthorized("".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
     let context: HashMap<String, Value> = req
         .headers()
@@ -953,7 +972,7 @@ async fn list_releases(
             let uri: http::Uri = match req.uri().parse() {
                 Ok(uri) => uri,
                 Err(e) => {
-                    eprintln!("Failed to parse URI from request: {:?}", e);
+                    info!("Failed to parse URI from request: {:?}", e);
                     return;
                 }
             };
@@ -992,7 +1011,7 @@ async fn list_releases(
             let path_and_query = match PathAndQuery::from_str(&pq) {
                 Ok(pq) => pq,
                 Err(e) => {
-                    eprintln!("Failed to create valid path/query from '{}': {:?}", pq, e);
+                    info!("Failed to create valid path/query from '{}': {:?}", pq, e);
                     return; // Skip URI modification on error
                 }
             };
@@ -1002,7 +1021,7 @@ async fn list_releases(
             let new_uri = match Uri::from_parts(parts) {
                 Ok(uri) => uri,
                 Err(e) => {
-                    eprintln!("Failed to create valid URI from parts: {:?}", e);
+                    info!("Failed to create valid URI from parts: {:?}", e);
                     return;
                 }
             };
@@ -1012,7 +1031,7 @@ async fn list_releases(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("Failed to list experiments: {:?}", e);
+            info!("Failed to list experiments: {:?}", e);
             ABError::InternalServerError(
                 "Failed to list experiments from Superposition".to_string(),
             )
@@ -1079,7 +1098,7 @@ async fn list_releases(
             .and_then(utils::document_to_value)
             .unwrap_or_default();
 
-        println!("Resources files: {:?}", rc_resources);
+        info!("Resources files: {:?}", rc_resources);
 
         let (index_file, important_files, lazy_files, resource_files) = {
             let all_files = rc_package_important
@@ -1090,8 +1109,13 @@ async fn list_releases(
                 .cloned()
                 .collect::<Vec<String>>();
 
-            let files_result =
-                utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
+            let files_result = utils::get_files_by_file_keys_async(
+                state.db_pool.clone(),
+                organisation.clone(),
+                application.clone(),
+                all_files.clone(),
+            )
+            .await;
 
             if let Ok(files) = files_result {
                 let important_files: Vec<ServeFile> = rc_package_important
@@ -1108,7 +1132,7 @@ async fn list_releases(
                             })
                     })
                     .collect();
-                println!("Important files: {:?}", important_files);
+                info!("Important files: {:?}", important_files);
 
                 let lazy_files: Vec<ServeFile> = rc_package_lazy
                     .iter()
@@ -1157,7 +1181,7 @@ async fn list_releases(
                         })
                 };
 
-                println!("Lazy files: {:?}", lazy_files);
+                info!("Lazy files: {:?}", lazy_files);
 
                 (index_file, important_files, lazy_files, resource_files)
             } else {
@@ -1174,8 +1198,8 @@ async fn list_releases(
             }
         };
 
-        println!("Important files: {:?}", important_files);
-        println!("Lazy files: {:?}", lazy_files);
+        info!("Important files: {:?}", important_files);
+        info!("Lazy files: {:?}", lazy_files);
 
         // Parse created_at string to DateTime<Utc>
         let created_at_str = utils::dt(&experiment.created_at);
@@ -1229,22 +1253,19 @@ async fn ramp_release(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
     let experiment_id = release_id.to_string();
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
-    println!(
+    info!(
         "Ramping experiment {} to {}% traffic for release {} in workspace {} org {}",
         experiment_id,
         req.traffic_percentage,
@@ -1263,7 +1284,7 @@ async fn ramp_release(
     .await
     .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
-    println!("Successfully ramped experiment {}", experiment_id);
+    info!("Successfully ramped experiment {}", experiment_id);
 
     let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
 
@@ -1274,7 +1295,7 @@ async fn ramp_release(
     )
     .await
     {
-        println!("Failed to invalidate CloudFront cache: {:?}", e);
+        info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
     Ok(Json(RampReleaseResponse {
@@ -1311,7 +1332,7 @@ async fn ramp_experiment(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("Failed to ramp experiment: {:?}", e);
+            info!("Failed to ramp experiment: {:?}", e);
             error::ErrorInternalServerError("Failed to ramp experiment in Superposition")
         })?;
     Ok(())
@@ -1330,20 +1351,17 @@ async fn conclude_release(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
     let experiment_id = release_id.to_string();
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
     let experiment_details = state
         .superposition_client
@@ -1354,7 +1372,7 @@ async fn conclude_release(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("Failed to get experiment details: {:?}", e);
+            info!("Failed to get experiment details: {:?}", e);
             ABError::InternalServerError(
                 "Failed to get experiment details from Superposition".to_string(),
             )
@@ -1377,7 +1395,7 @@ async fn conclude_release(
             ))
         })?;
 
-    println!(
+    info!(
         "Concluding experiment {} with transformed variant {} (original: {}) for release {}",
         experiment_id, transformed_variant_id, req.chosen_variant, release_id
     );
@@ -1398,13 +1416,13 @@ async fn conclude_release(
         .send()
         .await
         .map_err(|e| {
-            eprintln!("Failed to conclude experiment: {:?}", e);
+            info!("Failed to conclude experiment: {:?}", e);
             ABError::InternalServerError(
                 "Failed to conclude experiment in Superposition".to_string(),
             )
         })?;
 
-    println!(
+    info!(
         "Successfully concluded experiment {} with variant {}",
         experiment_id, transformed_variant_id
     );
@@ -1418,7 +1436,7 @@ async fn conclude_release(
     )
     .await
     {
-        println!("Failed to invalidate CloudFront cache: {:?}", e);
+        info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
     Ok(Json(ConcludeReleaseResponse {
@@ -1435,29 +1453,25 @@ async fn conclude_release(
 #[get("{organisation}/{application}")]
 async fn serve_release(
     path: web::Path<(String, String)>,
-    query: web::Query<std::collections::HashMap<String, String>>,
     req: actix_web::HttpRequest,
+    _query: web::Query<HashMap<String, String>>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let (organisation, application) = path.into_inner();
-    println!(
-        "Serving release for org: {}, app: {}",
-        organisation, application
-    );
-    println!("Query parameters: {:?}", query);
-
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let workspace_name = get_workspace_name_for_application(&application, &organisation, &mut conn)
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+    info!(
+        "Serving release for organisation: {}, application: {}",
+        organisation, application
+    );
+
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
     let context: HashMap<String, Value> = req
         .headers()
@@ -1465,14 +1479,6 @@ async fn serve_release(
         .and_then(|val| val.to_str().ok())
         .map(utils::parse_kv_string)
         .unwrap_or_default();
-
-    println!("context: {:?}", context);
-
-    println!("workspace_name: {}", workspace_name);
-    println!(
-        "superposition_org_id_from_env: {}",
-        superposition_org_id_from_env
-    );
 
     let toss = rand::thread_rng().gen_range(1..=100);
 
@@ -1499,8 +1505,6 @@ async fn serve_release(
         ABError::InternalServerError(format!("Failed to get applicable variants: {}", e))
     })?;
 
-    println!("applicable_variants: {:?}", applicable_variants);
-
     let applicable_variants_ids = applicable_variants
         .data
         .iter()
@@ -1525,8 +1529,6 @@ async fn serve_release(
     let resolved_config = resolved_config_builder.send().await.map_err(|e| {
         ABError::InternalServerError(format!("Failed to get resolved config: {}", e))
     })?;
-
-    println!("config from superposition: {:?}", resolved_config);
 
     let config_document = resolved_config.config;
 
@@ -1565,8 +1567,13 @@ async fn serve_release(
             .cloned()
             .collect::<Vec<String>>();
 
-        let files_result =
-            utils::get_files_by_file_keys(&mut conn, &organisation, &application, &all_files);
+        let files_result = utils::get_files_by_file_keys_async(
+            state.db_pool.clone(),
+            organisation,
+            application.clone(),
+            all_files,
+        )
+        .await;
 
         if let Ok(files) = files_result {
             let important_files: Vec<ServeFile> = rc_package_important
@@ -1583,7 +1590,6 @@ async fn serve_release(
                         })
                 })
                 .collect();
-            println!("Important files: {:?}", important_files);
 
             let lazy_files: Vec<ServeFile> = rc_package_lazy
                 .iter()
@@ -1632,8 +1638,6 @@ async fn serve_release(
                     })
             };
 
-            println!("Lazy files: {:?}", lazy_files);
-
             (index_file, important_files, lazy_files, resource_files)
         } else {
             (
@@ -1649,9 +1653,6 @@ async fn serve_release(
         }
     };
 
-    println!("Important files: {:?}", important_files);
-    println!("Lazy files: {:?}", lazy_files);
-
     let pkg_version =
         utils::extract_integer_from_configs::<i64>(&config_document, "package.version");
 
@@ -1663,6 +1664,12 @@ async fn serve_release(
             None
         }
     });
+
+    // let nested_config_props_result =
+    //     dotted_docs_to_nested(opt_rc_config_properties.unwrap_or_default().into_iter());
+    // let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
+    //     Value::Object(serde_json::Map::new())
+    // });
 
     let release_response = ServeReleaseResponse {
         version: "2".to_string(),
