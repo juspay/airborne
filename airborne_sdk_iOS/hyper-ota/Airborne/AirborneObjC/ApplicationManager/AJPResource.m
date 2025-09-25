@@ -30,7 +30,7 @@
         _url = [NSURL URLWithString:urlString];
         
         // Parse filePath
-        NSString *filePath = dictionary[@"file_path"];
+        NSString *filePath = dictionary[@"filePath"];
         if (![filePath isKindOfClass:[NSString class]]) {
             if (error) {
                 *error = [NSError errorWithDomain:@"ResourceError" code:402 userInfo:@{NSLocalizedDescriptionKey: @"Invalid filePath"}];

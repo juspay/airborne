@@ -28,7 +28,7 @@ import AirborneObjC
      * @return A string identifier for the application namespace.
      *         If not implemented, defaults to "juspay".
      */
-    @objc optional func namespace() -> String
+    @objc func namespace() -> String
     
     /**
      * Returns the custom bundle for loading local assets and fallback files.
@@ -71,7 +71,7 @@ import AirborneObjC
      * @note Boot completion occurs even if some downloads failed or timed out.
      *       Check the release configuration for actual status.
      */
-    @objc optional func startApp(indexBundleURL: URL?) -> Void
+    @objc func startApp(indexBundleURL: URL) -> Void
     
     /**
      * Called when significant events occur during the OTA update process.
@@ -139,7 +139,7 @@ import AirborneObjC
     private let releaseConfigURL: String
     private lazy var namespace: String = {
         // TODO: Default namespace needs to be confirmed
-        delegate?.namespace?() ?? "default"
+        delegate?.namespace() ?? "default"
     }()
     private lazy var dimensions: [String: String] = {
         delegate?.dimensions?() ?? [:]
@@ -189,8 +189,11 @@ import AirborneObjC
     private func startApplicationManager() {
         self.applicationManager = AJPApplicationManager.getSharedInstance(withWorkspace: self.namespace, delegate: self, logger: self)
         self.applicationManager?.waitForPackagesAndResources { [weak self] _ in
-            if let indexBundlePath = self?.getIndexBundlePath() {
-                self?.delegate?.startApp?(indexBundleURL: indexBundlePath)
+
+            if let indexBundleURL = self?.getIndexBundlePath() {
+                self?.delegate?.startApp(indexBundleURL: indexBundleURL)
+            } else {
+                print("❌ Could not find a valid JS bundle URL")
             }
         }
     }
@@ -259,7 +262,7 @@ extension AirborneServices {
             let indexFilePath = self.applicationManager?.getCurrentApplicationManifest().package.index.filePath,
             !indexFilePath.isEmpty
         else {
-            return bundlePath.url(forResource: "main", withExtension: "jsBundle") ?? bundlePath.bundleURL.appendingPathComponent("main.jsBundle")
+            return bundlePath.url(forResource: "main", withExtension: "jsbundle") ?? bundlePath.bundleURL.appendingPathComponent("main.jsbundle") // get this from release config
         }
             
         guard

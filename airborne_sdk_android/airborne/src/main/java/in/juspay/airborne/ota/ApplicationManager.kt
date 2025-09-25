@@ -26,7 +26,6 @@ import `in`.juspay.airborne.ota.Constants.DEFAULT_RESOURCES
 import `in`.juspay.airborne.ota.Constants.PACKAGE_DIR_NAME
 import `in`.juspay.airborne.ota.Constants.PACKAGE_MANIFEST_FILE_NAME
 import `in`.juspay.airborne.ota.Constants.RC_VERSION_FILE_NAME
-import `in`.juspay.airborne.ota.Constants.RESOURCES_DIR_NAME
 import `in`.juspay.airborne.ota.Constants.RESOURCES_FILE_NAME
 import `in`.juspay.airborne.services.OTAServices
 import `in`.juspay.airborne.utils.OTAUtils
@@ -40,6 +39,11 @@ import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Future
+import `in`.juspay.airborne.ota.Constants.APP_DIR
+import `in`.juspay.airborne.ota.Constants.BACKUP_DIR
+import `in`.juspay.airborne.ota.Constants.BACKUP_MAIN
+import `in`.juspay.airborne.ota.Constants.BACKUP_TEMP
+import org.json.JSONException
 
 class ApplicationManager(
     private val ctx: Context,
@@ -61,6 +65,8 @@ class ApplicationManager(
     private var indexFolderPath = ""
     private var sessionId: String? = null
     private var rcCallback: ReleaseConfigCallback? = null
+    private val backupTempDir = "$BACKUP_DIR/$BACKUP_TEMP"
+    private val backupMainDir = "$BACKUP_DIR/$BACKUP_MAIN"
 
     fun loadApplication(
         unSanitizedClientId: String,
@@ -83,6 +89,7 @@ class ApplicationManager(
                         true
                     }
                     val contextRef = CONTEXT_MAP[clientId] ?: newRef
+                    completeRollback(clientId)
                     releaseConfig = readReleaseConfig(contextRef)
                     if (shouldUpdate) {
                         releaseConfig =
@@ -130,7 +137,7 @@ class ApplicationManager(
     fun getIndexBundlePath(): String {
         while (!indexPathWaitTask.isDone) {
             try {
-                (ctx as java.lang.Object).wait()
+                (ctx as Object).wait()
             } catch (e: Exception) {
                 // ignore
             }
@@ -146,6 +153,13 @@ class ApplicationManager(
         return releaseConfig?.pkg?.index?.filePath ?: ""
     }
 
+    fun completeRollback(clientId: String) {
+        val rollbackInProgress = workspace.getFromSharedPreference(Constants.ROLLBACK_IN_PROGRESS, "false")
+        if (rollbackInProgress == "true") {
+            rollbackOTA(clientId)
+        }
+    }
+
     private fun tryUpdate(
         clientId: String,
         initialized: Boolean,
@@ -156,11 +170,13 @@ class ApplicationManager(
         val url = if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
         netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
         netUtils.setTrackMetrics(metricsEndPoint != null)
+        val blackListedVersions = getRolledBackVersions()
         val newTask =
             UpdateTask(
                 url ?: releaseConfigTemplateUrl,
                 otaServices.fileProviderService,
                 releaseConfig,
+                blackListedVersions,
                 fileLock,
                 tracker,
                 netUtils,
@@ -217,6 +233,7 @@ class ApplicationManager(
             else -> releaseConfig
         }
         logTimeTaken(startTime, "tryUpdate")
+        checkIfBackupPending() //TODO: This can backup the next version also. Evaluate how that can be stopped.
         return rc
     }
 
@@ -243,16 +260,8 @@ class ApplicationManager(
             releaseConfig?.resources?.filePaths ?: emptyList()
         val newResourceFiles =
             updatedRc?.resources?.filePaths ?: emptyList()
-        val splits = if (fromAirborne) {
-            pkgSplits + newPkgSplits + resourceFiles + newResourceFiles
-        } else {
-            (pkgSplits + newPkgSplits)
-        }
+        val splits = pkgSplits + newPkgSplits + resourceFiles + newResourceFiles
         cleanUpDir(pkgDir, splits)
-
-        if (!fromAirborne) {
-            cleanUpDir("app/$RESOURCES_DIR_NAME", resourceFiles + newResourceFiles)
-        }
 
         val savedPkgDir = persistentState.optJSONObject(StateKey.SAVED_PACKAGE_UPDATE.name)
             ?.optString("dir")
@@ -314,6 +323,16 @@ class ApplicationManager(
         logTimeTaken(startTime)
     }
 
+    private fun checkIfBackupPending() {
+        doAsync {
+            val stage = workspace.getFromSharedPreference(Constants.BACKUP_STAGE, "")
+            if (stage == "" || stage == BACKUP_STAGES.DONE.name || stage == BACKUP_STAGES.FAILED.name) {
+                return@doAsync
+            }
+            backupOTA()
+        }
+    }
+
     fun readResourceByName(name: String): String {
         val filePath = releaseConfig?.resources?.getResource(name)?.filePath
         val text = filePath?.let { readResourceByFileName(it) } ?: ""
@@ -342,7 +361,7 @@ class ApplicationManager(
     }
 
     private fun readResourceByFileName(filePath: String): String =
-        readFile("$RESOURCES_DIR_NAME/$filePath")
+        readFile("$PACKAGE_DIR_NAME/$filePath")
 
     private fun readReleaseConfig(lock: Any): ReleaseConfig? {
         // TODO big change, need to do server change
@@ -373,6 +392,11 @@ class ApplicationManager(
             }
         }
         return null
+    }
+
+    private fun readReleaseConfigFromDir(folderPath: String): List<String> {
+        return listOf(RC_VERSION_FILE_NAME, CONFIG_FILE_NAME, PACKAGE_MANIFEST_FILE_NAME, RESOURCES_FILE_NAME)
+            .map { otaServices.fileProviderService.readFromInternalStorage("$folderPath/$it") }
     }
 
     private fun <T> loadConfigComponent(
@@ -499,12 +523,234 @@ class ApplicationManager(
 
     private fun getIndexFilePath(fileName: String): String {
         val file =
-            otaServices.fileProviderService.getFileFromInternalStorage("app/$PACKAGE_DIR_NAME/$fileName")
+            otaServices.fileProviderService.getFileFromInternalStorage("$APP_DIR/$PACKAGE_DIR_NAME/$fileName")
         if (file.exists()) {
             return file.absolutePath
         }
         return ""
     }
+
+    /**
+     * Creates a restore point which can be used in rollback.
+     */
+    fun createRestorePoint() {
+        backupOTA()
+    }
+
+    internal fun backupOTA(): Boolean {
+        val stage = workspace.getFromSharedPreference(Constants.BACKUP_STAGE, "")
+
+        val (rcVersion, config, pkg, res) = readReleaseConfigFromDir("$backupMainDir/$APP_DIR")
+        val (curRcVersion, curConfig, curPkg, curRes) = readReleaseConfigFromDir(APP_DIR)
+
+        if (stage == BACKUP_STAGES.DONE.name && rcVersion == curRcVersion && config == curConfig && pkg == curPkg && res == curRes) {
+            return true
+        }
+
+        if (BACKUP_STAGES.COPY_TO_BACKUP_IN_PROGRESS.name == stage) {
+            // The backup is incomplete in this case, so can't be used. Or have to check if the versions of current and temp are same and then
+            // take a decision based on that.
+            val (tempRcVersion, tempConfig, tempPkg, tempRes) = readReleaseConfigFromDir("backupTempDir/$APP_DIR")
+            if (curRcVersion == tempRcVersion && curConfig == tempConfig && curPkg == tempPkg && curRes == tempRes) {
+                return backupInternal(stage)
+            } else {
+                return backupInternal(BACKUP_STAGES.STARTED.name)
+            }
+        }
+        return backupInternal(if (stage == "" || stage == BACKUP_STAGES.FAILED.name) BACKUP_STAGES.STARTED.name else stage ?: BACKUP_STAGES.STARTED.name)
+    }
+
+    private fun backupInternal(stage: String): Boolean {
+
+        var internalStage = stage
+        val fps = otaServices.fileProviderService
+        if (internalStage == BACKUP_STAGES.STARTED.name) {
+            OTAUtils.deleteRecursive(fps.getFileFromInternalStorageInternal("$backupTempDir/"))
+            workspace.writeToSharedPreference(Constants.BACKUP_STAGE, BACKUP_STAGES.STARTED.name)
+
+            val files = fps.listFilesRecursive(APP_DIR)
+            var tempWriteSuccess = true
+            files?.forEach { name ->
+                val fileName = "$APP_DIR/$name"
+                val data = fps.readFromInternalStorage(fileName) // TODO: readFromFile -> Won't this read from assets? Is reading from assets fine?
+                tempWriteSuccess = tempWriteSuccess && fps.writeToFile(fps.getFileFromInternalStorageInternal("$backupTempDir/$fileName"), data.toByteArray(), false, false) // "$backupTempDir/$name" is this correct?
+            }
+
+            if (tempWriteSuccess) {
+                internalStage = BACKUP_STAGES.COPY_TO_BACKUP_IN_PROGRESS.name
+                workspace.writeToSharedPreference(Constants.BACKUP_STAGE, BACKUP_STAGES.COPY_TO_BACKUP_IN_PROGRESS.name)
+            } else {
+                workspace.writeToSharedPreference(Constants.BACKUP_STAGE, BACKUP_STAGES.FAILED.name)
+                return false
+            }
+        }
+
+        if (internalStage == BACKUP_STAGES.COPY_TO_BACKUP_IN_PROGRESS.name) {
+            workspace.writeToSharedPreference(Constants.BACKUP_STAGE, BACKUP_STAGES.COPY_TO_BACKUP_IN_PROGRESS.name)
+            var copySuccess = true
+            val files = fps.listFilesRecursive("$backupTempDir/$APP_DIR")
+            files?.forEach { name ->
+                val fileName = "$APP_DIR/$name"
+                copySuccess = copySuccess && fps.getFileFromInternalStorageInternal("$backupTempDir/$fileName").renameTo(fps.getFileFromInternalStorageInternal("$backupMainDir/$fileName"))
+            }
+
+            if (copySuccess) {
+                workspace.writeToSharedPreference(Constants.BACKUP_STAGE, BACKUP_STAGES.DONE.name)
+                workspace.writeToSharedPreference(Constants.BACKUP_INPLACE, "true")
+            } else {
+                workspace.writeToSharedPreference(Constants.BACKUP_INPLACE, "false")
+                workspace.writeToSharedPreference(Constants.BACKUP_STAGE, BACKUP_STAGES.FAILED.name)
+                OTAUtils.deleteRecursive(fps.getFileFromInternalStorageInternal("$backupMainDir/"))
+                return false
+            }
+        }
+
+        Log.d(UpdateTask.TAG, "Created restore point at.")
+        return true
+    }
+
+    private fun getRolledBackVersions(): JSONArray {
+        return try {
+            JSONArray(workspace.getFromSharedPreference(Constants.BLACKLISTED_VERSIONS, JSONArray().toString()))
+        } catch (_: JSONException) {
+            workspace.writeToSharedPreference(Constants.BLACKLISTED_VERSIONS, JSONArray().toString())
+            JSONArray()
+        }
+    }
+
+    private fun addToRolledBackVersions(versions: JSONObject) {
+        val storedVersions = getRolledBackVersions()
+        storedVersions.put(versions)
+        workspace.writeToSharedPreference(Constants.BLACKLISTED_VERSIONS, storedVersions.toString())
+        trackInfo("version added to rolled back versions", JSONObject().put("version added to rolled back versions", versions))
+        Log.d(TAG, "Added version to rolled-back versions list $versions")
+    }
+
+    /**
+     * Rolls back the package update to the last backed up versions.
+     * If no back up exists then this function returns false.
+     *
+     * @return true if rollback was successful, false otherwise.
+     */
+    fun rollbackOTA(clientId: String): Boolean {
+        workspace.writeToSharedPreference(Constants.ROLLBACK_IN_PROGRESS, "true")
+        Log.d(UpdateTask.TAG, "Rolling back update.")
+        cancelTask(clientId) // Will check this
+        trackInfo("rollback_initiated", JSONObject().put("rc_version", releaseConfig?.version ?: "").put("config_version", releaseConfig?.config?.version ?: "").put("pkg_version", releaseConfig?.pkg?.version ?: ""))
+
+        val backupStage = workspace.getFromSharedPreference(Constants.BACKUP_STAGE, "")
+        val backupInplace = workspace.getFromSharedPreference(Constants.BACKUP_INPLACE, "false")
+
+        val fps = otaServices.fileProviderService
+        if (backupInplace == "false" || backupStage == BACKUP_STAGES.COPY_TO_BACKUP_IN_PROGRESS.name) {
+            Log.e(UpdateTask.TAG, "No backup found for rollback, so deleting the contents inside app dir")
+            // Here just delete everything
+            OTAUtils.deleteRecursive(fps.getFileFromInternalStorage(APP_DIR))
+            OTAUtils.deleteRecursive(fps.getFileFromInternalStorage(BACKUP_DIR))
+            workspace.writeToSharedPreference(Constants.BACKUP_STAGE, "")
+            trackInfo("rollback_failed", JSONObject().put("reason", "No backup found so deleting the contents inside app dir"))
+            return true
+        }
+
+        // Here have to check if the app and backup has same versions, if yes then have to delete everything.
+        if (backupInplace == "true") {
+            val (_, config, pkg, res) = readReleaseConfigFromDir("$backupMainDir/$APP_DIR")
+
+            ReleaseConfig.deSerializeConfig(config).onSuccess {
+                it
+                if (it.version == releaseConfig?.config?.version) {
+                    // Now delete the config file in app dir and backup also
+                    fps.getFileFromInternalStorage("$APP_DIR/$CONFIG_FILE_NAME").delete()
+                    fps.getFileFromInternalStorage("$backupMainDir/$APP_DIR/$CONFIG_FILE_NAME").delete()
+                }
+            }
+
+            ReleaseConfig.deSerializePackage(pkg).onSuccess { pkgSer ->
+                if (pkgSer.version == releaseConfig?.pkg?.version) {
+                    // Now delete the pkg file  and pkg splits in app dir and backup also
+                    fps.getFileFromInternalStorage("$APP_DIR/$PACKAGE_MANIFEST_FILE_NAME").delete()
+                    fps.getFileFromInternalStorage("$backupMainDir/$APP_DIR/$PACKAGE_MANIFEST_FILE_NAME").delete()
+
+                    releaseConfig?.pkg?.filePaths?.map {
+                        it
+                        fps.getFileFromInternalStorage("$APP_DIR/$PACKAGE_DIR_NAME/$it").delete()
+                        fps.getFileFromInternalStorage("$backupMainDir/$APP_DIR/$PACKAGE_DIR_NAME/$it").delete()
+                    }
+
+                }
+            }
+
+            if (releaseConfig?.resources?.toJSON().toString() == res) {
+                // Now delete the resource file and resource splits of app dir and backup also
+                fps.getFileFromInternalStorage("$APP_DIR/$RESOURCES_FILE_NAME").delete()
+                fps.getFileFromInternalStorage("$backupMainDir/$APP_DIR/$RESOURCES_FILE_NAME").delete()
+
+                releaseConfig?.resources?.filePaths?.map {
+                    it
+                    fps.getFileFromInternalStorage("$APP_DIR/$PACKAGE_DIR_NAME/$it").delete()
+                    fps.getFileFromInternalStorage("$backupMainDir/$APP_DIR/$PACKAGE_DIR_NAME/$it").delete()
+                }
+            }
+        }
+
+        // We don't want to rollback this package as this is being rolled back now.
+        if (backupStage == BACKUP_STAGES.STARTED.name) {
+            workspace.writeToSharedPreference(Constants.BACKUP_STAGE, "")
+        }
+        var rollbackSuccess = false
+        val files = fps.listFilesRecursive(backupMainDir)
+        if (files?.isEmpty() ?: true) {
+            trackInfo("rollback_failed", JSONObject().put("reason", "Backup folder is empty"))
+        } else {
+            files.forEach { name ->
+                val fileName = "$APP_DIR/$name"
+                val data = fps.readFromFile("$backupMainDir/$fileName")
+                rollbackSuccess = fps.writeToFile(fps.getFileFromInternalStorageInternal("$APP_DIR/$name"), data.toByteArray(), false, false)
+                if (!rollbackSuccess) {
+                    trackInfo("rollback_failed", JSONObject().put("reason", "Not able to write the file $fileName from backup to main dir"))
+                    return@forEach
+                }
+            }
+        }
+
+        if (!rollbackSuccess) {
+            OTAUtils.deleteRecursive(fps.getFileFromInternalStorage(APP_DIR))
+        }
+        workspace.writeToSharedPreference(Constants.ROLLBACK_IN_PROGRESS, "false")
+
+        if (rollbackSuccess) {
+            Log.d(UpdateTask.TAG, "Rollback successful")
+            trackInfo("rollback_success", JSONObject().put("result", "success"))
+        }
+        val resContent = releaseConfig?.resources?.toJSON().toString().toByteArray()
+        val resHash = try {
+            OTAUtils.SHA256(resContent).toString()
+        } catch (_: Exception) {
+            null
+        }
+        releaseConfig?.let { rc ->
+            val json = JSONObject().put("configVersion", rc.config.version).put("pkgVersion", rc.pkg.version)
+            resHash?.let {
+                json.put("resHash", it)
+            }
+            addToRolledBackVersions(json)
+            trackInfo("release_blacklisted", json)
+        }
+        return rollbackSuccess
+    }
+
+    fun cancelTask(clientId: String) {
+        RUNNING_UPDATE_TASKS.remove(clientId)?.cancel()
+    }
+
+    fun cancelAllUpdateTasks() {
+        val snapshot = RUNNING_UPDATE_TASKS.entries.toList()
+        snapshot.forEach { (clientId, task) ->
+            task.cancel()
+            RUNNING_UPDATE_TASKS.remove(clientId)
+        }
+    }
+
 
     companion object {
         const val TAG = "ApplicationManager"
@@ -523,6 +769,13 @@ class ApplicationManager(
 
         private fun sanitizeClientId(clientId: String) = clientId.split('_')[0].lowercase()
     }
+}
+
+enum class BACKUP_STAGES {
+    STARTED,
+    COPY_TO_BACKUP_IN_PROGRESS,
+    DONE,
+    FAILED
 }
 
 interface ReleaseConfigCallback {
