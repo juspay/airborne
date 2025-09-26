@@ -5,5 +5,5 @@ target 'AirborneDemo' do
   
   pod 'FLEX', '5.22.10'
   
-  pod 'Airborne', :path => '../'
+  pod 'Airborne', :path => '../Airborne-Framework'
 end

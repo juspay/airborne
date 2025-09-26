@@ -277,15 +277,13 @@
 			);
 			inputPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-AirborneDemo/Pods-AirborneDemo-frameworks.sh",
-				"${BUILT_PRODUCTS_DIR}/Airborne/Airborne.framework",
 				"${BUILT_PRODUCTS_DIR}/FLEX/FLEX.framework",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/HyperCore/HyperCore.framework/HyperCore",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/Airborne/Airborne.framework/Airborne",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Airborne.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/FLEX.framework",
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/HyperCore.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Airborne.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
