@@ -35,6 +35,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { OrganisationsList } from "@/app/dashboard/page";
+import { hasAppAccess } from "@/lib/utils";
 
 interface SharedLayoutProps {
   children: React.ReactNode;
@@ -44,7 +45,7 @@ interface SharedLayoutProps {
 type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, logout } = useAppContext();
+  const { org, app, user, token, logout, getOrgAccess, getAppAccess } = useAppContext();
   const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
   const router = useRouter();
@@ -96,6 +97,11 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/dimensions",
           icon: Sliders,
           label: "Dimensions",
+        },
+        {
+          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/users",
+          icon: Users2,
+          label: "Users",
         },
       ]
     : [
@@ -197,37 +203,40 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
               {user?.name || user?.user_id || "GUEST"}
             </Badge>
             <ThemeToggle />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="gap-2" disabled={!org || !app}>
-                  <Plus className="h-4 w-4" />
-                  Create
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={!org || !app} onClick={() => setCreateFileOpen(true)}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Create File
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild disabled={!org || !app}>
-                  <Link
-                    href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
-                  >
-                    <Package className="mr-2 h-4 w-4" />
-                    Create Package
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild disabled={!org || !app}>
-                  <Link
-                    href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
-                  >
-                    <Rocket className="mr-2 h-4 w-4" />
-                    New Release
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="gap-2" disabled={!org || !app}>
+                    <Plus className="h-4 w-4" />
+                    Create
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem disabled={!org || !app} onClick={() => setCreateFileOpen(true)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Create File
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild disabled={!org || !app}>
+                    <Link
+                      href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
+                    >
+                      <Package className="mr-2 h-4 w-4" />
+                      Create Package
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild disabled={!org || !app}>
+                    <Link
+                      href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
+                    >
+                      <Rocket className="mr-2 h-4 w-4" />
+                      New Release
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm">

@@ -18,6 +18,7 @@ import {
 import { Plus, Target, ArrowUp, ArrowDown } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
+import { hasAppAccess } from "@/lib/utils";
 
 export type Dimension = {
   dimension: string;
@@ -29,7 +30,7 @@ export type Dimension = {
 };
 
 export default function DimensionsPage() {
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formData, setFormData] = useState({ key: "", description: "" });
@@ -84,48 +85,51 @@ export default function DimensionsPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Dimensions</h1>
           <p className="text-muted-foreground mt-2">Manage targeting dimensions for precise release control</p>
         </div>
-
-        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Dimension
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Dimension</DialogTitle>
-              <DialogDescription>Add a new targeting dimension for release control</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="key">Key *</Label>
-                <Input
-                  id="key"
-                  value={formData.key}
-                  onChange={(e) => setFormData({ ...formData, key: e.target.value.toLowerCase().replace(/\s+/g, "_") })}
-                />
+        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Dimension
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Dimension</DialogTitle>
+                <DialogDescription>Add a new targeting dimension for release control</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="key">Key *</Label>
+                  <Input
+                    id="key"
+                    value={formData.key}
+                    onChange={(e) =>
+                      setFormData({ ...formData, key: e.target.value.toLowerCase().replace(/\s+/g, "_") })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description*</Label>
+                  <Textarea
+                    id="description"
+                    rows={2}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreate} disabled={!formData.key || !formData.description}>
+                    Create Dimension
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description*</Label>
-                <Textarea
-                  id="description"
-                  rows={2}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreate} disabled={!formData.key || !formData.description}>
-                  Create Dimension
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Card>
@@ -161,7 +165,7 @@ export default function DimensionsPage() {
                           size="sm"
                           className="h-4 w-4 p-0"
                           onClick={() => movePriority(d.dimension, Math.max(1, d.position - 1))}
-                          disabled={d.position === 1}
+                          disabled={d.position === 1 || !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))}
                         >
                           <ArrowUp className="h-3 w-3" />
                         </Button>
@@ -170,6 +174,10 @@ export default function DimensionsPage() {
                           size="sm"
                           className="h-4 w-4 p-0"
                           onClick={() => movePriority(d.dimension, d.position + 1)}
+                          disabled={
+                            d.position === dimensions.length - 1 ||
+                            !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))
+                          }
                         >
                           <ArrowDown className="h-3 w-3" />
                         </Button>

@@ -17,7 +17,7 @@ pub mod utils;
 
 use crate::{
     file::types::*,
-    middleware::auth::{validate_user, AuthResponse, READ, WRITE},
+    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     types::{ABError, AppState},
     utils::{
         db::{
@@ -65,10 +65,17 @@ async fn create_file(
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -140,11 +147,17 @@ async fn bulk_create_files(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
     let mut conn = state
         .db_pool
         .get()
@@ -275,10 +288,17 @@ async fn get_file(
     }
 
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -319,10 +339,17 @@ async fn list_files(
     state: web::Data<AppState>,
 ) -> Result<Json<FileListResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -406,10 +433,17 @@ async fn update_file(
     }
 
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -459,10 +493,17 @@ async fn upload_file(
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -578,10 +619,17 @@ async fn upload_bulk_files(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let tmp_path = std::env::temp_dir().join(format!("bulk-{}.zip", Uuid::new_v4()));
     tokio::fs::copy(req.file.file.path(), &tmp_path)

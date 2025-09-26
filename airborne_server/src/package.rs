@@ -1,6 +1,5 @@
 pub mod utils;
 use crate::{
-    middleware::auth::READ,
     package::{types::*, utils::parse_package_key},
     types::ABError,
     utils::db::{
@@ -25,7 +24,7 @@ use actix_web::{
 
 use crate::{
     file::utils::parse_file_key,
-    middleware::auth::{validate_user, AuthResponse, WRITE},
+    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     types::AppState,
 };
 use diesel::expression::BoxableExpression;
@@ -50,10 +49,17 @@ async fn create_package(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -148,10 +154,17 @@ async fn get_package(
     }
 
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth_response.application, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -187,11 +200,18 @@ async fn list_packages(
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let ListPackagesInput { offset, limit } = input.into_inner();
-    let auth = auth_response.into_inner();
-    let organisation = validate_user(auth.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let application = validate_user(auth.application, READ)
-        .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
     let mut conn = state
         .db_pool
         .get()
