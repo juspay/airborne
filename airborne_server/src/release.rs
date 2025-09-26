@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::types::ABError;
+use crate::{middleware::auth::Auth, types::ABError};
 use actix_web::{
     error, get, post,
     web::{self, Json, Path},
@@ -31,7 +31,7 @@ use url::form_urlencoded;
 
 use crate::{
     file::utils::parse_file_key,
-    middleware::auth::{validate_user, AuthResponse, READ, WRITE},
+    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     package::utils::parse_package_key,
     release::{types::*, utils::value_to_document},
     types::AppState,
@@ -44,14 +44,16 @@ use crate::{
 mod types;
 mod utils;
 
-pub fn add_routes() -> Scope {
-    Scope::new("")
-        .service(create_release)
-        .service(list_releases)
-        .service(ramp_release)
-        .service(conclude_release)
-        .service(serve_release)
-        .service(get_release)
+pub fn add_routes(path: &str) -> Scope {
+    Scope::new(path).service(serve_release).service(
+        Scope::new("")
+            .wrap(Auth)
+            .service(create_release)
+            .service(list_releases)
+            .service(ramp_release)
+            .service(conclude_release)
+            .service(get_release),
+    )
 }
 
 pub fn add_public_routes() -> Scope {
@@ -72,10 +74,17 @@ async fn get_release(
     }
 
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
-    let application = validate_user(auth_response.application, READ)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state.db_pool.get().map_err(|_| {
         ABError::InternalServerError("Failed to get database connection".to_string())
@@ -288,10 +297,17 @@ async fn create_release(
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<CreateReleaseResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state.db_pool.get().map_err(|_| {
         ABError::InternalServerError("Failed to get database connection".to_string())
@@ -919,10 +935,17 @@ async fn list_releases(
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<ListReleaseResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, READ)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
-    let application = validate_user(auth_response.application, READ)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -1224,10 +1247,17 @@ async fn ramp_release(
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<RampReleaseResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool
@@ -1325,10 +1355,17 @@ async fn conclude_release(
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<ConcludeReleaseResponse>, ABError> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     let mut conn = state
         .db_pool

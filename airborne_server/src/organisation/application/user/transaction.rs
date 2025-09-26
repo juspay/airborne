@@ -38,6 +38,11 @@ pub async fn add_user_with_transaction(
     target_user: &UserContext,
     role_name: &str,
 ) -> Result<(), AppError> {
+    let _user_org_currenet_rol =
+        get_user_current_role_in_org(admin, realm, &app_context.org_name, &target_user.user_id)
+            .await
+            .map_err(|_| AppError::UserNotFound("User not found in org".to_string()))?;
+
     // Create a new transaction manager for this operation
     let transaction = TransactionManager::new(
         &format!("{}/{}", app_context.org_name, app_context.app_name),
@@ -69,18 +74,6 @@ pub async fn add_user_with_transaction(
         .await
         .map_err(|e| AppError::Internal(format!("Failed to add user to group: {}", e)))?;
     }
-
-    // Add user to the organisation group as well with READ role
-    add_user_to_group(
-        admin,
-        realm,
-        &target_user.user_id,
-        &app_context.org_group_id,
-        "read",
-        &transaction,
-    )
-    .await
-    .map_err(|e| AppError::Internal(format!("Failed to add user to organisation group: {}", e)))?;
 
     // Mark transaction as complete
     transaction.set_database_inserted();
@@ -156,6 +149,49 @@ async fn add_user_to_group(
     Ok(())
 }
 
+async fn remove_user_from_group(
+    admin: &KeycloakAdmin,
+    realm: &str,
+    user_id: &str,
+    group_id: &str,
+    role_name: &str,
+    transaction: &TransactionManager,
+) -> Result<(), AppError> {
+    // Find the role group
+    let role_group = find_role_subgroup(admin, realm, group_id, role_name)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to find role group: {}", e)))?
+        .ok_or_else(|| AppError::Internal(format!("Role group {} not found", role_name)))?;
+
+    let role_group_id = role_group
+        .id
+        .as_ref()
+        .ok_or_else(|| AppError::Internal("Role group has no ID".to_string()))?
+        .to_string();
+
+    // Add user to role group
+    match admin
+        .realm_users_with_user_id_groups_with_group_id_delete(realm, user_id, &role_group_id)
+        .await
+    {
+        Ok(_) => {
+            // Record this resource in the transaction
+            transaction.add_keycloak_resource(
+                "user_group_membership",
+                &format!("{}:{}", user_id, role_group_id),
+            );
+        }
+        Err(e) => {
+            // If this fails, there's nothing to roll back yet
+            return Err(AppError::Internal(format!(
+                "Failed to add user to role group: {}",
+                e
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Update a user's role in an application with transaction management
 pub async fn update_user_with_transaction(
     admin: &KeycloakAdmin,
@@ -164,7 +200,7 @@ pub async fn update_user_with_transaction(
     target_user: &UserContext,
     new_role_name: &str,
     current_role: &str,
-    state: &web::Data<AppState>,
+    _state: &web::Data<AppState>,
 ) -> Result<(), AppError> {
     // Create a new transaction manager
     let transaction = TransactionManager::new(
@@ -181,106 +217,53 @@ pub async fn update_user_with_transaction(
         new_role_name
     );
 
-    // Find current role group
-    let current_role_group =
-        find_role_subgroup(admin, realm, &app_context.app_group_id, current_role)
-            .await
-            .map_err(|e| AppError::Internal(format!("Failed to find current role group: {}", e)))?
-            .ok_or_else(|| {
-                AppError::Internal(format!("Current role group {} not found", current_role))
-            })?;
-
-    let current_role_id = current_role_group
-        .id
-        .as_ref()
-        .ok_or_else(|| AppError::Internal("Current role group has no ID".to_string()))?
-        .to_string();
-
-    // Find new role group
-    let new_role_group = find_role_subgroup(admin, realm, &app_context.app_group_id, new_role_name)
+    let mut new_roles = get_additional_roles(new_role_name)
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to find new role group: {}", e)))?
-        .ok_or_else(|| AppError::Internal(format!("New role group {} not found", new_role_name)))?;
+        .map_err(|e| AppError::Internal(format!("Failed to get additional roles: {}", e)))?;
+    new_roles.push(new_role_name.to_string());
 
-    let new_role_id = new_role_group
-        .id
-        .as_ref()
-        .ok_or_else(|| AppError::Internal("New role group has no ID".to_string()))?
-        .to_string();
+    let mut current_roles = get_additional_roles(current_role)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to get additional roles: {}", e)))?;
+    current_roles.push(current_role.to_string());
 
-    // Step 1: Add user to new role group
-    match admin
-        .realm_users_with_user_id_groups_with_group_id_put(
+    let to_add: Vec<_> = new_roles
+        .iter()
+        .filter(|r| !current_roles.contains(r))
+        .cloned()
+        .collect();
+
+    let to_remove: Vec<_> = current_roles
+        .iter()
+        .filter(|r| !new_roles.contains(r))
+        .cloned()
+        .collect();
+
+    for role_name in to_add {
+        add_user_to_group(
+            admin,
             realm,
             &target_user.user_id,
-            &new_role_id,
+            &app_context.app_group_id,
+            &role_name,
+            &transaction,
         )
         .await
-    {
-        Ok(_) => {
-            // Record this action in the transaction
-            transaction.add_keycloak_resource(
-                "user_group_membership",
-                &format!("{}:{}", target_user.user_id, new_role_id),
-            );
-            debug!(
-                "Added user {} to new role group {}",
-                target_user.username, new_role_name
-            );
-        }
-        Err(e) => {
-            // If this fails, nothing to roll back yet
-            return Err(AppError::Internal(format!(
-                "Failed to add user to new role group: {}",
-                e
-            )));
-        }
+        .map_err(|e| AppError::Internal(format!("Failed to add user to group: {}", e)))?;
     }
 
-    // Step 2: Remove user from old role group
-    match admin
-        .realm_users_with_user_id_groups_with_group_id_delete(
+    // Remove roles no longer needed
+    for role_name in to_remove {
+        remove_user_from_group(
+            admin,
             realm,
             &target_user.user_id,
-            &current_role_id,
+            &app_context.app_group_id,
+            &role_name,
+            &transaction,
         )
         .await
-    {
-        Ok(_) => {
-            debug!(
-                "Removed user {} from old role group {}",
-                target_user.username, current_role
-            );
-        }
-        Err(e) => {
-            warn!(
-                "Failed to remove user from old role group: {}. Attempting rollback...",
-                e
-            );
-
-            // Attempt to rollback by removing from new role group
-            if let Err(rollback_err) = admin
-                .realm_users_with_user_id_groups_with_group_id_delete(
-                    realm,
-                    &target_user.user_id,
-                    &new_role_id,
-                )
-                .await
-            {
-                error!("Rollback failed: {}", rollback_err);
-                // Record for future cleanup
-                if let Err(record_err) =
-                    record_failed_cleanup(state, &transaction.get_state()).await
-                {
-                    error!("Failed to record cleanup job: {}", record_err);
-                }
-            }
-
-            return Err(AppError::Internal(format!(
-                "Failed to remove user from old role group: {}",
-                e
-            )));
-        }
+        .map_err(|e| AppError::Internal(format!("Failed to remove user from group: {}", e)))?;
     }
 
     // Mark transaction as complete
@@ -434,7 +417,7 @@ pub async fn get_user_current_role(
 
     // Find role groups under this application
     let app_path = format!("/{}/{}/", app_context.org_name, app_context.app_name);
-
+    let mut user_roles = Vec::new();
     // Find the role group the user is in
     for group in user_groups {
         if let Some(path) = group.path {
@@ -442,10 +425,16 @@ pub async fn get_user_current_role(
                 // Extract role name from path
                 if let Some(role) = path.split('/').next_back() {
                     if !role.is_empty() {
-                        return Ok(role.to_string());
+                        user_roles.push(role.to_string());
                     }
                 }
             }
+        }
+    }
+    let hierarchy = ["owner", "admin", "write", "read"];
+    for &role in &hierarchy {
+        if user_roles.contains(&role.to_string()) {
+            return Ok(role.to_string());
         }
     }
 
@@ -464,4 +453,46 @@ async fn record_failed_cleanup(
     // For now, we'll just log the failure
     warn!("Recording failed cleanup for future processing");
     Ok(())
+}
+
+/// Get a user's current role in an organization
+pub async fn get_user_current_role_in_org(
+    admin: &KeycloakAdmin,
+    realm: &str,
+    org_context: &str,
+    user_id: &str,
+) -> Result<String, AppError> {
+    // Get user's groups
+    let user_groups = admin
+        .realm_users_with_user_id_groups_get(realm, user_id, None, None, None, None)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to get user groups: {}", e)))?;
+
+    // Find role groups under this organization
+    let org_path = format!("/{}/", org_context);
+    let mut user_roles = Vec::new();
+    // Find the role group the user is in
+    for group in user_groups {
+        if let Some(path) = group.path {
+            if path.starts_with(&org_path) && path != org_path {
+                // Extract role name from path
+                if let Some(role) = path.split('/').next_back() {
+                    if !role.is_empty() {
+                        user_roles.push(role.to_string());
+                    }
+                }
+            }
+        }
+    }
+    let hierarchy = ["owner", "admin", "write", "read"];
+    for &role in &hierarchy {
+        if user_roles.contains(&role.to_string()) {
+            return Ok(role.to_string());
+        }
+    }
+
+    Err(AppError::Internal(format!(
+        "User is not a member of any role in organization {}",
+        org_context
+    )))
 }

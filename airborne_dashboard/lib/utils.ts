@@ -37,3 +37,14 @@ export function parseFileRef(input: string): ParsedFileRef {
   // kind === "tag"
   return { filePath, tag: value };
 }
+
+export function hasAppAccess(orgAccess: string[], appAccess: string[], accessType?: string): boolean {
+  // Check if org has admin
+  if (orgAccess.includes("admin")) return true;
+
+  // Check if org has read and app has write
+  if (orgAccess.includes("read") && appAccess.includes(accessType ? accessType : "write")) return true;
+
+  // Otherwise, no access
+  return false;
+}
