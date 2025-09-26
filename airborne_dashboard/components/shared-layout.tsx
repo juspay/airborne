@@ -24,6 +24,7 @@ import {
   FileText,
   LogOut,
   Users2,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -96,6 +97,11 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/dimensions",
           icon: Sliders,
           label: "Dimensions",
+        },
+        {
+          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/remote-configs",
+          icon: Settings,
+          label: "Remote Configs",
         },
       ]
     : [
