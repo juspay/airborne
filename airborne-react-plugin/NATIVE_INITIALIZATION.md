@@ -182,72 +182,64 @@ class SplashActivity : AppCompatActivity() {
 
 ## iOS Setup
 
-### 1. Initialize Airborne in AppDelegate
+### 1. Add Airborne SDK
 
-In your `AppDelegate.swift` (or `.m`), initialize Airborne:
-
-```swift
-import UIKit
-import react_native_hyperota
-
-@UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
-
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-
-        // Initialize Airborne
-        Hyperota.initializeAirborne(
-            withAppId: "your-app-id",
-            indexFileName: "main.jsbundle",
-            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
-            releaseConfigTemplateUrl: "https://your-server.com/release-config",
-            headers: [
-                "Authorization": "Bearer your-token",
-                "X-Custom-Header": "value"
-            ]
-        )
-
-        // Rest of your initialization code...
-        return true
-    }
-}
-```
-
-For Objective-C:
-
-```objc
-#import "AppDelegate.h"
-#import <react_native_hyperota/react_native_hyperota-Swift.h>
-
-@implementation AppDelegate
-
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-
-    // Initialize Airborne
-    [Hyperota initializeAirborneWithAppId:@"your-app-id"
-                            indexFileName:@"main.jsbundle"
-                               appVersion:[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"]
-                  releaseConfigTemplateUrl:@"https://your-server.com/release-config"
-                                  headers:@{
-                                      @"Authorization": @"Bearer your-token",
-                                      @"X-Custom-Header": @"value"
-                                  }];
-
-    // Rest of your initialization code...
-    return YES;
-}
-
-@end
-```
-
-### 2. Add Airborne SDK
-
-Add the Airborne iOS SDK to your project. You can use CocoaPods, Carthage, or Swift Package Manager.
+Add the Airborne iOS SDK to your project.
 
 For CocoaPods, add to your `Podfile`:
 
 ```ruby
 pod 'Airborne', '~> YOUR_VERSION'
+```
+
+### 2. Initialize Airborne in AppDelegate
+
+In your `AppDelegate.swift`, initialize Airborne:
+
+```swift
+import UIKit
+import Airborne
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    
+    private var airborne: AirborneServices?
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        
+        // Initialize Airborne
+        airborne = AirborneServices(releaseConfigURL: "https://yourdomain.com/release-config-url.json", delegate: self)
+        
+        return true
+    }
+}
+
+// AirborneDelegate
+extension AppDelegate: AirborneDelegate {
+    func namespace() -> String {
+        return "airborne-example"
+    }
+    
+    func dimensions() -> [String : String] {
+        ["city": "bangalore"]
+    }
+    
+    func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String) {
+        
+    }
+    
+    func onAllLazyPackageDownloadsComplete() {
+        
+    }
+    
+    func onEvent(level: String, label: String, key: String, value: [String : Any], category: String, subcategory: String) {
+        // Log the event
+    }
+    
+    func startApp(indexBundleURL: URL?) {
+        // Local file path URL for the available index bundle
+    }
+}
 ```
 
 ## React Native Usage
