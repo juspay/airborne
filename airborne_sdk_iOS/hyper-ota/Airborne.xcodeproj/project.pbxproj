@@ -210,13 +210,13 @@
 		DCB6144C2E61924D0099D87E /* Airborne */ = {
 			isa = PBXGroup;
 			children = (
-				DCB614492E61924D0099D87E /* ApplicationManager */,
 				DCB6144A2E61924D0099D87E /* Airborne.h */,
 				DCB6144B2E61924D0099D87E /* Airborne.swift */,
-				DC76412B2E61931B0028FCDA /* Airborne.modulemap */,
-				DCC583332E83B51000E29833 /* Helper */,
+				DCB614492E61924D0099D87E /* ApplicationManager */,
 				DCC583302E83B4C900E29833 /* FileUtil */,
 				DCC5833B2E83BBC800E29833 /* Network */,
+				DCC583332E83B51000E29833 /* Helper */,
+				DC76412B2E61931B0028FCDA /* Airborne.modulemap */,
 			);
 			path = Airborne;
 			sourceTree = "<group>";
