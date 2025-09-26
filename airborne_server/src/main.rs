@@ -33,18 +33,22 @@ use google_sheets4::{
     yup_oauth2::{self, ServiceAccountAuthenticator},
     Sheets,
 };
+use log::info;
 use middleware::auth::Auth;
 use serde_json::json;
 use std::sync::Arc;
 use superposition_sdk::config::Config as SrsConfig;
+use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::dashboard::configuration;
+use crate::{dashboard::configuration, middleware::request::request_id_mw};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    utils::init_tracing();
+
     // Load Environment variables
     dotenv().ok(); // Load .env file
     let url = std::env::var("KEYCLOAK_URL").expect("KEYCLOAK_URL must be set");
@@ -89,6 +93,13 @@ async fn main() -> std::io::Result<()> {
     let num_workers = std::env::var("ACTIX_WORKERS").map_or(4, |v| {
         v.parse().expect("ACTIX_WORKERS must be a valid number")
     });
+
+    let keep_alive = std::env::var("KEEP_ALIVE").map_or(30, |v| {
+        v.parse().expect("KEEP_ALIVE must be a valid number")
+    });
+
+    let backlog = std::env::var("BACKLOG")
+        .map_or(1024, |v| v.parse().expect("BACKLOG must be a valid number"));
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -185,14 +196,16 @@ async fn main() -> std::io::Result<()> {
     // Start the background cleanup job for transaction reconciliation
     let app_state_data = web::Data::from(app_state.clone());
     let _cleanup_handle = start_cleanup_job(app_state_data.clone());
-    println!("Started transaction cleanup background job");
-    println!("Using server prefix {}", server_path_prefix);
+    info!("Started transaction cleanup background job");
+    info!("Using server prefix {}", server_path_prefix);
 
     HttpServer::new(move || {
         App::new()
+            .wrap(actix_web::middleware::from_fn(request_id_mw))
+            .wrap(TracingLogger::default())
             .app_data(web::Data::from(app_state.clone()))
-            .wrap(actix_web::middleware::Logger::default())
             .wrap(actix_web::middleware::Compress::default())
+            .wrap(actix_web::middleware::Logger::default())
             .service(docs::add_routes())
             .service(
                 web::scope("/release").service(release::add_public_routes()),
@@ -244,6 +257,8 @@ async fn main() -> std::io::Result<()> {
             )
     })
     .workers(num_workers)
+    .keep_alive(std::time::Duration::from_secs(keep_alive))
+    .backlog(backlog)
     .bind(("0.0.0.0", port))? // Listen on all interfaces
     .run()
     .await

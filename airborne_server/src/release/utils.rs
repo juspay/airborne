@@ -15,26 +15,23 @@ use std::collections::HashMap;
 
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
-use diesel::{
-    pg::Pg,
-    pg::PgConnection,
-    prelude::*,
-    r2d2::{ConnectionManager, PooledConnection},
-    sql_types::Bool,
-    BoxableExpression,
-};
+use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
+use log::info;
 use serde_json::Value;
 use superposition_sdk::types::Variant;
 
 use crate::{
     file::utils::parse_file_key,
     release::types::*,
+    run_blocking,
+    types::ABError,
     utils::db::{
         models::FileEntry,
         schema::hyperotaserver::files::{
             app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id,
             table as files_table, tag as file_dsl_tag, version as file_dsl_version,
         },
+        DbPool,
     },
 };
 
@@ -161,46 +158,51 @@ pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key
     extract_string_from_experiment(experimental_variant, key)
 }
 
-pub fn get_files_by_file_keys(
-    conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    organisation: &String,
-    application: &String,
-    file_paths: &Vec<String>,
-) -> Result<Vec<FileEntry>, actix_web::error::Error> {
+pub async fn get_files_by_file_keys_async(
+    pool: DbPool,
+    organisation: String,
+    application: String,
+    file_paths: Vec<String>,
+) -> Result<Vec<FileEntry>, ABError> {
     if file_paths.is_empty() {
         return Ok(vec![]);
     }
-    let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
 
-    for file_id in file_paths {
-        let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
+    run_blocking!({
+        let mut conn = pool.get()?;
 
-        if let Some(v) = ver_opt {
-            file_conds.push(Box::new(
-                file_dsl_path.eq(fp.clone()).and(file_dsl_version.eq(v)),
-            ));
-        } else if let Some(t) = tag_opt {
-            file_conds.push(Box::new(
-                file_dsl_path.eq(fp.clone()).and(file_dsl_tag.eq(t.clone())),
-            ));
-        } else {
-            return Err(actix_web::error::ErrorBadRequest("Invalid file key format"));
+        let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+
+        for file_id in &file_paths {
+            let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
+
+            if let Some(v) = ver_opt {
+                file_conds.push(Box::new(
+                    file_dsl_path.eq(fp.clone()).and(file_dsl_version.eq(v)),
+                ));
+            } else if let Some(t) = tag_opt {
+                file_conds.push(Box::new(
+                    file_dsl_path.eq(fp.clone()).and(file_dsl_tag.eq(t.clone())),
+                ));
+            } else {
+                return Err(ABError::BadRequest("Invalid file key format".to_string()));
+            }
         }
-    }
 
-    let combined = file_conds
-        .into_iter()
-        .reduce(|a, b| Box::new(a.or(b)))
-        .unwrap_or(Box::new(file_dsl_path.eq("")));
+        let combined = file_conds
+            .into_iter()
+            .reduce(|a, b| Box::new(a.or(b)))
+            .unwrap_or(Box::new(file_dsl_path.eq("")));
 
-    let files: Vec<FileEntry> = files_table
-        .into_boxed::<Pg>()
-        .filter(file_dsl_org_id.eq(organisation))
-        .filter(file_dsl_app_id.eq(application))
-        .filter(combined)
-        .load(conn)
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-    Ok(files)
+        let files: Vec<FileEntry> = files_table
+            .into_boxed::<Pg>()
+            .filter(file_dsl_org_id.eq(&organisation))
+            .filter(file_dsl_app_id.eq(&application))
+            .filter(combined)
+            .load(&mut conn)?;
+
+        Ok(files)
+    })
 }
 
 pub fn build_release_experiment_from_experiment(
@@ -357,10 +359,10 @@ pub async fn invalidate_cf(
 
     resp.invalidation()
         .map(|inv| {
-            println!("Invalidation created: {:?}", inv.id);
+            info!("Invalidation created: {:?}", inv.id);
         })
         .unwrap_or_else(|| {
-            println!("Invalidation created but no ID returned");
+            info!("Invalidation created but no ID returned");
         });
 
     Ok(())

@@ -8,6 +8,7 @@ use actix_web::{
 };
 use chrono::Utc;
 use diesel::prelude::*;
+use log::info;
 use serde_json::json;
 use tokio::task;
 use uuid::Uuid;
@@ -18,6 +19,7 @@ pub mod utils;
 use crate::{
     file::types::*,
     middleware::auth::{validate_user, AuthResponse, READ, WRITE},
+    run_blocking,
     types::{ABError, AppState},
     utils::{
         db::{
@@ -70,36 +72,35 @@ async fn create_file(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-
-    let existing_file = files
-        .filter(org_id.eq(&organisation))
-        .filter(app_id.eq(&application))
-        .filter(file_path.eq(&req.file_path))
-        .filter(tag.eq(&req.tag))
-        .select(DbFile::as_select())
-        .first::<DbFile>(&mut conn)
-        .optional()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-
-    if existing_file.is_some() {
-        return Err(ABError::BadRequest(format!(
-            "File with file_path '{}' already exists",
-            req.file_path
-        )));
-    }
-
     let (file_size, file_checksum) = utils::download_and_checksum(&req.url.clone())
         .await
         .map_err(|_| ABError::InternalServerError("Download or checksum failure".to_string()))?;
 
-    let created_file = conn
-        .transaction::<DbFile, diesel::result::Error, _>(|conn| {
+    let pool = state.db_pool.clone();
+    let request = req.into_inner();
+
+    let created_file = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let existing_file = files
+            .filter(org_id.eq(&organisation))
+            .filter(app_id.eq(&application))
+            .filter(file_path.eq(&request.file_path))
+            .filter(tag.eq(&request.tag))
+            .select(DbFile::as_select())
+            .first::<DbFile>(&mut conn)
+            .optional()?;
+
+        if existing_file.is_some() {
+            return Err(ABError::BadRequest(format!(
+                "File with file_path '{}' already exists",
+                request.file_path
+            )));
+        }
+
+        let result = conn.transaction::<DbFile, diesel::result::Error, _>(|conn| {
             let latest_file = files
-                .filter(file_path.eq(&req.file_path))
+                .filter(file_path.eq(&request.file_path))
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
                 .order(version.desc())
@@ -113,13 +114,13 @@ async fn create_file(
             let new_file = NewFileEntry {
                 app_id: application.clone(),
                 org_id: organisation.clone(),
-                url: req.url.clone(),
-                file_path: req.file_path.clone(),
+                url: request.url.clone(),
+                file_path: request.file_path.clone(),
                 version: latest_version + 1,
-                tag: req.tag.clone(),
+                tag: request.tag.clone(),
                 size: file_size as i64,
                 checksum: file_checksum,
-                metadata: req.metadata.clone().unwrap_or_else(|| json!({})),
+                metadata: request.metadata.clone().unwrap_or_else(|| json!({})),
                 created_at: Utc::now(),
             };
 
@@ -127,8 +128,9 @@ async fn create_file(
                 .values(&new_file)
                 .returning(DbFile::as_returning())
                 .get_result::<DbFile>(conn)
-        })
-        .map_err(|_| ABError::DbError("Failed to create file".to_string()))?;
+        })?;
+        Ok(result)
+    })?;
 
     Ok(Json(db_file_to_response(&created_file)))
 }
@@ -145,17 +147,17 @@ async fn bulk_create_files(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
+    let request = req.into_inner();
 
-    let mut new_files = Vec::new();
-    let mut skipped_files = Vec::new();
+    let (inserted_files, skipped_files) = run_blocking!({
+        let mut conn = pool.get()?;
 
-    let inserted_files = conn
-        .transaction::<Vec<DbFile>, diesel::result::Error, _>(|conn| {
-            for file_req in &req.files {
+        let mut new_files = Vec::new();
+        let mut skipped_files = Vec::new();
+
+        let result = conn.transaction::<Vec<DbFile>, diesel::result::Error, _>(|conn| {
+            for file_req in &request.files {
                 let existing_file = files
                     .filter(org_id.eq(&organisation))
                     .filter(app_id.eq(&application))
@@ -166,7 +168,7 @@ async fn bulk_create_files(
                     .optional()?;
 
                 if existing_file.is_some() {
-                    if req.skip_duplicates {
+                    if request.skip_duplicates {
                         skipped_files.push(file_req.file_path.clone());
                         continue;
                     }
@@ -211,14 +213,10 @@ async fn bulk_create_files(
                 .values(&new_files)
                 .returning(DbFile::as_returning())
                 .get_results::<DbFile>(conn)
-        })
-        .map_err(|e| match e {
-            diesel::result::Error::DatabaseError(
-                diesel::result::DatabaseErrorKind::UniqueViolation,
-                info,
-            ) => ABError::InternalServerError(info.message().to_string()),
-            _ => ABError::InternalServerError("DB Error".to_string()),
         })?;
+
+        Ok((result, skipped_files))
+    })?;
 
     let created_files: Vec<FileResponse> = inserted_files
         .clone()
@@ -232,11 +230,15 @@ async fn bulk_create_files(
         let res_id = res.id;
         task::spawn(async move {
             if let Ok((file_size, file_checksum)) = utils::download_and_checksum(&file_url).await {
-                if let Ok(mut conn) = pool.get() {
-                    let _ = diesel::update(files.find(res_id))
-                        .set((size.eq(file_size as i64), checksum.eq(file_checksum)))
-                        .execute(&mut conn);
-                }
+                let mut conn = pool.get()?;
+                diesel::update(files.find(res_id))
+                    .set((size.eq(file_size as i64), checksum.eq(file_checksum)))
+                    .execute(&mut conn)?;
+                Ok(())
+            } else {
+                Err(ABError::InternalServerError(
+                    "Failed to download file".into(),
+                ))
             }
         });
     }
@@ -280,34 +282,36 @@ async fn get_file(
     let application = validate_user(auth_response.application, READ)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    let file = if let Some(f_version) = file_version {
-        files
-            .filter(file_path.eq(&input_file_path))
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application))
-            .filter(version.eq(f_version))
-            .select(DbFile::as_select())
-            .first::<DbFile>(&mut conn)
-            .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?
-    } else if let Some(f_tag) = file_tag {
-        files
-            .filter(file_path.eq(&input_file_path))
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application))
-            .filter(tag.eq(f_tag))
-            .select(DbFile::as_select())
-            .first::<DbFile>(&mut conn)
-            .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?
-    } else {
-        return Err(ABError::BadRequest(
-            "File key must contain a version or tag".to_string(),
-        ));
-    };
+    let file = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let result = if let Some(f_version) = file_version {
+            files
+                .filter(file_path.eq(&input_file_path))
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(version.eq(f_version))
+                .select(DbFile::as_select())
+                .first::<DbFile>(&mut conn)
+                .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?
+        } else if let Some(f_tag) = file_tag {
+            files
+                .filter(file_path.eq(&input_file_path))
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(tag.eq(f_tag))
+                .select(DbFile::as_select())
+                .first::<DbFile>(&mut conn)
+                .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?
+        } else {
+            return Err(ABError::BadRequest(
+                "File key must contain a version or tag".to_string(),
+            ));
+        };
+        Ok(result)
+    })?;
 
     Ok(Json(db_file_to_response(&file)))
 }
@@ -324,57 +328,55 @@ async fn list_files(
     let application = validate_user(auth_response.application, READ)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-
-    let base_query = files
-        .filter(org_id.eq(&organisation))
-        .filter(app_id.eq(&application));
-
-    let search_filter = if let Some(search_term) = &query.search {
-        let search_pattern = format!("%{}%", search_term);
-        Some((search_pattern.clone(), search_pattern))
-    } else {
-        None
-    };
-
-    let total = if let Some((ref pattern1, ref pattern2)) = search_filter {
-        base_query
-            .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-            .count()
-            .get_result::<i64>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))? as usize
-    } else {
-        base_query
-            .count()
-            .get_result::<i64>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))? as usize
-    };
-
+    let pool = state.db_pool.clone();
+    let search_term = query.search.clone();
     let page = query.page.unwrap_or(1);
     let per_page = query.per_page.unwrap_or(50).min(200);
-    let offset = ((page - 1) * per_page) as i64;
 
-    let file_list = if let Some((ref pattern1, ref pattern2)) = search_filter {
-        base_query
-            .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-            .order(created_at.desc())
-            .limit(per_page as i64)
-            .offset(offset)
-            .select(DbFile::as_select())
-            .load::<DbFile>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
-    } else {
-        base_query
-            .order(created_at.desc())
-            .limit(per_page as i64)
-            .offset(offset)
-            .select(DbFile::as_select())
-            .load::<DbFile>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
-    };
+    let (file_list, total) = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let base_query = files
+            .filter(org_id.eq(&organisation))
+            .filter(app_id.eq(&application));
+
+        let search_filter = if let Some(search_term) = &search_term {
+            let search_pattern = format!("%{}%", search_term);
+            Some((search_pattern.clone(), search_pattern))
+        } else {
+            None
+        };
+
+        let total = if let Some((ref pattern1, ref pattern2)) = search_filter {
+            base_query
+                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
+                .count()
+                .get_result::<i64>(&mut conn)? as usize
+        } else {
+            base_query.count().get_result::<i64>(&mut conn)? as usize
+        };
+
+        let offset = ((page - 1) * per_page) as i64;
+
+        let file_list = if let Some((ref pattern1, ref pattern2)) = search_filter {
+            base_query
+                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
+                .order(created_at.desc())
+                .limit(per_page as i64)
+                .offset(offset)
+                .select(DbFile::as_select())
+                .load::<DbFile>(&mut conn)?
+        } else {
+            base_query
+                .order(created_at.desc())
+                .limit(per_page as i64)
+                .offset(offset)
+                .select(DbFile::as_select())
+                .load::<DbFile>(&mut conn)?
+        };
+
+        Ok((file_list, total))
+    })?;
 
     let files_response = file_list
         .into_iter()
@@ -411,13 +413,13 @@ async fn update_file(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
+    let request = req.into_inner();
 
-    let file = conn
-        .transaction::<DbFile, diesel::result::Error, _>(|conn| {
+    let file = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let result = conn.transaction::<DbFile, diesel::result::Error, _>(|conn| {
             let file_in_db = if let Some(f_version) = file_version {
                 files
                     .filter(file_path.eq(&input_file_path))
@@ -439,15 +441,17 @@ async fn update_file(
             };
 
             diesel::update(files.filter(id.eq(file_in_db.id)))
-                .set(tag.eq(&req.tag))
+                .set(tag.eq(&request.tag))
                 .execute(conn)?;
 
             files
                 .filter(id.eq(file_in_db.id))
                 .select(DbFile::as_select())
                 .first::<DbFile>(conn)
-        })
-        .map_err(|e| ABError::DbError(e.to_string()))?;
+        })?;
+
+        Ok(result)
+    })?;
 
     Ok(Json(db_file_to_response(&file)))
 }
@@ -464,53 +468,58 @@ async fn upload_file(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-
     let file_path_str = form.file_path.into_inner();
     let uploaded_file = form.file;
+    let file_version = *form.version;
 
     if file_path_str.is_empty() {
         return Err(ABError::BadRequest("File path cannot be empty".to_string()));
     }
 
-    let existing_file = files
-        .filter(org_id.eq(&organisation))
-        .filter(app_id.eq(&application))
-        .filter(file_path.eq(&file_path_str))
-        .filter(version.eq(*form.version))
-        .select(DbFile::as_select())
-        .first::<DbFile>(&mut conn)
-        .optional()
-        .map_err(|_| ABError::DbError("".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    if existing_file.is_some() {
-        return Err(ABError::BadRequest(format!(
-            "File with file_path '{}' already exists",
-            file_path_str
-        )));
-    }
+    let db_org = organisation.clone();
+    let db_app = application.clone();
+    let db_file_path = file_path_str.clone();
+    let created_file = run_blocking!({
+        let mut conn = pool.get()?;
 
-    let new_file = NewFileEntry {
-        app_id: application.clone(),
-        org_id: organisation.clone(),
-        url: "".to_string(),
-        file_path: file_path_str.clone(),
-        tag: "".to_string(),
-        version: *form.version,
-        size: 0,
-        checksum: "".to_string(),
-        metadata: json!({}),
-        created_at: Utc::now(),
-    };
+        let existing_file = files
+            .filter(org_id.eq(&db_org))
+            .filter(app_id.eq(&db_app))
+            .filter(file_path.eq(&db_file_path))
+            .filter(version.eq(file_version))
+            .select(DbFile::as_select())
+            .first::<DbFile>(&mut conn)
+            .optional()?;
 
-    let created_file = diesel::insert_into(files)
-        .values(&new_file)
-        .returning(DbFile::as_returning())
-        .get_result::<DbFile>(&mut conn)
-        .map_err(|_| ABError::DbError("Insert Fail".to_string()))?;
+        if existing_file.is_some() {
+            return Err(ABError::BadRequest(format!(
+                "File with file_path '{}' already exists",
+                db_file_path
+            )));
+        }
+
+        let new_file = NewFileEntry {
+            app_id: db_app.clone(),
+            org_id: db_org.clone(),
+            url: "".to_string(),
+            file_path: db_file_path.clone(),
+            tag: "".to_string(),
+            version: file_version,
+            size: 0,
+            checksum: "".to_string(),
+            metadata: json!({}),
+            created_at: Utc::now(),
+        };
+
+        let result = diesel::insert_into(files)
+            .values(&new_file)
+            .returning(DbFile::as_returning())
+            .get_result::<DbFile>(&mut conn)?;
+
+        Ok(result)
+    })?;
 
     let file_data = tokio::fs::read(uploaded_file.file.path())
         .await
@@ -544,24 +553,35 @@ async fn upload_file(
     .await
     {
         Ok(obj) => {
-            println!("File uploaded successfully: {:?}", obj);
+            info!("File uploaded successfully: {:?}", obj);
             let file_url = utils::create_s3_file_url(&state.env.bucket_name, &s3_path);
 
-            diesel::update(files.filter(id.eq(created_file.id)))
-                .set((
-                    url.eq(file_url),
-                    size.eq(file_size),
-                    checksum.eq(calculated_checksum),
-                ))
-                .execute(&mut conn)
-                .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+            let pool = state.db_pool.clone();
+            let file_id = created_file.id;
+
+            run_blocking!({
+                let mut conn = pool.get()?;
+                diesel::update(files.filter(id.eq(file_id)))
+                    .set((
+                        url.eq(file_url),
+                        size.eq(file_size),
+                        checksum.eq(calculated_checksum),
+                    ))
+                    .execute(&mut conn)?;
+                Ok(())
+            })?;
 
             Ok(Json(db_file_to_response(&created_file)))
         }
         Err(e) => {
-            diesel::delete(files.filter(id.eq(created_file.id)))
-                .execute(&mut conn)
-                .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+            let pool = state.db_pool.clone();
+            let file_id = created_file.id;
+
+            let _ = run_blocking!({
+                let mut conn = pool.get()?;
+                diesel::delete(files.filter(id.eq(file_id))).execute(&mut conn)?;
+                Ok(())
+            });
 
             Err(ABError::InternalServerError(format!(
                 "Failed to upload file to S3: {:?}",
@@ -603,64 +623,72 @@ async fn upload_bulk_files(
         serde_json::from_str(&map_contents).map_err(|e| ABError::BadRequest(e.to_string()))?
     };
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
+    let skip_duplicates = *req.skip_duplicates;
 
-    let mut to_be_uploaded = Vec::new();
-    let mut skipped = Vec::new();
-    let mut uploaded = Vec::new();
+    let db_org = organisation.clone();
+    let db_app = application.clone();
+    let (inserted_files, to_be_uploaded, skipped) = run_blocking!({
+        let mut conn = pool.get()?;
 
-    for m in mappings {
-        let existing_file = files
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application))
-            .filter(file_path.eq(&m.file_path))
-            .filter(version.eq(&m.version))
-            .select(DbFile::as_select())
-            .first::<DbFile>(&mut conn)
-            .optional()
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+        let mut to_be_uploaded = Vec::new();
+        let mut skipped = Vec::new();
 
-        if existing_file.is_some() {
-            if *req.skip_duplicates {
-                skipped.push(m.file_path.clone());
-                continue;
+        for m in mappings {
+            let existing_file = files
+                .filter(org_id.eq(&db_org))
+                .filter(app_id.eq(&db_app))
+                .filter(file_path.eq(&m.file_path))
+                .filter(version.eq(&m.version))
+                .select(DbFile::as_select())
+                .first::<DbFile>(&mut conn)
+                .optional()?;
+
+            if existing_file.is_some() {
+                if skip_duplicates {
+                    skipped.push(m.file_path.clone());
+                    continue;
+                }
+                return Err(ABError::BadRequest(format!(
+                    "A file with file_path '{}' already exists with same version '{}'",
+                    m.file_path, m.version
+                )));
             }
-            return Err(ABError::BadRequest(format!(
-                "A file with file_path '{}' already exists with same version '{}'",
-                m.file_path, m.version
-            )));
+
+            let new_file = NewFileEntry {
+                app_id: db_app.clone(),
+                org_id: db_org.clone(),
+                url: "".to_string(),
+                file_path: m.file_path.clone(),
+                version: m.version,
+                size: 0,
+                tag: "".to_string(),
+                checksum: "".to_string(),
+                metadata: m.metadata.clone().unwrap_or_else(|| json!({})),
+                created_at: Utc::now(),
+            };
+            to_be_uploaded.push((m, new_file));
         }
 
-        let new_file = NewFileEntry {
-            app_id: application.clone(),
-            org_id: organisation.clone(),
-            url: "".to_string(),
-            file_path: m.file_path.clone(),
-            version: m.version,
-            size: 0,
-            tag: "".to_string(),
-            checksum: "".to_string(),
-            metadata: m.metadata.clone().unwrap_or_else(|| json!({})),
-            created_at: Utc::now(),
+        let inserted_files = if !to_be_uploaded.is_empty() {
+            diesel::insert_into(files)
+                .values(
+                    to_be_uploaded
+                        .iter()
+                        .map(|(_, file)| file)
+                        .collect::<Vec<_>>(),
+                )
+                .returning(DbFile::as_returning())
+                .get_results::<DbFile>(&mut conn)?
+        } else {
+            Vec::new()
         };
-        to_be_uploaded.push((m, new_file));
-    }
+
+        Ok((inserted_files, to_be_uploaded, skipped))
+    })?;
+    let mut uploaded = Vec::new();
 
     if !to_be_uploaded.is_empty() {
-        let inserted_files = diesel::insert_into(files)
-            .values(
-                to_be_uploaded
-                    .iter()
-                    .map(|(_, file)| file)
-                    .collect::<Vec<_>>(),
-            )
-            .returning(DbFile::as_returning())
-            .get_results::<DbFile>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-
         for mapping in to_be_uploaded.iter().map(|(m, _)| m) {
             let created_file = inserted_files
                 .iter()
@@ -704,22 +732,33 @@ async fn upload_bulk_files(
             {
                 Ok(_) => {
                     let file_url = utils::create_s3_file_url(&state.env.bucket_name, &s3_path);
+                    let pool = state.db_pool.clone();
+                    let file_id = created_file.id;
 
-                    diesel::update(files.filter(id.eq(created_file.id)))
-                        .set((
-                            url.eq(file_url),
-                            size.eq(file_size),
-                            checksum.eq(file_checksum),
-                        ))
-                        .execute(&mut conn)
-                        .map_err(|_| ABError::DbError("".to_string()))?;
+                    run_blocking!({
+                        let mut conn = pool.get()?;
+                        diesel::update(files.filter(id.eq(file_id)))
+                            .set((
+                                url.eq(file_url),
+                                size.eq(file_size),
+                                checksum.eq(file_checksum),
+                            ))
+                            .execute(&mut conn)?;
+                        Ok(())
+                    })?;
 
                     uploaded.push(db_file_to_response(created_file));
                 }
                 Err(e) => {
-                    diesel::delete(files.filter(id.eq(created_file.id)))
-                        .execute(&mut conn)
-                        .map_err(|_| ABError::DbError("".to_string()))?;
+                    let pool = state.db_pool.clone();
+                    let file_id = created_file.id;
+
+                    let _ = run_blocking!({
+                        let mut conn = pool.get()?;
+                        diesel::delete(files.filter(id.eq(file_id))).execute(&mut conn)?;
+                        Ok(())
+                    });
+
                     return Err(ABError::InternalServerError(format!(
                         "Failed to upload file to S3: {:?}",
                         e

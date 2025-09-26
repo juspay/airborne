@@ -82,7 +82,7 @@ pub async fn add_user_with_transaction(
         .map_err(|e| OrgError::Internal(format!("Failed to add user to group: {}", e)))?;
     }
 
-    println!("Let's update the subgroups");
+    info!("Let's update the subgroups");
     match admin
         .realm_groups_with_group_id_children_get(
             realm,

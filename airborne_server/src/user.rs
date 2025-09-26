@@ -23,6 +23,7 @@ use keycloak::{
     types::{CredentialRepresentation, UserRepresentation},
     KeycloakAdmin,
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -82,14 +83,14 @@ async fn create_user(
     req: Json<UserCredentials>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
-    println!("[CREATE_USER] Attempting to create user: {}", req.name);
+    info!("[CREATE_USER] Attempting to create user: {}", req.name);
 
     // Get Keycloak Admin Token
     let client = reqwest::Client::new();
     let admin_token = get_token(state.env.clone(), client)
         .await
         .map_err(|_| ABError::InternalServerError("Failed to get admin token".to_string()))?;
-    println!("[CREATE_USER] Got admin token successfully");
+    info!("[CREATE_USER] Got admin token successfully");
 
     let client = reqwest::Client::new();
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
@@ -120,15 +121,15 @@ async fn create_user(
         .await
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
-    println!("[CREATE_USER] Checking if user already exists");
+    info!("[CREATE_USER] Checking if user already exists");
     // Reject if user is present in db
     let exists = users.iter().any(|user| user.id == Some(req.name.clone()));
     if exists {
-        println!("[CREATE_USER] User {} already exists", req.name);
+        info!("[CREATE_USER] User {} already exists", req.name);
         return Err(ABError::BadRequest("User already Exists".to_string()));
     }
 
-    println!("[CREATE_USER] Creating new user in Keycloak: {}", req.name);
+    info!("[CREATE_USER] Creating new user in Keycloak: {}", req.name);
     // If not present in keycloak create a new user in keycloak
     let user = UserRepresentation {
         username: Some(req.name.clone()),
@@ -161,7 +162,7 @@ async fn login_implementation(
     req: UserCredentials,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
-    println!("[LOGIN] Login attempt for user: {}", req.name);
+    info!("[LOGIN] Login attempt for user: {}", req.name);
 
     // Move ENVs to App State
     let url = state.env.keycloak_url.clone();
@@ -170,7 +171,7 @@ async fn login_implementation(
     let realm = state.env.realm.clone();
 
     let url = format!("{}/realms/{}/protocol/openid-connect/token", url, realm);
-    println!("[LOGIN] Attempting Keycloak login at URL: {}", url);
+    info!("[LOGIN] Attempting Keycloak login at URL: {}", url);
 
     // Keycloak login API
     let client = reqwest::Client::new();
@@ -190,23 +191,20 @@ async fn login_implementation(
         .map_err(|e| ABError::InternalServerError(e.to_string()))?; // Handle request failure
 
     if response.status().is_success() {
-        println!("[LOGIN] Login successful for user: {}", req.name);
+        info!("[LOGIN] Login successful for user: {}", req.name);
         let token: UserToken = response
             .json()
             .await
             .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-        println!("[LOGIN] Token successful for user: {:?}", token);
         let token_data = decode_jwt_token(
             &token.access_token,
             &state.env.keycloak_public_key,
             &state.env.client_id,
         )
         .map_err(|_| ABError::Unauthorized("Token has expired or is invalid".to_string()))?;
-        println!("[LOGIN] Token data successful for user: {:?}", token_data);
         let admin_token = get_token(state.env.clone(), client)
             .await
             .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-        println!("[LOGIN] Token admin successful for user: {:?}", admin_token);
         let mut user_resp = get_user_impl(
             AuthResponse {
                 sub: token_data.claims.sub,
@@ -222,7 +220,7 @@ async fn login_implementation(
         user_resp.user_token = Some(token);
         return Ok(user_resp);
     } else {
-        println!("[LOGIN] Login failed for user: {}", req.name);
+        info!("[LOGIN] Login failed for user: {}", req.name);
     }
 
     // If response is not successful, extract error message
@@ -263,7 +261,7 @@ async fn get_user_impl(
     authresponse: AuthResponse,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
-    println!(
+    info!(
         "[GET_USER] Fetching user details for ID: {}",
         authresponse.sub
     );
@@ -281,7 +279,7 @@ async fn get_user_impl(
         .realm_users_with_user_id_groups_get(&realm, &user_id, None, None, None, None)
         .await
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-    println!("[GET_USER] Retrieved {} groups for user", groups.len());
+    info!("[GET_USER] Retrieved {} groups for user", groups.len());
 
     // Reject if organisation is present in db
     // If not present in db create entry in db and return success
@@ -295,16 +293,10 @@ async fn get_user_impl(
 }
 
 fn parse_groups(user_id: String, groups: Vec<String>) -> User {
-    println!(
-        "[PARSE_GROUPS] Parsing {} groups for user: {}",
-        groups.len(),
-        user_id
-    );
-
     let mut organisations: HashMap<String, Organisation> = HashMap::new();
 
     for group in groups.iter() {
-        println!("[PARSE_GROUPS] Processing group: {}", group);
+        info!("[PARSE_GROUPS] Processing group: {}", group);
         let path = group.trim_matches('/'); // Remove leading/trailing slashes
         let parts: Vec<&str> = path.split('/').collect();
 
@@ -357,7 +349,7 @@ fn parse_groups(user_id: String, groups: Vec<String>) -> User {
         }
     }
 
-    println!(
+    info!(
         "[PARSE_GROUPS] Finished parsing. Found {} organisations",
         organisations.len()
     );
@@ -420,9 +412,9 @@ async fn get_oauth_url(
         oauth_state
     );
 
-    println!("[OAUTH_URL] Generated OAuth URL: {}", auth_url);
-    println!("[OAUTH_URL] Base URL from request: {}", base_url);
-    println!("[OAUTH_URL] Redirect URI: {}", redirect_uri);
+    info!("[OAUTH_URL] Generated OAuth URL: {}", auth_url);
+    info!("[OAUTH_URL] Base URL from request: {}", base_url);
+    info!("[OAUTH_URL] Redirect URI: {}", redirect_uri);
 
     Ok(Json(json!({
         "auth_url": auth_url,
@@ -454,9 +446,9 @@ async fn exchange_code_for_token(
         ("redirect_uri", redirect_uri.to_string()),
     ];
 
-    println!("[EXCHANGE_CODE] Exchanging code for token");
-    println!("[EXCHANGE_CODE] URL: {}", url);
-    println!("[EXCHANGE_CODE] Redirect URI: {}", redirect_uri);
+    info!("[EXCHANGE_CODE] Exchanging code for token");
+    info!("[EXCHANGE_CODE] URL: {}", url);
+    info!("[EXCHANGE_CODE] Redirect URI: {}", redirect_uri);
 
     let client = reqwest::Client::new();
     let response = client
@@ -466,7 +458,7 @@ async fn exchange_code_for_token(
         .send()
         .await
         .map_err(|e| {
-            println!("[EXCHANGE_CODE] Request failed: {}", e);
+            info!("[EXCHANGE_CODE] Request failed: {}", e);
             ABError::InternalServerError(e.to_string())
         })?;
 
@@ -477,7 +469,7 @@ async fn exchange_code_for_token(
             .map_err(|e| ABError::InternalServerError(e.to_string()))
     } else {
         let error_text = response.text().await.unwrap_or_default();
-        println!("[EXCHANGE_CODE] Token exchange failed: {}", error_text);
+        info!("[EXCHANGE_CODE] Token exchange failed: {}", error_text);
         Err(ABError::Unauthorized(format!(
             "Token exchange failed: {}",
             error_text
@@ -496,14 +488,14 @@ async fn oauth_login(
             "Google Sign-in is disabled".to_string(),
         ));
     }
-    println!("[OAUTH_LOGIN] Processing OAuth login with code");
+    info!("[OAUTH_LOGIN] Processing OAuth login with code");
 
     let oauth_req = json_req.into_inner();
 
     let token_response = match exchange_code_for_token(&oauth_req.code, &req, &state).await {
         Ok(response) => response,
         Err(e) => {
-            println!("[OAUTH_LOGIN] Token exchange failed: {:?}", e);
+            info!("[OAUTH_LOGIN] Token exchange failed: {:?}", e);
             return Err(e);
         }
     };
@@ -515,7 +507,7 @@ async fn oauth_login(
         &state.env.client_id,
     )
     .map_err(|e| {
-        println!("[OAUTH_LOGIN] Token decode failed: {:?}", e);
+        info!("[OAUTH_LOGIN] Token decode failed: {:?}", e);
         ABError::BadRequest("Invalid token".to_string())
     })?;
 
@@ -564,7 +556,7 @@ async fn oauth_signup(
             "Google Sign-in is disabled".to_string(),
         ));
     }
-    println!("[OAUTH_SIGNUP] Processing OAuth signup with code");
+    info!("[OAUTH_SIGNUP] Processing OAuth signup with code");
 
     let oauth_req = json_req.into_inner();
 
@@ -579,7 +571,7 @@ async fn oauth_signup(
     )
     .map_err(|_| ABError::Unauthorized("Invalid token".to_string()))?;
 
-    println!(
+    info!(
         "[OAUTH_SIGNUP] Successfully authenticated user via Google OAuth: {}",
         token_data.claims.sub
     );
@@ -611,7 +603,7 @@ async fn oauth_signup(
         refresh_expires_in: token_response.refresh_expires_in.unwrap_or(0),
     });
 
-    println!(
+    info!(
         "[OAUTH_SIGNUP] OAuth signup completed successfully for user: {}",
         user_resp.user_id
     );

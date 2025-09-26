@@ -212,9 +212,6 @@ impl Client {
         let metric_families = registry.gather();
         encoder.encode(&metric_families, &mut buffer).unwrap();
 
-        // Output to the standard output.
-        println!("Yuvraj Registry {}", String::from_utf8(buffer).unwrap());
-
         Ok(Self {
             registry,
             ota_events_total,

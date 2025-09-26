@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use actix_web::http::StatusCode;
+use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
+use log::error;
 use serde::Serialize;
 use superposition_sdk::Client;
 use thiserror::Error;
@@ -67,9 +69,6 @@ pub enum ABError {
     #[error("{0}")]
     NotFound(String),
 
-    #[error("Database error: {0}")]
-    DbError(String),
-
     #[error("{0}")]
     InternalServerError(String),
 
@@ -81,29 +80,57 @@ pub enum ABError {
 
     #[error("{0}")]
     Forbidden(String),
+
+    #[error("R2D2 error: {0}")]
+    R2D2Error(#[from] r2d2::Error),
+}
+
+impl From<DieselErr> for ABError {
+    fn from(err: DieselErr) -> Self {
+        match err {
+            DieselErr::NotFound => ABError::NotFound("not found".into()),
+
+            DieselErr::DatabaseError(DatabaseErrorKind::UniqueViolation, info) => {
+                error!("Unique violation error: {:?}", info);
+                ABError::BadRequest("already exists".into())
+            }
+
+            DieselErr::DatabaseError(kind, info) => {
+                error!("Database error: kind: {:?}, info: {:?}", kind, info);
+                ABError::InternalServerError("service error".into())
+            }
+
+            _other => ABError::InternalServerError("service error".into()),
+        }
+    }
 }
 
 impl AppError for ABError {
     fn code(&self) -> &'static str {
         match self {
             ABError::NotFound(_) => ABErrorCodes::NotFound.label(),
-            ABError::DbError(_) => ABErrorCodes::DbError.label(),
             ABError::InternalServerError(_) => ABErrorCodes::InternalServerError.label(),
             ABError::Unauthorized(_) => ABErrorCodes::Unauthorized.label(),
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
+            ABError::R2D2Error(_) => ABErrorCodes::InternalServerError.label(),
         }
     }
 
     fn status_code(&self) -> StatusCode {
         match *self {
             ABError::NotFound(_) => StatusCode::NOT_FOUND,
-            ABError::DbError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
+            ABError::R2D2Error(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
+    }
+
+    fn message(&self) -> String {
+        error!("Airborne Error: {:?}", self);
+        self.to_string()
     }
 }
 
@@ -138,7 +165,6 @@ pub trait HasLabel {
 
 pub enum ABErrorCodes {
     NotFound,
-    DbError,
     InternalServerError,
     Unauthorized,
     BadRequest,
@@ -149,11 +175,28 @@ impl HasLabel for ABErrorCodes {
     fn label(&self) -> &'static str {
         match self {
             ABErrorCodes::NotFound => "AB_001",
-            ABErrorCodes::DbError => "AB_002",
             ABErrorCodes::InternalServerError => "AB_003",
             ABErrorCodes::Unauthorized => "AB_004",
             ABErrorCodes::BadRequest => "AB_005",
             ABErrorCodes::Forbidden => "AB_006",
         }
     }
+}
+
+/// Example:
+/// ```
+/// let res: Result<T, ABError> = run_blocking!({
+///     let mut conn = pool.get()?;
+///     my_diesel_query(&mut conn)
+/// });
+/// ```
+#[macro_export]
+macro_rules! run_blocking {
+    ($body:block) => {{
+        use actix_web::web;
+        web::block(move || -> Result<_, ABError> { $body })
+            .await
+            .map_err(|e| ABError::InternalServerError(format!("Blocking error: {e}")))
+            .and_then(|inner| inner)
+    }};
 }

@@ -2,6 +2,7 @@ pub mod utils;
 use crate::{
     middleware::auth::READ,
     package::{types::*, utils::parse_package_key},
+    run_blocking,
     types::ABError,
     utils::db::{
         models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
@@ -55,81 +56,82 @@ async fn create_package(
     let application = validate_user(auth_response.application, WRITE)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
+    let request = req.into_inner();
 
-    let files: Vec<FileEntry> = if !req.files.is_empty() {
-        let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+    let package = run_blocking!({
+        let mut conn = pool.get()?;
 
-        for file_id in &req.files {
-            let (fp, ver_opt, tag_opt) = parse_file_key(file_id);
+        let files: Vec<FileEntry> = if !request.files.is_empty() {
+            let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
 
-            if let Some(v) = ver_opt {
-                file_conds.push(Box::new(file_path.eq(fp.clone()).and(file_version.eq(v))));
-            } else if let Some(t) = tag_opt {
-                file_conds.push(Box::new(
-                    file_path.eq(fp.clone()).and(file_tag.eq(t.clone())),
-                ));
-            } else {
-                return Err(ABError::BadRequest("Invalid file key format".to_string()));
+            for file_id in &request.files {
+                let (fp, ver_opt, tag_opt) = parse_file_key(file_id);
+
+                if let Some(v) = ver_opt {
+                    file_conds.push(Box::new(file_path.eq(fp.clone()).and(file_version.eq(v))));
+                } else if let Some(t) = tag_opt {
+                    file_conds.push(Box::new(
+                        file_path.eq(fp.clone()).and(file_tag.eq(t.clone())),
+                    ));
+                } else {
+                    return Err(ABError::BadRequest("Invalid file key format".to_string()));
+                }
             }
+
+            let combined = file_conds
+                .into_iter()
+                .reduce(|a, b| Box::new(a.or(b)))
+                .unwrap_or(Box::new(file_path.eq("")));
+
+            let files: Vec<FileEntry> = files_table
+                .into_boxed::<Pg>()
+                .filter(file_org_id.eq(&organisation))
+                .filter(file_app_id.eq(&application))
+                .filter(combined)
+                .load(&mut conn)?;
+            files
+        } else {
+            vec![]
+        };
+
+        if files.len() != request.files.len() {
+            return Err(ABError::BadRequest("Some files not found".to_string()));
         }
 
-        let combined = file_conds
-            .into_iter()
-            .reduce(|a, b| Box::new(a.or(b)))
-            .unwrap_or(Box::new(file_path.eq("")));
+        let latest_package = packages_table
+            .filter(package_org_id.eq(&organisation))
+            .filter(package_app_id.eq(&application))
+            .order(package_version.desc())
+            .select(PackageV2Entry::as_select())
+            .first::<PackageV2Entry>(&mut conn)
+            .optional()?;
 
-        let files: Vec<FileEntry> = files_table
-            .into_boxed::<Pg>()
-            .filter(file_org_id.eq(&organisation))
-            .filter(file_app_id.eq(&application))
-            .filter(combined)
-            .load(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-        files
-    } else {
-        vec![]
-    };
+        let new_version = if let Some(latest) = latest_package {
+            latest.version + 1
+        } else {
+            1
+        };
 
-    if files.len() != req.files.len() {
-        return Err(ABError::BadRequest("Some files not found".to_string()));
-    }
+        let new_package = NewPackageV2Entry {
+            index: request.index.clone(),
+            org_id: organisation.clone(),
+            app_id: application.clone(),
+            tag: request.tag.clone(),
+            version: new_version,
+            files: files
+                .iter()
+                .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
+                .collect(),
+        };
 
-    let latest_package = packages_table
-        .filter(package_org_id.eq(&organisation))
-        .filter(package_app_id.eq(&application))
-        .order(package_version.desc())
-        .select(PackageV2Entry::as_select())
-        .first::<PackageV2Entry>(&mut conn)
-        .optional()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+        let result = diesel::insert_into(packages_table)
+            .values(&new_package)
+            .returning(PackageV2Entry::as_returning())
+            .get_result::<PackageV2Entry>(&mut conn)?;
 
-    let new_version = if let Some(latest) = latest_package {
-        latest.version + 1
-    } else {
-        1
-    };
-
-    let new_package = NewPackageV2Entry {
-        index: req.index.clone(),
-        org_id: organisation.clone(),
-        app_id: application.clone(),
-        tag: req.tag.clone(),
-        version: new_version,
-        files: files
-            .iter()
-            .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
-            .collect(),
-    };
-
-    let package = diesel::insert_into(packages_table)
-        .values(&new_package)
-        .returning(PackageV2Entry::as_returning())
-        .get_result::<PackageV2Entry>(&mut conn)
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+        Ok(result)
+    })?;
 
     Ok(HttpResponse::Created().json(utils::db_response_to_package(package)))
 }
@@ -153,30 +155,31 @@ async fn get_package(
     let application = validate_user(auth_response.application, READ)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
 
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    let package = if let Some(pkg_tag) = opt_pkg_tag {
-        packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
-            .filter(package_tag.eq(&pkg_tag))
-            .select(PackageV2Entry::as_select())
-            .first::<PackageV2Entry>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
-    } else if let Some(pkg_version) = opt_pkg_version {
-        packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
-            .filter(package_version.eq(&pkg_version))
-            .select(PackageV2Entry::as_select())
-            .first::<PackageV2Entry>(&mut conn)
-            .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?
-    } else {
-        return Err(ABError::BadRequest("Bad format for package id".to_string()));
-    };
+    let package = run_blocking!({
+        let mut conn = pool.get()?;
+
+        if let Some(pkg_tag) = opt_pkg_tag {
+            let result = packages_table
+                .filter(package_org_id.eq(&organisation))
+                .filter(package_app_id.eq(&application))
+                .filter(package_tag.eq(&pkg_tag))
+                .select(PackageV2Entry::as_select())
+                .first::<PackageV2Entry>(&mut conn)?;
+            Ok(result)
+        } else if let Some(pkg_version) = opt_pkg_version {
+            let result = packages_table
+                .filter(package_org_id.eq(&organisation))
+                .filter(package_app_id.eq(&application))
+                .filter(package_version.eq(&pkg_version))
+                .select(PackageV2Entry::as_select())
+                .first::<PackageV2Entry>(&mut conn)?;
+            Ok(result)
+        } else {
+            Err(ABError::BadRequest("Bad format for package id".to_string()))
+        }
+    })?;
     Ok(HttpResponse::Ok().json(utils::db_response_to_package(package)))
 }
 
@@ -192,33 +195,34 @@ async fn list_packages(
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
     let application = validate_user(auth.application, READ)
         .map_err(|_| ABError::Unauthorized("No Access".to_string()))?;
-    let mut conn = state
-        .db_pool
-        .get()
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
-
     // sanitize / defaults
     let offset_val = offset.unwrap_or(0).max(0) as i64;
     let limit_val = limit.unwrap_or(10).clamp(1, 100) as i64; // default 10, max 100
 
-    // 1) total count
-    let total_count: i64 = packages_table
-        .filter(package_org_id.eq(&organisation))
-        .filter(package_app_id.eq(&application))
-        .select(count_star())
-        .first(&mut conn)
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let pool = state.db_pool.clone();
 
-    // 2) fetch one page
-    let rows: Vec<PackageV2Entry> = packages_table
-        .filter(package_org_id.eq(&organisation))
-        .filter(package_app_id.eq(&application))
-        .order(package_version.desc())
-        .offset(offset_val)
-        .limit(limit_val)
-        .select(PackageV2Entry::as_select())
-        .load(&mut conn)
-        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+    let (total_count, rows) = run_blocking!({
+        let mut conn = pool.get()?;
+
+        // 1) total count
+        let total_count: i64 = packages_table
+            .filter(package_org_id.eq(&organisation))
+            .filter(package_app_id.eq(&application))
+            .select(count_star())
+            .first(&mut conn)?;
+
+        // 2) fetch one page
+        let rows: Vec<PackageV2Entry> = packages_table
+            .filter(package_org_id.eq(&organisation))
+            .filter(package_app_id.eq(&application))
+            .order(package_version.desc())
+            .offset(offset_val)
+            .limit(limit_val)
+            .select(PackageV2Entry::as_select())
+            .load(&mut conn)?;
+
+        Ok((total_count, rows))
+    })?;
 
     // 3) map to your public DTO
     let packages: Vec<Package> = rows

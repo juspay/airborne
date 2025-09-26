@@ -170,7 +170,7 @@ impl Client {
             })
             .collect();
 
-        println!("Inserting {}", serde_json::json!(rows));
+        info!("Inserting {}", serde_json::json!(rows));
 
         let mut insert = self.client.insert("ota_events_raw")?;
         for row in rows {
@@ -231,7 +231,7 @@ impl Client {
                 while let Some((hour, cnt)) = cursor.next().await? {
                     rows.push((hour, cnt));
                 }
-                println!("Fetched {} rows from {}", rows.len(), view_name);
+                info!("Fetched {} rows from {}", rows.len(), view_name);
                 Ok(rows)
             }
         };
@@ -469,7 +469,7 @@ impl Client {
                 while let Some(raw_aggregate) = cursor.next().await? {
                     rows.push(raw_aggregate);
                 }
-                println!(
+                info!(
                     "Fetched {} rows from {} and rows: {:?}",
                     rows.len(),
                     view_name,
