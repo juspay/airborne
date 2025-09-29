@@ -70,7 +70,7 @@ freeline_project_description.json
 *.jsa
 manifest.json
 .mainframer/config
-hyper-sdk/src/main/res/raw/juspay_keep.xml
+airborne/src/main/res/raw/juspay_keep.xml
 **/src/main/res/raw/juspay_*_keep.xml
 **/src/main/res/raw/juspay_*_res.xml
 

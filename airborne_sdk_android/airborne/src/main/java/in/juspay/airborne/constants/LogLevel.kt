@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//include ':app'
+package `in`.juspay.airborne.constants
 
-include ':airborne'
+import androidx.annotation.Keep
+
+@Keep
+object LogLevel {
+    const val ERROR = "error"
+    const val WARNING = "warning"
+    const val INFO = "info"
+    const val DEBUG = "debug"
+}
