@@ -43,8 +43,7 @@ nmcpAggregation {
 }
 
 dependencies {
-    nmcpAggregation(project(":hyper-ota"))
-    nmcpAggregation(project(":hyper-ota-react"))
+    nmcpAggregation(project(':airborne'))
 }
 
 allprojects {

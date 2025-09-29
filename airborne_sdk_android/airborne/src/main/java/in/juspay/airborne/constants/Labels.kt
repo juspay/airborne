@@ -12,6 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//include ':app'
+package `in`.juspay.airborne.constants
 
-include ':airborne'
+import androidx.annotation.Keep
+
+object Labels {
+    @Keep
+    object Airborne {
+        const val FIRST_TIME_SETUP = "first_time_setup"
+    }
+
+    object System {
+        const val FILE_PROVIDER_SERVICE = "file_provider_service"
+        const val REMOTE_ASSET_SERVICE = "remote_asset_service"
+    }
+
+    object Network {
+        const val CANCEL_API = "cancel_api"
+    }
+}

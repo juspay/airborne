@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//include ':app'
+package `in`.juspay.airborne.ota
 
-include ':airborne'
+internal sealed interface UpdateResult {
+    object NA : UpdateResult
+    data class Ok(val releaseConfig: ReleaseConfig) : UpdateResult
+    sealed interface Error : UpdateResult {
+        object RCFetchError : Error
+        object Unknown : Error
+    }
+    object ReleaseConfigFetchTimeout : UpdateResult
+    data class PackageUpdateTimeout(val releaseConfig: ReleaseConfig?) : UpdateResult
+}

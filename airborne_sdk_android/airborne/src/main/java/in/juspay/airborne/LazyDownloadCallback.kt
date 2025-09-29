@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//include ':app'
+package `in`.juspay.airborne
 
-include ':airborne'
+interface LazyDownloadCallback {
+    fun fileInstalled(filePath: String, success: Boolean)
+    fun lazySplitsInstalled(success: Boolean)
+}
