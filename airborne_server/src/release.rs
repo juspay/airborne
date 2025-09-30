@@ -1159,6 +1159,12 @@ async fn serve_release(
     // If toss not sent fallback to
     let toss = query.into_inner().toss.unwrap_or("99".into());
 
+    info!(
+        "Got Toss for serving release: {}, workspace: {}, org: {}, app: {}",
+        toss, workspace_name, organisation, application
+    );
+    info!("Context for serving release: {:?}", context);
+
     let applicable_variants = context.iter().fold(
         state
             .superposition_client

@@ -99,7 +99,10 @@ export default function CreateReleasePage() {
   const [filePriority, setFilePriority] = useState<Record<string, "important" | "lazy">>({});
   const [targetingRules, setTargetingRules] = useState<TargetingRule[]>([]);
   const [rolloutPercentage] = useState(100);
-  const [dimensions, setDimensions] = useState<{ dimension: string; values: string[] }[]>([]);
+  const [dimensions, setDimensions] = useState<
+    { dimension: string; values: string[]; type?: string; depends_on?: string }[]
+  >([]);
+  const [cohorts, setCohorts] = useState<Record<string, string[]>>({});
   const [packages, setPackages] = useState<Pkg[]>([]);
 
   // Resource-related state
@@ -216,10 +219,24 @@ export default function CreateReleasePage() {
     apiFetch<any>("/organisations/applications/dimension/list", {}, { token, org, app })
       .then((res) => {
         const data = (res.data || []) as any[];
-        const dims: any = data.map((d) => ({
-          dimension: d.dimension,
-          values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
-        }));
+        console.log("dims", data);
+
+        // Filter out dimensions that are dependencies of cohort dimensions
+        const cohortDependencies = new Set();
+        data.forEach((d) => {
+          if (d.dimension_type === "cohort" && d.depends_on) {
+            cohortDependencies.add(d.depends_on);
+          }
+        });
+
+        const dims: any = data
+          .filter((d) => !cohortDependencies.has(d.dimension)) // Hide dependency dimensions
+          .map((d) => ({
+            dimension: d.dimension,
+            values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
+            type: d.dimension_type,
+            depends_on: d.depends_on,
+          }));
         setDimensions(dims);
       })
       .catch(() => setDimensions([]));
@@ -276,6 +293,30 @@ export default function CreateReleasePage() {
   const lazyFiles = Object.entries(filePriority)
     .filter(([, v]) => v === "lazy")
     .map(([k]) => k);
+
+  // Load cohorts for a specific dimension
+  const loadCohortsForDimension = async (dimensionName: string) => {
+    if (!token || !org || !app) return;
+
+    try {
+      const result = await apiFetch<{ enum: string[]; definitions?: any }>(
+        `/organisations/applications/dimension/${encodeURIComponent(dimensionName)}/cohort`,
+        {},
+        { token, org, app }
+      );
+      console.log("Cohorts API response:", result);
+      setCohorts((prev) => ({
+        ...prev,
+        [dimensionName]: result.enum || [],
+      }));
+    } catch (error) {
+      console.error("Failed to load cohorts:", error);
+      setCohorts((prev) => ({
+        ...prev,
+        [dimensionName]: [],
+      }));
+    }
+  };
 
   const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: "" }]);
   const removeRule = (i: number) => setTargetingRules((r) => r.filter((_, idx) => idx !== i));
@@ -739,6 +780,10 @@ export default function CreateReleasePage() {
                   ) : (
                     <div className="space-y-4">
                       {targetingRules.map((rule, idx) => {
+                        const selectedDim = dimensions.find((d) => d.dimension === rule.dimension);
+                        const isCohortDimension = selectedDim?.type === "cohort";
+                        const cohortOptions = isCohortDimension ? cohorts[rule.dimension] || [] : [];
+
                         return (
                           <Card key={idx} className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -746,7 +791,13 @@ export default function CreateReleasePage() {
                                 <Label>Dimension</Label>
                                 <Select
                                   value={rule.dimension}
-                                  onValueChange={(v) => updateRule(idx, { dimension: v, values: "" })}
+                                  onValueChange={async (v) => {
+                                    updateRule(idx, { dimension: v, values: "" });
+                                    const dim = dimensions.find((d) => d.dimension === v);
+                                    if (dim?.type === "cohort") {
+                                      await loadCohortsForDimension(v);
+                                    }
+                                  }}
                                 >
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select dimension" />
@@ -754,7 +805,14 @@ export default function CreateReleasePage() {
                                   <SelectContent>
                                     {dimensions.map((d) => (
                                       <SelectItem key={d.dimension} value={d.dimension}>
-                                        {d.dimension}
+                                        <div className="flex items-center gap-2">
+                                          {d.dimension}
+                                          {d.type === "cohort" && (
+                                            <Badge variant="secondary" className="text-xs">
+                                              Cohort
+                                            </Badge>
+                                          )}
+                                        </div>
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -775,11 +833,36 @@ export default function CreateReleasePage() {
                                 </Select>
                               </div>
                               <div className="space-y-2">
-                                <Label>Value</Label>
-                                <Input
-                                  value={rule.values || ""}
-                                  onChange={(e) => updateRule(idx, { values: e.target.value })}
-                                />
+                                <Label>{isCohortDimension ? "Cohort" : "Value"}</Label>
+                                {isCohortDimension ? (
+                                  <Select
+                                    value={rule.values || ""}
+                                    onValueChange={(v) => updateRule(idx, { values: v })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select cohort" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {cohortOptions && cohortOptions.length > 0 ? (
+                                        cohortOptions.map((cohort) => (
+                                          <SelectItem key={cohort} value={cohort}>
+                                            {cohort}
+                                          </SelectItem>
+                                        ))
+                                      ) : (
+                                        <SelectItem disabled value="__loading__">
+                                          {isCohortDimension ? "No cohorts available" : "Loading cohorts..."}
+                                        </SelectItem>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    value={rule.values || ""}
+                                    onChange={(e) => updateRule(idx, { values: e.target.value })}
+                                    placeholder={selectedDim ? "Enter value" : "Select dimension first"}
+                                  />
+                                )}
                               </div>
                               <div className="flex items-end">
                                 <Button variant="outline" onClick={() => removeRule(idx)}>

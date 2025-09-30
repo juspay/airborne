@@ -3,98 +3,26 @@ use actix_web::{
     web::{self, Json, Path, ReqData},
     Result, Scope,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    organisation::application::dimension::cohort::types::CohortDimensionSchema,
     run_blocking,
     types::{ABError, AppState},
     utils::{
         db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
-        document::{document_to_json_value, value_to_document},
+        document::{hashmap_to_json_value, schema_doc_to_hashmap, value_to_document},
     },
 };
-use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use release_views::dsl::{app_id, created_at, dimensions as dimensions_col, id, name, org_id};
 use serde_json::Value;
+use types::*;
 use uuid::Uuid;
 
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-enum DimensionSchema {
-    #[default]
-    String,
-}
-
-impl DimensionSchema {
-    // Method that returns the JSON representation
-    fn to_json(&self) -> Value {
-        match self {
-            Self::String => serde_json::json!({ "type": "string" }),
-        }
-    }
-}
-
-#[derive(Deserialize)]
-struct CreateDimensionRequest {
-    dimension: String,
-    #[serde(default)]
-    schema: DimensionSchema,
-    description: String,
-    // function_name: Option<String>,
-    // mandatory: Option<bool>,
-}
-
-#[derive(Deserialize)]
-struct ListDimensionsQuery {
-    page: Option<i32>,
-    count: Option<i32>,
-}
-
-#[derive(Deserialize)]
-struct UpdateDimensionRequest {
-    position: Option<i32>,
-    change_reason: String,
-}
-
-#[derive(Deserialize)]
-struct CreateReleaseViewRequest {
-    name: String,
-    dimensions: Value,
-}
-
-#[derive(Deserialize)]
-struct ListReleaseViewsQuery {
-    page: Option<i32>,
-    count: Option<i32>,
-}
-
-#[derive(Serialize)]
-struct ReleaseView {
-    id: Uuid,
-    name: String,
-    dimensions: Value,
-    created_at: DateTime<Utc>,
-}
-
-#[derive(Serialize)]
-struct ListReleaseViewsResponse {
-    data: Vec<ReleaseView>,
-    total_items: Option<i64>,
-    total_pages: Option<i64>,
-}
-
-#[derive(Deserialize)]
-struct UpdateReleaseViewRequest {
-    dimensions: Value,
-    name: String,
-}
-
-#[derive(Serialize)]
-struct DeleteReleaseViewResponse {
-    success: bool,
-}
+mod cohort;
+mod types;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -107,6 +35,7 @@ pub fn add_routes() -> Scope {
         .service(get_release_view_api)
         .service(update_release_view_api)
         .service(delete_release_view_api)
+        .service(Scope::new("/{dimension}/cohort").service(cohort::add_routes()))
 }
 
 #[derive(Serialize)]
@@ -163,44 +92,63 @@ async fn create_dimension_api(
 
     let dim_schema = req.schema.to_json();
 
-    let dimension = state
-        .superposition_client
-        .create_dimension()
-        .org_id(state.env.superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .dimension(req.dimension.clone())
-        .position(highest_position + 1)
-        .schema(value_to_document(&dim_schema))
-        .description(req.description.clone())
-        .change_reason("Creating new dimension".to_string())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to create dimension: {}", e)))?;
-
-    Ok(Json(CreateDimensionResponse {
-        dimension: dimension.dimension,
-        position: dimension.position,
-        schema: document_to_json_value(&dimension.schema),
-        description: dimension.description,
-        change_reason: dimension.change_reason,
-    }))
-}
-
-#[derive(Serialize)]
-struct ListDimensionsResponse {
-    total_pages: Option<i32>,
-    total_items: Option<i32>,
-    data: Vec<Dimension>,
-}
-
-#[derive(Serialize)]
-struct Dimension {
-    dimension: String,
-    position: i32,
-    schema: Value,
-    description: String,
-    change_reason: String,
-    mandatory: Option<bool>,
+    match req.dimension_type {
+        DimensionType::Cohort => {
+            let depends_on = req.depends_on.clone().ok_or_else(|| {
+                ABError::BadRequest("depends_on is required for cohort dimensions".to_string())
+            })?;
+            let schema = CohortDimensionSchema::default(depends_on.clone()).to_kv_str_doc();
+            let dimension = state
+                .superposition_client
+                .create_dimension()
+                .org_id(state.env.superposition_org_id.clone())
+                .workspace_id(workspace_name.clone())
+                .dimension(req.dimension.clone())
+                .position(highest_position + 1)
+                .set_schema(Some(schema))
+                .dimension_type(superposition_sdk::types::DimensionType::LocalCohort(
+                    depends_on,
+                ))
+                .description(req.description.clone())
+                .change_reason("Creating new dimension".to_string())
+                .send()
+                .await
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to create dimension: {}", e))
+                })?;
+            Ok(Json(CreateDimensionResponse {
+                dimension: dimension.dimension,
+                position: dimension.position,
+                schema: hashmap_to_json_value(&dimension.schema),
+                description: dimension.description,
+                change_reason: dimension.change_reason,
+            }))
+        }
+        DimensionType::Standard => {
+            let dimension = state
+                .superposition_client
+                .create_dimension()
+                .org_id(state.env.superposition_org_id.clone())
+                .workspace_id(workspace_name.clone())
+                .dimension(req.dimension.clone())
+                .position(highest_position + 1)
+                .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&dim_schema))))
+                .description(req.description.clone())
+                .change_reason("Creating new dimension".to_string())
+                .send()
+                .await
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to create dimension: {}", e))
+                })?;
+            Ok(Json(CreateDimensionResponse {
+                dimension: dimension.dimension,
+                position: dimension.position,
+                schema: hashmap_to_json_value(&dimension.schema),
+                description: dimension.description,
+                change_reason: dimension.change_reason,
+            }))
+        }
+    }
 }
 
 #[get("/list")]
@@ -261,10 +209,22 @@ async fn list_dimensions_api(
             .map(|d| Dimension {
                 dimension: d.dimension,
                 position: d.position,
-                schema: document_to_json_value(&d.schema),
+                schema: hashmap_to_json_value(&d.schema),
                 description: d.description,
                 change_reason: d.change_reason,
                 mandatory: d.mandatory,
+                dimension_type: match d.dimension_type {
+                    superposition_sdk::types::DimensionType::LocalCohort(_) => {
+                        DimensionType::Cohort
+                    }
+                    _ => DimensionType::Standard,
+                },
+                depends_on: match d.dimension_type {
+                    superposition_sdk::types::DimensionType::LocalCohort(depends_on) => {
+                        Some(depends_on)
+                    }
+                    _ => None,
+                },
             })
             .collect(),
     }))
@@ -319,10 +279,18 @@ async fn update_dimension_api(
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
         position: update_dimension.position,
-        schema: document_to_json_value(&update_dimension.schema),
+        schema: hashmap_to_json_value(&update_dimension.schema),
         description: update_dimension.description,
         change_reason: update_dimension.change_reason,
         mandatory: update_dimension.mandatory,
+        dimension_type: match update_dimension.dimension_type {
+            superposition_sdk::types::DimensionType::LocalCohort(_) => DimensionType::Cohort,
+            _ => DimensionType::Standard,
+        },
+        depends_on: match update_dimension.dimension_type {
+            superposition_sdk::types::DimensionType::LocalCohort(depends_on) => Some(depends_on),
+            _ => None,
+        },
     }))
 }
 

@@ -150,3 +150,17 @@ fn type_name(v: &Value) -> &'static str {
         Value::Object(_) => "object",
     }
 }
+pub fn schema_doc_to_hashmap(doc: &Document) -> HashMap<String, Document> {
+    match doc {
+        Document::Object(map) => map.clone(),
+        _ => HashMap::new(),
+    }
+}
+
+pub fn hashmap_to_json_value(hashmap: &HashMap<String, Document>) -> Value {
+    let val_map = hashmap
+        .iter()
+        .map(|(k, v)| (k.clone(), document_to_json_value(v)))
+        .collect::<Map<_, _>>();
+    Value::Object(val_map)
+}

@@ -1121,7 +1121,10 @@ x-application: <application_name>
 ### 7.1 Create Dimension
 **Endpoint:** `POST /organisations/applications/dimension/create`
 
-**Description:** Creates a new dimension for application configuration.
+**Description:** Creates a new dimension for application configuration. Supports both standard dimensions and cohort dimensions.
+
+- **Standard dimensions**: Regular dimensions with custom schemas for feature flags, configuration values, etc.
+- **Cohort dimensions**: Special dimensions for user segmentation based on version ranges or group memberships. When created, they automatically generate a default schema and can be managed through the cohort-specific endpoints.
 
 **Headers:**
 ```json
@@ -1144,14 +1147,23 @@ x-application: <application_name>
     },
     "schema": {
       "type": "object",
-      "description": "JSON schema for dimension validation"
+      "description": "JSON schema for dimension validation (optional for cohort dimensions)"
     },
     "description": {
       "type": "string",
       "description": "Description of the dimension"
+    },
+    "dimension_type": {
+      "type": "string",
+      "enum": ["standard", "cohort"],
+      "description": "Type of dimension to create (default: 'standard')"
+    },
+    "depends_on": {
+      "type": "string",
+      "description": "Required for cohort dimensions - the dimension this cohort depends on"
     }
   },
-  "required": ["dimension", "schema", "description"]
+  "required": ["dimension", "description"]
 }
 ```
 
@@ -1178,6 +1190,32 @@ x-application: <application_name>
   }
 }
 ```
+
+**Examples:**
+
+1. **Creating a standard dimension:**
+   ```json
+   {
+     "dimension": "feature_flags",
+     "schema": {
+       "type": "object",
+       "properties": {
+         "enabled": {"type": "boolean"}
+       }
+     },
+     "description": "Feature flag configuration"
+   }
+   ```
+
+2. **Creating a cohort dimension:**
+   ```json
+   {
+     "dimension": "user_version_cohort",
+     "dimension_type": "cohort",
+     "depends_on": "app_version",
+     "description": "User segmentation based on app version"
+   }
+   ```
 
 ### 7.2 List Dimensions
 **Endpoint:** `GET /organisations/applications/dimension/list`
@@ -1330,9 +1368,297 @@ x-application: <application_name>
 
 ---
 
-## 8. Release Management
+## 8. Cohort Dimension Management
 
-### 8.1 Create Release
+Cohort dimensions allow you to segment users based on version ranges or group memberships. They support both checkpoint-based segmentation (using version comparisons) and group-based segmentation (using explicit member lists).
+
+### 8.1 List Cohort Schema
+**Endpoint:** `GET /organisations/applications/dimension/{cohort_dimension_name}/cohort`
+
+**Description:** Retrieves the schema and configuration of a cohort dimension.
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>",
+  "x-application": "<application_name>"
+}
+```
+
+**Path Parameters:**
+- `cohort_dimension_name`: Name of the cohort dimension
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "description": "Schema type (typically 'string')"
+    },
+    "enum": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of cohort names in priority order"
+    },
+    "definitions": {
+      "type": "object",
+      "description": "Map of cohort names to their JSON Logic definitions",
+      "additionalProperties": {
+        "type": "object",
+        "description": "JSON Logic rules defining cohort membership"
+      }
+    }
+  }
+}
+```
+
+### 8.2 Create Cohort Checkpoint
+**Endpoint:** `POST /organisations/applications/dimension/{cohort_dimension_name}/cohort/checkpoint`
+
+**Description:** Creates a checkpoint cohort that segments users based on version comparisons (e.g., users with app version >= 2.1.0).
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>",
+  "x-application": "<application_name>"
+}
+```
+
+**Path Parameters:**
+- `cohort_dimension_name`: Name of the cohort dimension
+
+**Request Body Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the cohort checkpoint"
+    },
+    "value": {
+      "type": "string",
+      "description": "Version or string value to compare against"
+    },
+    "comparator": {
+      "type": "string",
+      "enum": ["semver_gt", "semver_ge", "str_gt", "str_ge"],
+      "description": "Comparison operator: semver_gt (>), semver_ge (>=), str_gt (>), str_ge (>=)"
+    }
+  },
+  "required": ["name", "value", "comparator"]
+}
+```
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "value": {
+      "type": "string"
+    },
+    "comparator": {
+      "type": "string"
+    }
+  }
+}
+```
+
+### 8.3 Create Cohort Group  
+**Endpoint:** `POST /organisations/applications/dimension/{cohort_dimension_name}/cohort/group`
+
+**Description:** Creates a group cohort that segments users based on explicit membership lists (e.g., beta testers, VIP users).
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>",
+  "x-application": "<application_name>"
+}
+```
+
+**Path Parameters:**
+- `cohort_dimension_name`: Name of the cohort dimension
+
+**Request Body Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the cohort group"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of user identifiers that belong to this cohort"
+    }
+  },
+  "required": ["name", "members"]
+}
+```
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
+```
+
+### 8.4 Get Cohort Group Priority
+**Endpoint:** `GET /organisations/applications/dimension/{cohort_dimension_name}/cohort/group/priority`
+
+**Description:** Retrieves the priority ordering of cohort groups. Groups with lower priority values are evaluated first.
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>",
+  "x-application": "<application_name>"
+}
+```
+
+**Path Parameters:**
+- `cohort_dimension_name`: Name of the cohort dimension
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "priority_map": {
+      "type": "object",
+      "description": "Map of cohort group names to their priority values (0 = highest priority)",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    }
+  }
+}
+```
+
+### 8.5 Update Cohort Group Priority
+**Endpoint:** `PUT /organisations/applications/dimension/{cohort_dimension_name}/cohort/group/priority`
+
+**Description:** Updates the priority ordering of cohort groups. This affects the order in which groups are evaluated for user segmentation.
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>",
+  "x-application": "<application_name>"
+}
+```
+
+**Path Parameters:**
+- `cohort_dimension_name`: Name of the cohort dimension
+
+**Request Body Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "priority_map": {
+      "type": "object",
+      "description": "Map of cohort group names to their new priority values (0 = highest priority)",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    }
+  },
+  "required": ["priority_map"]
+}
+```
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "priority_map": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer"
+      }
+    }
+  }
+}
+```
+
+**Example Usage:**
+
+1. **Creating a version-based cohort:**
+   ```bash
+   # Create a checkpoint for users with version >= 2.1.0
+   POST /organisations/applications/dimension/app_version/checkpoint
+   {
+     "name": "v2_1_users",
+     "value": "2.1.0", 
+     "comparator": "semver_ge"
+   }
+   ```
+
+2. **Creating a user group cohort:**
+   ```bash
+   # Create a cohort for beta testers
+   POST /organisations/applications/dimension/user_segment/group
+   {
+     "name": "beta_testers",
+     "members": ["user1", "user2", "user3"]
+   }
+   ```
+
+3. **Updating group priorities:**
+   ```bash
+   # Set beta_testers as highest priority (0) and vip_users as second (1)
+   PUT /organisations/applications/dimension/user_segment/group/priority
+   {
+     "priority_map": {
+       "beta_testers": 0,
+       "vip_users": 1
+     }
+   }
+   ```
+
+---
+
+## 9. Release Management
+
+### 9.1 Create Release
 **Endpoint:** `POST /releases`
 
 **Description:** Creates a new release with configuration and package details.
@@ -1525,7 +1851,7 @@ x-application: <application_name>
 }
 ```
 
-### 8.2 List Releases
+### 9.2 List Releases
 **Endpoint:** `GET /releases/list`
 
 **Description:** Lists all releases for an application.
@@ -1555,7 +1881,7 @@ x-application: <application_name>
 }
 ```
 
-### 8.3 Get Individual Release
+### 9.3 Get Individual Release
 **Endpoint:** `GET /releases/{release_id}`
 
 **Description:** Gets details of a specific release.
@@ -1647,7 +1973,7 @@ x-application: <application_name>
 }
 ```
 
-### 8.4 Ramp Release
+### 9.4 Ramp Release
 **Endpoint:** `POST /releases/{release_id}/ramp`
 
 **Description:** Updates the traffic percentage for a release experiment.
@@ -1706,7 +2032,7 @@ x-application: <application_name>
 }
 ```
 
-### 8.5 Conclude Release
+### 9.5 Conclude Release
 **Endpoint:** `POST /releases/{release_id}/conclude`
 
 **Description:** Concludes a release experiment by choosing a winning variant.
@@ -1757,7 +2083,7 @@ x-application: <application_name>
 }
 ```
 
-### 8.6 Serve Release Configuration (Public)
+### 9.6 Serve Release Configuration (Public)
 **Endpoint:** `GET /release/{organisation}/{application}`
 
 **Description:** Public endpoint that serves the live release configuration for client SDKs. No authentication required.
@@ -1864,9 +2190,9 @@ x-application: <application_name>
 
 ---
 
-## 9. Configuration Management
+## 10. Configuration Management
 
-### 9.1 Create Configuration
+### 10.1 Create Configuration
 **Endpoint:** `POST /organisations/applications/config/create`
 
 **Description:** Creates application configuration.
@@ -1983,3 +2309,9 @@ All endpoints may return the following error responses:
 7. **OAuth**: Google OAuth endpoints are only available when `ENABLE_GOOGLE_SIGNIN` is set to `true`.
 
 8. **Organization Creation**: The `/organisations/request` endpoint is used when `ORGANISATION_CREATION_DISABLED` is `true`.
+
+9. **Cohort Dimensions**: Cohort dimensions support two types of segmentation:
+    - **Checkpoints**: Version-based segmentation using comparators (semver_gt, semver_ge, str_gt, str_ge)
+    - **Groups**: Explicit member-based segmentation using user ID lists
+    
+10. **Cohort Priority**: Group cohorts are evaluated in priority order (0 = highest priority). Users are assigned to the first matching group in priority order.

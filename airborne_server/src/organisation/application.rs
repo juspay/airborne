@@ -29,7 +29,7 @@ use superposition_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, ADMIN};
 use crate::types::{ABError, AppState};
-use crate::utils::document::value_to_document;
+use crate::utils::document::{schema_doc_to_hashmap, value_to_document};
 use diesel::RunQueryDsl;
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
@@ -83,7 +83,7 @@ where
             .value(Document::from(value.clone()))
             .description(description)
             .change_reason("Initial value".to_string())
-            .schema(get_scheme(value.clone()))
+            .set_schema(Some(schema_doc_to_hashmap(&get_scheme(value.clone()))))
             .send()
             .await
             .map_err(error::ErrorInternalServerError)

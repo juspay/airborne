@@ -4003,9 +4003,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "superposition_sdk"
-version = "0.89.0"
+version = "0.91.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81917e49055758115deb65fcabe5dd3fdbdf39d74b18c545bc4ad4c40d8eee28"
+checksum = "144fb2762e07b2df85103d10ff47187a75d51022eb8d4bf0511bf1bd5e854bf3"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http",

@@ -19,7 +19,10 @@ use crate::{
     organisation::application::properties::types::ConfigProperty,
     release::utils::parse_kv_string,
     types::{ABError, AppState},
-    utils::document::{document_to_json_value, dotted_docs_to_nested, value_to_document},
+    utils::document::{
+        document_to_json_value, dotted_docs_to_nested, hashmap_to_json_value,
+        schema_doc_to_hashmap, value_to_document,
+    },
 };
 use actix_web::{
     get,
@@ -125,7 +128,7 @@ async fn put_properties_schema_api(
         .iter()
         .filter_map(|config| {
             if config.key.starts_with("config.properties.") {
-                let schema = document_to_json_value(config.schema());
+                let schema = hashmap_to_json_value(config.schema());
                 let schema_node = types::SchemaNode {
                     description: config.description().to_string(),
                     default_value: document_to_json_value(config.value()),
@@ -194,7 +197,7 @@ async fn put_properties_schema_api(
                     .value(value_to_document(&default_value))
                     .description(description)
                     .change_reason("Create default config".to_string())
-                    .schema(value_to_document(&schema))
+                    .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&schema))))
                     .send()
                     .await
                     .map_err(|e| {
@@ -234,7 +237,7 @@ async fn put_properties_schema_api(
                     .value(value_to_document(&default_value))
                     .description(description)
                     .change_reason("Update default config".to_string())
-                    .schema(value_to_document(&schema))
+                    .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&schema))))
                     .send()
                     .await
                     .map_err(|e| {
@@ -350,7 +353,9 @@ async fn rollback_config_update(
                             .value(value_to_document(&old_schema.default_value))
                             .description(old_schema.description.clone())
                             .change_reason("Rollback update".to_string())
-                            .schema(value_to_document(&old_schema.schema))
+                            .set_schema(Some(schema_doc_to_hashmap(&value_to_document(
+                                &old_schema.schema,
+                            ))))
                             .send()
                             .await
                             .map(|_| format!("Rolled back update for {}", task_meta.key))
@@ -376,7 +381,9 @@ async fn rollback_config_update(
                             .value(value_to_document(&old_schema.default_value))
                             .description(old_schema.description.clone())
                             .change_reason("Rollback delete".to_string())
-                            .schema(value_to_document(&old_schema.schema))
+                            .set_schema(Some(schema_doc_to_hashmap(&value_to_document(
+                                &old_schema.schema,
+                            ))))
                             .send()
                             .await
                             .map(|_| format!("Rolled back delete for {}", task_meta.key))
@@ -548,7 +555,7 @@ async fn get_properties_schema_api(
                     .key
                     .strip_prefix("config.properties.")
                     .unwrap_or(&config.key);
-                let schema = document_to_json_value(config.schema());
+                let schema = hashmap_to_json_value(config.schema());
                 let default_value = rc_config_properties
                     .get(key)
                     .cloned()
