@@ -1,10 +1,11 @@
+#import "AirborneReact.h"
 #import "Airborne.h"
-#import "AirborneiOS.h"
 #import <React/RCTLog.h>
-#import <Airborne/Airborne.h>
+#import <Airborne/AJPLoggerDelegate.h>
+#import <Airborne/AJPApplicationManager.h>
 #import <Airborne/Airborne-Swift.h>
 
-@implementation Airborne
+@implementation AirborneReact
 
 RCT_EXPORT_MODULE(Airborne)
 
@@ -15,25 +16,22 @@ static NSString * const defaultNamespace = @"default";
 }
 
 + (void)initializeAirborneWithReleaseConfigUrl:(NSString *)releaseConfigUrl inNamespace:ns {
-    AirborneiOS* air = [AirborneiOS sharedInstanceWithNamespace:ns];
-    [air loadWithReleaseConfig:releaseConfigUrl delegate:nil];
+    AJPApplicationManager* manager = [AJPApplicationManager getSharedInstanceWithWorkspace:ns delegate:nil logger:nil];
 }
 
 + (void)initializeAirborneWithReleaseConfigUrl:(NSString *)releaseConfigUrl delegate:delegate {
-    AirborneiOS* air = [AirborneiOS sharedInstanceWithNamespace:defaultNamespace];
-    [air loadWithReleaseConfig:releaseConfigUrl delegate:delegate];
+    AJPApplicationManager* manager = [AJPApplicationManager getSharedInstanceWithWorkspace:defaultNamespace delegate:delegate logger:nil];
 }
 
 + (void)initializeAirborneWithReleaseConfigUrl:(NSString *)releaseConfigUrl inNamespace:ns delegate:delegate {
-    AirborneiOS* air = [AirborneiOS sharedInstanceWithNamespace:ns];
-    [air loadWithReleaseConfig:releaseConfigUrl delegate:delegate];
+    AJPApplicationManager* manager = [AJPApplicationManager getSharedInstanceWithWorkspace:ns delegate:delegate logger:nil];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED
 - (void)readReleaseConfig:(RCTPromiseResolveBlock)resolve
                    reject:(RCTPromiseRejectBlock)reject {
     @try {
-        NSString *config = [[AirborneiOS sharedInstanceWithNamespace:defaultNamespace] getReleaseConfig];
+        NSString *config = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getReleaseConfig];
         resolve(config);
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
@@ -44,7 +42,7 @@ static NSString * const defaultNamespace = @"default";
                resolve:(RCTPromiseResolveBlock)resolve
                 reject:(RCTPromiseRejectBlock)reject {
     @try {
-        NSString *content = [[AirborneiOS sharedInstanceWithNamespace:defaultNamespace] getFileContent:filePath];
+        NSString *content = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getFileContent:filePath];
         resolve(content);
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
@@ -54,7 +52,7 @@ static NSString * const defaultNamespace = @"default";
 - (void)getBundlePath:(RCTPromiseResolveBlock)resolve
                reject:(RCTPromiseRejectBlock)reject {
     @try {
-        NSString *bundlePath = [[AirborneiOS sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
+        NSString *bundlePath = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
         resolve(bundlePath);
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
