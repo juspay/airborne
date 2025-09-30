@@ -1,25 +1,18 @@
-#import "AirborneiOS.h"
-#ifdef RCT_NEW_ARCH_ENABLED
-#import <AirborneSpec/AirborneSpec.h>
+#import <Foundation/Foundation.h>
+#import <Airborne/Airborne-Swift.h>
 
-@interface Airborne : NSObject <NativeAirborneSpec>
-#else
-#import <React/RCTBridgeModule.h>
+NS_ASSUME_NONNULL_BEGIN
 
+@interface Airborne : NSObject
 
-@interface Airborne : NSObject <RCTBridgeModule>
-#endif
++ (instancetype)sharedInstanceWithNamespace:(NSString *)aNamespace;
 
-+ (void)initializeAirborneWithReleaseConfigUrl:(NSString *) releaseConfigUrl;
+- (instancetype)initWithReleaseConfigURL:(NSString *)releaseConfigURL delegate:(id<AirborneDelegate>)delegate;
 
-+ (void)initializeAirborneWithReleaseConfigUrl:(NSString *) releaseConfigUrl
-                                   inNamespace:(NSString *) ns;
-
-+ (void)initializeAirborneWithReleaseConfigUrl:(NSString *)releaseConfigUrl
-                                      delegate:delegate;
-
-+ (void)initializeAirborneWithReleaseConfigUrl:(NSString *) releaseConfigUrl
-                                   inNamespace:(NSString *) ns
-                                      delegate:(id<AirborneReactDelegate>) delegate;
+- (NSString *)getBundlePath;
+- (NSString *)getFileContent:(NSString *)filePath;
+- (NSString *)getReleaseConfig;
 
 @end
+
+NS_ASSUME_NONNULL_END
