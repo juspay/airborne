@@ -11,31 +11,36 @@ let package = Package(
     products: [
         .library(
             name: "Airborne",
-            targets: ["Airborne"]
+            targets: ["AirborneSwift"]
         ),
     ],
-    dependencies: [
-        .package(name: "HyperCore", url: "https://github.com/juspay/hypercore-ios.git", .exact("0.1.3"))
-    ],
     targets: [
-        // Single target that works with existing structure
         .target(
-            name: "Airborne",
-            dependencies: [
-                "HyperCore"
-            ],
-            path: "iOS/hyper-ota/Airborne/Classes",
-            publicHeadersPath: ".", // Use current directory as public headers path
+            name: "AirborneObjC",
+            dependencies: [],
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneObjC",
+            publicHeadersPath: "include",
             cSettings: [
-                .headerSearchPath("."),
-                .headerSearchPath("ApplicationManager"),
-                .headerSearchPath("ApplicationManager/AppConfig"),
-                .headerSearchPath("ApplicationManager/AppManifest"),
-                .headerSearchPath("ApplicationManager/AppPackage"),
-                .headerSearchPath("ApplicationManager/AppResources"),
                 .headerSearchPath("ApplicationManager/Constants"),
-                .headerSearchPath("ApplicationManager/Resource"),
                 .headerSearchPath("ApplicationManager/Tracker"),
+                .headerSearchPath("Helper"),
+                .headerSearchPath("Network/NetworkDetector"),
+                .define("SPM_BUILD", to: "1")
+            ]
+        ),
+        .target(
+            name: "AirborneSwift",
+            dependencies: ["AirborneObjC"],
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwift",
+            cSettings: [
+                .define("SPM_BUILD", to: "1")
+            ]
+        ),
+        .testTarget(
+            name: "AirborneTests",
+            dependencies: ["AirborneSwift"],
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneTest",
+            cSettings: [
                 .define("SPM_BUILD", to: "1")
             ]
         ),

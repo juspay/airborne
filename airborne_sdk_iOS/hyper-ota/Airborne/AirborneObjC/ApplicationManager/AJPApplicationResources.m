@@ -10,6 +10,8 @@
 
 @implementation AJPApplicationResources
 
+#if TARGET_OS_IOS
+
 + (BOOL)supportsSecureCoding {
     return YES;
 }
@@ -66,5 +68,7 @@
     }
     return array;
 }
+
+#endif
 
 @end

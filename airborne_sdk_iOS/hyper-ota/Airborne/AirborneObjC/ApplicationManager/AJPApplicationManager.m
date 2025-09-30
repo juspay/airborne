@@ -897,7 +897,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     // Add headers
     NSString *networkType = [AJPNetworkTypeDetector currentNetworkTypeString];
     [request setValue:networkType forHTTPHeaderField: @"x-network-type"];
+    #if TARGET_OS_IOS
     [request setValue:[[UIDevice currentDevice] systemVersion] forHTTPHeaderField: @"x-os-version"]; // TODO: Have to add airborne version as header
+    #endif
     [request setValue:self.package.version forHTTPHeaderField: @"x-package-version"];
     [request setValue:self.config.version forHTTPHeaderField: @"x-config-version"];
     
