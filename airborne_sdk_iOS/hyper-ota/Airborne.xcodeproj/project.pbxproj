@@ -23,72 +23,71 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
-		DCB6144D2E61924D0099D87E /* Airborne.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB6144B2E61924D0099D87E /* Airborne.swift */; };
-		DCB6144E2E61924D0099D87E /* AJPApplicationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614472E61924D0099D87E /* AJPApplicationManager.m */; };
-		DCB6144F2E61924D0099D87E /* AJPApplicationConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB6143E2E61924D0099D87E /* AJPApplicationConstants.m */; };
-		DCB614502E61924D0099D87E /* AJPApplicationConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614322E61924D0099D87E /* AJPApplicationConfig.m */; };
-		DCB614512E61924D0099D87E /* AJPApplicationManifest.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614352E61924D0099D87E /* AJPApplicationManifest.m */; };
-		DCB614522E61924D0099D87E /* AJPResource.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614412E61924D0099D87E /* AJPResource.m */; };
-		DCB614532E61924D0099D87E /* AJPApplicationPackage.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614382E61924D0099D87E /* AJPApplicationPackage.m */; };
-		DCB614542E61924D0099D87E /* AJPApplicationResources.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB6143B2E61924D0099D87E /* AJPApplicationResources.m */; };
-		DCB614552E61924D0099D87E /* AJPApplicationTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = DCB614442E61924D0099D87E /* AJPApplicationTracker.m */; };
-		DCB614562E61924D0099D87E /* Airborne.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB6144A2E61924D0099D87E /* Airborne.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB614572E61924D0099D87E /* AJPApplicationManifest.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614342E61924D0099D87E /* AJPApplicationManifest.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB614582E61924D0099D87E /* AJPApplicationResources.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB6143A2E61924D0099D87E /* AJPApplicationResources.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB614592E61924D0099D87E /* AJPApplicationManager.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614462E61924D0099D87E /* AJPApplicationManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB6145A2E61924D0099D87E /* AJPApplicationManagerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614482E61924D0099D87E /* AJPApplicationManagerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB6145B2E61924D0099D87E /* AJPApplicationConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB6143D2E61924D0099D87E /* AJPApplicationConstants.h */; };
-		DCB6145C2E61924D0099D87E /* AJPApplicationConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614312E61924D0099D87E /* AJPApplicationConfig.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB6145D2E61924D0099D87E /* AJPResource.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614402E61924D0099D87E /* AJPResource.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCB6145E2E61924D0099D87E /* AJPApplicationTracker.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614432E61924D0099D87E /* AJPApplicationTracker.h */; };
-		DCB6145F2E61924D0099D87E /* AJPApplicationPackage.h in Headers */ = {isa = PBXBuildFile; fileRef = DCB614372E61924D0099D87E /* AJPApplicationPackage.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCC582F82E827AE500E29833 /* AJPNetworkTypeDetector.h in Headers */ = {isa = PBXBuildFile; fileRef = DCC582F72E827AE500E29833 /* AJPNetworkTypeDetector.h */; };
-		DCC582FA2E827B1900E29833 /* AJPNetworkTypeDetector.m in Sources */ = {isa = PBXBuildFile; fileRef = DCC582F92E827B1900E29833 /* AJPNetworkTypeDetector.m */; };
-		DCC582FC2E82814C00E29833 /* AJPLoggerDelegate.h in Sources */ = {isa = PBXBuildFile; fileRef = DCC582FB2E82814C00E29833 /* AJPLoggerDelegate.h */; };
-		DCC582FD2E8281B400E29833 /* AJPLoggerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = DCC582FB2E82814C00E29833 /* AJPLoggerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCC583062E8292B300E29833 /* AJPFileUtil.m in Sources */ = {isa = PBXBuildFile; fileRef = DCC583052E8292B300E29833 /* AJPFileUtil.m */; };
-		DCC583072E8292B300E29833 /* AJPFileUtil.h in Headers */ = {isa = PBXBuildFile; fileRef = DCC583042E8292B300E29833 /* AJPFileUtil.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCC5830A2E82A55500E29833 /* AJPNetworkClient.m in Sources */ = {isa = PBXBuildFile; fileRef = DCC583092E82A55500E29833 /* AJPNetworkClient.m */; };
-		DCC5830B2E82A55500E29833 /* AJPNetworkClient.h in Headers */ = {isa = PBXBuildFile; fileRef = DCC583082E82A55500E29833 /* AJPNetworkClient.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCC5830E2E82AA9500E29833 /* AJPRemoteFileUtil.m in Sources */ = {isa = PBXBuildFile; fileRef = DCC5830D2E82AA9500E29833 /* AJPRemoteFileUtil.m */; };
-		DCC5830F2E82AA9500E29833 /* AJPRemoteFileUtil.h in Headers */ = {isa = PBXBuildFile; fileRef = DCC5830C2E82AA9500E29833 /* AJPRemoteFileUtil.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DCC583392E83B95600E29833 /* AJPHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = DCC583372E83B95600E29833 /* AJPHelpers.h */; };
-		DCC5833A2E83B95600E29833 /* AJPHelpers.m in Sources */ = {isa = PBXBuildFile; fileRef = DCC583382E83B95600E29833 /* AJPHelpers.m */; };
+		DC2400CF2E8BD5C50071EE0E /* AJPFileUtil.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BC2E8BD5C50071EE0E /* AJPFileUtil.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400D02E8BD5C50071EE0E /* AJPApplicationManager.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B72E8BD5C50071EE0E /* AJPApplicationManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400D12E8BD5C50071EE0E /* AJPNetworkClient.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BE2E8BD5C50071EE0E /* AJPNetworkClient.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400D22E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B82E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400D32E8BD5C50071EE0E /* AJPApplicationConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400A32E8BD5C50071EE0E /* AJPApplicationConstants.h */; };
+		DC2400D42E8BD5C50071EE0E /* AJPApplicationTracker.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400A62E8BD5C50071EE0E /* AJPApplicationTracker.h */; };
+		DC2400D52E8BD5C50071EE0E /* AJPNetworkTypeDetector.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400C22E8BD5C50071EE0E /* AJPNetworkTypeDetector.h */; };
+		DC2400D62E8BD5C50071EE0E /* Airborne.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B52E8BD5C50071EE0E /* Airborne.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400D72E8BD5C50071EE0E /* AJPApplicationPackage.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BA2E8BD5C50071EE0E /* AJPApplicationPackage.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400D82E8BD5C50071EE0E /* AJPHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B22E8BD5C50071EE0E /* AJPHelpers.h */; };
+		DC2400D92E8BD5C50071EE0E /* AJPRemoteFileUtil.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BF2E8BD5C50071EE0E /* AJPRemoteFileUtil.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400DA2E8BD5C50071EE0E /* AJPResource.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400C02E8BD5C50071EE0E /* AJPResource.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400DB2E8BD5C50071EE0E /* AJPApplicationManifest.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B92E8BD5C50071EE0E /* AJPApplicationManifest.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400DC2E8BD5C50071EE0E /* AJPLoggerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BD2E8BD5C50071EE0E /* AJPLoggerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400DD2E8BD5C50071EE0E /* AJPApplicationConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B62E8BD5C50071EE0E /* AJPApplicationConfig.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400DE2E8BD5C50071EE0E /* AJPApplicationResources.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BB2E8BD5C50071EE0E /* AJPApplicationResources.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		DC2400DF2E8BD5C50071EE0E /* AJPApplicationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AA2E8BD5C50071EE0E /* AJPApplicationManager.m */; };
+		DC2400E02E8BD5C50071EE0E /* AJPApplicationManifest.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AB2E8BD5C50071EE0E /* AJPApplicationManifest.m */; };
+		DC2400E12E8BD5C50071EE0E /* AJPHelpers.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400B32E8BD5C50071EE0E /* AJPHelpers.m */; };
+		DC2400E22E8BD5C50071EE0E /* AJPApplicationConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400A92E8BD5C50071EE0E /* AJPApplicationConfig.m */; };
+		DC2400E32E8BD5C50071EE0E /* AJPApplicationPackage.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AC2E8BD5C50071EE0E /* AJPApplicationPackage.m */; };
+		DC2400E42E8BD5C50071EE0E /* AJPNetworkClient.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400C52E8BD5C50071EE0E /* AJPNetworkClient.m */; };
+		DC2400E62E8BD5C50071EE0E /* AJPResource.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AE2E8BD5C50071EE0E /* AJPResource.m */; };
+		DC2400E72E8BD5C50071EE0E /* AJPFileUtil.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400B02E8BD5C50071EE0E /* AJPFileUtil.m */; };
+		DC2400E82E8BD5C50071EE0E /* AJPApplicationTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400A72E8BD5C50071EE0E /* AJPApplicationTracker.m */; };
+		DC2400E92E8BD5C50071EE0E /* AJPApplicationResources.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AD2E8BD5C50071EE0E /* AJPApplicationResources.m */; };
+		DC2400EA2E8BD5C50071EE0E /* AJPRemoteFileUtil.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400C62E8BD5C50071EE0E /* AJPRemoteFileUtil.m */; };
+		DC2400EB2E8BD5C50071EE0E /* AJPApplicationConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400A42E8BD5C50071EE0E /* AJPApplicationConstants.m */; };
+		DC2400EC2E8BD5C50071EE0E /* AJPNetworkTypeDetector.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400C32E8BD5C50071EE0E /* AJPNetworkTypeDetector.m */; };
+		DC2400ED2E8BD5C50071EE0E /* Airborne.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2400C92E8BD5C50071EE0E /* Airborne.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		DC76412B2E61931B0028FCDA /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
+		DC2400A32E8BD5C50071EE0E /* AJPApplicationConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationConstants.h; sourceTree = "<group>"; };
+		DC2400A42E8BD5C50071EE0E /* AJPApplicationConstants.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationConstants.m; sourceTree = "<group>"; };
+		DC2400A62E8BD5C50071EE0E /* AJPApplicationTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationTracker.h; sourceTree = "<group>"; };
+		DC2400A72E8BD5C50071EE0E /* AJPApplicationTracker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationTracker.m; sourceTree = "<group>"; };
+		DC2400A92E8BD5C50071EE0E /* AJPApplicationConfig.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationConfig.m; sourceTree = "<group>"; };
+		DC2400AA2E8BD5C50071EE0E /* AJPApplicationManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationManager.m; sourceTree = "<group>"; };
+		DC2400AB2E8BD5C50071EE0E /* AJPApplicationManifest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationManifest.m; sourceTree = "<group>"; };
+		DC2400AC2E8BD5C50071EE0E /* AJPApplicationPackage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationPackage.m; sourceTree = "<group>"; };
+		DC2400AD2E8BD5C50071EE0E /* AJPApplicationResources.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationResources.m; sourceTree = "<group>"; };
+		DC2400AE2E8BD5C50071EE0E /* AJPResource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPResource.m; sourceTree = "<group>"; };
+		DC2400B02E8BD5C50071EE0E /* AJPFileUtil.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPFileUtil.m; sourceTree = "<group>"; };
+		DC2400B22E8BD5C50071EE0E /* AJPHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPHelpers.h; sourceTree = "<group>"; };
+		DC2400B32E8BD5C50071EE0E /* AJPHelpers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPHelpers.m; sourceTree = "<group>"; };
+		DC2400B52E8BD5C50071EE0E /* Airborne.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Airborne.h; sourceTree = "<group>"; };
+		DC2400B62E8BD5C50071EE0E /* AJPApplicationConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationConfig.h; sourceTree = "<group>"; };
+		DC2400B72E8BD5C50071EE0E /* AJPApplicationManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManager.h; sourceTree = "<group>"; };
+		DC2400B82E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManagerDelegate.h; sourceTree = "<group>"; };
+		DC2400B92E8BD5C50071EE0E /* AJPApplicationManifest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManifest.h; sourceTree = "<group>"; };
+		DC2400BA2E8BD5C50071EE0E /* AJPApplicationPackage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationPackage.h; sourceTree = "<group>"; };
+		DC2400BB2E8BD5C50071EE0E /* AJPApplicationResources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationResources.h; sourceTree = "<group>"; };
+		DC2400BC2E8BD5C50071EE0E /* AJPFileUtil.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPFileUtil.h; sourceTree = "<group>"; };
+		DC2400BD2E8BD5C50071EE0E /* AJPLoggerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPLoggerDelegate.h; sourceTree = "<group>"; };
+		DC2400BE2E8BD5C50071EE0E /* AJPNetworkClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPNetworkClient.h; sourceTree = "<group>"; };
+		DC2400BF2E8BD5C50071EE0E /* AJPRemoteFileUtil.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPRemoteFileUtil.h; sourceTree = "<group>"; };
+		DC2400C02E8BD5C50071EE0E /* AJPResource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPResource.h; sourceTree = "<group>"; };
+		DC2400C22E8BD5C50071EE0E /* AJPNetworkTypeDetector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPNetworkTypeDetector.h; sourceTree = "<group>"; };
+		DC2400C32E8BD5C50071EE0E /* AJPNetworkTypeDetector.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPNetworkTypeDetector.m; sourceTree = "<group>"; };
+		DC2400C52E8BD5C50071EE0E /* AJPNetworkClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPNetworkClient.m; sourceTree = "<group>"; };
+		DC2400C62E8BD5C50071EE0E /* AJPRemoteFileUtil.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPRemoteFileUtil.m; sourceTree = "<group>"; };
+		DC2400C92E8BD5C50071EE0E /* Airborne.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Airborne.swift; sourceTree = "<group>"; };
+		DC2400CD2E8BD5C50071EE0E /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
 		DCB613FB2E6191FB0099D87E /* Airborne.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Airborne.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		DCB614312E61924D0099D87E /* AJPApplicationConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationConfig.h; sourceTree = "<group>"; };
-		DCB614322E61924D0099D87E /* AJPApplicationConfig.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationConfig.m; sourceTree = "<group>"; };
-		DCB614342E61924D0099D87E /* AJPApplicationManifest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManifest.h; sourceTree = "<group>"; };
-		DCB614352E61924D0099D87E /* AJPApplicationManifest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationManifest.m; sourceTree = "<group>"; };
-		DCB614372E61924D0099D87E /* AJPApplicationPackage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationPackage.h; sourceTree = "<group>"; };
-		DCB614382E61924D0099D87E /* AJPApplicationPackage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationPackage.m; sourceTree = "<group>"; };
-		DCB6143A2E61924D0099D87E /* AJPApplicationResources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationResources.h; sourceTree = "<group>"; };
-		DCB6143B2E61924D0099D87E /* AJPApplicationResources.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationResources.m; sourceTree = "<group>"; };
-		DCB6143D2E61924D0099D87E /* AJPApplicationConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationConstants.h; sourceTree = "<group>"; };
-		DCB6143E2E61924D0099D87E /* AJPApplicationConstants.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationConstants.m; sourceTree = "<group>"; };
-		DCB614402E61924D0099D87E /* AJPResource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPResource.h; sourceTree = "<group>"; };
-		DCB614412E61924D0099D87E /* AJPResource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPResource.m; sourceTree = "<group>"; };
-		DCB614432E61924D0099D87E /* AJPApplicationTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationTracker.h; sourceTree = "<group>"; };
-		DCB614442E61924D0099D87E /* AJPApplicationTracker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationTracker.m; sourceTree = "<group>"; };
-		DCB614462E61924D0099D87E /* AJPApplicationManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManager.h; sourceTree = "<group>"; };
-		DCB614472E61924D0099D87E /* AJPApplicationManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationManager.m; sourceTree = "<group>"; };
-		DCB614482E61924D0099D87E /* AJPApplicationManagerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManagerDelegate.h; sourceTree = "<group>"; };
-		DCB6144A2E61924D0099D87E /* Airborne.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Airborne.h; sourceTree = "<group>"; };
-		DCB6144B2E61924D0099D87E /* Airborne.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Airborne.swift; sourceTree = "<group>"; };
-		DCC582F72E827AE500E29833 /* AJPNetworkTypeDetector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPNetworkTypeDetector.h; sourceTree = "<group>"; };
-		DCC582F92E827B1900E29833 /* AJPNetworkTypeDetector.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPNetworkTypeDetector.m; sourceTree = "<group>"; };
-		DCC582FB2E82814C00E29833 /* AJPLoggerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPLoggerDelegate.h; sourceTree = "<group>"; };
-		DCC583042E8292B300E29833 /* AJPFileUtil.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPFileUtil.h; sourceTree = "<group>"; };
-		DCC583052E8292B300E29833 /* AJPFileUtil.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPFileUtil.m; sourceTree = "<group>"; };
-		DCC583082E82A55500E29833 /* AJPNetworkClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPNetworkClient.h; sourceTree = "<group>"; };
-		DCC583092E82A55500E29833 /* AJPNetworkClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPNetworkClient.m; sourceTree = "<group>"; };
-		DCC5830C2E82AA9500E29833 /* AJPRemoteFileUtil.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPRemoteFileUtil.h; sourceTree = "<group>"; };
-		DCC5830D2E82AA9500E29833 /* AJPRemoteFileUtil.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPRemoteFileUtil.m; sourceTree = "<group>"; };
-		DCC583372E83B95600E29833 /* AJPHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPHelpers.h; sourceTree = "<group>"; };
-		DCC583382E83B95600E29833 /* AJPHelpers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPHelpers.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +101,124 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		DC2400A52E8BD5C50071EE0E /* Constants */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400A32E8BD5C50071EE0E /* AJPApplicationConstants.h */,
+				DC2400A42E8BD5C50071EE0E /* AJPApplicationConstants.m */,
+			);
+			path = Constants;
+			sourceTree = "<group>";
+		};
+		DC2400A82E8BD5C50071EE0E /* Tracker */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400A62E8BD5C50071EE0E /* AJPApplicationTracker.h */,
+				DC2400A72E8BD5C50071EE0E /* AJPApplicationTracker.m */,
+			);
+			path = Tracker;
+			sourceTree = "<group>";
+		};
+		DC2400AF2E8BD5C50071EE0E /* ApplicationManager */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400A52E8BD5C50071EE0E /* Constants */,
+				DC2400A82E8BD5C50071EE0E /* Tracker */,
+				DC2400A92E8BD5C50071EE0E /* AJPApplicationConfig.m */,
+				DC2400AA2E8BD5C50071EE0E /* AJPApplicationManager.m */,
+				DC2400AB2E8BD5C50071EE0E /* AJPApplicationManifest.m */,
+				DC2400AC2E8BD5C50071EE0E /* AJPApplicationPackage.m */,
+				DC2400AD2E8BD5C50071EE0E /* AJPApplicationResources.m */,
+				DC2400AE2E8BD5C50071EE0E /* AJPResource.m */,
+			);
+			path = ApplicationManager;
+			sourceTree = "<group>";
+		};
+		DC2400B12E8BD5C50071EE0E /* FileUtil */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400B02E8BD5C50071EE0E /* AJPFileUtil.m */,
+			);
+			path = FileUtil;
+			sourceTree = "<group>";
+		};
+		DC2400B42E8BD5C50071EE0E /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400B22E8BD5C50071EE0E /* AJPHelpers.h */,
+				DC2400B32E8BD5C50071EE0E /* AJPHelpers.m */,
+			);
+			path = Helper;
+			sourceTree = "<group>";
+		};
+		DC2400C12E8BD5C50071EE0E /* include */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400B52E8BD5C50071EE0E /* Airborne.h */,
+				DC2400B62E8BD5C50071EE0E /* AJPApplicationConfig.h */,
+				DC2400B72E8BD5C50071EE0E /* AJPApplicationManager.h */,
+				DC2400B82E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h */,
+				DC2400B92E8BD5C50071EE0E /* AJPApplicationManifest.h */,
+				DC2400BA2E8BD5C50071EE0E /* AJPApplicationPackage.h */,
+				DC2400BB2E8BD5C50071EE0E /* AJPApplicationResources.h */,
+				DC2400BC2E8BD5C50071EE0E /* AJPFileUtil.h */,
+				DC2400BD2E8BD5C50071EE0E /* AJPLoggerDelegate.h */,
+				DC2400BE2E8BD5C50071EE0E /* AJPNetworkClient.h */,
+				DC2400BF2E8BD5C50071EE0E /* AJPRemoteFileUtil.h */,
+				DC2400C02E8BD5C50071EE0E /* AJPResource.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		DC2400C42E8BD5C50071EE0E /* NetworkDetector */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400C22E8BD5C50071EE0E /* AJPNetworkTypeDetector.h */,
+				DC2400C32E8BD5C50071EE0E /* AJPNetworkTypeDetector.m */,
+			);
+			path = NetworkDetector;
+			sourceTree = "<group>";
+		};
+		DC2400C72E8BD5C50071EE0E /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400C42E8BD5C50071EE0E /* NetworkDetector */,
+				DC2400C52E8BD5C50071EE0E /* AJPNetworkClient.m */,
+				DC2400C62E8BD5C50071EE0E /* AJPRemoteFileUtil.m */,
+			);
+			path = Network;
+			sourceTree = "<group>";
+		};
+		DC2400C82E8BD5C50071EE0E /* AirborneObjC */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400AF2E8BD5C50071EE0E /* ApplicationManager */,
+				DC2400B12E8BD5C50071EE0E /* FileUtil */,
+				DC2400B42E8BD5C50071EE0E /* Helper */,
+				DC2400C12E8BD5C50071EE0E /* include */,
+				DC2400C72E8BD5C50071EE0E /* Network */,
+			);
+			path = AirborneObjC;
+			sourceTree = "<group>";
+		};
+		DC2400CA2E8BD5C50071EE0E /* AirborneSwift */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400C92E8BD5C50071EE0E /* Airborne.swift */,
+			);
+			path = AirborneSwift;
+			sourceTree = "<group>";
+		};
+		DC2400CE2E8BD5C50071EE0E /* Airborne */ = {
+			isa = PBXGroup;
+			children = (
+				DC2400C82E8BD5C50071EE0E /* AirborneObjC */,
+				DC2400CA2E8BD5C50071EE0E /* AirborneSwift */,
+				DC2400CD2E8BD5C50071EE0E /* Airborne.modulemap */,
+			);
+			path = Airborne;
+			sourceTree = "<group>";
+		};
 		DC7641262E6192BC0028FCDA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -112,7 +229,7 @@
 		DCB613F12E6191FB0099D87E = {
 			isa = PBXGroup;
 			children = (
-				DCB6144C2E61924D0099D87E /* Airborne */,
+				DC2400CE2E8BD5C50071EE0E /* Airborne */,
 				DC7641262E6192BC0028FCDA /* Frameworks */,
 				DCB613FC2E6191FB0099D87E /* Products */,
 			);
@@ -126,156 +243,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		DCB614332E61924D0099D87E /* AppConfig */ = {
-			isa = PBXGroup;
-			children = (
-				DCB614312E61924D0099D87E /* AJPApplicationConfig.h */,
-				DCB614322E61924D0099D87E /* AJPApplicationConfig.m */,
-			);
-			path = AppConfig;
-			sourceTree = "<group>";
-		};
-		DCB614362E61924D0099D87E /* AppManifest */ = {
-			isa = PBXGroup;
-			children = (
-				DCB614342E61924D0099D87E /* AJPApplicationManifest.h */,
-				DCB614352E61924D0099D87E /* AJPApplicationManifest.m */,
-			);
-			path = AppManifest;
-			sourceTree = "<group>";
-		};
-		DCB614392E61924D0099D87E /* AppPackage */ = {
-			isa = PBXGroup;
-			children = (
-				DCB614372E61924D0099D87E /* AJPApplicationPackage.h */,
-				DCB614382E61924D0099D87E /* AJPApplicationPackage.m */,
-			);
-			path = AppPackage;
-			sourceTree = "<group>";
-		};
-		DCB6143C2E61924D0099D87E /* AppResources */ = {
-			isa = PBXGroup;
-			children = (
-				DCB6143A2E61924D0099D87E /* AJPApplicationResources.h */,
-				DCB6143B2E61924D0099D87E /* AJPApplicationResources.m */,
-			);
-			path = AppResources;
-			sourceTree = "<group>";
-		};
-		DCB6143F2E61924D0099D87E /* Constants */ = {
-			isa = PBXGroup;
-			children = (
-				DCB6143D2E61924D0099D87E /* AJPApplicationConstants.h */,
-				DCB6143E2E61924D0099D87E /* AJPApplicationConstants.m */,
-			);
-			path = Constants;
-			sourceTree = "<group>";
-		};
-		DCB614422E61924D0099D87E /* Resource */ = {
-			isa = PBXGroup;
-			children = (
-				DCB614402E61924D0099D87E /* AJPResource.h */,
-				DCB614412E61924D0099D87E /* AJPResource.m */,
-			);
-			path = Resource;
-			sourceTree = "<group>";
-		};
-		DCB614452E61924D0099D87E /* Tracker */ = {
-			isa = PBXGroup;
-			children = (
-				DCC582FB2E82814C00E29833 /* AJPLoggerDelegate.h */,
-				DCB614432E61924D0099D87E /* AJPApplicationTracker.h */,
-				DCB614442E61924D0099D87E /* AJPApplicationTracker.m */,
-			);
-			path = Tracker;
-			sourceTree = "<group>";
-		};
-		DCB614492E61924D0099D87E /* ApplicationManager */ = {
-			isa = PBXGroup;
-			children = (
-				DCB614332E61924D0099D87E /* AppConfig */,
-				DCB614362E61924D0099D87E /* AppManifest */,
-				DCB614392E61924D0099D87E /* AppPackage */,
-				DCB6143C2E61924D0099D87E /* AppResources */,
-				DCB6143F2E61924D0099D87E /* Constants */,
-				DCB614422E61924D0099D87E /* Resource */,
-				DCB614452E61924D0099D87E /* Tracker */,
-				DCB614462E61924D0099D87E /* AJPApplicationManager.h */,
-				DCB614472E61924D0099D87E /* AJPApplicationManager.m */,
-				DCB614482E61924D0099D87E /* AJPApplicationManagerDelegate.h */,
-			);
-			path = ApplicationManager;
-			sourceTree = "<group>";
-		};
-		DCB6144C2E61924D0099D87E /* Airborne */ = {
-			isa = PBXGroup;
-			children = (
-				DCB6144A2E61924D0099D87E /* Airborne.h */,
-				DCB6144B2E61924D0099D87E /* Airborne.swift */,
-				DCB614492E61924D0099D87E /* ApplicationManager */,
-				DCC583302E83B4C900E29833 /* FileUtil */,
-				DCC5833B2E83BBC800E29833 /* Network */,
-				DCC583332E83B51000E29833 /* Helper */,
-				DC76412B2E61931B0028FCDA /* Airborne.modulemap */,
-			);
-			path = Airborne;
-			sourceTree = "<group>";
-		};
-		DCC583302E83B4C900E29833 /* FileUtil */ = {
-			isa = PBXGroup;
-			children = (
-				DCC583042E8292B300E29833 /* AJPFileUtil.h */,
-				DCC583052E8292B300E29833 /* AJPFileUtil.m */,
-			);
-			path = FileUtil;
-			sourceTree = "<group>";
-		};
-		DCC583312E83B4D500E29833 /* NetworkClient */ = {
-			isa = PBXGroup;
-			children = (
-				DCC583082E82A55500E29833 /* AJPNetworkClient.h */,
-				DCC583092E82A55500E29833 /* AJPNetworkClient.m */,
-			);
-			path = NetworkClient;
-			sourceTree = "<group>";
-		};
-		DCC583322E83B4E900E29833 /* RemoteFileUtil */ = {
-			isa = PBXGroup;
-			children = (
-				DCC5830C2E82AA9500E29833 /* AJPRemoteFileUtil.h */,
-				DCC5830D2E82AA9500E29833 /* AJPRemoteFileUtil.m */,
-			);
-			path = RemoteFileUtil;
-			sourceTree = "<group>";
-		};
-		DCC583332E83B51000E29833 /* Helper */ = {
-			isa = PBXGroup;
-			children = (
-				DCC583372E83B95600E29833 /* AJPHelpers.h */,
-				DCC583382E83B95600E29833 /* AJPHelpers.m */,
-			);
-			path = Helper;
-			sourceTree = "<group>";
-		};
-		DCC583342E83B52C00E29833 /* NetworkDetector */ = {
-			isa = PBXGroup;
-			children = (
-				DCC582F72E827AE500E29833 /* AJPNetworkTypeDetector.h */,
-				DCC582F92E827B1900E29833 /* AJPNetworkTypeDetector.m */,
-			);
-			path = NetworkDetector;
-			sourceTree = "<group>";
-		};
-		DCC5833B2E83BBC800E29833 /* Network */ = {
-			isa = PBXGroup;
-			children = (
-				DCC583342E83B52C00E29833 /* NetworkDetector */,
-				DCC583312E83B4D500E29833 /* NetworkClient */,
-				DCC583322E83B4E900E29833 /* RemoteFileUtil */,
-			);
-			path = Network;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -283,22 +250,22 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DCB614562E61924D0099D87E /* Airborne.h in Headers */,
-				DCB614582E61924D0099D87E /* AJPApplicationResources.h in Headers */,
-				DCB614592E61924D0099D87E /* AJPApplicationManager.h in Headers */,
-				DCC583392E83B95600E29833 /* AJPHelpers.h in Headers */,
-				DCB6145A2E61924D0099D87E /* AJPApplicationManagerDelegate.h in Headers */,
-				DCB6145C2E61924D0099D87E /* AJPApplicationConfig.h in Headers */,
-				DCC582F82E827AE500E29833 /* AJPNetworkTypeDetector.h in Headers */,
-				DCB6145D2E61924D0099D87E /* AJPResource.h in Headers */,
-				DCB6145F2E61924D0099D87E /* AJPApplicationPackage.h in Headers */,
-				DCC5830F2E82AA9500E29833 /* AJPRemoteFileUtil.h in Headers */,
-				DCC5830B2E82A55500E29833 /* AJPNetworkClient.h in Headers */,
-				DCC583072E8292B300E29833 /* AJPFileUtil.h in Headers */,
-				DCC582FD2E8281B400E29833 /* AJPLoggerDelegate.h in Headers */,
-				DCB614572E61924D0099D87E /* AJPApplicationManifest.h in Headers */,
-				DCB6145B2E61924D0099D87E /* AJPApplicationConstants.h in Headers */,
-				DCB6145E2E61924D0099D87E /* AJPApplicationTracker.h in Headers */,
+				DC2400CF2E8BD5C50071EE0E /* AJPFileUtil.h in Headers */,
+				DC2400D12E8BD5C50071EE0E /* AJPNetworkClient.h in Headers */,
+				DC2400D02E8BD5C50071EE0E /* AJPApplicationManager.h in Headers */,
+				DC2400D22E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h in Headers */,
+				DC2400D72E8BD5C50071EE0E /* AJPApplicationPackage.h in Headers */,
+				DC2400D62E8BD5C50071EE0E /* Airborne.h in Headers */,
+				DC2400D92E8BD5C50071EE0E /* AJPRemoteFileUtil.h in Headers */,
+				DC2400DB2E8BD5C50071EE0E /* AJPApplicationManifest.h in Headers */,
+				DC2400DC2E8BD5C50071EE0E /* AJPLoggerDelegate.h in Headers */,
+				DC2400DD2E8BD5C50071EE0E /* AJPApplicationConfig.h in Headers */,
+				DC2400DE2E8BD5C50071EE0E /* AJPApplicationResources.h in Headers */,
+				DC2400DA2E8BD5C50071EE0E /* AJPResource.h in Headers */,
+				DC2400D32E8BD5C50071EE0E /* AJPApplicationConstants.h in Headers */,
+				DC2400D42E8BD5C50071EE0E /* AJPApplicationTracker.h in Headers */,
+				DC2400D52E8BD5C50071EE0E /* AJPNetworkTypeDetector.h in Headers */,
+				DC2400D82E8BD5C50071EE0E /* AJPHelpers.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -398,21 +365,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DCB6144D2E61924D0099D87E /* Airborne.swift in Sources */,
-				DCC583062E8292B300E29833 /* AJPFileUtil.m in Sources */,
-				DCB6144E2E61924D0099D87E /* AJPApplicationManager.m in Sources */,
-				DCB6144F2E61924D0099D87E /* AJPApplicationConstants.m in Sources */,
-				DCB614502E61924D0099D87E /* AJPApplicationConfig.m in Sources */,
-				DCC582FA2E827B1900E29833 /* AJPNetworkTypeDetector.m in Sources */,
-				DCB614512E61924D0099D87E /* AJPApplicationManifest.m in Sources */,
-				DCC5830E2E82AA9500E29833 /* AJPRemoteFileUtil.m in Sources */,
-				DCC5833A2E83B95600E29833 /* AJPHelpers.m in Sources */,
-				DCB614522E61924D0099D87E /* AJPResource.m in Sources */,
-				DCB614532E61924D0099D87E /* AJPApplicationPackage.m in Sources */,
-				DCB614542E61924D0099D87E /* AJPApplicationResources.m in Sources */,
-				DCC5830A2E82A55500E29833 /* AJPNetworkClient.m in Sources */,
-				DCC582FC2E82814C00E29833 /* AJPLoggerDelegate.h in Sources */,
-				DCB614552E61924D0099D87E /* AJPApplicationTracker.m in Sources */,
+				DC2400DF2E8BD5C50071EE0E /* AJPApplicationManager.m in Sources */,
+				DC2400E02E8BD5C50071EE0E /* AJPApplicationManifest.m in Sources */,
+				DC2400E12E8BD5C50071EE0E /* AJPHelpers.m in Sources */,
+				DC2400E22E8BD5C50071EE0E /* AJPApplicationConfig.m in Sources */,
+				DC2400E32E8BD5C50071EE0E /* AJPApplicationPackage.m in Sources */,
+				DC2400E42E8BD5C50071EE0E /* AJPNetworkClient.m in Sources */,
+				DC2400E62E8BD5C50071EE0E /* AJPResource.m in Sources */,
+				DC2400E72E8BD5C50071EE0E /* AJPFileUtil.m in Sources */,
+				DC2400E82E8BD5C50071EE0E /* AJPApplicationTracker.m in Sources */,
+				DC2400E92E8BD5C50071EE0E /* AJPApplicationResources.m in Sources */,
+				DC2400EA2E8BD5C50071EE0E /* AJPRemoteFileUtil.m in Sources */,
+				DC2400EB2E8BD5C50071EE0E /* AJPApplicationConstants.m in Sources */,
+				DC2400EC2E8BD5C50071EE0E /* AJPNetworkTypeDetector.m in Sources */,
+				DC2400ED2E8BD5C50071EE0E /* Airborne.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

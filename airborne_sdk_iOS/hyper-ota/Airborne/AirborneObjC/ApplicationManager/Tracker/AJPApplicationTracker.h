@@ -6,7 +6,11 @@
 //
 
 #import <Foundation/Foundation.h>
+#ifdef SPM_BUILD
+#import "AJPLoggerDelegate.h"
+#else
 #import <Airborne/AJPLoggerDelegate.h>
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 

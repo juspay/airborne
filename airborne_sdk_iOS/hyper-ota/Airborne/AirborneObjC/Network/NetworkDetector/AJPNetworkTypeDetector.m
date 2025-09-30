@@ -11,6 +11,8 @@
 
 @implementation AJPNetworkTypeDetector
 
+#if TARGET_OS_IOS
+
 #pragma mark - Exposed
 
 + (AJPNetworkType)currentNetworkType {
@@ -138,5 +140,7 @@
     
     return NetworkTypeUnknown;
 }
+
+#endif
 
 @end

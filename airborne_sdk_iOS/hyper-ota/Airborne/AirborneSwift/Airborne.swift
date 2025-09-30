@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if SPM_BUILD
+import AirborneObjC
+#endif
 
 // MARK: - AirborneDelegate Protocol
 
