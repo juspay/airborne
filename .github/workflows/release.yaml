@@ -282,8 +282,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          context: .
-          file: airborne_dashboard/Dockerfile
+          context: ./airborne_dashboard
+          file: ./airborne_dashboard/Dockerfile
           tags: ghcr.io/${{ github.repository }}-dashboard:${{ needs.tag-release.outputs.version }}-${{ matrix.tag }}
 
   dashboard-create-manifest:
@@ -396,7 +396,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.0.0"
+          node-version: "22.12.0"
           registry-url: "https://registry.npmjs.org"
 
       - name: Publish to NPM
