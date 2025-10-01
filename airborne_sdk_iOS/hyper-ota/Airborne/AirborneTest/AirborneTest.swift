@@ -1,6 +1,5 @@
 import XCTest
-@testable import AirborneSwift
-@testable import AirborneObjC
+@testable import Airborne
 
 final class AirborneTests: XCTestCase {
     var airborne: AirborneServices!

@@ -5,7 +5,7 @@
 //  Copyright © Juspay Technologies. All rights reserved.
 //
 
-#ifdef SPM_BUILD
+#if SWIFT_PACKAGE
 #import "AJPApplicationManager.h"
 #import "AJPApplicationManagerDelegate.h"
 #import "AJPApplicationManifest.h"

@@ -6,7 +6,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#ifdef SPM_BUILD
+#if SWIFT_PACKAGE
 #import "AJPFileUtil.h"
 #else
 #import <Airborne/AJPFileUtil.h>
