@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//include ':app'
+package `in`.juspay.airborne.constants
 
-include ':airborne'
+import androidx.annotation.Keep
+
+@Keep
+object LogCategory {
+    const val ACTION = "action"
+    const val LIFECYCLE = "lifecycle"
+}

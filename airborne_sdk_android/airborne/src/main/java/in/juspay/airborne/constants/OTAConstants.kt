@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//include ':app'
+package `in`.juspay.airborne.constants
 
-include ':airborne'
+object OTAConstants {
+    const val ATTR_HASH_IN_DISK = "hashInDisk"
+    const val OTA_BUILD_ID: String = "jp_airborne_build_id"
+}
