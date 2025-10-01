@@ -182,17 +182,7 @@ class SplashActivity : AppCompatActivity() {
 
 ## iOS Setup
 
-### 1. Add Airborne SDK
-
-Add the Airborne iOS SDK to your project.
-
-For CocoaPods, add to your `Podfile`:
-
-```ruby
-pod 'Airborne', '~> YOUR_VERSION'
-```
-
-### 2. Initialize Airborne in AppDelegate
+### 1. Initialize Airborne in AppDelegate
 
 In your `AppDelegate.swift`, initialize Airborne:
 
@@ -208,7 +198,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         
         // Initialize Airborne
-        airborne = AirborneServices(releaseConfigURL: "https://yourdomain.com/release-config-url.json", delegate: self)
+        airborne = Airborne(releaseConfigURL: "https://yourdomain.com/release-config-url.json", delegate: self)
         
         return true
     }
