@@ -11,7 +11,7 @@ let package = Package(
     products: [
         .library(
             name: "Airborne",
-            targets: ["AirborneSwift"]
+            targets: ["Airborne"]
         ),
     ],
     targets: [
@@ -21,28 +21,22 @@ let package = Package(
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneObjC",
             publicHeadersPath: "include",
             cSettings: [
+                .headerSearchPath("include"),
                 .headerSearchPath("ApplicationManager/Constants"),
                 .headerSearchPath("ApplicationManager/Tracker"),
                 .headerSearchPath("Helper"),
-                .headerSearchPath("Network/NetworkDetector"),
-                .define("SPM_BUILD", to: "1")
-            ]
+                .headerSearchPath("Network/NetworkDetector")
+            ],
         ),
         .target(
-            name: "AirborneSwift",
+            name: "Airborne",
             dependencies: ["AirborneObjC"],
-            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwift",
-            cSettings: [
-                .define("SPM_BUILD", to: "1")
-            ]
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwift"
         ),
         .testTarget(
             name: "AirborneTests",
-            dependencies: ["AirborneSwift"],
-            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneTest",
-            cSettings: [
-                .define("SPM_BUILD", to: "1")
-            ]
+            dependencies: ["Airborne"],
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneTest"
         ),
     ]
 )

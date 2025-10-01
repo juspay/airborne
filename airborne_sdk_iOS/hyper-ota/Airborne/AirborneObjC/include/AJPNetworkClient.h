@@ -7,7 +7,7 @@
 
 #import <Foundation/Foundation.h>
 
-#ifdef SPM_BUILD
+#if SWIFT_PACKAGE
 #import "AJPLoggerDelegate.h"
 #else
 #import <Airborne/AJPLoggerDelegate.h>

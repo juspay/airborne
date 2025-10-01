@@ -9,7 +9,7 @@
 #define ApplicationManifest_h
 
 #import <Foundation/Foundation.h>
-#ifdef SPM_BUILD
+#if SWIFT_PACKAGE
 #import "AJPApplicationConfig.h"
 #import "AJPApplicationPackage.h"
 #import "AJPApplicationResources.h"

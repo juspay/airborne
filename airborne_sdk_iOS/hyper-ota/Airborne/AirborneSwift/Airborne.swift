@@ -6,7 +6,7 @@
 //
 
 import Foundation
-#if SPM_BUILD
+#if SWIFT_PACKAGE
 import AirborneObjC
 #endif
 

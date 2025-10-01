@@ -1,0 +1,4 @@
+module AirborneObjC {
+    umbrella header "AirborneSwiftPackage.h"
+    export *
+}

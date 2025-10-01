@@ -8,7 +8,7 @@
 #ifndef AJPApplicationManagerDelegate_h
 #define AJPApplicationManagerDelegate_h
 
-#ifdef SPM_BUILD
+#if SWIFT_PACKAGE
 #import "AJPApplicationManifest.h"
 #import "AJPRemoteFileUtil.h"
 #else

@@ -10,7 +10,7 @@
 
 #import <WebKit/WKWebView.h>
 
-#ifdef SPM_BUILD
+#if SWIFT_PACKAGE
 #import "AJPApplicationManifest.h"
 #import "AJPApplicationManagerDelegate.h"
 #import "AJPLoggerDelegate.h"
