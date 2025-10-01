@@ -2,6 +2,22 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_plugin-v0.1.1 - 2025-10-01
+#### Bug Fixes
+- Missing headers in Airborne.h and react plugin update - (841e594) - Balaganesh S
+#### Documentation
+- iOS integration steps - (3656b18) - Balaganesh S
+
+- - -
+
+## v0.3.0 - 2025-10-01
+#### Bug Fixes
+- update bundles in background using airborne - (71ea78c) - Yaswanth
+#### Miscellaneous Chores
+- updated react plugin version to 0.3.0 - (c6f5426) - george.james
+
+- - -
+
 ## airborne_react_plugin-v0.1.0 - 2025-09-24
 #### Features
 - introduce unified versioning - (b1d910e) - ayush.jain@juspay.in

@@ -2,6 +2,23 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.4.0 - 2025-10-01
+### Package updates
+- airborne_dashboard bumped to airborne_dashboard-v0.2.0
+- airborne_react_plugin bumped to airborne_react_plugin-v0.1.1
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.0.1
+- airborne_analytics_server bumped to airborne_analytics_server-v0.1.0
+- airborne_server bumped to airborne_server-v0.1.0
+### Global changes
+#### Bug Fixes
+- **(release)** Analytics dockerfile and add dashboard ghcr release - (450568e) - ayush.jain@juspay.in
+- Respect toss from application for release - (1ca7fe9) - george.james
+- release step - (c18214e) - ayush.jain@juspay.in
+#### Build system
+- add npm release - (43f984f) - ayush.jain@juspay.in
+
+- - -
+
 ## v0.1.0 - 2025-09-24
 ### Package updates
 - airborne_react_plugin bumped to airborne_react_plugin-v0.1.0

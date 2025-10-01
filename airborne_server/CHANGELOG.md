@@ -2,21 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
-## airborne_dashboard-v0.2.0 - 2025-10-01
+## airborne_server-v0.1.0 - 2025-10-01
+#### Bug Fixes
+- Respect toss from application for release - (1ca7fe9) - george.james
+- update bundles in background using airborne - (71ea78c) - Yaswanth
 #### Features
 - offload blocking code to threadpool + implement tracing - (c1887e8) - yuvrajjsingh0
 #### Miscellaneous Chores
-- **(build)** undo file Changelog file formatting - (75cbe21) - ayush.jain@juspay.in
-
-- - -
-
-## airborne_dashboard-v0.1.0 - 2025-09-24
-#### Features
-- introduce unified versioning - (b1d910e) - ayush.jain@juspay.in
-#### Miscellaneous Chores
 - fix rebase misses - (ea91dd3) - ayush.jain@juspay.in
 #### Refactoring
-- Move server/dashboard_nextjs to airborne_dashboard - (68b6d6f) - ayush.jain@juspay.in
+- Rename server to airborne_server - (3ff65b6) - ayush.jain@juspay.in
 
 - - -
 
