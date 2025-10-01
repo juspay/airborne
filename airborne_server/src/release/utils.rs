@@ -11,8 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
+use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
@@ -22,9 +23,10 @@ use superposition_sdk::types::Variant;
 
 use crate::{
     file::utils::parse_file_key,
+    package::utils::parse_package_key,
     release::types::*,
     run_blocking,
-    types::ABError,
+    types::{ABError, AppState},
     utils::db::{
         models::FileEntry,
         schema::hyperotaserver::files::{
@@ -33,6 +35,7 @@ use crate::{
         },
         DbPool,
     },
+    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
 };
 
 pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<Vec<String>> {
@@ -366,4 +369,456 @@ pub async fn invalidate_cf(
         });
 
     Ok(())
+}
+
+pub async fn build_overrides(
+    req: &Json<CreateReleaseRequest>,
+    superposition_org_id: String,
+    application: String,
+    organisation: String,
+    dims: HashMap<String, Value>,
+    state: web::Data<AppState>,
+    workspace: String,
+) -> Result<BuildOverrides, ABError> {
+    let dims1 = dims.clone();
+    info!("Dimensions: {:?}", serde_json::json!(dims1));
+
+    let resolved_config_builder = dims1.iter().fold(
+        state
+            .superposition_client
+            .get_resolved_config()
+            .workspace_id(workspace.clone())
+            .org_id(superposition_org_id.clone())
+            .context("variantIds", vec![].into()),
+        |builder, (key, value)| {
+            builder.context(
+                key.clone(),
+                Document::String(value.as_str().unwrap_or("").to_string()),
+            )
+        },
+    );
+
+    let resolved_config = resolved_config_builder.send().await;
+    info!("resolved config result: {:?}", resolved_config);
+
+    let config_document = match resolved_config {
+        Ok(config) => {
+            info!("config from superposition: {:?}", config);
+            config.config
+        }
+        Err(e) => {
+            info!("Failed to get resolved config: {}", e);
+            None
+        }
+    };
+
+    let imp_from_configs = extract_files_from_configs(&config_document, "package.important");
+    let lazy_from_configs = extract_files_from_configs(&config_document, "package.lazy");
+    let resources_from_configs = extract_files_from_configs(&config_document, "resources");
+
+    // If you give me package_id -> I'll expect you to provide me complete important and lazy splits
+    // If you just want to PATCH the important or lazy blocks -> DO NOT provide me the package_id
+    //
+    let mut package_update = false;
+    let mut is_first_release = false;
+    let opt_pkg_version_from_config = &config_document.as_ref().and_then(|doc| {
+        if let Document::Object(obj) = doc {
+            obj.get("package.version").and_then(document_to_value)
+        } else {
+            None
+        }
+    });
+    if let Some(pkg_version_from_config) = opt_pkg_version_from_config {
+        is_first_release = pkg_version_from_config == 0;
+    }
+    let pkg_version = if let Some(package_id) = &req.package_id {
+        package_update = true;
+        let (version_opt, _) = parse_package_key(package_id);
+        version_opt.ok_or_else(|| {
+            ABError::InternalServerError(format!(
+                "Package ID should contain version: {}",
+                package_id
+            ))
+        })?
+    } else {
+        if is_first_release {
+            return Err(ABError::BadRequest(
+                "First release must provide package_id".to_string(),
+            ));
+        }
+        if !opt_pkg_version_from_config.is_some() {
+            let pool = state.db_pool.clone();
+            let org = organisation.clone();
+            let app = application.clone();
+
+            run_blocking!({
+                let mut conn = pool.get()?;
+                packages_dsl::packages_v2
+                    .filter(
+                        packages_dsl::org_id
+                            .eq(&org)
+                            .and(packages_dsl::app_id.eq(&app)),
+                    )
+                    .order_by(packages_dsl::version.desc())
+                    .select(packages_dsl::version)
+                    .first::<i32>(&mut conn)
+                    .map_err(|_| {
+                        ABError::NotFound("No packages found for this application".to_string())
+                    })
+            })?
+        } else {
+            let version = opt_pkg_version_from_config
+                .as_ref()
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32)
+                .ok_or_else(|| {
+                    ABError::BadRequest("Could not extract package version from config".to_string())
+                })?;
+            version
+        }
+    };
+
+    let package_data = {
+        let pool = state.db_pool.clone();
+        let org = organisation.clone();
+        let app = application.clone();
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            packages_dsl::packages_v2
+                .filter(
+                    packages_dsl::org_id
+                        .eq(&org)
+                        .and(packages_dsl::app_id.eq(&app))
+                        .and(packages_dsl::version.eq(pkg_version)),
+                )
+                .select(PackageV2Entry::as_select())
+                .first::<PackageV2Entry>(&mut conn)
+                .map_err(|_| {
+                    ABError::NotFound(format!("Package version {} not found", pkg_version))
+                })
+        })?
+    };
+
+    // check any resources don't overlap with important or lazy
+    let check_resource_duplicacy = |resources: &Vec<String>| -> bool {
+        for resource in resources {
+            if package_data.files.contains(&Some(resource.clone())) {
+                return true;
+            }
+        }
+        false
+    };
+
+    // check if a file group exists in package  -> returns (exists, file_that_does_not_exist)
+    let check_file_group_exists_in_package = |file_paths: &Vec<String>| -> (bool, Option<String>) {
+        for file_path in file_paths {
+            if !package_data.files.contains(&Some(file_path.clone())) {
+                return (false, Some(file_path.clone()));
+            }
+        }
+        (true, None)
+    };
+
+    let (final_important, final_lazy, final_resources, final_properties) =
+        if let Some(package_req) = &req.package {
+            // case where package_id is provided -> Expect to get important and lazy : package_update is true
+            // case where package_id is not provided and package block is provided -> Use whatever is in request package and others from config : package_update is false
+            let mut f_imp: Option<Vec<String>> = if package_update {
+                Some(vec![])
+            } else {
+                imp_from_configs
+            };
+            let mut f_lazy: Option<Vec<String>> = if package_update {
+                Some(vec![])
+            } else {
+                lazy_from_configs
+            };
+
+            if let Some(req_imp) = &package_req.important {
+                let (exists, file_that_does_not_exist) =
+                    check_file_group_exists_in_package(req_imp);
+                if !exists {
+                    return Err(ABError::BadRequest(format!(
+                        "Important file '{}' not found in package {}",
+                        file_that_does_not_exist.unwrap_or_default(),
+                        pkg_version
+                    )));
+                }
+                f_imp = Some(req_imp.clone());
+            }
+
+            if let Some(req_lazy) = &package_req.lazy {
+                let (exists, file_that_does_not_exist) =
+                    check_file_group_exists_in_package(req_lazy);
+                if !exists {
+                    return Err(ABError::BadRequest(format!(
+                        "Lazy file '{}' not found in package {}",
+                        file_that_does_not_exist.unwrap_or_default(),
+                        pkg_version
+                    )));
+                }
+                f_lazy = Some(req_lazy.clone());
+            }
+            if let (Some(important), Some(lazy)) = (&package_req.important, &package_req.lazy) {
+                let important_set: HashSet<&String> = important.iter().collect();
+                let lazy_set: HashSet<&String> = lazy.iter().collect();
+                let overlap: Vec<&String> =
+                    important_set.intersection(&lazy_set).cloned().collect();
+                if !overlap.is_empty() {
+                    return Err(ABError::BadRequest(format!(
+                        "Files cannot be in both important and lazy splits: {:?}",
+                        overlap
+                    )));
+                }
+            }
+
+            let f_resources = if let Some(resources) = &req.resources {
+                if check_resource_duplicacy(resources) {
+                    return Err(ABError::BadRequest(format!(
+                        "Resource cannot be a file in package {}",
+                        pkg_version
+                    )));
+                }
+                req.resources.clone()
+            } else {
+                if resources_from_configs.is_some()
+                    && check_resource_duplicacy(&resources_from_configs.clone().unwrap_or_default())
+                {
+                    return Err(ABError::BadRequest(format!(
+                        "Resource cannot be a file in package {}",
+                        pkg_version
+                    )));
+                }
+                resources_from_configs
+            };
+
+            (f_imp, f_lazy, f_resources, package_req.properties.clone())
+        } else {
+            // handle if package id is provided but package block was not provided
+            if req.package_id.is_some() {
+                return Err(ABError::BadRequest(
+                    "Package ID provided but no package block in request".to_string(),
+                ));
+            }
+
+            (
+                imp_from_configs,
+                lazy_from_configs,
+                resources_from_configs,
+                None,
+            )
+        };
+
+    info!(
+        "Final: {:?}",
+        (
+            final_important.clone(),
+            final_lazy.clone(),
+            final_resources.clone()
+        )
+    );
+
+    let combined_files = package_data
+        .files
+        .iter()
+        .filter_map(|f| f.as_ref().cloned())
+        .chain(final_resources.clone().unwrap_or_default())
+        .chain(vec![package_data.index.clone()])
+        .collect::<Vec<String>>();
+
+    let files = get_files_by_file_keys_async(
+        state.db_pool.clone(),
+        organisation.clone(),
+        application.clone(),
+        combined_files.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get files by keys: {}", e)))?;
+
+    if files.len() != combined_files.len() {
+        return Err(ABError::InternalServerError(
+            "Some files were missing in DB".to_string(),
+        ));
+    }
+
+    let config_version = uuid::Uuid::new_v4().to_string();
+
+    let mut control_overrides = std::collections::HashMap::new();
+    control_overrides.insert(
+        "package.version".to_string(),
+        Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
+    );
+
+    if let Some(Document::Object(obj)) = &config_document {
+        if let Some(version) = obj.get("config.version") {
+            control_overrides.insert("config.version".to_string(), version.clone());
+        } else {
+            control_overrides.insert(
+                "config.version".to_string(),
+                Document::String(config_version.clone()),
+            );
+        }
+        if let Some(boot_timeout) = obj.get("config.boot_timeout") {
+            control_overrides.insert("config.boot_timeout".to_string(), boot_timeout.clone());
+        } else {
+            control_overrides.insert(
+                "config.boot_timeout".to_string(),
+                Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout)),
+            );
+        }
+        if let Some(release_config_timeout) = obj.get("config.release_config_timeout") {
+            control_overrides.insert(
+                "config.release_config_timeout".to_string(),
+                release_config_timeout.clone(),
+            );
+        } else {
+            control_overrides.insert(
+                "config.release_config_timeout".to_string(),
+                Document::Number(aws_smithy_types::Number::PosInt(
+                    req.config.release_config_timeout,
+                )),
+            );
+        }
+        if let Some(props) = obj.get("config.properties") {
+            control_overrides.insert("config.properties".to_string(), props.clone());
+        } else {
+            control_overrides.insert(
+                "config.properties".to_string(),
+                Document::Object(std::collections::HashMap::new()),
+            );
+        }
+        if let Some(version) = obj.get("package.name") {
+            control_overrides.insert("package.name".to_string(), version.clone());
+        } else {
+            control_overrides.insert("package.name".to_string(), Document::String("".to_string()));
+        }
+        if let Some(package_idx) = obj.get("package.index") {
+            control_overrides.insert("package.index".to_string(), package_idx.clone());
+        } else {
+            control_overrides.insert(
+                "package.index".to_string(),
+                Document::String("".to_string()),
+            );
+        }
+        if let Some(version) = obj.get("package.version") {
+            control_overrides.insert("package.version".to_string(), version.clone());
+        } else {
+            control_overrides.insert(
+                "package.version".to_string(),
+                Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
+            );
+        }
+        if let Some(props) = obj.get("package.properties") {
+            control_overrides.insert("package.properties".to_string(), props.clone());
+        } else {
+            control_overrides.insert(
+                "package.properties".to_string(),
+                Document::Object(std::collections::HashMap::new()),
+            );
+        }
+        if let Some(important) = obj.get("package.important") {
+            control_overrides.insert("package.important".to_string(), important.clone());
+        } else {
+            let default_important_docs: Vec<Document> = package_data
+                .files
+                .iter()
+                .filter_map(|f| f.as_ref().map(|s| Document::String(s.clone())))
+                .collect();
+            control_overrides.insert(
+                "package.important".to_string(),
+                Document::Array(default_important_docs),
+            );
+        }
+        if let Some(lazy) = obj.get("package.lazy") {
+            control_overrides.insert("package.lazy".to_string(), lazy.clone());
+        } else {
+            control_overrides.insert("package.lazy".to_string(), Document::Array(Vec::new()));
+        }
+        if let Some(resources) = obj.get("resources") {
+            control_overrides.insert("resources".to_string(), resources.clone());
+        } else {
+            control_overrides.insert("resources".to_string(), Document::Array(Vec::new()));
+        }
+    } else {
+        // Config is empty, throw internal error
+        return Err(ABError::InternalServerError(
+            "Resolved config is not an object".to_string(),
+        ));
+    }
+
+    let mut experimental_overrides: std::collections::HashMap<String, Document> =
+        std::collections::HashMap::new();
+    experimental_overrides.insert(
+        "config.version".to_string(),
+        Document::String(config_version.clone()),
+    );
+    experimental_overrides.insert(
+        "config.boot_timeout".to_string(),
+        Document::Number(aws_smithy_types::Number::PosInt(req.config.boot_timeout)),
+    );
+    experimental_overrides.insert(
+        "config.release_config_timeout".to_string(),
+        Document::Number(aws_smithy_types::Number::PosInt(
+            req.config.release_config_timeout,
+        )),
+    );
+
+    let config_props = value_to_document(&req.config.properties.clone().unwrap_or_default());
+
+    experimental_overrides.insert("config.properties".to_string(), config_props.clone());
+    experimental_overrides.insert(
+        "package.name".to_string(),
+        Document::String(application.clone()),
+    );
+    experimental_overrides.insert(
+        "package.version".to_string(),
+        Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
+    );
+    experimental_overrides.insert(
+        "package.index".to_string(),
+        Document::String(package_data.index.clone()),
+    );
+
+    if let Some(ref properties) = final_properties {
+        experimental_overrides.insert(
+            "package.properties".to_string(),
+            value_to_document(properties),
+        );
+    } else {
+        experimental_overrides.insert(
+            "package.properties".to_string(),
+            Document::Object(std::collections::HashMap::new()),
+        );
+    }
+    if let Some(ref imp_vec) = final_important {
+        let imp_docs: Vec<Document> = imp_vec.iter().cloned().map(Document::String).collect();
+        experimental_overrides.insert("package.important".to_string(), Document::Array(imp_docs));
+    }
+    if let Some(ref lazy_vec) = final_lazy {
+        let lazy_docs: Vec<Document> = lazy_vec.iter().cloned().map(Document::String).collect();
+        experimental_overrides.insert("package.lazy".to_string(), Document::Array(lazy_docs));
+    }
+    if let Some(ref resources) = final_resources {
+        let res_docs: Vec<Document> = resources.iter().cloned().map(Document::String).collect();
+        experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
+    }
+
+    info!("Control overrides: {:?}", control_overrides);
+    info!("Experimental overrides: {:?}", experimental_overrides);
+
+    Ok(BuildOverrides {
+        final_important,
+        package_data,
+        is_first_release,
+        final_lazy,
+        final_resources,
+        config_version,
+        config_props,
+        pkg_version,
+        files,
+        final_properties,
+        control_overrides,
+        experimental_overrides,
+    })
 }

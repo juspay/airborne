@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::utils::db::models::{FileEntry, PackageV2Entry};
+use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -135,4 +137,19 @@ pub struct ServeReleaseResponse {
 #[derive(Deserialize)]
 pub struct ServeReleaseQueryParams {
     pub toss: Option<String>,
+}
+
+pub struct BuildOverrides {
+    pub final_important: Option<Vec<String>>,
+    pub package_data: PackageV2Entry,
+    pub is_first_release: bool,
+    pub final_lazy: Option<Vec<String>>,
+    pub final_resources: Option<Vec<String>>,
+    pub config_version: String,
+    pub config_props: Document,
+    pub pkg_version: i32,
+    pub files: Vec<FileEntry>,
+    pub final_properties: Option<Value>,
+    pub control_overrides: HashMap<String, Document>,
+    pub experimental_overrides: HashMap<String, Document>,
 }

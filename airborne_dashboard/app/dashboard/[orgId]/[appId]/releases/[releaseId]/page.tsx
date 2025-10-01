@@ -21,9 +21,20 @@ import {
   Download,
   ExternalLink,
   Settings,
+  RotateCw,
+  Pencil,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import json from "highlight.js/lib/languages/json";
@@ -31,6 +42,8 @@ import hljs from "highlight.js";
 import { toastWarning } from "@/hooks/use-toast";
 import "highlight.js/styles/vs2015.css";
 import Analytics from "@/components/analytics/Analytics";
+import { Input } from "@/components/ui/input";
+import { hasAppAccess } from "@/lib/utils";
 
 hljs.registerLanguage("json", json);
 
@@ -44,7 +57,7 @@ interface ChecksummedFile {
 
 interface ReleaseConfig {
   boot_timeout: number;
-  package_timeout: number;
+  release_config_timeout: number;
 }
 
 interface ReleasePackage {
@@ -68,7 +81,7 @@ type ServeReleaseConfig = Pick<ReleasePayload, "config" | "resources"> & {
   package: Pick<ReleasePayload["package"], "version" | "properties" | "index" | "important" | "lazy">;
 };
 
-interface ReleasePayload {
+export interface ReleasePayload {
   id: string;
   created_at: ISO8601;
   config: ReleaseConfig;
@@ -91,12 +104,13 @@ function toServeReleaseConfig(payload: ReleasePayload): ServeReleaseConfig {
 }
 
 export default function ReleaseDetailPage() {
+  const router = useRouter();
   const params = useParams() as { releaseId: string; appId: string; orgId: string };
   const releaseId = params.releaseId;
   const appId = params.appId;
   const orgId = params.orgId;
 
-  const { token, org, app, setOrg, setApp } = useAppContext();
+  const { token, org, app, setOrg, setApp, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
 
   // Keep context in sync (avoids blank org/app in provider)
   useEffect(() => {
@@ -110,13 +124,18 @@ export default function ReleaseDetailPage() {
     canFetch ? ["/releases", releaseId, token, orgId, appId] : null,
     ([, id, t, o, a]) => apiFetch<any>(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
   );
+  const release: ReleasePayload = data;
 
   const [isRamping, setIsRamping] = useState(false);
+  const [rampDialogOpen, setRampDialogOpen] = useState(false);
+  const [trafficPct, setTrafficPct] = useState(release?.experiment?.traffic_percentage || 0);
   const [isConcluding, setIsConcluding] = useState(false);
+  const [concludeDialogOpen, setConcludeDialogOpen] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+  const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
 
   if (isLoading) return <div>Loading...</div>;
 
-  const release: ReleasePayload = data;
   const serveRC: ServeReleaseConfig = toServeReleaseConfig(data);
 
   const getStatusColor = (status: string) => {
@@ -163,19 +182,14 @@ export default function ReleaseDetailPage() {
     return num.toString();
   };
 
-  async function rampRelease() {
-    const currentPercentage = release.experiment.traffic_percentage || 0;
-    const input = prompt(`Enter new traffic percentage (current: ${currentPercentage}%, 0-50):`, "50");
-    if (!input) return;
-
-    if (Number(input) > 50) {
+  const handleRampRelease = async () => {
+    const pct = Math.min(50, Math.max(0, Number(trafficPct)));
+    if (pct > 50) {
       toastWarning("Invalid Traffic Percentage", "Traffic percentage cannot exceed 50%");
       return;
     }
 
-    const pct = Math.min(50, Math.max(0, Number(input)));
     setIsRamping(true);
-
     try {
       await apiFetch(
         `/releases/${encodeURIComponent(releaseId)}/ramp`,
@@ -183,16 +197,15 @@ export default function ReleaseDetailPage() {
         { token, org, app }
       );
       mutate();
+      setRampDialogOpen(false);
     } catch (error) {
       console.error("Failed to ramp release:", error);
     } finally {
       setIsRamping(false);
     }
-  }
+  };
 
-  async function concludeRelease() {
-    if (!confirm("Conclude this release? This will roll out to 100% and finalize the deployment.")) return;
-
+  const handleConcludeRelease = async () => {
     setIsConcluding(true);
     try {
       await apiFetch(
@@ -204,12 +217,32 @@ export default function ReleaseDetailPage() {
         { token, org, app }
       );
       mutate();
+      setConcludeDialogOpen(false);
     } catch (error) {
       console.error("Failed to conclude release:", error);
     } finally {
       setIsConcluding(false);
     }
-  }
+  };
+
+  const revertRelease = async () => {
+    try {
+      await apiFetch(
+        `/releases/${encodeURIComponent(releaseId)}/conclude`,
+        {
+          method: "POST",
+          body: { chosen_variant: `${releaseId}-control` },
+        },
+        { token, org, app }
+      );
+      mutate();
+      setIsRevertDialogOpen(false);
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setIsReverting(false);
+    }
+  };
 
   const currentTrafficPercentage = release.experiment.traffic_percentage || 0;
   const targetPercentage = 50;
@@ -244,18 +277,114 @@ export default function ReleaseDetailPage() {
               <p className="text-muted-foreground">{`Package version ${release.package?.version || "N/A"}`}</p>
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={rampRelease}
-                disabled={isRamping || release.experiment.status === "CONCLUDED"}
-              >
-                <TrendingUp className="h-4 w-4 mr-2" />
-                {isRamping ? "Ramping..." : "Ramp"}
-              </Button>
-              <Button onClick={concludeRelease} disabled={isConcluding || release.experiment.status === "CONCLUDED"}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                {isConcluding ? "Concluding..." : "Conclude"}
-              </Button>
+              {!loadingAccess && hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                <>
+                  {release.experiment.status === "CREATED" && (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        router.push(
+                          `/dashboard/${encodeURIComponent(org ?? "")}/${encodeURIComponent(app ?? "")}/releases/${releaseId}/edit`
+                        )
+                      }
+                      size="sm"
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
+
+                  {release.experiment.status !== "CONCLUDED" && (
+                    <>
+                      <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" disabled={isRamping}>
+                            <TrendingUp className="h-4 w-4 mr-2" />
+                            {isRamping ? "Ramping..." : "Ramp"}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Ramp Release</DialogTitle>
+                            <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
+                          </DialogHeader>
+                          <Input
+                            type="number"
+                            value={trafficPct}
+                            min={0}
+                            max={50}
+                            onChange={(e) => setTrafficPct(Number(e.target.value))}
+                            className="mb-4"
+                          />
+                          <DialogFooter className="justify-end gap-2">
+                            <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
+                              {isRamping ? "Ramping..." : "Ramp"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={isConcluding}>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            {isConcluding ? "Concluding..." : "Conclude"}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Conclude Release</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to conclude this release? This will roll out to 100% and finalize
+                              the deployment.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter className="justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
+                              {isConcluding ? "Concluding..." : "Conclude"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </>
+                  )}
+
+                  {release.experiment.status === "INPROGRESS" && (
+                    <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button disabled={isReverting}>
+                          <RotateCw className="h-4 w-4 mr-2" />
+                          Revert Release
+                        </Button>
+                      </DialogTrigger>
+
+                      {/* Dialog content */}
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Confirm Revert</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to revert this release? This action cannot be undone.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsRevertDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button variant="destructive" onClick={revertRelease} disabled={isReverting}>
+                            {isReverting ? "Reverting..." : "Revert Release"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
