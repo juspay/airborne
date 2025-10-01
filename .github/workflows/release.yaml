@@ -1,6 +1,9 @@
 name: Create an airborne release
 
-on: workflow_dispatch
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,9 +15,10 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main'
     outputs:
       version: ${{ steps.git_tag.outputs.version }}
+      is_new_version: ${{ steps.git_tag.outputs.is_new_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,6 +61,13 @@ jobs:
           ssh-keyscan github.com >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
+      - name: Get current version
+        id: current_version
+        shell: bash
+        run: |
+          current_version=`cog -v get-version || echo "0.0.0"`
+          echo "current_version=$current_version" >> $GITHUB_OUTPUT
+
       - name: Semver release
         shell: bash
         run: |
@@ -68,11 +79,21 @@ jobs:
         id: git_tag
         shell: bash
         run: |
-          version=`git tag -l --sort=-creatordate | grep "^v" | head -n 1 | sed 's/^v//'`
+          current_version=${{ steps.current_version.outputs.current_version }}
+          version=`cog -v get-version`
           echo "version=$version" >> $GITHUB_OUTPUT
+
+          if [ "$version" != "$current_version" ]; then
+            echo "is_new_version=true" >> $GITHUB_OUTPUT
+            echo "New version detected: $current_version -> $version"
+          else
+            echo "is_new_version=false" >> $GITHUB_OUTPUT
+            echo "No version change detected: $version"
+          fi
 
       - name: Push code to main
         shell: bash
+        if: steps.git_tag.outputs.is_new_version == 'true'
         run: |
           git push origin main
           git push origin --tags
@@ -82,7 +103,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -124,7 +145,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -155,7 +176,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -197,7 +218,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -228,7 +249,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -270,7 +291,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -301,7 +322,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.tag-release.outputs.version }}
@@ -356,6 +377,34 @@ jobs:
           ORG_GRADLE_PROJECT_signingKey: ${{ env.DECODED_SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
 
+  publish-to-npm:
+    needs: [tag-release]
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.tag-release.outputs.version }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.0.0"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish to NPM
+        run: |
+          cd airborne-react-plugin
+          npm ci
+          npm publish --access public
+
   release:
     permissions:
       contents: read
@@ -366,9 +415,10 @@ jobs:
         analytics-create-manifest,
         dashboard-create-manifest,
         publish-to-maven-central,
+        publish-to-npm,
       ]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
