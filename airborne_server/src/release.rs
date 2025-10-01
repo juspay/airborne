@@ -23,7 +23,6 @@ use chrono::{DateTime, Utc};
 use diesel::prelude::*;
 use http::{uri::PathAndQuery, Uri};
 use log::info;
-use rand::Rng;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
@@ -1454,7 +1453,7 @@ async fn conclude_release(
 async fn serve_release(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
-    _query: web::Query<HashMap<String, String>>,
+    query: web::Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse, ABError> {
     let (organisation, application) = path.into_inner();
@@ -1480,7 +1479,8 @@ async fn serve_release(
         .map(utils::parse_kv_string)
         .unwrap_or_default();
 
-    let toss = rand::thread_rng().gen_range(1..=100);
+    // If toss not sent fallback to
+    let toss = query.into_inner().toss.unwrap_or("99".into());
 
     let applicable_variants = context.iter().fold(
         state
@@ -1488,7 +1488,7 @@ async fn serve_release(
             .applicable_variants()
             .workspace_id(workspace_name.clone())
             .org_id(superposition_org_id_from_env.clone())
-            .identifier(toss.to_string()),
+            .identifier(toss),
         |builder, (key, value)| {
             builder.context(
                 key.clone(),
