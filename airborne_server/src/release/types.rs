@@ -131,3 +131,8 @@ pub struct ServeReleaseResponse {
     pub package: ServePackage,
     pub resources: Vec<ServeFile>,
 }
+
+#[derive(Deserialize)]
+pub struct ServeReleaseQueryParams {
+    pub toss: Option<String>,
+}
