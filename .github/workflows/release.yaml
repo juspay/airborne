@@ -407,7 +407,7 @@ jobs:
 
   release:
     permissions:
-      contents: read
+      contents: write
     needs:
       [
         tag-release,
