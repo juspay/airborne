@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.5.0 - 2025-10-03
+### Package updates
+- airborne_server bumped to airborne_server-v0.2.0
+- airborne_dashboard bumped to airborne_dashboard-v0.3.0
+### Global changes
+#### Build system
+- added contents write for release step - (6088c25) - george.james
+
+- - -
+
 ## v0.4.1 - 2025-10-03
 ### Package updates
 - airborne_sdk_ios bumped to airborne_sdk_ios-v0.0.2

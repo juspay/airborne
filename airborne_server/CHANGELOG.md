@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.2.0 - 2025-10-03
+#### Features
+- implemented user management - (a29091a) - yash.rajput.001
+
+- - -
+
 ## airborne_server-v0.1.0 - 2025-10-01
 #### Bug Fixes
 - Respect toss from application for release - (1ca7fe9) - george.james

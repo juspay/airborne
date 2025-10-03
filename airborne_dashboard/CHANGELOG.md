@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.3.0 - 2025-10-03
+#### Features
+- implemented user management - (a29091a) - yash.rajput.001
+
+- - -
+
+## v0.4.1 - 2025-10-03
+#### Miscellaneous Chores
+- **(version)** v0.4.1 [skip ci] - (8b6e744) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.2.0 - 2025-10-01
 #### Features
 - offload blocking code to threadpool + implement tracing - (c1887e8) - yuvrajjsingh0
