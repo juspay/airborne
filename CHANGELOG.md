@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.6.0 - 2025-10-03
+### Package updates
+- airborne_dashboard bumped to airborne_dashboard-v0.4.0
+- airborne_server bumped to airborne_server-v0.3.0
+### Global changes
+#### Features
+- Application default config and auto population in release creation - (c11cc64) - yuvrajjsingh0
+
+- - -
+
 ## v0.5.0 - 2025-10-03
 ### Package updates
 - airborne_server bumped to airborne_server-v0.2.0

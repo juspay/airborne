@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.4.0 - 2025-10-03
+#### Build system
+- **(deps)** bump next from 15.2.4 to 15.5.4 in /airborne_dashboard - (d1255ab) - dependabot[bot]
+#### Features
+- Application default config and auto population in release creation - (c11cc64) - yuvrajjsingh0
+- add reveret and edit release - (881644f) - yash.rajput.001
+
+- - -
+
 ## airborne_dashboard-v0.3.0 - 2025-10-03
 #### Features
 - implemented user management - (a29091a) - yash.rajput.001
