@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.4.1 - 2025-10-03
+### Package updates
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.0.2
+### Global changes
+#### Bug Fixes
+- dashboard and npm release - (f9df54e) - ayush.jain@juspay.in
+- Initial Package for SPM integration testing - (f97ba84) - Balaganesh S
+- header imports & package name - (618566d) - Balaganesh S
+
+- - -
+
 ## v0.4.0 - 2025-10-01
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.2.0

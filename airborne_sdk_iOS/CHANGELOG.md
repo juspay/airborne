@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.0.2 - 2025-10-03
+#### Bug Fixes
+- header imports & package name - (618566d) - Balaganesh S
+- Initial Package for SPM integration testing - (f97ba84) - Balaganesh S
+
+- - -
+
 ## airborne_sdk_ios-v0.0.1 - 2025-10-01
 #### Bug Fixes
 - Missing headers in Airborne.h and react plugin update - (841e594) - Balaganesh S
