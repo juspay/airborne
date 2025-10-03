@@ -23,6 +23,7 @@ import {
   Eye,
   FileText,
   LogOut,
+  Lock,
   Users2,
 } from "lucide-react";
 import Link from "next/link";
@@ -103,6 +104,15 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           icon: Users2,
           label: "Users",
         },
+        ...(hasAppAccess(getOrgAccess(org), getAppAccess(org, app), "admin")
+          ? [
+              {
+                href: `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/token`,
+                icon: Lock,
+                label: "Tokens",
+              },
+            ]
+          : []),
       ]
     : [
         { href: "/dashboard/" + encodeURIComponent(org || ""), icon: Activity, label: "Overview" },

@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{run_blocking, types::ABError, utils::workspace::get_workspace_name_for_application};
+use crate::{
+    run_blocking,
+    {
+        middleware::auth::Auth, types::ABError,
+        utils::workspace::get_workspace_name_for_application,
+    },
+};
 use actix_web::{
     error, get, post,
     web::{self, Json, Path},
@@ -41,14 +47,16 @@ use crate::{
 mod types;
 mod utils;
 
-pub fn add_routes() -> Scope {
-    Scope::new("")
-        .service(create_release)
-        .service(list_releases)
-        .service(ramp_release)
-        .service(conclude_release)
-        .service(serve_release)
-        .service(get_release)
+pub fn add_routes(path: &str) -> Scope {
+    Scope::new(path).service(serve_release).service(
+        Scope::new("")
+            .wrap(Auth)
+            .service(create_release)
+            .service(list_releases)
+            .service(ramp_release)
+            .service(conclude_release)
+            .service(get_release),
+    )
 }
 
 pub fn add_public_routes() -> Scope {

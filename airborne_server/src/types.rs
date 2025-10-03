@@ -200,3 +200,8 @@ macro_rules! run_blocking {
             .and_then(|inner| inner)
     }};
 }
+
+#[derive(Serialize)]
+pub struct ListResponse<T> {
+    pub data: T,
+}
