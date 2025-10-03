@@ -19,14 +19,11 @@ use actix_web::{
 };
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
-use http::{uri::PathAndQuery, Uri};
 use log::info;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
-use std::str::FromStr;
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::VariantType::Experimental;
-use url::form_urlencoded;
 
 use crate::{
     file::utils::parse_file_key,
@@ -342,6 +339,20 @@ async fn create_release(
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
 
+    if utils::check_non_concluded_releases(
+        superposition_org_id_from_env.clone(),
+        dimensions.clone(),
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "There is already an ongoing release for the given dimensions. Please conclude it before creating a new release."
+                .to_string(),
+        ));
+    }
+
     let BuildOverrides {
         final_important,
         package_data,
@@ -601,80 +612,14 @@ async fn list_releases(
         .map(utils::parse_kv_string)
         .unwrap_or_default();
 
-    let experiments_list = state
-        .superposition_client
-        .list_experiment()
-        .org_id(superposition_org_id_from_env)
-        .workspace_id(workspace_name)
-        .customize()
-        .mutate_request(move |req| {
-            let uri: http::Uri = match req.uri().parse() {
-                Ok(uri) => uri,
-                Err(e) => {
-                    info!("Failed to parse URI from request: {:?}", e);
-                    return;
-                }
-            };
-
-            let mut parts = uri.into_parts();
-            let (path, existing_q) = match parts.path_and_query.take() {
-                Some(pq) => {
-                    let s = pq.as_str();
-                    match s.split_once('?') {
-                        Some((p, q)) => (p.to_string(), Some(q.to_string())),
-                        None => (s.to_string(), None),
-                    }
-                }
-                None => ("/".to_string(), None),
-            };
-
-            let mut ser = form_urlencoded::Serializer::new(String::new());
-            if let Some(eq) = existing_q {
-                for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
-                    ser.append_pair(&k, &v);
-                }
-            }
-            for (k, v) in &context {
-                if let Some(val_str) = v.as_str() {
-                    ser.append_pair(&format!("dimension[{k}]"), val_str);
-                }
-            }
-
-            let new_q = ser.finish();
-            let pq = if new_q.is_empty() {
-                path
-            } else {
-                format!("{path}?{new_q}")
-            };
-
-            let path_and_query = match PathAndQuery::from_str(&pq) {
-                Ok(pq) => pq,
-                Err(e) => {
-                    info!("Failed to create valid path/query from '{}': {:?}", pq, e);
-                    return; // Skip URI modification on error
-                }
-            };
-
-            parts.path_and_query = Some(path_and_query);
-
-            let new_uri = match Uri::from_parts(parts) {
-                Ok(uri) => uri,
-                Err(e) => {
-                    info!("Failed to create valid URI from parts: {:?}", e);
-                    return;
-                }
-            };
-
-            *req.uri_mut() = new_uri.into();
-        })
-        .send()
-        .await
-        .map_err(|e| {
-            info!("Failed to list experiments: {:?}", e);
-            ABError::InternalServerError(
-                "Failed to list experiments from Superposition".to_string(),
-            )
-        })?;
+    let experiments_list = utils::list_experiments_by_context(
+        superposition_org_id_from_env.clone(),
+        workspace_name.clone(),
+        context,
+        false,
+        state.clone(),
+    )
+    .await?;
 
     let experiments = experiments_list.data();
 

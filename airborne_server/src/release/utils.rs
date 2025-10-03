@@ -11,15 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    str::FromStr,
+};
 
 use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
+use http::{uri::PathAndQuery, Uri};
 use log::info;
 use serde_json::Value;
-use superposition_sdk::types::Variant;
+use superposition_sdk::{operation::list_experiment::ListExperimentOutput, types::Variant};
+use url::form_urlencoded;
 
 use crate::{
     file::utils::parse_file_key,
@@ -371,6 +376,31 @@ pub async fn invalidate_cf(
     Ok(())
 }
 
+pub async fn check_non_concluded_releases(
+    superposition_org_id: String,
+    dims: HashMap<String, Value>,
+    state: web::Data<AppState>,
+    workspace: String,
+) -> Result<bool, ABError> {
+    let experiments_list = list_experiments_by_context(
+        superposition_org_id.clone(),
+        workspace.clone(),
+        dims,
+        true,
+        state.clone(),
+    )
+    .await?;
+
+    let non_concluded_exists = experiments_list.data().iter().any(|exp| {
+        matches!(
+            exp.status,
+            superposition_sdk::types::ExperimentStatusType::Created
+                | superposition_sdk::types::ExperimentStatusType::Inprogress
+        )
+    });
+    Ok(non_concluded_exists)
+}
+
 pub async fn build_overrides(
     req: &Json<CreateReleaseRequest>,
     superposition_org_id: String,
@@ -380,10 +410,7 @@ pub async fn build_overrides(
     state: web::Data<AppState>,
     workspace: String,
 ) -> Result<BuildOverrides, ABError> {
-    let dims1 = dims.clone();
-    info!("Dimensions: {:?}", serde_json::json!(dims1));
-
-    let resolved_config_builder = dims1.iter().fold(
+    let resolved_config_builder = dims.iter().fold(
         state
             .superposition_client
             .get_resolved_config()
@@ -775,4 +802,91 @@ pub async fn build_overrides(
         control_overrides,
         experimental_overrides,
     })
+}
+
+pub async fn list_experiments_by_context(
+    superposition_org_id: String,
+    workspace_name: String,
+    context: HashMap<String, Value>,
+    strict_mode: bool,
+    state: web::Data<AppState>,
+) -> Result<ListExperimentOutput, ABError> {
+    let experiments_list = state
+        .superposition_client
+        .list_experiment()
+        .org_id(superposition_org_id)
+        .workspace_id(workspace_name)
+        .dimension_match_strategy(superposition_sdk::types::DimensionMatchStrategy::Exact)
+        .global_experiments_only(context.is_empty() && strict_mode)
+        .all(true)
+        .customize()
+        .mutate_request(move |req| {
+            let uri: http::Uri = match req.uri().parse() {
+                Ok(uri) => uri,
+                Err(e) => {
+                    info!("Failed to parse URI from request: {:?}", e);
+                    return;
+                }
+            };
+
+            let mut parts = uri.into_parts();
+            let (path, existing_q) = match parts.path_and_query.take() {
+                Some(pq) => {
+                    let s = pq.as_str();
+                    match s.split_once('?') {
+                        Some((p, q)) => (p.to_string(), Some(q.to_string())),
+                        None => (s.to_string(), None),
+                    }
+                }
+                None => ("/".to_string(), None),
+            };
+
+            let mut ser = form_urlencoded::Serializer::new(String::new());
+            if let Some(eq) = existing_q {
+                for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
+                    ser.append_pair(&k, &v);
+                }
+            }
+            for (k, v) in &context {
+                if let Some(val_str) = v.as_str() {
+                    ser.append_pair(&format!("dimension[{k}]"), val_str);
+                }
+            }
+
+            let new_q = ser.finish();
+            let pq = if new_q.is_empty() {
+                path
+            } else {
+                format!("{path}?{new_q}")
+            };
+
+            let path_and_query = match PathAndQuery::from_str(&pq) {
+                Ok(pq) => pq,
+                Err(e) => {
+                    info!("Failed to create valid path/query from '{}': {:?}", pq, e);
+                    return; // Skip URI modification on error
+                }
+            };
+
+            parts.path_and_query = Some(path_and_query);
+
+            let new_uri = match Uri::from_parts(parts) {
+                Ok(uri) => uri,
+                Err(e) => {
+                    info!("Failed to create valid URI from parts: {:?}", e);
+                    return;
+                }
+            };
+
+            *req.uri_mut() = new_uri.into();
+        })
+        .send()
+        .await
+        .map_err(|e| {
+            info!("Failed to list experiments: {:?}", e);
+            ABError::InternalServerError(
+                "Failed to list experiments from Superposition".to_string(),
+            )
+        })?;
+    Ok(experiments_list)
 }
