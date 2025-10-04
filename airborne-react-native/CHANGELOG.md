@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.0.1 - 2025-10-04
+#### Bug Fixes
+- node module dependancies corrected for npmjs - (0bb90db) - george.james
+
+- - -
+
 ## airborne_react_plugin-v0.1.1 - 2025-10-01
 #### Bug Fixes
 - Missing headers in Airborne.h and react plugin update - (841e594) - Balaganesh S

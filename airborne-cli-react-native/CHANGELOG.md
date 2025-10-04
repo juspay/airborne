@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli_react_native-v0.0.1 - 2025-10-04
+#### Bug Fixes
+- node module dependancies corrected for npmjs - (0bb90db) - george.james
+
+- - -
+
 ## airborne_cli-v0.0.1 - 2025-09-24
 #### Bug Fixes
 - Reading release config from namespace folder/bundle ad fetching indexpath from release config - (75df672) - Yaswanth

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.4.1 - 2025-10-04
+#### Bug Fixes
+- node module dependancies corrected for npmjs - (0bb90db) - george.james
+
+- - -
+
 ## airborne_server-v0.4.0 - 2025-10-04
 #### Features
 - diallow parallel releases in same dimensions - (88a4e99) - yuvrajjsingh0
