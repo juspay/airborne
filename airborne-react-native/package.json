@@ -59,7 +59,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "airborne-cli-react-native": "file:../airborne_cli"
+    "airborne-cli-react-native": "*"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.6.0",

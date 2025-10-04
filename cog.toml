@@ -33,9 +33,9 @@ authors = []
 
 [packages]
 airborne_analytics_server = { path = "airborne_analytics_server" }
-airborne_cli = { path = "airborne_cli" }
+airborne_cli_react_native = { path = "airborne-cli-react-native" }
 airborne_dashboard = { path = "airborne_dashboard" }
-airborne_react_plugin = { path = "airborne-react-plugin" }
+airborne_react_native = { path = "airborne-react-native" }
 airborne_sdk_android = { path = "airborne_sdk_android" }
 airborne_sdk_ios = { path = "airborne_sdk_iOS" }
 airborne_server = { path = "airborne_server" }
