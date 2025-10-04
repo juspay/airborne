@@ -401,7 +401,10 @@ jobs:
 
       - name: Publish to NPM
         run: |
-          cd airborne-react-plugin
+          cd airborne-react-native
+          npm ci
+          npm publish --access public
+          cd ../airborne-cli-react-native
           npm ci
           npm publish --access public
 

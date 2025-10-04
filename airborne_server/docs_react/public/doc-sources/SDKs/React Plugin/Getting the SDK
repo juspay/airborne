@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "airborne-react-plugin": "0.2.0"
+    "airborne-react-native": "0.5.0"
   }
 }

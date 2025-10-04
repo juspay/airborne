@@ -2,9 +2,9 @@
     "private": true,
     "name": "airborne",
     "workspaces": [
-        "airborne-react-plugin",
-        "airborne_cli",
-        "airborne-react-plugin/example",
-        "airborne-react-plugin/ExampleOldArch"
+        "airborne-react-native",
+        "airborne-cli-react-native",
+        "airborne-react-native/example",
+        "airborne-react-native/ExampleOldArch"
     ]
 }
