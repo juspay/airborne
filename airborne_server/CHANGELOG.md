@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.4.0 - 2025-10-04
+#### Features
+- diallow parallel releases in same dimensions - (88a4e99) - yuvrajjsingh0
+- Support for Cohort dimensions - (0b34748) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.3.0 - 2025-10-03
 #### Build system
 - **(deps)** bump vite in /airborne_server/docs_react - (2cab12c) - dependabot[bot]

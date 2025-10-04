@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.7.0 - 2025-10-04
+### Package updates
+- airborne_server bumped to airborne_server-v0.4.0
+- airborne_dashboard bumped to airborne_dashboard-v0.5.0
+### Global changes
+#### Features
+- Support for Cohort dimensions - (0b34748) - yuvrajjsingh0
+
+- - -
+
 ## v0.6.0 - 2025-10-03
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.4.0

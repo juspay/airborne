@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.5.0 - 2025-10-04
+#### Features
+- Support for Cohort dimensions - (0b34748) - yuvrajjsingh0
+
+- - -
+
 ## airborne_dashboard-v0.4.0 - 2025-10-03
 #### Build system
 - **(deps)** bump next from 15.2.4 to 15.5.4 in /airborne_dashboard - (d1255ab) - dependabot[bot]
