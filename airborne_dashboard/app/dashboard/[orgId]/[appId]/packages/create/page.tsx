@@ -123,7 +123,7 @@ export default function CreatePackagePage() {
   const canProceedToStep = (step: number) => {
     switch (step) {
       case 1:
-        return tag && selectedIndexFile;
+        return selectedIndexFile;
       case 2:
         return true;
       default:
@@ -338,7 +338,7 @@ export default function CreatePackagePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tag">Tag *</Label>
+                  <Label htmlFor="tag">Tag</Label>
                   <Input
                     id="tag"
                     placeholder="e.g., latest, v1.0, production"

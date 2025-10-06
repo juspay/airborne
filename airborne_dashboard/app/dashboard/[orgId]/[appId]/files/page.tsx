@@ -34,7 +34,7 @@ type ApiFile = {
   file_path: string;
   url: string;
   version: number;
-  tag: string;
+  tag?: string;
   size?: number;
   status?: string;
   created_at?: string;
@@ -274,9 +274,7 @@ export default function FilesPage() {
                   .map((f) => (
                     <TableRow key={f.id || f.file_path}>
                       <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{f.tag}</Badge>
-                      </TableCell>
+                      <TableCell>{f.tag && <Badge variant="outline">{f.tag}</Badge>}</TableCell>
                       <TableCell className="text-muted-foreground">{f.version}</TableCell>
                       <TableCell className="max-w-[280px] truncate text-muted-foreground">{f.url}</TableCell>
                       <TableCell>

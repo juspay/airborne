@@ -78,7 +78,9 @@ async fn create_package(
                     file_conds.push(Box::new(file_path.eq(fp.clone()).and(file_version.eq(v))));
                 } else if let Some(t) = tag_opt {
                     file_conds.push(Box::new(
-                        file_path.eq(fp.clone()).and(file_tag.eq(t.clone())),
+                        file_path
+                            .eq(fp.clone())
+                            .and(file_tag.is_not_distinct_from(t.clone())),
                     ));
                 } else {
                     return Err(ABError::BadRequest("Invalid file key format".to_string()));

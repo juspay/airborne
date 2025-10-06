@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Package {
     pub index: String,
-    pub tag: String,
+    pub tag: Option<String>,
     pub version: i32,
     pub files: Vec<String>,
 }
@@ -11,7 +11,7 @@ pub struct Package {
 #[derive(Debug, Deserialize)]
 pub struct CreatePackageInput {
     pub index: String,
-    pub tag: String,
+    pub tag: Option<String>,
     pub files: Vec<String>,
 }
 

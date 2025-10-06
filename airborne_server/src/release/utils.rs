@@ -190,7 +190,9 @@ pub async fn get_files_by_file_keys_async(
                 ));
             } else if let Some(t) = tag_opt {
                 file_conds.push(Box::new(
-                    file_dsl_path.eq(fp.clone()).and(file_dsl_tag.eq(t.clone())),
+                    file_dsl_path
+                        .eq(fp.clone())
+                        .and(file_dsl_tag.is_not_distinct_from(t.clone())),
                 ));
             } else {
                 return Err(ABError::BadRequest("Invalid file key format".to_string()));

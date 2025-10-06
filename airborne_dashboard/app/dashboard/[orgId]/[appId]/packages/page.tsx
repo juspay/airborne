@@ -16,7 +16,7 @@ import { hasAppAccess } from "@/lib/utils";
 
 type ApiPackage = {
   index: string;
-  tag: string;
+  tag?: string;
   version: number;
   files: string[];
 };
@@ -146,9 +146,7 @@ export default function PackagesPage() {
             <TableBody>
               {filtered.map((pkg, i) => (
                 <TableRow key={`${pkg.tag}-${pkg.version}-${i}`}>
-                  <TableCell>
-                    <Badge variant="outline">{pkg.tag}</Badge>
-                  </TableCell>
+                  <TableCell>{pkg.tag && <Badge variant="outline">{pkg.tag}</Badge>}</TableCell>
                   <TableCell className="font-mono text-sm">{pkg.index}</TableCell>
                   <TableCell className="text-muted-foreground">{pkg.version}</TableCell>
                   <TableCell className="text-muted-foreground">{pkg.files.length} files</TableCell>

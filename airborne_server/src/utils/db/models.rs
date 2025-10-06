@@ -99,7 +99,7 @@ pub struct FileEntry {
     pub app_id: String,
     pub org_id: String,
     pub version: i32,
-    pub tag: String,
+    pub tag: Option<String>,
     pub url: String,
     pub file_path: String,
     pub size: i64,
@@ -115,7 +115,7 @@ pub struct NewFileEntry {
     pub app_id: String,
     pub org_id: String,
     pub version: i32,
-    pub tag: String,
+    pub tag: Option<String>,
     pub url: String,
     pub file_path: String,
     pub size: i64,
@@ -134,7 +134,7 @@ pub struct PackageV2Entry {
     pub app_id: String,
     pub org_id: String,
     pub version: i32,
-    pub tag: String,
+    pub tag: Option<String>,
     pub files: Vec<Option<String>>,
     pub created_at: DateTime<Utc>,
 }
@@ -146,7 +146,7 @@ pub struct NewPackageV2Entry {
     pub app_id: String,
     pub org_id: String,
     pub version: i32,
-    pub tag: String,
+    pub tag: Option<String>,
     pub files: Vec<Option<String>>,
 }
 

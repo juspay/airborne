@@ -67,6 +67,7 @@ async fn create_file(
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, ABError> {
     let auth_response = auth_response.into_inner();
+
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
         Ok(org_name) => auth_response
@@ -81,7 +82,10 @@ async fn create_file(
 
     let (file_size, file_checksum) = utils::download_and_checksum(&req.url.clone())
         .await
-        .map_err(|_| ABError::InternalServerError("Download or checksum failure".to_string()))?;
+        .map_err(|e| {
+            info!("Download or checksum failed for URL {}: {:?}", req.url, e);
+            ABError::InternalServerError("Download or checksum failure".to_string())
+        })?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -93,16 +97,27 @@ async fn create_file(
             .filter(org_id.eq(&organisation))
             .filter(app_id.eq(&application))
             .filter(file_path.eq(&request.file_path))
-            .filter(tag.eq(&request.tag))
+            .filter(tag.is_not_distinct_from(&request.tag))
             .select(DbFile::as_select())
             .first::<DbFile>(&mut conn)
             .optional()?;
 
-        if existing_file.is_some() {
-            return Err(ABError::BadRequest(format!(
-                "File with file_path '{}' already exists",
-                request.file_path
-            )));
+        if let Some(existing) = &existing_file {
+            if request.tag.is_some() {
+                if existing.checksum != file_checksum || existing.url != request.url {
+                    return Err(ABError::BadRequest(format!(
+                        "File with file_path '{}' and tag '{}' already exists with different checksum or URL",
+                        request.file_path, request.tag.as_ref().unwrap()
+                    )));
+                }
+                info!("Existing file matches request, returning existing file");
+                return Ok(existing.clone());
+            } else if existing.checksum == file_checksum && existing.url == request.url {
+                info!("Existing file matches request (no tag), returning existing file");
+                return Ok(existing.clone());
+            }
+        } else {
+            info!("No existing file found, creating new entry");
         }
 
         let result = conn.transaction::<DbFile, diesel::result::Error, _>(|conn| {
@@ -189,8 +204,8 @@ async fn bulk_create_files(
                     return Err(diesel::result::Error::DatabaseError(
                         diesel::result::DatabaseErrorKind::UniqueViolation,
                         Box::new(format!(
-                            "A file with file_path '{}' already exists with same tag '{}'",
-                            file_req.file_path, file_req.tag
+                            "A file with file_path '{}' already exists with same tag ",
+                            file_req.file_path
                         )),
                     ));
                 }
@@ -547,7 +562,7 @@ async fn upload_file(
             org_id: db_org.clone(),
             url: "".to_string(),
             file_path: db_file_path.clone(),
-            tag: "".to_string(),
+            tag: None,
             version: file_version,
             size: 0,
             checksum: "".to_string(),
@@ -711,7 +726,7 @@ async fn upload_bulk_files(
                 file_path: m.file_path.clone(),
                 version: m.version,
                 size: 0,
-                tag: "".to_string(),
+                tag: None,
                 checksum: "".to_string(),
                 metadata: m.metadata.clone().unwrap_or_else(|| json!({})),
                 created_at: Utc::now(),

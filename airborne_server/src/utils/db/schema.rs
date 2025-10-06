@@ -34,7 +34,7 @@ pub mod hyperotaserver {
             app_id -> Text,
             org_id -> Text,
             version -> Int4,
-            tag -> Text,
+            tag -> Nullable<Text>,
             url -> Text,
             file_path -> Text,
             size -> Int8,
@@ -66,7 +66,7 @@ pub mod hyperotaserver {
             org_id -> Text,
             index -> Text,
             files -> Array<Nullable<Text>>,
-            tag -> Text,
+            tag -> Nullable<Text>,
             created_at -> Timestamptz,
         }
     }

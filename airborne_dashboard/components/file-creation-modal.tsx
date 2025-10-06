@@ -51,7 +51,7 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
         "/file",
         {
           method: "POST",
-          body: { file_path: filePath, url, tag, ...(meta ? { metadata: meta } : {}) },
+          body: { file_path: filePath, url, ...(tag ? { tag } : {}), ...(meta ? { metadata: meta } : {}) },
         },
         { token, org, app }
       );
@@ -68,7 +68,7 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
     }
   };
 
-  const canSubmit = filePath.trim() && url.trim() && tag.trim();
+  const canSubmit = filePath.trim() && url.trim();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -98,7 +98,7 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="tag">Tag *</Label>
+            <Label htmlFor="tag">Tag</Label>
             <Input id="tag" placeholder="latest" value={tag} onChange={(e) => setTag(e.target.value)} />
           </div>
           <div className="space-y-2">

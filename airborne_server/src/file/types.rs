@@ -8,7 +8,7 @@ use serde_json::Value;
 pub struct FileRequest {
     pub file_path: String,
     pub url: String,
-    pub tag: String,
+    pub tag: Option<String>,
     pub metadata: Option<Value>,
 }
 
@@ -44,7 +44,7 @@ pub struct FileResponse {
     pub file_path: String,
     pub url: String,
     pub version: i32,
-    pub tag: String,
+    pub tag: Option<String>,
     pub size: i64,
     pub checksum: String,
     pub metadata: Value,
