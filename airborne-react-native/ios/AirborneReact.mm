@@ -62,7 +62,7 @@ static NSString * const defaultNamespace = @"default";
 RCT_EXPORT_METHOD(readReleaseConfig:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
     @try {
-        NSString *config = [[AirborneiOS sharedInstanceWithNamespace:defaultNamespace] getReleaseConfig];
+        NSString *config = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getReleaseConfig];
         resolve(config);
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
@@ -73,7 +73,7 @@ RCT_EXPORT_METHOD(getFileContent:(NSString *)filePath
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
     @try {
-        NSString *content = [[AirborneiOS sharedInstanceWithNamespace:defaultNamespace] getFileContent:filePath];
+        NSString *content = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getFileContent:filePath];
         resolve(content);
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
@@ -83,7 +83,7 @@ RCT_EXPORT_METHOD(getFileContent:(NSString *)filePath
 RCT_EXPORT_METHOD(getBundlePath:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
     @try {
-        NSString *bundlePath = [[AirborneiOS sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
+        NSString *bundlePath = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
         resolve(bundlePath);
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
