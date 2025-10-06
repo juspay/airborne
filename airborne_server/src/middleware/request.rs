@@ -1,40 +1,85 @@
-use actix_web::middleware::Next;
 use actix_web::{
-    body::BoxBody,
     dev::{ServiceRequest, ServiceResponse},
-    Error,
+    http::{header::HeaderName, header::HeaderValue},
+    middleware::Next,
+    Error, HttpMessage,
 };
-use tracing::{info_span, Instrument};
+use tracing::Span;
+use tracing_actix_web::RootSpanBuilder;
+use uuid::Uuid;
 
-pub async fn request_id_mw(
-    mut req: ServiceRequest,
-    next: Next<BoxBody>,
-) -> Result<ServiceResponse<BoxBody>, Error> {
-    let rid = req
-        .headers()
-        .get("x-request-id")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+#[derive(Clone)]
+struct RequestId(pub String);
 
-    req.headers_mut().insert(
-        actix_web::http::header::HeaderName::from_static("x-request-id"),
-        rid.parse().unwrap(),
-    );
+pub struct WithRequestId;
 
-    let span = info_span!("http_request", request_id = %rid);
+impl RootSpanBuilder for WithRequestId {
+    fn on_request_start(req: &ServiceRequest) -> Span {
+        let req_id = req
+            .headers()
+            .get("x-request-id")
+            .and_then(|h| h.to_str().ok())
+            .map(str::to_owned)
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    // instrument the future so all logs during it are attached to the span
-    let res = async move {
-        let mut res = next.call(req).await?;
-        // add request_id to response headers
-        res.headers_mut().insert(
-            actix_web::http::header::HeaderName::from_static("x-request-id"),
-            rid.parse().unwrap(),
-        );
-        Ok::<_, actix_web::Error>(res)
+        req.extensions_mut().insert(RequestId(req_id.clone()));
+
+        let dimensions = req
+            .headers()
+            .get("x-dimension")
+            .and_then(|h| h.to_str().ok())
+            .map(str::to_owned)
+            .unwrap_or_default();
+
+        let org = req
+            .headers()
+            .get("x-organisation")
+            .and_then(|h| h.to_str().ok())
+            .map(str::to_owned)
+            .or_else(|| req.match_info().get("org").map(str::to_owned))
+            .or_else(|| req.match_info().get("organisation").map(str::to_owned))
+            .unwrap_or_default();
+
+        let app = req
+            .headers()
+            .get("x-application")
+            .and_then(|h| h.to_str().ok())
+            .map(str::to_owned)
+            .or_else(|| req.match_info().get("app").map(str::to_owned))
+            .or_else(|| req.match_info().get("application").map(str::to_owned))
+            .unwrap_or_default();
+
+        tracing::info_span!(
+            "HTTP request",
+            request_id = %req_id,
+            dimensions = %dimensions,
+            method = %req.method(),
+            org_id = %org,
+            app_id = %app,
+            superposition_workspace = tracing::field::Empty,
+            route  = %req.match_pattern().unwrap_or("<unmatched>".to_string()),
+        )
     }
-    .instrument(span)
-    .await?;
+
+    fn on_request_end<B: actix_web::body::MessageBody>(
+        _: Span,
+        _: &Result<ServiceResponse<B>, Error>,
+    ) {
+    }
+}
+
+pub async fn req_id_header_mw<B>(
+    req: ServiceRequest,
+    next: Next<B>,
+) -> Result<ServiceResponse<B>, Error> {
+    let mut res = next.call(req).await?;
+
+    let req_id = res.request().extensions().get::<RequestId>().cloned();
+    if let Some(RequestId(id)) = req_id {
+        res.headers_mut().insert(
+            HeaderName::from_static("x-request-id"),
+            HeaderValue::from_str(&id).unwrap_or(HeaderValue::from_static("invalid-req-id")),
+        );
+    }
     Ok(res)
 }

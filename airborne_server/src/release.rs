@@ -1126,6 +1126,10 @@ async fn serve_release_handler(
     let (organisation, application) = path.into_inner();
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
+    let span = tracing::Span::current();
+    span.record("org_id", tracing::field::display(&organisation));
+    span.record("app_id", tracing::field::display(&application));
+
     info!(
         "Serving release for organisation: {}, application: {}",
         organisation, application
