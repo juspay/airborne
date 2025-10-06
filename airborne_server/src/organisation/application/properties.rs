@@ -300,10 +300,20 @@ async fn put_properties_schema_api(
         Err(e) => match e {
             transaction::TxnError::Operation { source, .. } => return Err(source),
             transaction::TxnError::Join { source, .. } => {
-                return Err(ABError::InternalServerError(format!(
-                    "Task join error: {}",
-                    source
-                )));
+                log::error!("Task Join Error: {:?}", source);
+                return Err(ABError::InternalServerError("service error".to_string()));
+            }
+            transaction::TxnError::Panic { index } => {
+                log::error!(
+                    "Task Panic at: {:?}, task_metadata: {:?}",
+                    index,
+                    task_metadata.get(index)
+                );
+                return Err(ABError::InternalServerError("service error".to_string()));
+            }
+            transaction::TxnError::MissingResult { index } => {
+                log::error!("Missing result for task: {:?}", index);
+                return Err(ABError::InternalServerError("service error".to_string()));
             }
         },
     }

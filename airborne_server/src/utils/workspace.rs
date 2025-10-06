@@ -36,5 +36,15 @@ pub async fn get_workspace_name_for_application(
         Ok(result)
     });
 
-    Ok(workspace_result?.workspace_name)
+    match workspace_result {
+        Ok(name) => {
+            let span = tracing::Span::current();
+            span.record(
+                "superposition_workspace",
+                tracing::field::display(&name.workspace_name),
+            );
+            Ok(name.workspace_name)
+        }
+        Err(e) => Err(e),
+    }
 }

@@ -47,10 +47,13 @@ use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::dashboard::configuration;
-use crate::middleware::auth::Auth;
-use crate::middleware::request::request_id_mw;
-
+use crate::{
+    dashboard::configuration,
+    middleware::{
+        auth::Auth,
+        request::{req_id_header_mw, WithRequestId},
+    },
+};
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub fn calculate_bucket_index(identifier: &str, group_id: &i64) -> usize {
@@ -244,8 +247,8 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(actix_web::middleware::from_fn(request_id_mw))
-            .wrap(TracingLogger::default())
+            .wrap(TracingLogger::<WithRequestId>::new())
+            .wrap(actix_web::middleware::from_fn(req_id_header_mw))
             .app_data(web::Data::from(app_state.clone()))
             .app_data(PathConfig::default().error_handler(middleware::path_error_handler))
             .app_data(QueryConfig::default().error_handler(middleware::query_error_handler))
