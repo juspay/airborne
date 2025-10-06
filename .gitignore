@@ -44,6 +44,8 @@ xcuserdata/
 Package.resolved
 Airborne.xcframework
 Airborne.zip
+Pods
+.xcode.env.local
 
 target/
 **/result
