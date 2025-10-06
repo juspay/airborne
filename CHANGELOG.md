@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.7.3 - 1970-01-01
+### Package updates
+- airborne_sdk_android bumped to airborne_sdk_android-v0.0.1
+### Global changes
+
+- - -
+
 ## v0.7.2 - 2025-10-06
 ### Package updates
 - airborne_react_native bumped to airborne_react_native-v0.0.2
