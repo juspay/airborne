@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::Future;
+use futures::{Future, FutureExt};
 use std::{fmt::Debug, pin::Pin};
 use thiserror::Error;
 use tokio::task::{JoinError, JoinSet};
@@ -45,9 +45,13 @@ pub enum TxnError<E: std::error::Error + Send + Sync + 'static> {
         #[source]
         source: JoinError,
     },
+    #[error("task {index} panicked during execution")]
+    Panic { index: usize },
+    #[error("internal error: missing result for operation {index}")]
+    MissingResult { index: usize },
 }
 
-/// Run all operations concurrently and wait for all to complete.
+/// Run N-1 operations concurrently, then run the last operation after they complete.
 /// If any operation fails:
 /// 1) wait for all operations to finish
 /// 2) call `rollback` with all indices that completed successfully
@@ -65,9 +69,38 @@ where
     RFut: Future<Output = ()> + Send + 'static,
 {
     let n = operations.len();
-    let mut set = JoinSet::new();
 
-    // Track success indices and store results by original index.
+    if n == 0 {
+        return Ok(Vec::new());
+    }
+    if n == 1 {
+        if let Some(op) = operations.into_iter().next() {
+            match op().await {
+                Ok(result) => return Ok(vec![result]),
+                Err(e) => {
+                    rollback(vec![]).await;
+                    return Err(TxnError::Operation {
+                        index: 0,
+                        source: e,
+                    });
+                }
+            }
+        } else {
+            return Ok(Vec::new());
+        }
+    }
+
+    // Split operations: first N-1 and the last one
+    let mut operations = operations;
+    let last_operation = match operations.pop() {
+        Some(op) => op,
+        None => {
+            return Ok(Vec::new());
+        }
+    };
+    let last_index = n - 1;
+
+    let mut set = JoinSet::new();
     let mut successes: Vec<usize> = Vec::with_capacity(n);
     let mut results: Vec<Option<R>> = Vec::with_capacity(n);
     let mut first_error: Option<TxnError<E>> = None;
@@ -76,20 +109,26 @@ where
         results.push(None);
     }
 
-    // Spawn each operation as its own task, tagged with its index.
+    // Phase 1: Run first N-1 operations in parallel
     for (i, op) in operations.into_iter().enumerate() {
-        set.spawn(async move { (i, op().await) });
+        set.spawn(async move {
+            let result = std::panic::AssertUnwindSafe(op()).catch_unwind().await;
+
+            match result {
+                Ok(operation_result) => (i, Ok(operation_result)),
+                Err(_panic_payload) => (i, Err(())),
+            }
+        });
     }
 
-    // Process completions as they finish; collect all results before deciding.
+    // Wait for all N-1 operations to complete
     while let Some(joined) = set.join_next().await {
         match joined {
-            Ok((i, Ok(val))) => {
+            Ok((i, Ok(Ok(val)))) => {
                 results[i] = Some(val);
                 successes.push(i);
             }
-            Ok((i, Err(e))) => {
-                // Store the first error but continue waiting for other operations
+            Ok((i, Ok(Err(e)))) => {
                 if first_error.is_none() {
                     first_error = Some(TxnError::Operation {
                         index: i,
@@ -97,11 +136,15 @@ where
                     });
                 }
             }
+            Ok((i, Err(()))) => {
+                if first_error.is_none() {
+                    first_error = Some(TxnError::Panic { index: i });
+                }
+            }
             Err(join_err) => {
-                // Store the first join error but continue waiting for other operations
                 if first_error.is_none() {
                     first_error = Some(TxnError::Join {
-                        index: usize::MAX, // unknown which one if task panicked before tagging
+                        index: usize::MAX,
                         source: join_err,
                     });
                 }
@@ -109,15 +152,37 @@ where
         }
     }
 
-    // If any operation failed, rollback all successful operations
     if let Some(err) = first_error {
         rollback(successes).await;
         return Err(err);
     }
 
-    // All succeeded; unwrap in original order.
-    Ok(results
-        .into_iter()
-        .map(|o| o.expect("logic error: missing result"))
-        .collect())
+    // Phase 2: All N-1 operations succeeded, now run the last operation
+    match last_operation().await {
+        Ok(last_result) => {
+            results[last_index] = Some(last_result);
+            successes.push(last_index);
+
+            // All succeeded
+            let mut final_results = Vec::with_capacity(n);
+            for (i, result_opt) in results.into_iter().enumerate() {
+                match result_opt {
+                    Some(result) => final_results.push(result),
+                    None => {
+                        rollback(successes).await;
+                        return Err(TxnError::MissingResult { index: i });
+                    }
+                }
+            }
+            Ok(final_results)
+        }
+        Err(e) => {
+            // Last operation failed, rollback all successful operations
+            rollback(successes).await;
+            Err(TxnError::Operation {
+                index: last_index,
+                source: e,
+            })
+        }
+    }
 }
