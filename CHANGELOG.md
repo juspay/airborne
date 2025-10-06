@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.7.2 - 2025-10-06
+### Package updates
+- airborne_react_native bumped to airborne_react_native-v0.0.2
+### Global changes
+#### Bug Fixes
+- Renamed class name for old arch - (5b57e2c) - Balaganesh S
+
+- - -
+
 ## v0.7.1 - 2025-10-04
 ### Package updates
 - airborne_server bumped to airborne_server-v0.4.1

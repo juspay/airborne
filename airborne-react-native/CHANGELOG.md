@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.0.2 - 2025-10-06
+#### Bug Fixes
+- Renamed class name for old arch - (5b57e2c) - Balaganesh S
+
+- - -
+
 ## airborne_react_native-v0.0.1 - 2025-10-04
 #### Bug Fixes
 - node module dependancies corrected for npmjs - (0bb90db) - george.james
