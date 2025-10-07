@@ -48,7 +48,9 @@ pub fn add_routes() -> Scope {
 }
 
 pub fn add_public_routes() -> Scope {
-    Scope::new("").service(serve_release)
+    Scope::new("")
+        .service(serve_release)
+        .service(serve_release_v2)
 }
 
 #[get("/{release_id}")]
@@ -1073,6 +1075,25 @@ async fn conclude_release(
 
 #[get("{organisation}/{application}")]
 async fn serve_release(
+    path: web::Path<(String, String)>,
+    req: actix_web::HttpRequest,
+    query: web::Query<ServeReleaseQueryParams>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ABError> {
+    serve_release_handler(path, req, query, state).await
+}
+
+#[get("v2/{organisation}/{application}")]
+async fn serve_release_v2(
+    path: web::Path<(String, String)>,
+    req: actix_web::HttpRequest,
+    query: web::Query<ServeReleaseQueryParams>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ABError> {
+    serve_release_handler(path, req, query, state).await
+}
+
+async fn serve_release_handler(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     query: web::Query<ServeReleaseQueryParams>,
