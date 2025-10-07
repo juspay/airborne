@@ -21,12 +21,21 @@ export default function DashboardHome() {
   const [reqOrgName, setReqOrgName] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [appStoreLink, setAppStoreLink] = useState("");
   const [playStoreLink, setPlayStoreLink] = useState("");
+  const [orgRequestSuccess, setOrgRequestSuccess] = useState(false);
   const { data: orgs, mutate: refreshOrgs } = useSWR(token ? "/organisations" : null, (url) =>
     apiFetch<OrganisationsList>(url, {}, { token, logout })
   );
+
+  const resetOrgRequestForm = () => {
+    setReqOrgName("");
+    setName("");
+    setEmail("");
+    setAppStoreLink("");
+    setPlayStoreLink("");
+    setOrgRequestSuccess(false);
+  };
   const orgList: { name: string; applications: { application: string }[] }[] = orgs?.organisations || [];
   const apps = useMemo(
     () => orgList.find((o) => o.name === org)?.applications?.map((a) => a.application) || [],
@@ -35,6 +44,24 @@ export default function DashboardHome() {
 
   const [orgName, setOrgName] = useState("");
   const [appName, setAppName] = useState("");
+
+  // Check for saved org request data on component mount
+  useEffect(() => {
+    const savedRequest = localStorage.getItem("org_request_data");
+    if (savedRequest && config?.organisation_creation_disabled) {
+      try {
+        const requestData = JSON.parse(savedRequest);
+        setReqOrgName(requestData.organisation_name || "");
+        setName(requestData.name || "");
+        setEmail(requestData.email || "");
+        setAppStoreLink(requestData.app_store_link || "");
+        setPlayStoreLink(requestData.play_store_link || "");
+        setOrgRequestSuccess(true);
+      } catch (err) {
+        console.error("Error parsing saved org request:", err);
+      }
+    }
+  }, [config?.organisation_creation_disabled]);
 
   useEffect(() => {
     if (orgList.length === 0) {
@@ -82,7 +109,6 @@ export default function DashboardHome() {
             organisation_name: reqOrgName,
             name,
             email,
-            phone: phoneNumber,
             app_store_link: appStoreLink,
             play_store_link: playStoreLink,
           },
@@ -91,6 +117,20 @@ export default function DashboardHome() {
           token,
         }
       );
+
+      // Save request data to local storage
+      const requestData = {
+        organisation_name: reqOrgName,
+        name,
+        email,
+        app_store_link: appStoreLink,
+        play_store_link: playStoreLink,
+        requested_at: new Date().toISOString(),
+      };
+      localStorage.setItem("org_request_data", JSON.stringify(requestData));
+
+      // Show success message
+      setOrgRequestSuccess(true);
     } catch (err) {
       console.error("Error while requesting organisation:", err);
     }
@@ -101,56 +141,82 @@ export default function DashboardHome() {
     return (
       <div className="mt-10">
         {config?.organisation_creation_disabled ? (
-          <Card className="mx-auto max-w-lg shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl font-semibold">Request your first Organisation</CardTitle>
-              <CardDescription>
-                You need an organisation to get started. Fill in the details below to request one.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="orgName">Organisation name</Label>
-                  <Input id="orgName" value={reqOrgName} onChange={(e) => setReqOrgName(e.target.value)} />
+          orgRequestSuccess ? (
+            <Card className="mx-auto max-w-lg shadow-lg border-green-200 bg-green-50">
+              <CardHeader>
+                <CardTitle className="text-2xl font-semibold text-green-800">Request Submitted Successfully!</CardTitle>
+                <CardDescription className="text-green-700">
+                  Your organisation request has been submitted.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 text-green-800">
+                  <p className="font-medium">Organisation: {reqOrgName}</p>
+                  <p>Someone from our team will connect with you soon to process your request.</p>
+                  <p className="text-sm text-green-600">We&apos;ll reach out to you at {email}.</p>
                 </div>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  variant="outline"
+                  className="w-full border-green-300 text-green-800 hover:bg-green-100"
+                  onClick={resetOrgRequestForm}
+                >
+                  Submit Another Request
+                </Button>
+              </CardFooter>
+            </Card>
+          ) : (
+            <Card className="mx-auto max-w-lg shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl font-semibold">Request your first Organisation</CardTitle>
+                <CardDescription>
+                  You need an organisation to get started. Fill in the details below to request one.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="orgName">Organisation name</Label>
+                    <Input id="orgName" value={reqOrgName} onChange={(e) => setReqOrgName(e.target.value)} />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="name">Your name</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Your name</Label>
+                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number</Label>
-                  <Input id="phoneNumber" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="appStoreLink">App Store Link</Label>
+                    <Input id="appStoreLink" value={appStoreLink} onChange={(e) => setAppStoreLink(e.target.value)} />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="appStoreLink">App Store Link</Label>
-                  <Input id="appStoreLink" value={appStoreLink} onChange={(e) => setAppStoreLink(e.target.value)} />
+                  <div className="space-y-2">
+                    <Label htmlFor="playStoreLink">Play Store Link</Label>
+                    <Input
+                      id="playStoreLink"
+                      value={playStoreLink}
+                      onChange={(e) => setPlayStoreLink(e.target.value)}
+                    />
+                  </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="playStoreLink">Play Store Link</Label>
-                  <Input id="playStoreLink" value={playStoreLink} onChange={(e) => setPlayStoreLink(e.target.value)} />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full"
-                onClick={onRequestOrg}
-                disabled={!reqOrgName.trim() || !name.trim() || !email.trim() || !phoneNumber.trim()}
-              >
-                Request Organisation
-              </Button>
-            </CardFooter>
-          </Card>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full"
+                  onClick={onRequestOrg}
+                  disabled={!reqOrgName.trim() || !name.trim() || !email.trim()}
+                >
+                  Request Organisation
+                </Button>
+              </CardFooter>
+            </Card>
+          )
         ) : (
           <Card className="mx-auto max-w-lg shadow-lg">
             <CardHeader>
