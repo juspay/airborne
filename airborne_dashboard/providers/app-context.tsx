@@ -104,6 +104,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setOrg(null);
     setApp(null);
+    if (localStorage.getItem("org_request_data")) localStorage.removeItem("org_request_data");
     // redirect to login after clearing state
     if (typeof window !== "undefined") window.location.href = "/login";
   };

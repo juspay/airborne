@@ -62,7 +62,6 @@ pub struct OrganisationRequest {
     pub organisation_name: String,
     pub name: String,
     pub email: String,
-    pub phone: Option<String>,
     pub play_store_link: Option<String>,
     pub app_store_link: Option<String>,
 }
@@ -87,7 +86,6 @@ async fn request_organisation(
     let organisation_name = body.organisation_name.clone();
     let name = body.name.clone();
     let email = body.email.clone();
-    let phone = body.phone.clone().unwrap_or("".to_string());
     let play_store_link = body.play_store_link.clone().unwrap_or("".to_string());
     let app_store_link = body.app_store_link.clone().unwrap_or("".to_string());
 
@@ -133,7 +131,7 @@ async fn request_organisation(
         values: Some(vec![vec![
             serde_json::Value::String(name),
             serde_json::Value::String(email),
-            serde_json::Value::String(phone),
+            serde_json::Value::String("".to_string()), // phone number
             serde_json::Value::String(organisation_name.clone()),
             serde_json::Value::String(app_store_link),
             serde_json::Value::String(play_store_link),
