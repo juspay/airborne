@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #![deny(unused_crate_dependencies)]
+mod build;
 mod dashboard;
 mod docs;
 mod file;
@@ -34,16 +35,26 @@ use google_sheets4::{
     Sheets,
 };
 use log::info;
-use middleware::auth::Auth;
 use serde_json::json;
-use std::sync::Arc;
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    sync::Arc,
+};
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::{dashboard::configuration, middleware::request::request_id_mw};
+use crate::dashboard::configuration;
+use crate::middleware::auth::Auth;
+use crate::middleware::request::request_id_mw;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+
+pub fn calculate_bucket_index(identifier: &str, group_id: &i64) -> usize {
+    let mut hasher = DefaultHasher::new();
+    (identifier, group_id).hash(&mut hasher);
+    (hasher.finish() % 100) as usize
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -214,6 +225,11 @@ async fn main() -> std::io::Result<()> {
                 // Decide if this needs auth; Ideally this only needs signature verfication
             )
             .service(
+                web::scope("/build").service(build::add_routes()),
+                // Decide if this needs auth; Ideally this only needs signature verfication
+                // Same as release routes
+            )
+            .service(
                 web::scope(&server_path_prefix)
                     .service(
                         web::resource("/health").route(
@@ -264,4 +280,8 @@ async fn main() -> std::io::Result<()> {
     .bind(("0.0.0.0", port))? // Listen on all interfaces
     .run()
     .await
+
+    // for i in 0 .. 100 {
+    //     calculate_bucket_index(identifier, group_id)
+    // }
 }

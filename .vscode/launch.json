@@ -11,6 +11,12 @@
       "program": "${workspaceFolder}/<executable file>",
       "args": [],
       "cwd": "${workspaceFolder}"
+    },
+    {
+    "type": "lldb",
+    "request": "attach",
+    "name": "Attach to Rust Process",
+    "pid": "${command:pickProcess}" // This will prompt you to select a running process
     }
   ]
 }

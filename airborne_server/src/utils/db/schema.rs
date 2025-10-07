@@ -104,8 +104,20 @@ pub mod hyperotaserver {
         }
     }
 
+    diesel::table! {
+        hyperotaserver.builds (id) {
+            id -> Uuid,
+            build_version -> Text,
+            organisation -> Text,
+            application -> Text,
+            release_id -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
     diesel::allow_tables_to_appear_in_same_query!(
         cleanup_outbox,
+        builds,
         configs,
         files,
         packages,

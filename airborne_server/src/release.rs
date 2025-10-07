@@ -1364,7 +1364,7 @@ async fn serve_release_handler(
     let response = actix_web::HttpResponse::Ok()
         .insert_header((
             actix_web::http::header::CACHE_CONTROL,
-            "Cache-Control: public, max-age=86400, stale-while-revalidate=60",
+            "public, s-maxage=86400, max-age=0",
         ))
         .insert_header((actix_web::http::header::CONTENT_TYPE, "application/json"))
         .json(release_response);
