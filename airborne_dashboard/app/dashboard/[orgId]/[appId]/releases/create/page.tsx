@@ -19,10 +19,21 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { Search, Info, ChevronRight, Target, Check, PlugIcon as PkgIcon, FileText, Settings, Cog } from "lucide-react";
+import {
+  Search,
+  Info,
+  ChevronRight,
+  Target,
+  Check,
+  PlugIcon as PkgIcon,
+  FileText,
+  Settings,
+  Cog,
+  Copy,
+} from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
-import { notFound, useRouter } from "next/navigation";
+import { notFound, useRouter, useSearchParams } from "next/navigation";
 import { hasAppAccess, parseFileRef } from "@/lib/utils";
 import Link from "next/link";
 import { toastWarning } from "@/hooks/use-toast";
@@ -113,13 +124,97 @@ export default function CreateReleasePage() {
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const perPage = 50;
+
+  // Check if we're in clone mode and get the release ID
+  const isClone = searchParams.get("clone") === "true";
+  const cloneReleaseId = searchParams.get("releaseId");
+
+  // Fetch the release data if we're cloning
+  const { data: cloneReleaseData, isLoading: cloneReleaseLoading } = useSWR(
+    isClone && cloneReleaseId && token && org && app ? ["/releases", cloneReleaseId, token, org, app] : null,
+    ([, id, t, o, a]) => apiFetch<any>(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
+  );
 
   useEffect(() => {
     if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
       notFound();
     }
   }, [loadingAccess]);
+
+  // Initialize state from cloned release data
+  useEffect(() => {
+    if (isClone && cloneReleaseData && !cloneReleaseLoading) {
+      try {
+        const release = cloneReleaseData;
+
+        // Initialize configuration
+        setBootTimeout(release.config.boot_timeout || 4000);
+        setReleaseConfigTimeout(release.config.release_config_timeout || 4000);
+
+        // Initialize targeting rules from dimensions
+        const targetingRules = Object.entries(release.dimensions || {}).map(([dimension, values]) => ({
+          dimension,
+          operator: "equals" as const,
+          values: Array.isArray(values) ? values.join(",") : String(values),
+        }));
+        setTargetingRules(targetingRules);
+
+        // Initialize remote config values
+        if (release.config.properties && typeof release.config.properties === "object") {
+          setRemoteConfigValues(release.config.properties);
+        }
+
+        // Initialize selected resources (using file paths)
+        const resourceFilePaths = release.resources.map((resource: any) => resource.file_path);
+        setSelectedResources(new Set(resourceFilePaths));
+
+        // Initialize package properties
+        if (release.package.properties) {
+          setPropertiesJSON(JSON.stringify(release.package.properties, null, 2));
+        }
+
+        // Store package and file priority info for later use when packages are loaded
+        sessionStorage.setItem(
+          "clonePackageInfo",
+          JSON.stringify({
+            tag: release.package.tag,
+            version: release.package.version,
+            indexFilePath: release.package.index.file_path,
+            filePriorities: {
+              ...release.package.important.reduce((acc: any, file: any) => {
+                acc[file.file_path] = "important";
+                return acc;
+              }, {}),
+              ...release.package.lazy.reduce((acc: any, file: any) => {
+                acc[file.file_path] = "lazy";
+                return acc;
+              }, {}),
+            },
+          })
+        );
+      } catch (error) {
+        console.error("Failed to initialize clone data:", error);
+        toastWarning("Clone Error", "Failed to load cloned release data");
+      }
+    }
+  }, [isClone, cloneReleaseData, cloneReleaseLoading]);
+
+  // Load cohorts for cloned targeting rules
+  useEffect(() => {
+    if (isClone && targetingRules.length > 0 && dimensions.length > 0) {
+      // Load cohorts for any cohort dimensions in the targeting rules
+      targetingRules.forEach(async (rule) => {
+        if (rule.dimension) {
+          const dimension = dimensions.find((d) => d.dimension === rule.dimension);
+          if (dimension?.type === "cohort") {
+            await loadCohortsForDimension(rule.dimension);
+          }
+        }
+      });
+    }
+  }, [isClone, targetingRules, dimensions]);
 
   // Fetch schema for remote config
   const fetchSchema = async () => {
@@ -151,20 +246,56 @@ export default function CreateReleasePage() {
         const convertedFields = convertBackendDataToFields(data);
         setSchemaFields(convertedFields);
 
-        // Initialize remote config values with default values
-        const initialValues: Record<string, any> = {};
-        const extractDefaults = (fields: SchemaField[], prefix = "") => {
-          fields.forEach((field) => {
-            const key = prefix ? `${prefix}.${field.name}` : field.name;
-            if (field.children && field.children.length > 0) {
-              extractDefaults(field.children, key);
-            } else {
-              initialValues[key] = field.defaultValue;
-            }
-          });
-        };
-        extractDefaults(convertedFields);
-        setRemoteConfigValues(initialValues);
+        // Check if we're in clone mode and already have remote config values
+        const hasExistingValues = Object.keys(remoteConfigValues).length > 0;
+        let shouldPreserveValues = false;
+        let cloneConfigValues = {};
+
+        if (isClone && hasExistingValues) {
+          shouldPreserveValues = true;
+          cloneConfigValues = remoteConfigValues;
+        }
+
+        if (shouldPreserveValues) {
+          // Convert nested clone values to dotted key format
+          const flattenObject = (obj: any, prefix = ""): Record<string, any> => {
+            const flattened: Record<string, any> = {};
+
+            Object.keys(obj).forEach((key) => {
+              const value = obj[key];
+              const newKey = prefix ? `${prefix}.${key}` : key;
+
+              if (value && typeof value === "object" && !Array.isArray(value)) {
+                // Recursively flatten nested objects
+                Object.assign(flattened, flattenObject(value, newKey));
+              } else {
+                // Use the value directly
+                flattened[newKey] = value;
+              }
+            });
+
+            return flattened;
+          };
+
+          const flattenedCloneValues = flattenObject(cloneConfigValues);
+          console.log("Clone mode: converted nested values to dotted keys:", flattenedCloneValues);
+          setRemoteConfigValues(flattenedCloneValues);
+        } else {
+          // Initialize remote config values with default values
+          const initialValues: Record<string, any> = {};
+          const extractDefaults = (fields: SchemaField[], prefix = "") => {
+            fields.forEach((field) => {
+              const key = prefix ? `${prefix}.${field.name}` : field.name;
+              if (field.children && field.children.length > 0) {
+                extractDefaults(field.children, key);
+              } else {
+                initialValues[key] = field.defaultValue;
+              }
+            });
+          };
+          extractDefaults(convertedFields);
+          setRemoteConfigValues(initialValues);
+        }
       } else {
         setSchemaFields([]);
         setRemoteConfigValues({});
@@ -191,14 +322,88 @@ export default function CreateReleasePage() {
     if (!token || !org || !app) return;
     apiFetch<any>("/packages/list", { query: { offset: 0, limit: 100 } }, { token, org, app })
       .then((res) => {
-        setPackages(res.packages || []);
+        const loadedPackages = res.packages || [];
+        setPackages(loadedPackages);
+
+        // Handle package selection from clone data
+        if (isClone) {
+          try {
+            const clonePackageInfoStr = sessionStorage.getItem("clonePackageInfo");
+            if (clonePackageInfoStr) {
+              const clonePackageInfo = JSON.parse(clonePackageInfoStr);
+              const targetTag = clonePackageInfo.tag;
+              const targetVersion = clonePackageInfo.version;
+
+              // Extract tag from index file path as fallback if not directly available
+              let fallbackTag: string | undefined;
+              if (clonePackageInfo.indexFilePath) {
+                try {
+                  const parsed = parseFileRef(clonePackageInfo.indexFilePath);
+                  fallbackTag = parsed.tag;
+                } catch (error) {
+                  console.error("Failed to extract tag from index file path:", error);
+                }
+              }
+
+              // First try to find by tag and version (convert version to number if needed)
+              console.log("Looking for package with tag:", targetTag, "version:", targetVersion);
+              console.log(
+                "Available packages:",
+                loadedPackages.map((p: Pkg) => ({ tag: p.tag, version: p.version, versionType: typeof p.version }))
+              );
+
+              let matchingPackage: Pkg | undefined = loadedPackages.find(
+                (pkg: Pkg) => pkg.tag === targetTag && Number(pkg.version) === Number(targetVersion)
+              );
+
+              // If not found and we have a fallback tag, try with that
+              if (!matchingPackage && fallbackTag && fallbackTag !== targetTag) {
+                matchingPackage = loadedPackages.find(
+                  (pkg: Pkg) => pkg.tag === fallbackTag && Number(pkg.version) === Number(targetVersion)
+                );
+              }
+
+              // If still not found, try to find by version only (convert to number for comparison)
+              if (!matchingPackage) {
+                matchingPackage = loadedPackages.find((pkg: Pkg) => Number(pkg.version) === Number(targetVersion));
+              }
+
+              if (matchingPackage) {
+                console.log("Found matching package:", matchingPackage);
+                setSelectedPackage(matchingPackage);
+              } else {
+                console.log("No matching package found");
+              }
+            }
+          } catch (error) {
+            console.error("Failed to select cloned package:", error);
+          }
+        }
       })
       .catch(() => setPackages([]));
-  }, [token, org, app]);
+  }, [token, org, app, searchParams]);
 
   useEffect(() => {
     if (selectedPackage) {
       const pkgFiles = [];
+      let clonedPriorities: Record<string, "important" | "lazy"> = {};
+
+      // Extract cloned priorities if available
+      if (isClone) {
+        try {
+          const clonePackageInfoStr = sessionStorage.getItem("clonePackageInfo");
+          if (clonePackageInfoStr) {
+            const clonePackageInfo = JSON.parse(clonePackageInfoStr);
+            clonedPriorities = clonePackageInfo.filePriorities || {};
+          }
+        } catch (error) {
+          console.error("Failed to parse cloned priorities:", error);
+        }
+      }
+
+      // Clear existing file priorities to avoid duplicates
+      const newPriorities: Record<string, "important" | "lazy"> = {};
+
       for (const file of selectedPackage.files) {
         const file_parsed = parseFileRef(file);
         pkgFiles.push({
@@ -207,11 +412,17 @@ export default function CreateReleasePage() {
           version: file_parsed.version,
           tag: file_parsed.tag,
         });
-        setFilePriority((prev) => ({ ...prev, [file]: "important" }));
+
+        // Use cloned priority if available, otherwise default to important
+        const priority = clonedPriorities[file_parsed.filePath] || "important";
+        newPriorities[file] = priority;
       }
+
+      // Set the new priorities, replacing any existing ones
+      setFilePriority(newPriorities);
       setFiles(pkgFiles);
     }
-  }, [selectedPackage]);
+  }, [selectedPackage, isClone]);
 
   // Load dimensions options
   useEffect(() => {
@@ -271,6 +482,35 @@ export default function CreateReleasePage() {
   const allResources = resourceData?.files || [];
   const resourceTotal = resourceData?.total || 0;
   const resourceTotalPages = Math.ceil(resourceTotal / perPage);
+
+  // Convert cloned resource file paths to resource IDs when resources are loaded
+  useEffect(() => {
+    if (isClone && allResources.length > 0) {
+      // Check if we have file paths in selectedResources that need to be converted to IDs
+      const currentSelection = Array.from(selectedResources);
+      if (currentSelection.length > 0) {
+        // Check if any of the current selections are file paths (not found in resource IDs)
+        const resourceIds = new Set(allResources.map((r) => r.id));
+        const hasFilePaths = currentSelection.some((id) => !resourceIds.has(id));
+
+        if (hasFilePaths) {
+          // Convert file paths to resource IDs
+          const newResourceIds = new Set<string>();
+
+          currentSelection.forEach((filePath: string) => {
+            const matchingResource = allResources.find((resource) => resource.file_path === filePath);
+            if (matchingResource) {
+              newResourceIds.add(matchingResource.id);
+            }
+          });
+
+          if (newResourceIds.size > 0) {
+            setSelectedResources(newResourceIds);
+          }
+        }
+      }
+    }
+  }, [isClone, allResources, selectedResources]);
 
   // Filter resources excluding package files and index file by file path only
   const packageFilePaths = new Set([
@@ -650,11 +890,35 @@ export default function CreateReleasePage() {
     }
   };
 
+  const isCloneMode = isClone;
+
+  // Show loading state when cloning and waiting for release data
+  if (isClone && cloneReleaseLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin inline-block h-8 w-8 border-4 border-current border-t-transparent text-muted-foreground rounded-full mb-4" />
+          <p className="text-muted-foreground">Loading release data for cloning...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="flex-1">
         <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Create Release</h1>
         <p className="text-muted-foreground mt-2">Step-by-step: configure, remote config, package, files, targeting</p>
+
+        {isCloneMode && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mt-4">
+            <Copy className="h-4 w-4 text-amber-600" />
+            <div className="text-sm text-amber-800">
+              You&apos;re creating a release based on a cloned configuration. All settings have been pre-populated from
+              the original release.
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-4 mt-6">
           {[
@@ -957,6 +1221,27 @@ export default function CreateReleasePage() {
               <CardHeader>
                 <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Version</CardTitle>
                 <CardDescription>Choose an existing package to base this release on (optional)</CardDescription>
+                {isCloneMode && (
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg mt-2">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <div className="text-sm text-blue-800">
+                      The original release used package version{" "}
+                      {(() => {
+                        try {
+                          const clonePackageInfoStr = sessionStorage.getItem("clonePackageInfo");
+                          if (clonePackageInfoStr) {
+                            const clonePackageInfo = JSON.parse(clonePackageInfoStr);
+                            return clonePackageInfo.version;
+                          }
+                        } catch (error) {
+                          console.error("Error reading clone package info:", error);
+                        }
+                        return "unknown";
+                      })()}{" "}
+                      - it should be automatically selected if available.
+                    </div>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
@@ -985,14 +1270,14 @@ export default function CreateReleasePage() {
                     {filteredPackages.map((p) => {
                       const key = `${p.tag}:${p.version}`;
                       const checked = selectedPackage
-                        ? `${selectedPackage.tag}:${selectedPackage.version}` === key
+                        ? selectedPackage.version === p.version && selectedPackage.tag === p.tag
                         : false;
                       return (
                         <TableRow key={key}>
                           <TableCell>
                             <Checkbox
                               checked={checked}
-                              onCheckedChange={() => setSelectedPackage(checked ? null : p)}
+                              onCheckedChange={(isChecked) => setSelectedPackage(isChecked ? p : null)}
                             />
                           </TableCell>
                           <TableCell className="text-muted-foreground">{p.version}</TableCell>

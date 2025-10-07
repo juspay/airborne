@@ -23,6 +23,7 @@ import {
   Settings,
   RotateCw,
   Pencil,
+  Copy,
 } from "lucide-react";
 import {
   Dialog,
@@ -58,6 +59,7 @@ interface ChecksummedFile {
 interface ReleaseConfig {
   boot_timeout: number;
   release_config_timeout: number;
+  properties?: Record<string, any>;
 }
 
 interface ReleasePackage {
@@ -126,6 +128,8 @@ export default function ReleaseDetailPage() {
   );
   const release: ReleasePayload = data;
 
+  console.log("Release", release);
+
   const [isRamping, setIsRamping] = useState(false);
   const [rampDialogOpen, setRampDialogOpen] = useState(false);
   const [trafficPct, setTrafficPct] = useState(release?.experiment?.traffic_percentage || 0);
@@ -133,6 +137,7 @@ export default function ReleaseDetailPage() {
   const [concludeDialogOpen, setConcludeDialogOpen] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
   const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
 
   if (isLoading) return <div>Loading...</div>;
 
@@ -244,6 +249,18 @@ export default function ReleaseDetailPage() {
     }
   };
 
+  const handleCloneRelease = () => {
+    setIsCloning(true);
+
+    // Navigate to create page with just the release ID and clone flag
+    router.push(
+      `/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases/create?clone=true&releaseId=${encodeURIComponent(releaseId)}`
+    );
+
+    // Reset loading state after a short delay (navigation happens asynchronously)
+    setTimeout(() => setIsCloning(false), 1000);
+  };
+
   const currentTrafficPercentage = release.experiment.traffic_percentage || 0;
   const targetPercentage = 50;
   const affectedUsers = 0;
@@ -293,6 +310,11 @@ export default function ReleaseDetailPage() {
                       Edit
                     </Button>
                   )}
+
+                  <Button variant="outline" onClick={handleCloneRelease} disabled={isCloning} size="sm">
+                    <Copy className="h-4 w-4 mr-2" />
+                    {isCloning ? "Cloning..." : "Clone Release"}
+                  </Button>
 
                   {release.experiment.status !== "CONCLUDED" && (
                     <>
@@ -567,9 +589,9 @@ export default function ReleaseDetailPage() {
                           </TableCell>
                           <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
                           <TableCell className="text-muted-foreground">
-                            {release.package.important.findIndex((f) => f.checksum == file.checksum) !== -1
-                              ? "important"
-                              : "lazy"}
+                            {release.package.important.findIndex((f) => f.file_path == file.file_path) == -1
+                              ? "lazy"
+                              : "important"}
                           </TableCell>
                           <TableCell>
                             {file.url && (
