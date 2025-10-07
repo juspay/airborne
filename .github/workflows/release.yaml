@@ -119,6 +119,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -151,6 +152,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -192,6 +194,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -224,6 +227,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -265,6 +269,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -297,6 +302,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -330,6 +336,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Filter paths
         id: changes
@@ -391,6 +401,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
@@ -426,7 +437,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
