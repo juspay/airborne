@@ -1,6 +1,6 @@
 {
   "name": "airborne-cli-react-native",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Cli for Airborne",
   "main": "bin/index.js",
   "bin": {

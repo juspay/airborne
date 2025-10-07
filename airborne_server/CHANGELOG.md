@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.4.2 - 2025-10-07
+#### Bug Fixes
+- add v2 release route - (8e73c36) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.4.1 - 2025-10-04
 #### Bug Fixes
 - node module dependancies corrected for npmjs - (0bb90db) - george.james
