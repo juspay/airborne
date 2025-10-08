@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.8.0 - 2025-10-08
+### Package updates
+- airborne_dashboard bumped to airborne_dashboard-v0.6.0
+### Global changes
+#### Build system
+- fix release action reading stale head - (b6b5359) - ayush.jain@juspay.in
+
+- - -
+
 ## v0.7.4 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.4.2

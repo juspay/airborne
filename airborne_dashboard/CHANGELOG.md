@@ -2,6 +2,36 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.6.0 - 2025-10-08
+#### Features
+- release cloning - (5a645f4) - yuvrajjsingh0
+
+- - -
+
+## v0.7.4 - 2025-10-08
+#### Miscellaneous Chores
+- **(version)** v0.7.4 [skip ci] - (15ee23e) - Airborne Bot
+
+- - -
+
+## v0.7.3 - 2025-10-08
+#### Miscellaneous Chores
+- **(version)** v0.7.3 [skip ci] - (6c03f7d) - Airborne Bot
+
+- - -
+
+## v0.7.2 - 2025-10-08
+#### Miscellaneous Chores
+- **(version)** v0.7.2 [skip ci] - (b89e65c) - Airborne Bot
+
+- - -
+
+## v0.7.1 - 2025-10-08
+#### Miscellaneous Chores
+- **(version)** v0.7.1 [skip ci] - (c7b2500) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.5.0 - 2025-10-04
 #### Features
 - Support for Cohort dimensions - (0b34748) - yuvrajjsingh0
