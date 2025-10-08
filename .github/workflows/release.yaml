@@ -410,12 +410,30 @@ jobs:
           node-version: "22.12.0"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Publish to NPM
+      - name: Publish airborne-server-sdk
+        working-directory: airborne_server_clients/javascript/sdk
         run: |
-          cd airborne-react-native
           npm ci
           npm publish --access public
-          cd ../airborne-cli-react-native
+
+      - name: Publish airborne-core-cli
+        working-directory: airborne-core-cli
+        run: |
+          sed -i "s|\"airborne-server-sdk\": \"file:../airborne_server_clients/javascript/sdk\"|\"airborne-server-sdk\": \"*\"|" package.json
+          npm ci
+          npm publish --access public
+
+      - name: Publish airborne-cli
+        working-directory: airborne_cli
+        run: |
+          sed -i "s|\"airborne-core-cli\": \"file:../airborne-core-cli\"|\"airborne-core-cli\": \"*\"|" package.json
+          npm ci
+          npm publish --access public
+
+      - name: Publish airborne-react-native
+        working-directory: airborne-react-native
+        run: |
+          sed -i "s|\"airborne-cli\": \"file:../airborne_cli\"|\"airborne-cli\": \"*\"|" package.json
           npm ci
           npm publish --access public
 

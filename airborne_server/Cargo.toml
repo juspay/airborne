@@ -12,9 +12,10 @@ aes-gcm = "0.10.3"
 aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
 aws-sdk-cloudfront = "1.81.0"
 aws-sdk-kms = "1.65.0"
-aws-sdk-s3 = "1.81.0"
+aws-sdk-s3 = "1.106.0"
 aws-smithy-types = "1.2.5"
 base64 = "0.22"
+bytes = "1"
 chrono = { workspace = true }
 diesel = { version = "2.2", features = [
     "postgres",
@@ -30,6 +31,7 @@ futures-util = "0.3"
 google-sheets4 = "=6.0.0"
 hex = "0.4"
 http = "0.2.12"
+http-body = "1.0.1"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
 log = "0.4.27"

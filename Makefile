@@ -16,6 +16,8 @@ CARGO_FLAGS := --color always --no-default-features
 ENV_FILE_VM ?= airborne_analytics_server/.env.victoria-metrics
 ENV_FILE_KC    ?= airborne_analytics_server/.env.kafka-clickhouse
 
+SMITHY_BUILD_SRC := smithy/output/source
+
 
 # ANSI color codes
 export GREEN := $(shell printf '\033[0;32m')
@@ -23,6 +25,7 @@ export YELLOW := $(shell printf '\033[1;33m')
 export RED := $(shell printf '\033[0;31m')
 export NC := $(shell printf '\033[0m') # No Color
 
+export SMITHY_MAVEN_REPOS = https://repo1.maven.org/maven2%7Chttps://sandbox.assets.juspay.in/smithy/m2
 
 # Docker detection
 HAS_DOCKER := $(shell command -v docker > /dev/null; echo $$?)
@@ -588,3 +591,51 @@ define init_status_simple
 	fi; \
 	echo ""
 endef
+
+smithy-clean:
+	rm -rf smithy/output
+
+smithy-build:
+	cd smithy && smithy build
+
+smithy-clean-build: smithy-clean smithy-build
+
+smithy-clients: smithy-build
+	rm -rf airborne_server_clients/javascript/sdk
+	mkdir -p airborne_server_clients/javascript/sdk
+	rm -rf airborne_server_clients/model
+	mkdir -p airborne_server_clients/model
+# 	git restore airborne_server_clients/javascript/sdk/README.md
+	git restore airborne_server_clients/javascript/sdk/LICENSE
+	cp -r $(SMITHY_BUILD_SRC)/typescript-client-codegen/*\
+				airborne_server_clients/javascript/sdk
+	cp -f $(SMITHY_BUILD_SRC)/model/*\
+				airborne_server_clients/model
+
+
+	@for d in $(SMITHY_BUILD_SRC)/*-client-codegen; do \
+		[ -d "$$d" ] || continue; \
+		[[ "$$d" =~ "typescript" ]] && continue; \
+		name=$$(basename "$$d" -client-codegen); \
+		mkdir -p "airborne_server_clients/$$name"; \
+		cp -r "$$d"/* "airborne_server_clients/$$name"; \
+	done
+	git apply smithy/patches/*.patch
+
+generate-cli: smithy-clients
+	cd airborne_server_clients/javascript/sdk && npm install && npm run build
+	cd ../../../
+	rm -rf airborne-core-cli
+	cd smithy-cli-generator && npm install
+	node smithy-cli-generator/src/index.js \
+		--smithyBuildJSONPath smithy/smithy-build.json \
+		--smithyTypescriptSdk file:../airborne_server_clients/javascript/sdk \
+		--cliName "airborne-core-cli" \
+		--cliDescription "Command-line interface for Airborne OTA operations" \
+		--buildPath . \
+		--namespace io.airborne.server \
+		--service Airborne \
+		--smithyModelJSONPath airborne_server_clients/model/model.json \
+		--plugin typescript-client-codegen
+	cd airborne-core-cli && npm install
+  

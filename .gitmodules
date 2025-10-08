@@ -1,0 +1,3 @@
+[submodule "smithy-cli-generator"]
+	path = smithy-cli-generator
+	url = git@github.com:Yash02Rajput/smithy-cli-generator.git

@@ -1,8 +1,13 @@
-use std::fmt::Display;
-
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
+use actix_web::error::PayloadError;
+use bytes::Bytes;
+use http_body::Frame;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::Display;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::sync::mpsc;
 
 #[derive(Serialize, Deserialize)]
 pub struct FileRequest {
@@ -79,12 +84,10 @@ pub struct FileListQuery {
 pub struct GetFileQuery {
     pub file_key: String,
 }
-
-#[derive(MultipartForm)]
-pub struct UploadFileRequest {
-    pub file: TempFile,
-    pub file_path: actix_multipart::form::text::Text<String>,
-    pub version: actix_multipart::form::text::Text<i32>,
+#[derive(Deserialize)]
+pub struct UploadFileQuery {
+    pub file_path: String,
+    pub tag: Option<String>,
 }
 
 #[derive(MultipartForm)]
@@ -105,4 +108,29 @@ pub struct UploadBulkMapping {
 pub struct BulkFileUploadResponse {
     pub uploaded: Vec<FileResponse>,
     pub skipped: Vec<String>,
+}
+
+pub type ReadResult = Result<Bytes, PayloadError>;
+pub struct FileStream(pub mpsc::UnboundedReceiver<ReadResult>);
+
+impl http_body::Body for FileStream {
+    type Data = Bytes;
+    type Error = std::io::Error;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        match self.0.poll_recv(cx) {
+            Poll::Pending => {
+                // No new data in stream, awaiting...
+                Poll::Pending
+            }
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(Some(result)) => match result {
+                Ok(bytes) => Poll::Ready(Some(Ok(Frame::data(bytes)))),
+                Err(e) => Poll::Ready(Some(Err(std::io::Error::other(e)))),
+            },
+        }
+    }
 }

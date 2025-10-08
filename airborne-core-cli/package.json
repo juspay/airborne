@@ -1,0 +1,26 @@
+{
+  "name": "airborne-core-cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "airborne-core-cli": "bin.js"
+  },
+  "pkg": {
+    "targets": [
+      "node18-linux-x64",
+      "node18-macos-x64",
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "dependencies": {
+    "airborne-server-sdk": "file:../airborne_server_clients/javascript/sdk",
+    "chalk": "^5.6.2",
+    "commander": "14.0.1",
+    "json-stringify-safe": "^5.0.1"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./action": "./action.js"
+  }
+}

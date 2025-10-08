@@ -49,6 +49,7 @@ pub struct Environment {
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
+    pub aws_endpoint_url: String,
 }
 pub trait AppError: std::error::Error + Send + Sync + 'static {
     fn code(&self) -> &'static str;
@@ -61,7 +62,7 @@ pub trait AppError: std::error::Error + Send + Sync + 'static {
 #[derive(Serialize)]
 pub struct ErrorBody {
     pub code: String,
-    pub error: String,
+    pub message: String,
 }
 
 #[derive(Debug, Error)]
@@ -148,7 +149,8 @@ macro_rules! impl_response_error {
                 fn error_response(&self) -> HR {
                     let body = EB {
                         code:  self.code().to_string(),
-                        error: self.message(),
+                        message: self.message(),
+
                     };
                     HR::build(AE::status_code(self)).json(body)
                 }

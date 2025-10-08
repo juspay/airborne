@@ -75,6 +75,8 @@ async fn main() -> std::io::Result<()> {
     let superposition_org_id_env =
         std::env::var("SUPERPOSITION_ORG_ID").expect("SUPERPOSITION_ORG_ID must be set");
     let bucket_name = std::env::var("AWS_BUCKET").expect("AWS_BUCKET must be set");
+    let aws_endpoint_url_env =
+        std::env::var("AWS_ENDPOINT_URL").expect("AWS_ENDPOINT_URL must be set");
     let public_url = std::env::var("PUBLIC_ENDPOINT").expect("PUBLIC_ENDPOINT must be set");
     let port =
         std::env::var("PORT").map_or(8081, |v| v.parse().expect("PORT must be a valid number"));
@@ -150,6 +152,7 @@ async fn main() -> std::io::Result<()> {
         organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
         cloudfront_distribution_id: cf_distribution_id.clone(),
+        aws_endpoint_url: aws_endpoint_url_env,
     };
 
     // This is required for localStack

@@ -12,8 +12,11 @@ pre_bump_hooks = [
     "cargo set-version --workspace {{version}}",
     "npm version {{version}} --workspaces",
     "cd airborne_dashboard && npm version {{version}}",
+    "cd airborne-core-cli && npm version {{version}}",
+    "cd airborne_server_clients/javascript/sdk && npm version {{version}}",
     "sed -i \"s|^  s.version *=.*|  s.version          = '{{version}}'|\" airborne_sdk_iOS/hyper-ota/Airborne-Framework/Airborne.podspec",
     "sed -i 's|^hyperVersion=.*|hyperVersion={{version}}|' airborne_sdk_android/version.properties",
+    "sed -i 's/\"packageVersion\": *\"[^\"]*\"/\"packageVersion\": \"{{version}}\"/' smithy/smithy-build.json"
 ]
 post_bump_hooks = []
 pre_package_bump_hooks = []
@@ -33,9 +36,12 @@ authors = []
 
 [packages]
 airborne_analytics_server = { path = "airborne_analytics_server" }
-airborne_cli_react_native = { path = "airborne-cli-react-native" }
+airborne_cli = { path = "airborne_cli" }
+airborne_core_cli = { path = "airborne-core-cli" }
 airborne_dashboard = { path = "airborne_dashboard" }
 airborne_react_native = { path = "airborne-react-native" }
+airborne_server_clients = { path = "airborne_server_clients" }
 airborne_sdk_android = { path = "airborne_sdk_android" }
 airborne_sdk_ios = { path = "airborne_sdk_iOS" }
 airborne_server = { path = "airborne_server" }
+smithy = { path = "smithy" }

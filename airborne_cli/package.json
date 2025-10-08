@@ -1,0 +1,51 @@
+{
+  "name": "airborne-cli",
+  "version": "0.9.1",
+  "description": "Cli for Airborne",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "airborne-cli": "src/index.js"
+  },
+  "scripts": {
+    "cli": "node src/index.js",
+    "release": "release-it --only-version"
+  },
+  "keywords": [
+    "cli",
+    "react",
+    "component-generator"
+  ],
+  "author": "Yaswanth Polisetti",
+  "license": "MIT",
+  "homepage": "https://github.com/juspay/airborne#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "commander": "14.0.1",
+    "airborne-core-cli": "file:../airborne-core-cli"
+  },
+  "devDependencies": {
+    "release-it": "^17.10.0"
+  },
+  "release-it": {
+    "git": {
+      "commitMessage": "chore: release ${version}",
+      "tagName": "v${version}"
+    },
+    "npm": {
+      "publish": true
+    },
+    "github": {
+      "release": true
+    },
+    "plugins": {
+      "@release-it/conventional-changelog": {
+        "preset": {
+          "name": "angular"
+        }
+      }
+    }
+  }
+}

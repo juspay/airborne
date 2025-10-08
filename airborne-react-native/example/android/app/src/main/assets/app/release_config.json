@@ -1,0 +1,20 @@
+{
+  "version": "",
+  "config": {
+    "version": "",
+    "boot_timeout": 4000,
+    "release_config_timeout": 4000,
+    "properties": {}
+  },
+  "package": {
+    "version": "12",
+    "properties": {},
+    "index": {
+      "file_path": "index.android.bundle",
+      "url": ""
+    },
+    "important": [],
+    "lazy": []
+  },
+  "resources": []
+}

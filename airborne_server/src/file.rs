@@ -1,20 +1,25 @@
+pub mod types;
+pub mod utils;
+
 use std::{fs::File, io::Read};
 
 use actix_multipart::form::MultipartForm;
 use actix_web::{
+    error::PayloadError,
     get, patch, post,
-    web::{self, Json, Path, Query, ReqData},
+    web::{self, Json, Path, Payload, Query, ReqData},
     HttpResponse, Result, Scope,
 };
+use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
 use diesel::prelude::*;
+use futures_util::StreamExt;
 use log::info;
 use serde_json::json;
+use tokio::sync::mpsc;
 use tokio::task;
 use uuid::Uuid;
 use zip::ZipArchive;
-pub mod types;
-pub mod utils;
 
 use crate::{
     file::types::*,
@@ -26,7 +31,7 @@ use crate::{
             models::{FileEntry as DbFile, NewFileEntry},
             schema::hyperotaserver::files::dsl::*,
         },
-        s3::{push_file, push_file_byte_arr},
+        s3::{push_file_byte_arr, stream_file},
     },
 };
 
@@ -508,11 +513,14 @@ async fn update_file(
 
 #[post("/upload")]
 async fn upload_file(
-    MultipartForm(form): MultipartForm<UploadFileRequest>,
+    req: actix_web::HttpRequest,
+    mut payload: Payload,
+    query: Query<UploadFileQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> Result<Json<FileResponse>, ABError> {
     let auth_response = auth_response.into_inner();
+
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
         Ok(org_name) => auth_response
@@ -525,121 +533,248 @@ async fn upload_file(
         }),
     }?;
 
-    let file_path_str = form.file_path.into_inner();
-    let uploaded_file = form.file;
-    let file_version = *form.version;
+    let file_path_str = query.file_path.clone();
+    let tag_str = query.tag.clone();
+
+    let file_size = req
+        .headers()
+        .get("Content-Length")
+        .ok_or_else(|| ABError::BadRequest("Missing Content-Length header".to_string()))?
+        .to_str()
+        .map_err(|_| ABError::BadRequest("Invalid Content-Length header".to_string()))?
+        .parse::<i64>()
+        .map_err(|_| ABError::BadRequest("Content-Length is not a valid number".to_string()))?;
+
+    let b64_file_checksum = req
+        .headers()
+        .get("x-checksum")
+        .ok_or_else(|| ABError::BadRequest("Missing x-checksum header".to_string()))?
+        .to_str()
+        .map_err(|_| ABError::BadRequest("Invalid x-checksum header".to_string()))?
+        .to_string();
 
     if file_path_str.is_empty() {
+        info!("Rejected upload: empty file_path");
         return Err(ABError::BadRequest("File path cannot be empty".to_string()));
     }
 
     let pool = state.db_pool.clone();
 
-    let db_org = organisation.clone();
-    let db_app = application.clone();
-    let db_file_path = file_path_str.clone();
-    let created_file = run_blocking!({
-        let mut conn = pool.get()?;
+    let existing_file = {
+        let pool_clone = pool.clone();
+        let org = organisation.clone();
+        let app = application.clone();
+        let fp = file_path_str.clone();
+        let tg = tag_str.clone();
+        let b64_fc = b64_file_checksum.clone();
+        let fc = utils::base64_to_hex(&b64_fc);
 
-        let existing_file = files
-            .filter(org_id.eq(&db_org))
-            .filter(app_id.eq(&db_app))
-            .filter(file_path.eq(&db_file_path))
-            .filter(version.eq(file_version))
-            .select(DbFile::as_select())
-            .first::<DbFile>(&mut conn)
-            .optional()?;
+        let file = run_blocking!({
+            let mut conn = pool_clone.get()?;
 
-        if existing_file.is_some() {
-            return Err(ABError::BadRequest(format!(
-                "File with file_path '{}' already exists",
-                db_file_path
-            )));
-        }
+            info!("Checking for existing file in DB");
 
-        let new_file = NewFileEntry {
-            app_id: db_app.clone(),
-            org_id: db_org.clone(),
-            url: "".to_string(),
-            file_path: db_file_path.clone(),
-            tag: None,
-            version: file_version,
-            size: 0,
-            checksum: "".to_string(),
-            metadata: json!({}),
-            created_at: Utc::now(),
-        };
+            let existing_file = files
+                .filter(org_id.eq(&org))
+                .filter(app_id.eq(&app))
+                .filter(file_path.eq(&fp))
+                .filter(tag.is_not_distinct_from(&tg))
+                .select(DbFile::as_select())
+                .first::<DbFile>(&mut conn)
+                .optional()
+                .map_err(|e| {
+                    info!("DB query failed: {:?}", e);
+                    ABError::InternalServerError("DB Error".to_string())
+                })?;
 
-        let result = diesel::insert_into(files)
-            .values(&new_file)
-            .returning(DbFile::as_returning())
-            .get_result::<DbFile>(&mut conn)?;
+            match &existing_file {
+                Some(file) => {
+                    info!(
+                        "Found existing file in DB: id={}, checksum={}",
+                        file.file_path, file.checksum
+                    );
+                    if tg.is_some() {
+                        if file.checksum != fc {
+                            info!(
+                            "Checksum mismatch for file_path '{}' and tag '{}': existing={} vs incoming={}",
+                            fp,
+                            tg.as_ref().unwrap(),
+                            file.checksum,
+                            fc
+                        );
+                            return Err(ABError::BadRequest(format!(
+                            "File with file_path '{}' and tag '{}' already exists with different checksum or URL",
+                            fp,
+                            tg.as_ref().unwrap()
+                        )));
+                        }
+                        info!("Checksum matches for tagged file, returning existing");
+                        return Ok(Some(file.clone()));
+                    } else if file.checksum == fc {
+                        info!("Checksum matches for untagged file, returning existing");
+                        return Ok(Some(file.clone()));
+                    } else {
+                        info!("Checksum differs for untagged file, will create new version");
+                    }
+                }
+                None => info!("No existing file found in DB"),
+            }
 
-        Ok(result)
-    })?;
+            Ok(None)
+        })?;
+        file
+    };
 
-    let file_data = tokio::fs::read(uploaded_file.file.path())
-        .await
-        .map_err(|_| ABError::InternalServerError("File Read Error".to_string()))?;
+    if let Some(existing_file) = existing_file {
+        info!("Returning existing file: id={}", existing_file.id);
+        return Ok(Json(db_file_to_response(&existing_file)));
+    }
 
-    let file_size = file_data.len() as i64;
+    let created_file = {
+        let pool_clone = pool.clone();
+        let org = organisation.clone();
+        let app = application.clone();
+        let fp = file_path_str.clone();
+        let tg = tag_str.clone();
 
-    let calculated_checksum = utils::calculate_checksum(file_data.clone()).await;
+        let file = run_blocking!({
+            let mut conn = pool_clone.get()?;
 
-    let file_name = std::path::Path::new(&file_path_str)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(&file_path_str);
+            info!("Starting DB transaction for new file creation");
+            let created_file = conn
+                .transaction::<DbFile, diesel::result::Error, _>(|conn| {
+                    let latest_file = files
+                        .filter(file_path.eq(&fp))
+                        .filter(org_id.eq(&org))
+                        .filter(app_id.eq(&app))
+                        .order(version.desc())
+                        .select(DbFile::as_select())
+                        .for_update()
+                        .first::<DbFile>(conn)
+                        .optional()?;
+
+                    let next_version = latest_file.map_or(1, |f| f.version + 1);
+
+                    let new_file = NewFileEntry {
+                        app_id: app.clone(),
+                        org_id: org.clone(),
+                        url: "".to_string(),
+                        file_path: fp.clone(),
+                        tag: tg.clone(),
+                        version: next_version,
+                        size: 0,
+                        checksum: "".to_string(),
+                        metadata: json!({}),
+                        created_at: Utc::now(),
+                    };
+
+                    diesel::insert_into(files)
+                        .values(&new_file)
+                        .returning(DbFile::as_returning())
+                        .get_result::<DbFile>(conn)
+                })
+                .map_err(|_| {
+                    ABError::InternalServerError("DBError: Failed to create file".to_string())
+                })?;
+
+            Ok(created_file)
+        })?;
+        file
+    };
 
     let s3_path = utils::create_s3_file_path(
         &organisation,
         &application,
         &created_file.id.to_string(),
         &created_file.version.to_string(),
-        file_name,
+        &file_path_str,
     );
 
-    let s3_client = &state.s3_client;
+    let s3_path_clone = s3_path.clone();
+    let (tx, rx) = mpsc::unbounded_channel::<types::ReadResult>();
+    let byte_stream = ByteStream::from_body_1_x(types::FileStream(rx));
+    let bucket_name = state.env.bucket_name.clone();
+    let s3_client = state.s3_client.clone();
+    let b64_fc = b64_file_checksum.clone();
+    let handle = tokio::spawn(async move {
+        info!("Starting S3 streaming task");
+        stream_file(
+            &s3_client,
+            bucket_name,
+            byte_stream,
+            s3_path_clone,
+            file_size,
+            b64_fc.clone(),
+        )
+        .await
+    });
 
-    match push_file(
-        s3_client,
-        state.env.bucket_name.clone(),
-        uploaded_file,
-        s3_path.clone(),
-    )
-    .await
-    {
-        Ok(obj) => {
-            info!("File uploaded successfully: {:?}", obj);
-            let file_url = utils::create_s3_file_url(&state.env.bucket_name, &s3_path);
-
-            let pool = state.db_pool.clone();
-            let file_id = created_file.id;
-
-            run_blocking!({
-                let mut conn = pool.get()?;
-                diesel::update(files.filter(id.eq(file_id)))
-                    .set((
-                        url.eq(file_url),
-                        size.eq(file_size),
-                        checksum.eq(calculated_checksum),
-                    ))
-                    .execute(&mut conn)?;
-                Ok(())
-            })?;
-
-            Ok(Json(db_file_to_response(&created_file)))
+    while let Some(result) = payload.next().await {
+        match result {
+            Ok(chunk) => {
+                let _ = tx.send(Ok(chunk));
+            }
+            Err(PayloadError::Overflow) => {
+                info!("Payload overflow during upload");
+            }
+            Err(e) => {
+                info!("Error while reading upload payload: {:?}", e);
+                let _ = tx.send(Err(e));
+            }
         }
-        Err(e) => {
-            let pool = state.db_pool.clone();
-            let file_id = created_file.id;
+    }
 
+    let full_url = utils::create_s3_file_url(
+        &state.env.aws_endpoint_url,
+        &state.env.bucket_name,
+        &s3_path,
+    );
+
+    let result = handle.await;
+    match result {
+        Ok(inner_result) => match inner_result {
+            Ok(_) => {
+                info!("✅ Upload to S3 completed successfully");
+                let checksum_hex = utils::base64_to_hex(&b64_file_checksum);
+
+                let updated_file = run_blocking!({
+                    let mut conn = pool.get()?;
+                    let updated_file = diesel::update(files.filter(id.eq(created_file.id)))
+                        .set((
+                            url.eq(full_url),
+                            size.eq(file_size),
+                            checksum.eq(checksum_hex),
+                        ))
+                        .get_result::<DbFile>(&mut conn)
+                        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+                    Ok(updated_file)
+                })?;
+
+                Ok(Json(db_file_to_response(&updated_file)))
+            }
+            Err(e) => {
+                info!("❌ Upload to S3 failed: {:?}", e);
+                run_blocking!({
+                    let mut conn = pool.get()?;
+                    diesel::delete(files.filter(id.eq(created_file.id)))
+                        .execute(&mut conn)
+                        .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
+                    Ok(())
+                })?;
+                Err(ABError::InternalServerError(format!(
+                    "Failed to upload file to S3: {:?}",
+                    e
+                )))
+            }
+        },
+        Err(e) => {
+            info!("❌ Upload task join error: {:?}", e);
+            let file_id = created_file.id;
             let _ = run_blocking!({
                 let mut conn = pool.get()?;
                 diesel::delete(files.filter(id.eq(file_id))).execute(&mut conn)?;
                 Ok(())
             });
-
             Err(ABError::InternalServerError(format!(
                 "Failed to upload file to S3: {:?}",
                 e
@@ -795,7 +930,11 @@ async fn upload_bulk_files(
             .await
             {
                 Ok(_) => {
-                    let file_url = utils::create_s3_file_url(&state.env.bucket_name, &s3_path);
+                    let file_url = utils::create_s3_file_url(
+                        &state.env.aws_endpoint_url,
+                        &state.env.bucket_name,
+                        &s3_path,
+                    );
                     let pool = state.db_pool.clone();
                     let file_id = created_file.id;
 

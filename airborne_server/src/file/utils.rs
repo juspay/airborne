@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256 as checksum_algorithm};
 
@@ -27,8 +28,8 @@ pub async fn calculate_checksum(byte_arr: Vec<u8>) -> String {
     hex::encode(hasher.finalize())
 }
 
-pub fn create_s3_file_url(bucket_name: &str, s3_path: &str) -> String {
-    format!("{}/{}/{}", "http://localhost:7566", bucket_name, s3_path)
+pub fn create_s3_file_url(aws_endpoint_url: &str, bucket_name: &str, s3_path: &str) -> String {
+    format!("{}/{}/{}", aws_endpoint_url, bucket_name, s3_path)
 }
 
 pub fn create_s3_file_path(
@@ -55,5 +56,12 @@ pub fn parse_file_key(spec: &str) -> (String, Option<i32>, Option<String>) {
         }
     } else {
         (spec.to_string(), None, None)
+    }
+}
+
+pub fn base64_to_hex(value: &str) -> String {
+    match general_purpose::STANDARD.decode(value) {
+        Ok(bytes) => hex::encode(bytes),
+        Err(_) => String::new(), // return empty string on invalid base64
     }
 }

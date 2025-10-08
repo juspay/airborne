@@ -1,10 +1,12 @@
 {
-    "private": true,
-    "name": "airborne",
-    "workspaces": [
-        "airborne-react-native",
-        "airborne-cli-react-native",
-        "airborne-react-native/example",
-        "airborne-react-native/ExampleOldArch"
-    ]
+  "private": true,
+  "name": "airborne",
+  "workspaces": [
+    "airborne-react-native",
+    "airborne_cli",
+    "airborne-core-cli",
+    "airborne_server_clients/javascript/sdk",
+    "airborne-react-native/example",
+    "airborne-react-native/ExampleOldArch"
+  ]
 }

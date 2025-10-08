@@ -51,3 +51,5 @@ target/
 **/result
 .direnv
 .pre-commit-config.yaml
+
+airborne-core-cli/.config

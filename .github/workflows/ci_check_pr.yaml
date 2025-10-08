@@ -121,6 +121,7 @@ jobs:
           required_files=(
             "airborne_sdk_iOS/hyper-ota/Airborne-Framework/Airborne.podspec"
             "airborne_sdk_android/version.properties"
+            "smithy/smithy-build.json"
           )
 
           missing_files=()
