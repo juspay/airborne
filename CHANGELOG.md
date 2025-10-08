@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.9.0 - 2025-10-08
+### Package updates
+- airborne_server bumped to airborne_server-v0.5.0
+### Global changes
+#### Features
+- Added support to build zip files for iOS - (155c8f8) - george.james
+
+- - -
+
 ## v0.8.0 - 2025-10-08
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.6.0

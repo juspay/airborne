@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.5.0 - 2025-10-08
+#### Features
+- Added support to build zip files for iOS - (155c8f8) - george.james
+
+- - -
+
 ## airborne_server-v0.4.2 - 2025-10-07
 #### Bug Fixes
 - add v2 release route - (8e73c36) - yuvrajjsingh0
