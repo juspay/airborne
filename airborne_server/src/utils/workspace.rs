@@ -37,7 +37,14 @@ pub async fn get_workspace_name_for_application(
     });
 
     match workspace_result {
-        Ok(name) => Ok(name.workspace_name),
+        Ok(name) => {
+            let span = tracing::Span::current();
+            span.record(
+                "superposition_workspace",
+                tracing::field::display(&name.workspace_name),
+            );
+            Ok(name.workspace_name)
+        }
         Err(ABError::NotFound(_)) => Err(error::ErrorNotFound("workspace not found")),
         Err(e) => Err(error::ErrorInternalServerError(e.to_string())),
     }
