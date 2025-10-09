@@ -14,6 +14,7 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { hasAppAccess } from "@/lib/utils";
 
 interface CohortSchema {
   type: string;
@@ -56,7 +57,7 @@ type GroupForm = {
 };
 
 export default function CohortsPage() {
-  const { token, org, app } = useAppContext();
+  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
   const { toast } = useToast();
 
   // State
@@ -233,11 +234,11 @@ export default function CohortsPage() {
         title: "Checkpoint created",
         description: `Successfully created checkpoint "${checkpointForm.name}"`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create checkpoint:", error);
       toast({
         title: "Error",
-        description: "Failed to create checkpoint. Please try again.",
+        description: error?.message || error?.error || "Failed to create checkpoint. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -414,10 +415,12 @@ export default function CohortsPage() {
                     <CardTitle>Version Checkpoints</CardTitle>
                     <CardDescription>Segment users based on version comparisons</CardDescription>
                   </div>
-                  <Button onClick={() => setShowCheckpointForm(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Checkpoint
-                  </Button>
+                  {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                    <Button onClick={() => setShowCheckpointForm(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Checkpoint
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -444,10 +447,12 @@ export default function CohortsPage() {
                     <CardTitle>User Groups</CardTitle>
                     <CardDescription>Segment users based on explicit membership lists</CardDescription>
                   </div>
-                  <Button onClick={() => setShowGroupForm(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Group
-                  </Button>
+                  {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                    <Button onClick={() => setShowGroupForm(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Group
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -617,17 +622,19 @@ interface CheckpointTimelineProps {
 }
 
 function CheckpointTimeline({ checkpoints, releases, onAddCheckpoint }: CheckpointTimelineProps) {
-  const { org, app } = useAppContext();
+  const { org, app, getAppAccess, getOrgAccess } = useAppContext();
   if (checkpoints.length === 0) {
     return (
       <div className="text-center py-8">
         <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
         <p className="text-muted-foreground mb-4">No checkpoints created yet</p>
         <p className="text-xs text-muted-foreground mb-4">Checkpoints segment users based on version comparisons</p>
-        <Button onClick={onAddCheckpoint} variant="outline">
-          <Plus className="h-4 w-4 mr-2" />
-          Create First Checkpoint
-        </Button>
+        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+          <Button onClick={onAddCheckpoint} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Create First Checkpoint
+          </Button>
+        )}
       </div>
     );
   }
@@ -643,20 +650,22 @@ function CheckpointTimeline({ checkpoints, releases, onAddCheckpoint }: Checkpoi
       </div>
 
       {/* Add button at the top */}
-      <div className="relative flex items-start mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onAddCheckpoint}
-          className="relative z-10 w-8 h-8 p-0 border-2 border-dashed border-primary rounded-full hover:bg-primary hover:text-primary-foreground"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-        <div className="ml-4">
-          <span className="text-sm text-muted-foreground">Add new checkpoint</span>
-          <p className="text-xs text-muted-foreground">New checkpoints are added at the top (highest priority)</p>
+      {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        <div className="relative flex items-start mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onAddCheckpoint}
+            className="relative z-10 w-8 h-8 p-0 border-2 border-dashed border-primary rounded-full hover:bg-primary hover:text-primary-foreground"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <div className="ml-4">
+            <span className="text-sm text-muted-foreground">Add new checkpoint</span>
+            <p className="text-xs text-muted-foreground">New checkpoints are added at the top (highest priority)</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="relative">
         {/* Vertical line */}
@@ -701,21 +710,6 @@ function CheckpointTimeline({ checkpoints, releases, onAddCheckpoint }: Checkpoi
                   )}
                 </div>
               </div>
-
-              {/* Hover add button between checkpoints */}
-              {index < checkpoints.length - 1 && (
-                <div className="absolute left-4 -bottom-3 z-20">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onAddCheckpoint}
-                    className="w-6 h-6 p-0 border border-dashed border-muted-foreground/50 rounded-full opacity-0 hover:opacity-100 transition-opacity bg-background"
-                    title="Add checkpoint here"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -745,7 +739,7 @@ function GroupAccordion({
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const { org, app } = useAppContext();
+  const { org, app, getAppAccess, getOrgAccess } = useAppContext();
 
   if (groups.length === 0) {
     return (
@@ -810,17 +804,19 @@ function GroupAccordion({
   return (
     <div className="space-y-4">
       {/* Header with priority info */}
-      <div className="flex items-center justify-between p-4 bg-muted/50 border rounded-lg">
-        <div>
-          <h4 className="font-semibold">Group Priority Management</h4>
-          <p className="text-sm text-muted-foreground">
-            Drag and drop groups to reorder priorities. Groups at the top are evaluated first.
-          </p>
+      {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        <div className="flex items-center justify-between p-4 bg-muted/50 border rounded-lg">
+          <div>
+            <h4 className="font-semibold">Group Priority Management</h4>
+            <p className="text-sm text-muted-foreground">
+              Drag and drop groups to reorder priorities. Groups at the top are evaluated first.
+            </p>
+          </div>
+          <Button onClick={onUpdatePriority} disabled={updating} variant="default">
+            {updating ? "Updating..." : "Save Order"}
+          </Button>
         </div>
-        <Button onClick={onUpdatePriority} disabled={updating} variant="default">
-          {updating ? "Updating..." : "Save Order"}
-        </Button>
-      </div>
+      )}
 
       {/* Draggable group list */}
       <div className="space-y-3">

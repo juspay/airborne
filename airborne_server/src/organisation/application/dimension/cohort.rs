@@ -88,10 +88,17 @@ async fn create_cohort_checkpoint_api(
 ) -> airborne_types::Result<Json<types::CreateCohortDimensionCheckpointOutput>> {
     let cohort_dimension_id = cohort_dimension.into_inner();
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Forbidden("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Forbidden("No access to application".to_string()))?;
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(

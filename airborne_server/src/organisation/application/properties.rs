@@ -440,7 +440,7 @@ async fn get_properties_schema_api(
             .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
+            validate_user(auth_response.application.clone(), READ)
                 .map(|app_name| (org_name, app_name))
         }),
     }?;
@@ -602,7 +602,7 @@ async fn list_properties_api(
             .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
+            validate_user(auth_response.application.clone(), READ)
                 .map(|app_name| (org_name, app_name))
         }),
     }?;
