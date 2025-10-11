@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::types::AppState;
+use crate::types::{AppState, Result};
 use crate::{middleware::auth::AuthResponse, types::ABError};
 use actix_web::{
     delete, get, post,
@@ -83,7 +83,7 @@ async fn request_organisation(
     req: HttpRequest,
     body: Json<OrganisationRequest>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<OrganisationRequestResponse>, ABError> {
+) -> Result<Json<OrganisationRequestResponse>> {
     let organisation_name = body.organisation_name.clone();
     let name = body.name.clone();
     let email = body.email.clone();
@@ -170,7 +170,7 @@ async fn create_organisation(
     req: HttpRequest,
     body: Json<OrganisationCreatedRequest>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<Organisation>, ABError> {
+) -> Result<Json<Organisation>> {
     let organisation = body.name.clone();
 
     // Validate organization name
@@ -255,7 +255,7 @@ async fn delete_organisation(
     req: HttpRequest,
     path: Path<String>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<serde_json::Value>, ABError> {
+) -> Result<Json<serde_json::Value>> {
     let organisation = path.into_inner();
 
     // Validate organization name
@@ -322,7 +322,7 @@ async fn delete_organisation(
 async fn list_organisations(
     req: HttpRequest,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<OrganisationListResponse>, ABError> {
+) -> Result<Json<OrganisationListResponse>> {
     // Get Keycloak Admin Token
     let auth_response = req
         .extensions()
@@ -422,7 +422,7 @@ fn parse_user_organizations(groups: Vec<String>) -> Vec<Organisation> {
 }
 
 /// Validate organization name for security and usability
-pub fn validate_organisation_name(name: &str) -> actix_web::Result<(), ABError> {
+pub fn validate_organisation_name(name: &str) -> Result<()> {
     let trimmed = name.trim();
 
     if trimmed.is_empty() {

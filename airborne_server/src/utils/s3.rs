@@ -1,13 +1,14 @@
 use actix_multipart::form::tempfile::TempFile;
-use actix_web::error;
 use aws_sdk_s3::{operation::put_object::PutObjectOutput, primitives::ByteStream, Client};
+
+use crate::types::{ABError, Result};
 
 pub async fn push_file(
     s3_client: &Client,
     bucket_name: String,
     file: TempFile,
     filename: String,
-) -> actix_web::Result<PutObjectOutput> {
+) -> Result<PutObjectOutput> {
     // Convert file into S3 ByteStream
     let file_data = tokio::fs::read(file.file.path()).await?;
     let byte_stream = ByteStream::from(file_data);
@@ -19,7 +20,7 @@ pub async fn push_file(
         .body(byte_stream)
         .send()
         .await
-        .map_err(error::ErrorInternalServerError)
+        .map_err(|e| ABError::InternalServerError(e.to_string()))
 }
 
 pub async fn push_file_byte_arr(
@@ -27,7 +28,7 @@ pub async fn push_file_byte_arr(
     bucket_name: String,
     byte_arr: Vec<u8>,
     filename: String,
-) -> actix_web::Result<PutObjectOutput> {
+) -> Result<PutObjectOutput> {
     let byte_stream = ByteStream::from(byte_arr);
 
     s3_client
@@ -37,5 +38,5 @@ pub async fn push_file_byte_arr(
         .body(byte_stream)
         .send()
         .await
-        .map_err(error::ErrorInternalServerError)
+        .map_err(|e| ABError::InternalServerError(e.to_string()))
 }
