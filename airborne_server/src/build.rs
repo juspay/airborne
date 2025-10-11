@@ -25,12 +25,125 @@ use crate::{
 };
 
 pub fn add_routes() -> Scope {
-    Scope::new("").service(serve_version).service(serve_zip)
+    Scope::new("")
+        .service(serve_version)
+        .service(serve_zip)
+        .service(serve_aar)
 }
 
 #[derive(Serialize)]
 struct BuildResponse {
     version: String,
+}
+
+fn get_android_root_path(prefix: &String, org: &String, app: &String) -> String {
+    format!("builds/{0}/{1}/{2}/airborne-assets/", prefix, org, app)
+}
+
+fn get_aar_path(prefix: &String, org: &String, app: &String, new_build_version: &String) -> String {
+    format!(
+        "{0}{1}/airborne-assets-{1}.aar",
+        get_android_root_path(prefix, org, app),
+        new_build_version
+    )
+}
+
+fn get_pom_path(prefix: &String, org: &String, app: &String, new_build_version: &String) -> String {
+    format!(
+        "{0}{1}/airborne-assets-{1}.pom",
+        get_android_root_path(prefix, org, app),
+        new_build_version
+    )
+}
+
+fn get_maven_metadata_path(prefix: &String, org: &String, app: &String) -> String {
+    format!(
+        "{}maven-metadata.xml",
+        get_android_root_path(prefix, org, app)
+    )
+}
+
+fn generate_pom_content(org: &String, app: &String, version: &String) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>{0}.{1}</groupId>
+    <artifactId>airborne-assets</artifactId>
+    <version>{2}</version>
+    <packaging>aar</packaging>
+    <name>Airborne Assets</name>
+    <description>Airborne assets package for {0}/{1}</description>
+</project>"#,
+        org, app, version
+    )
+}
+
+fn parse_existing_maven_metadata(metadata_content: &str) -> Vec<String> {
+    // Simple XML parsing to extract version numbers
+    let mut versions = Vec::new();
+
+    // Look for <version>...</version> tags
+    for line in metadata_content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("<version>") && trimmed.ends_with("</version>") {
+            let version = trimmed
+                .strip_prefix("<version>")
+                .and_then(|s| s.strip_suffix("</version>"))
+                .map(|s| s.to_string());
+
+            if let Some(v) = version {
+                if !v.is_empty() {
+                    versions.push(v);
+                }
+            }
+        }
+    }
+
+    versions.sort();
+    versions
+}
+
+fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<String>) -> String {
+    let default_version = String::from("1.0.1");
+    let latest_version = versions.last().unwrap_or(&default_version);
+    let versions_xml = versions
+        .iter()
+        .map(|v| format!("      <version>{}</version>", v))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // Get current timestamp in the format Maven expects (YYYYMMDDHHMMSS)
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Convert to a simple timestamp format
+    let timestamp = format!("{}", now);
+
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+    <groupId>{}.{}</groupId>
+    <artifactId>airborne-assets</artifactId>
+    <versioning>
+        <latest>{}</latest>
+        <release>{}</release>
+        <versions>
+{}
+        </versions>
+        <lastUpdated>{}</lastUpdated>
+    </versioning>
+</metadata>"#,
+        org, app, latest_version, latest_version, versions_xml, timestamp
+    )
+}
+
+fn get_zip_path(org: &String, app: &String, new_build_version: &String) -> String {
+    format!("builds/{}/{}/{}.zip", org, app, new_build_version)
 }
 
 fn increment_build_version(latest_version: Option<&str>, _release_version: &str) -> String {
@@ -152,35 +265,148 @@ async fn create_and_upload_build(
 
         // Create a temporary zip file in memory
         let mut zip_data: Vec<u8> = Vec::new();
-        let mut zip = ZipWriter::new(std::io::Cursor::new(&mut zip_data));
+        let mut zip_builder = ZipWriter::new(std::io::Cursor::new(&mut zip_data));
+        let mut aar_data: Vec<u8> = Vec::new();
+        let mut aar_builder = ZipWriter::new(std::io::Cursor::new(&mut aar_data));
 
         // Download each file and add it to the zip
         for file_entry in files {
             let file_content = download_file_content(&file_entry.file_url).await?;
 
             // Add file to zip with its file path as the name
-            zip.start_file::<_, ()>(
-                format!(
-                    "AirborneAssets/{}",
-                    sanitize_path(&file_entry.file_path, true)
-                ),
-                FileOptions::default(),
-            )
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to add file to zip: {}", e))
-            })?;
-            zip.write_all(&file_content).map_err(|e| {
+            zip_builder
+                .start_file::<_, ()>(
+                    format!(
+                        "AirborneAssets/{}",
+                        sanitize_path(&file_entry.file_path, true)
+                    ),
+                    FileOptions::default(),
+                )
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to add file to zip: {}", e))
+                })?;
+            zip_builder.write_all(&file_content).map_err(|e| {
                 ABError::InternalServerError(format!("Failed to write file to zip: {}", e))
+            })?;
+
+            aar_builder
+                .start_file::<_, ()>(
+                    format!("assets/{}/{}/{}", &org, &app, &file_entry.file_path),
+                    FileOptions::default(),
+                )
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to add file to zip: {}", e))
+                })?;
+
+            aar_builder.write_all(&file_content).map_err(|e| {
+                ABError::InternalServerError(format!("Failed to write file to aar: {}", e))
             })?;
         }
 
         // Finish the zip file
-        zip.finish().map_err(|e| {
+        zip_builder.finish().map_err(|e| {
             ABError::InternalServerError(format!("Failed to finish zip file: {}", e))
         })?;
 
+        // Minimal AndroidManifest.xml
+        aar_builder
+            .start_file::<_, ()>(
+                "AndroidManifest.xml",
+                FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to create manifest file: {}", e))
+            })?;
+
+        aar_builder
+            .write_all(
+                br#"<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.assets" />"#,
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to write manifest file: {}", e))
+            })?;
+
+        // Empty classes.jar as a proper zip file
+        let mut jar_data: Vec<u8> = Vec::new();
+        {
+            let jar_builder = ZipWriter::new(std::io::Cursor::new(&mut jar_data));
+            jar_builder.finish().map_err(|e| {
+                ABError::InternalServerError(format!("Failed to create empty jar: {}", e))
+            })?;
+        }
+
+        aar_builder
+            .start_file::<_, ()>(
+                "classes.jar",
+                FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to create classes.jar file: {}", e))
+            })?;
+
+        aar_builder.write_all(&jar_data).map_err(|e| {
+            ABError::InternalServerError(format!("Failed to write classes.jar file: {}", e))
+        })?;
+
+        // String resource for asset version
+        let strings_xml = format!(
+            r#"<resources>
+    <string name="airborne_asset_version">{}</string>
+</resources>"#,
+            &new_build_version
+        );
+        aar_builder
+            .start_file::<_, ()>(
+                "res/values/strings.xml",
+                FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to create strings file: {}", e))
+            })?;
+        aar_builder.write_all(strings_xml.as_bytes()).map_err(|e| {
+            ABError::InternalServerError(format!("Failed to write strings file: {}", e))
+        })?;
+
+        // Add R.txt file
+        let r_txt_content = "int string airborne_asset_version 0x7f0e0001\n".to_string();
+        aar_builder
+            .start_file::<_, ()>(
+                "R.txt",
+                FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to create R.txt file: {}", e))
+            })?;
+        aar_builder
+            .write_all(r_txt_content.as_bytes())
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to write R.txt file: {}", e))
+            })?;
+
+        // Add keep file in res/raw to prevent string resource removal
+        let keep_content = "# Keep airborne asset version string\n-keep class **.R$string { public static final int airborne_asset_version; }\n";
+        aar_builder
+            .start_file::<_, ()>(
+                "res/raw/airborne_keep.txt",
+                FileOptions::default().compression_method(zip::CompressionMethod::Stored),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to create keep file: {}", e))
+            })?;
+        aar_builder
+            .write_all(keep_content.as_bytes())
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to write keep file: {}", e))
+            })?;
+
+        aar_builder.finish().map_err(|e| {
+            ABError::InternalServerError(format!("Failed to finish aar file: {}", e))
+        })?;
+
         // Upload zip file to S3
-        let s3_path = format!("builds/{}/{}/{}.zip", org, app, new_build_version);
+        let s3_path = get_zip_path(&org, &app, &new_build_version);
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -190,6 +416,89 @@ async fn create_and_upload_build(
         .await
         .map_err(|e| {
             ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
+        })?;
+
+        let aar_path = get_aar_path(&String::from("hyper-sdk"), &org, &app, &new_build_version);
+        push_file_byte_arr(
+            &state.s3_client,
+            state.env.bucket_name.clone(),
+            aar_data,
+            aar_path,
+        )
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
+        })?;
+
+        // Generate and upload POM file
+        let pom_content = generate_pom_content(&org, &app, &new_build_version);
+        let pom_path = get_pom_path(&String::from("hyper-sdk"), &org, &app, &new_build_version);
+        push_file_byte_arr(
+            &state.s3_client,
+            state.env.bucket_name.clone(),
+            pom_content.into_bytes(),
+            pom_path,
+        )
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("Failed to upload POM to S3: {}", e)))?;
+
+        // Get existing Maven metadata from S3 and merge with new version
+        let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), &org, &app);
+        let existing_versions = match state
+            .s3_client
+            .get_object()
+            .bucket(state.env.bucket_name.clone())
+            .key(&maven_metadata_path)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let data = resp
+                    .body
+                    .collect()
+                    .await
+                    .map_err(|e| {
+                        ABError::InternalServerError(format!(
+                            "Failed to read existing Maven metadata: {}",
+                            e
+                        ))
+                    })?
+                    .into_bytes();
+
+                let metadata_content = String::from_utf8(data.to_vec()).map_err(|e| {
+                    ABError::InternalServerError(format!(
+                        "Failed to parse Maven metadata as UTF-8: {}",
+                        e
+                    ))
+                })?;
+
+                parse_existing_maven_metadata(&metadata_content)
+            }
+            Err(_) => {
+                // No existing metadata, start with empty list
+                Vec::new()
+            }
+        };
+
+        // Merge existing versions with new version
+        let mut versions = existing_versions;
+        if !versions.contains(&new_build_version) {
+            versions.push(new_build_version.clone());
+            versions.sort();
+        }
+
+        // Generate and upload Maven metadata
+        let maven_metadata_content = generate_maven_metadata_content(&org, &app, versions);
+        let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), &org, &app);
+        push_file_byte_arr(
+            &state.s3_client,
+            state.env.bucket_name.clone(),
+            maven_metadata_content.into_bytes(),
+            maven_metadata_path,
+        )
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to upload Maven metadata to S3: {}", e))
         })?;
     }
 
@@ -402,8 +711,6 @@ async fn generate(
                     let config_document_clone = config_document.clone();
                     let state_clone = state.clone();
                     tokio::spawn(async move {
-                        println!("Here?");
-                        tracing::info!("Here?");
                         if let Err(e) = build(
                             build_args.organisation.clone(),
                             build_args.application.clone(),
@@ -491,10 +798,7 @@ async fn serve_zip(
     let app_id = _args.application.clone();
     let build_response = generate(_args, state.clone()).await?;
 
-    let key = format!(
-        "builds/{}/{}/{}.zip",
-        org_id, app_id, build_response.version
-    );
+    let key = get_zip_path(&org_id, &app_id, &build_response.version);
 
     // Fetch the full object from S3
     let resp = state
@@ -521,7 +825,62 @@ async fn serve_zip(
         .insert_header((actix_web::http::header::CONTENT_TYPE, "application/zip"))
         .insert_header((
             actix_web::http::header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}.zip\"", build_response.version),
+            format!(
+                "attachment; filename=\"Assets-{}.zip\"",
+                build_response.version
+            ),
+        ))
+        .body(data))
+}
+
+#[get("{organisation}/{application}/aar")]
+async fn serve_aar(
+    path: web::Path<(String, String)>,
+    req: actix_web::HttpRequest,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ABError> {
+    // Extract args
+    let _args = extract_args(path, state.clone(), req).await?;
+    let org_id = _args.organisation.clone();
+    let app_id = _args.application.clone();
+    let build_response = generate(_args, state.clone()).await?;
+
+    let aar_path = get_aar_path(
+        &String::from("hyper-sdk"),
+        &org_id,
+        &app_id,
+        &build_response.version,
+    );
+
+    // Fetch the full object from S3
+    let resp = state
+        .s3_client
+        .get_object()
+        .bucket(state.env.bucket_name.clone())
+        .key(&aar_path)
+        .send()
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to get object from S3: {}", e))
+        })?;
+
+    // Collect the object body into a Vec<u8>
+    let data = resp
+        .body
+        .collect()
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("Failed to read S3 object: {}", e)))?
+        .into_bytes();
+
+    // Return it as the HTTP response
+    Ok(HttpResponse::Ok()
+        .insert_header((actix_web::http::header::CONTENT_TYPE, "application/zip"))
+        .insert_header((
+            actix_web::http::header::CONTENT_DISPOSITION,
+            format!(
+                "attachment; filename=\"airborne-assets-{}.aar\"",
+                build_response.version
+            ),
         ))
         .body(data))
 }

@@ -17,7 +17,7 @@ const s3 = new S3Client({
   forcePathStyle: true,
 });
 
-const BUCKET_NAME = "test";
+const BUCKET_NAME = "hyper-ota-bucket";
 
 app.get("/*name", async (req, res) => {
   const key = req.path === "/" ? "index.html" : req.path.slice(1);
