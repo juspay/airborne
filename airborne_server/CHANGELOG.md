@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.5.1 - 2025-10-11
+#### Bug Fixes
+- Added android support for build generation - (9da7ce0) - george.james
+
+- - -
+
 ## airborne_server-v0.5.0 - 2025-10-08
 #### Features
 - Added support to build zip files for iOS - (155c8f8) - george.james
