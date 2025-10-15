@@ -1444,10 +1444,32 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     if (existingResource == nil) {
         return YES;
     }
-    if (resourceToBeDownloaded == nil || [resourceToBeDownloaded.url.absoluteString isEqual:existingResource.url.absoluteString]) {
+       
+    if (resourceToBeDownloaded == nil) {
         return NO;
     }
-    return YES;
+    
+    BOOL urlChanged = ![[resourceToBeDownloaded.url absoluteString] isEqualToString:[existingResource.url absoluteString]];
+    
+    if (urlChanged) {
+        return YES;
+    }
+    
+    BOOL checksumChanged = NO;
+    NSString *newChecksum = resourceToBeDownloaded.checksum;
+    NSString *existingChecksum = existingResource.checksum;
+    
+    BOOL newValid = newChecksum != nil && newChecksum.length > 0;
+    BOOL existingValid = existingChecksum != nil && existingChecksum.length > 0;
+    
+    if (newValid && existingValid) {
+        checksumChanged = ![newChecksum isEqualToString:existingChecksum];
+    } else {
+        // if either is nil or empty, treat them as different
+        checksumChanged = YES;
+    }
+    
+    return checksumChanged;
 }
 
 - (void)downloadResourcesWithCurrentResources:(AppResources *)currentResources
@@ -1828,14 +1850,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     for (AJPResource *newResource in newSplits) {
         AJPResource *currentResource = currentResourcesDict[newResource.filePath];
         
-        if (currentResource == nil) {
-            // Resource not found in current list - need to download
+        if ([self shouldDownloadResource:newResource existingResource:currentResource]) {
             [differences addObject:newResource];
-        } else {
-            // Resource exists - check if URL has changed
-            if (![[newResource.url absoluteString] isEqualToString:[currentResource.url absoluteString]]) {
-                [differences addObject:newResource];
-            }
         }
     }
     
