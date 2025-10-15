@@ -251,17 +251,13 @@ async fn create_and_upload_build(
         )
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to get files by keys: {}", e)))?;
-        let mut files: Vec<File> = files
+        let files: Vec<File> = files
             .iter()
             .map(|f| File {
                 file_path: f.file_path.clone(),
                 file_url: f.url.clone(),
             })
             .collect();
-        files.push(File {
-            file_path: String::from("release_config.json"),
-            file_url: format!("{}/release/{}/{}", state.env.public_url, &org, &app),
-        });
 
         // Create a temporary zip file in memory
         let mut zip_data: Vec<u8> = Vec::new();
@@ -291,7 +287,10 @@ async fn create_and_upload_build(
 
             aar_builder
                 .start_file::<_, ()>(
-                    format!("assets/{}/{}/{}", &org, &app, &file_entry.file_path),
+                    format!(
+                        "assets/{}/{}/app/package/{}",
+                        &org, &app, &file_entry.file_path
+                    ),
                     FileOptions::default(),
                 )
                 .map_err(|e| {
@@ -302,6 +301,37 @@ async fn create_and_upload_build(
                 ABError::InternalServerError(format!("Failed to write file to aar: {}", e))
             })?;
         }
+
+        let file_content = download_file_content(&format!(
+            "{}/release/{}/{}",
+            state.env.public_url, &org, &app
+        ))
+        .await?;
+
+        zip_builder
+            .start_file::<_, ()>(
+                "AirborneAssets/release_config.json".to_string(),
+                FileOptions::default(),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to add file to zip: {}", e))
+            })?;
+        zip_builder.write_all(&file_content).map_err(|e| {
+            ABError::InternalServerError(format!("Failed to write file to zip: {}", e))
+        })?;
+
+        aar_builder
+            .start_file::<_, ()>(
+                format!("assets/{}/{}/app/release_config.json", &org, &app),
+                FileOptions::default(),
+            )
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to add file to zip: {}", e))
+            })?;
+
+        aar_builder.write_all(&file_content).map_err(|e| {
+            ABError::InternalServerError(format!("Failed to write file to aar: {}", e))
+        })?;
 
         // Finish the zip file
         zip_builder.finish().map_err(|e| {
@@ -320,9 +350,13 @@ async fn create_and_upload_build(
 
         aar_builder
             .write_all(
-                br#"<?xml version="1.0" encoding="utf-8"?>
+                format!(
+                    r#"<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.assets" />"#,
+    package="{}.{}.assets" />"#,
+                    &org, &app
+                )
+                .as_bytes(),
             )
             .map_err(|e| {
                 ABError::InternalServerError(format!("Failed to write manifest file: {}", e))
@@ -386,10 +420,10 @@ async fn create_and_upload_build(
             })?;
 
         // Add keep file in res/raw to prevent string resource removal
-        let keep_content = "# Keep airborne asset version string\n-keep class **.R$string { public static final int airborne_asset_version; }\n";
+        let keep_content = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources xmlns:tools=\"http://schemas.android.com/tools\"\ntools:keep=\"@string/airborne_asset_version\" />";
         aar_builder
             .start_file::<_, ()>(
-                "res/raw/airborne_keep.txt",
+                "res/raw/airborne_keep.xml",
                 FileOptions::default().compression_method(zip::CompressionMethod::Stored),
             )
             .map_err(|e| {
