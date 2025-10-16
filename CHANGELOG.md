@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.10.0 - 2025-10-16
+### Package updates
+- airborne_core_cli bumped to airborne_core_cli-v0.1.0
+- smithy bumped to smithy-v0.1.0
+- airborne_server_clients bumped to airborne_server_clients-v0.1.0
+- airborne_server bumped to airborne_server-v0.6.0
+- airborne_dashboard bumped to airborne_dashboard-v0.7.0
+- airborne_cli bumped to airborne_cli-v0.1.0
+- airborne_react_native bumped to airborne_react_native-v0.1.0
+### Global changes
+#### Bug Fixes
+- remove redundant npm version calls for packages - (ebc8cd8) - yash.rajput.001
+#### Features
+- add access token authentication using client_id and client_secret - (9687906) - yash.rajput.001
+- added airborne cli - (545c8a7) - yash.rajput.001
+
+- - -
+
 ## v0.9.1 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.5.1

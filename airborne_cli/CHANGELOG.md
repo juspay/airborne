@@ -2,6 +2,44 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.0 - 2025-10-16
+#### Bug Fixes
+- node module dependancies corrected for npmjs - (0bb90db) - george.james
+#### Features
+- added airborne cli - (545c8a7) - yash.rajput.001
+
+- - -
+
+## v0.7.0 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.7.0 [skip ci] - (2107c1b) - Airborne Bot
+
+- - -
+
+## v0.6.0 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.6.0 [skip ci] - (e227b97) - Airborne Bot
+
+- - -
+
+## v0.5.0 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.5.0 [skip ci] - (04079d4) - Airborne Bot
+
+- - -
+
+## v0.4.1 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.4.1 [skip ci] - (8b6e744) - Airborne Bot
+
+- - -
+
+## v0.4.0 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.4.0 [skip ci] - (acd7a73) - Airborne Bot
+
+- - -
+
 ## airborne_cli_react_native-v0.0.1 - 2025-10-04
 #### Bug Fixes
 - node module dependancies corrected for npmjs - (0bb90db) - george.james

@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.6.0 - 2025-10-16
+#### Bug Fixes
+- aar content and structure fix - (c47ad68) - george.james
+#### Features
+- added airborne cli - (545c8a7) - yash.rajput.001
+- make tag optional for files and packages - (dc88a99) - yash.rajput.001
+- add access token authentication using client_id and client_secret - (9687906) - yash.rajput.001
+
+- - -
+
 ## airborne_server-v0.5.1 - 2025-10-11
 #### Bug Fixes
 - Added android support for build generation - (9da7ce0) - george.james

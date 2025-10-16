@@ -2,6 +2,25 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.7.0 - 2025-10-16
+#### Features
+- make tag optional for files and packages - (dc88a99) - yash.rajput.001
+- add access token authentication using client_id and client_secret - (9687906) - yash.rajput.001
+
+- - -
+
+## v0.9.1 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.9.1 [skip ci] - (8635d5e) - Airborne Bot
+
+- - -
+
+## v0.9.0 - 2025-10-16
+#### Miscellaneous Chores
+- **(version)** v0.9.0 [skip ci] - (5c9c2d5) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.6.0 - 2025-10-08
 #### Features
 - release cloning - (5a645f4) - yuvrajjsingh0
