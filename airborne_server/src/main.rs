@@ -86,12 +86,7 @@ async fn main() -> std::io::Result<()> {
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
-    let gcp_service_account_json_path = if organisation_creation_disabled {
-        std::env::var("GCP_SERVICE_ACCOUNT_PATH")
-            .expect("GCP_SERVICE_ACCOUNT_PATH must be set if ORGANISATION_CREATION_DISABLED=true")
-    } else {
-        "".to_string()
-    };
+
     let spreadsheet_id = if organisation_creation_disabled {
         std::env::var("GOOGLE_SPREADSHEET_ID")
             .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true")
@@ -125,6 +120,25 @@ async fn main() -> std::io::Result<()> {
 
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
+
+    let gsa_creds: Option<yup_oauth2::ServiceAccountKey> = if organisation_creation_disabled {
+        let creds_from_path = if let Ok(path) = std::env::var("GCP_SERVICE_ACCOUNT_PATH") {
+            yup_oauth2::read_service_account_key(path).await.ok()
+        } else {
+            None
+        };
+
+        let creds_from_env = if let Ok(encrypted) = std::env::var("GOOGLE_SERVICE_ACCOUNT_KEY") {
+            let decrypted = decrypt_kms(&aws_kms_client, encrypted).await;
+            serde_json::from_str::<yup_oauth2::ServiceAccountKey>(&decrypted).ok()
+        } else {
+            None
+        };
+
+        creds_from_path.or(creds_from_env)
+    } else {
+        None
+    };
 
     let mut conn = db::establish_connection(&aws_kms_client).await;
     conn.run_pending_migrations(MIGRATIONS)
@@ -166,11 +180,8 @@ async fn main() -> std::io::Result<()> {
         rustls::crypto::ring::default_provider()
             .install_default()
             .expect("Failed to install rustls crypto provider");
-        let creds = yup_oauth2::read_service_account_key(gcp_service_account_json_path)
-            .await
-            .expect("Can't read gcp credential, an error occurred");
 
-        let gcp_auth = ServiceAccountAuthenticator::builder(creds)
+        let gcp_auth = ServiceAccountAuthenticator::builder(gsa_creds.expect("You need to have valid value for env GOOGLE_SERVICE_ACCOUNT_KEY or GCP_SERVICE_ACCOUNT_PATH if ORGANISATION_CREATION_DISABLED=true"))
             .build()
             .await
             .expect("There was an error, trying to build connection with gcp authenticator");
