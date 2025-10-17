@@ -1,11 +1,11 @@
 {
-  "name": "airborne-cli",
+  "name": "airborne-devkit",
   "version": "0.10.0",
   "description": "Cli for Airborne",
   "main": "src/index.js",
   "type": "module",
   "bin": {
-    "airborne-cli": "src/index.js"
+    "airborne-devkit": "src/index.js"
   },
   "scripts": {
     "cli": "node src/index.js",
