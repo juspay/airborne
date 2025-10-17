@@ -608,6 +608,9 @@ Notes:
   )
   .action(async (directoryPath, options) => {
     try {
+      if (!directoryPath) {
+        directoryPath = process.cwd();
+      }
       options.directoryPath = directoryPath;
       if (!options.platform) {
         options.platform = await promptWithType(
