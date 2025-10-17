@@ -12,9 +12,12 @@ pre_bump_hooks = [
     "cargo set-version --workspace {{version}}",
     "npm version {{version}} --workspaces",
     "cd airborne_dashboard && npm version {{version}}",
+    "sed -i 's/.version(*\"[^\"]*\")/.version(\"{{version}}\")/' airborne-core-cli/index.js",
+    "sed -i 's/.version(*\"[^\"]*\")/.version(\"{{version}}\")/' airborne_cli/src/index.js",
     "sed -i \"s|^  s.version *=.*|  s.version          = '{{version}}'|\" airborne_sdk_iOS/hyper-ota/Airborne-Framework/Airborne.podspec",
     "sed -i 's|^hyperVersion=.*|hyperVersion={{version}}|' airborne_sdk_android/version.properties",
-    "sed -i 's/\"packageVersion\": *\"[^\"]*\"/\"packageVersion\": \"{{version}}\"/' smithy/smithy-build.json"
+    "sed -i 's/\"packageVersion\": *\"[^\"]*\"/\"packageVersion\": \"{{version}}\"/' smithy/smithy-build.json",
+    "sed -i 's/\"version\": *\"[^\"]*\"/\"version\": \"{{version}}\"/' smithy/patches/javascript.patch"
 ]
 post_bump_hooks = []
 pre_package_bump_hooks = []

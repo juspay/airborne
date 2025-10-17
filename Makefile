@@ -624,8 +624,7 @@ smithy-clients: smithy-build
 
 generate-cli: smithy-clients
 	cd airborne_server_clients/javascript/sdk && npm install && npm run build
-	cd ../../../
-	rm -rf airborne-core-cli
+	find airborne-core-cli -mindepth 1 ! -name 'CHANGELOG.md' -exec rm -rf {} +
 	cd smithy-cli-generator && npm install
 	node smithy-cli-generator/src/index.js \
 		--smithyBuildJSONPath smithy/smithy-build.json \
