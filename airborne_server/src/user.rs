@@ -233,6 +233,7 @@ pub async fn login_implementation(
 #[derive(Serialize, Deserialize)]
 pub struct User {
     user_id: String,
+    username: String,
     organisations: Vec<Organisation>,
     user_token: Option<UserToken>,
 }
@@ -274,6 +275,7 @@ async fn get_user_impl(
     // If not present in db create entry in db and return success
     Ok(Json(parse_groups(
         user_id,
+        authresponse.username,
         groups
             .iter()
             .filter_map(|g| g.path.clone()) // Filters out None values
@@ -281,7 +283,7 @@ async fn get_user_impl(
     )))
 }
 
-fn parse_groups(user_id: String, groups: Vec<String>) -> User {
+fn parse_groups(user_id: String, username: String, groups: Vec<String>) -> User {
     let mut organisations: HashMap<String, Organisation> = HashMap::new();
 
     for group in groups.iter() {
@@ -344,6 +346,7 @@ fn parse_groups(user_id: String, groups: Vec<String>) -> User {
     );
     User {
         user_id,
+        username,
         organisations: organisations.into_values().collect(),
         user_token: None,
     }
