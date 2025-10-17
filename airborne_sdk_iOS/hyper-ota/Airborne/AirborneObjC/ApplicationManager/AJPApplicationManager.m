@@ -1444,10 +1444,29 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     if (existingResource == nil) {
         return YES;
     }
-    if (resourceToBeDownloaded == nil || [resourceToBeDownloaded.url.absoluteString isEqual:existingResource.url.absoluteString]) {
+       
+    if (resourceToBeDownloaded == nil) {
         return NO;
     }
-    return YES;
+    
+    BOOL urlChanged = ![[resourceToBeDownloaded.url absoluteString] isEqualToString:[existingResource.url absoluteString]];
+    
+    BOOL checksumChanged = NO;
+    NSString *newChecksum = resourceToBeDownloaded.checksum;
+    NSString *existingChecksum = existingResource.checksum;
+    
+    BOOL newValid = newChecksum != nil && newChecksum.length > 0;
+    BOOL existingValid = existingChecksum != nil && existingChecksum.length > 0;
+    
+    if (newValid && existingValid) {
+        checksumChanged = ![newChecksum isEqualToString:existingChecksum];
+    } else {
+        // if either is nil or empty, treat them as different
+        checksumChanged = YES;
+    }
+    
+    return urlChanged || checksumChanged;
+    
 }
 
 - (void)downloadResourcesWithCurrentResources:(AppResources *)currentResources
@@ -1833,7 +1852,24 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             [differences addObject:newResource];
         } else {
             // Resource exists - check if URL has changed
-            if (![[newResource.url absoluteString] isEqualToString:[currentResource.url absoluteString]]) {
+            BOOL urlChanged = ![[newResource.url absoluteString] isEqualToString:[currentResource.url absoluteString]];
+            
+            
+            NSString *newChecksum = newResource.checksum;
+            NSString *currentChecksum = currentResource.checksum;
+            
+            BOOL newValid = newChecksum != nil && newChecksum.length > 0;
+            BOOL currentValid = currentChecksum != nil && currentChecksum.length > 0;
+            
+            BOOL checksumChanged = NO;
+            if (newValid && currentValid) {
+                checksumChanged = ![newChecksum isEqualToString:currentChecksum];
+            } else {
+                // If either is nil or empty, treat as different
+                checksumChanged = YES;
+            }
+            
+            if (urlChanged || checksumChanged) {
                 [differences addObject:newResource];
             }
         }
