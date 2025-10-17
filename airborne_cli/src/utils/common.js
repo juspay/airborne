@@ -198,7 +198,7 @@ export function formatCommand(cmd) {
   cmd._description = removeToken(cmd._description);
   cmd._description = cmd._description.replace(
     /airborne-core-cli/g,
-    "airborne-cli"
+    "airborne-devkit"
   );
   cmd.listeners("option:token").forEach((listener) => {
     cmd.removeListener("option:token", listener);
@@ -218,8 +218,8 @@ export function formatCommand(cmd) {
 
       fn.apply(this, args);
 
-      // replace airborne_core_åcli with airborne-cli
-      output = output.replace(/airborne-core-cli/g, "airborne-cli");
+      // replace airborne_core_åcli with airborne-devkit
+      output = output.replace(/airborne-core-cli/g, "airborne-devkit");
 
       // restore stdout
       process.stdout.write = originalWrite;

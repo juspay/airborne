@@ -8,7 +8,7 @@
         "build:es": "tsc -p tsconfig.es.json",
         "build:types": "tsc -p tsconfig.types.json",
         "build:types:downlevel": "downlevel-dts dist-types dist-types/ts3.4",
-        "prepack": "npm run clean && npm run build",
+        "prepack": "npm run build",
         "prepublishOnly": "npm --no-git-tag-version version $VERSION"
     },
     "main": "./dist-cjs/index.js",

@@ -423,7 +423,7 @@ jobs:
           npm ci
           npm publish --access public
 
-      - name: Publish airborne-cli
+      - name: Publish airborne-devkit
         working-directory: airborne_cli
         run: |
           sed -i "s|\"airborne-core-cli\": \"file:../airborne-core-cli\"|\"airborne-core-cli\": \"*\"|" package.json
@@ -433,7 +433,7 @@ jobs:
       - name: Publish airborne-react-native
         working-directory: airborne-react-native
         run: |
-          sed -i "s|\"airborne-cli\": \"file:../airborne_cli\"|\"airborne-cli\": \"*\"|" package.json
+          sed -i "s|\"airborne-devkit\": \"file:../airborne_cli\"|\"airborne-devkit\": \"*\"|" package.json
           npm ci
           npm publish --access public
 

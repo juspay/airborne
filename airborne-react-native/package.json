@@ -59,7 +59,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "airborne-cli": "file:../airborne_cli"
+    "airborne-devkit": "file:../airborne_cli"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.6.0",

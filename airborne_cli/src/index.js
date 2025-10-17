@@ -24,7 +24,7 @@ import { PostLoginAction } from "airborne-core-cli/action";
 const program = new Command();
 
 program
-  .name("airborne-cli")
+  .name("airborne-devkit")
   .description("Command-line interface for Airborne operations")
   .version("1.0.0");
 
@@ -44,10 +44,10 @@ program
   It creates the necessary configuration files to set up your project for OTA updates.
 
   Usage 1 - Interactive mode (recommended):
-    $ airborne-cli create-local-airborne-config
+    $ airborne-devkit create-local-airborne-config
 
   Usage 2 - With all options specified:
-    $ airborne-cli create-local-airborne-config [directoryPath] \\
+    $ airborne-devkit create-local-airborne-config [directoryPath] \\
       -o <organisation> \\
       -n <namespace> \\
       -j <js-entry-file> \\
@@ -81,13 +81,13 @@ program
 Examples:
 
 1. Create config in current directory (interactive):
-   $ airborne-cli create-local-airborne-config
+   $ airborne-devkit create-local-airborne-config
 
 2. Create config in specific directory:
-   $ airborne-cli create-local-airborne-config /path/to/project
+   $ airborne-devkit create-local-airborne-config /path/to/project
 
 3. Create config with all options specified:
-   $ airborne-cli create-local-airborne-config \\
+   $ airborne-devkit create-local-airborne-config \\
      -o "MyCompany" \\
      -n "MyApp" \\
      -j "index.js" \\
@@ -95,7 +95,7 @@ Examples:
      -i "ios/main.jsbundle"
 
 4. Create config in specific directory with options:
-   $ airborne-cli create-local-airborne-config ./my-rn-project \\
+   $ airborne-devkit create-local-airborne-config ./my-rn-project \\
      -o "MyCompany" \\
      -n "MyApp"
 
@@ -136,13 +136,13 @@ program
   how your React Native bundles should be packaged for OTA updates.
 
   Usage 1 - Interactive mode (recommended):
-    $ airborne-cli create-local-release-config
+    $ airborne-devkit create-local-release-config
 
   Usage 2 - With platform specified:
-    $ airborne-cli create-local-release-config -p android
+    $ airborne-devkit create-local-release-config -p android
 
   Usage 3 - With all options:
-    $ airborne-cli create-local-release-config [directoryPath] \\
+    $ airborne-devkit create-local-release-config [directoryPath] \\
       -p <platform> \\
       -b <boot-timeout> \\
       -r <release-timeout>
@@ -200,19 +200,19 @@ program
 Examples:
 
 1. Create release config interactively:
-   $ airborne-cli create-local-release-config
+   $ airborne-devkit create-local-release-config
 
 2. Create Android release config:
-   $ airborne-cli create-local-release-config -p android
+   $ airborne-devkit create-local-release-config -p android
 
 3. Create iOS release config with timeouts:
-   $ airborne-cli create-local-release-config \\
+   $ airborne-devkit create-local-release-config \\
      -p ios \\
      -b 30000 \\
      -r 60000
 
 4. Create config in specific directory:
-   $ airborne-cli create-local-release-config ./my-project -p android
+   $ airborne-devkit create-local-release-config ./my-project -p android
 
 Notes:
 - Requires an existing airborne config file in the directory
@@ -274,13 +274,13 @@ program
   for a specific platform, updating timeouts and other configuration settings.
 
   Usage 1 - Interactive mode:
-    $ airborne-cli update-local-release-config
+    $ airborne-devkit update-local-release-config
 
   Usage 2 - Update specific platform:
-    $ airborne-cli update-local-release-config -p android
+    $ airborne-devkit update-local-release-config -p android
 
   Usage 3 - Update with new timeouts:
-    $ airborne-cli update-local-release-config \\
+    $ airborne-devkit update-local-release-config \\
       -p ios \\
       -b 45000 \\
       -r 90000
@@ -337,19 +337,19 @@ program
 Examples:
 
 1. Update release config interactively:
-   $ airborne-cli update-local-release-config
+   $ airborne-devkit update-local-release-config
 
 2. Update Android config with new boot timeout:
-   $ airborne-cli update-local-release-config -p android -b 35000
+   $ airborne-devkit update-local-release-config -p android -b 35000
 
 3. Update iOS config with both timeouts:
-   $ airborne-cli update-local-release-config \\
+   $ airborne-devkit update-local-release-config \\
      -p ios \\
      -b 40000 \\
      -r 80000
 
 4. Update config in specific directory:
-   $ airborne-cli update-local-release-config ./my-project -p android
+   $ airborne-devkit update-local-release-config ./my-project -p android
 
 Notes:
 - Requires existing airborne config and release config files
@@ -395,13 +395,13 @@ program
   to the Airborne server or creates remote file records with external URLs.
 
   Usage 1 - Create remote file records with external URLs:
-    $ airborne-cli create-remote-files -p android
+    $ airborne-devkit create-remote-files -p android
 
   Usage 2 - Upload files directly to Airborne server:
-    $ airborne-cli create-remote-files -p ios --upload
+    $ airborne-devkit create-remote-files -p ios --upload
 
   Usage 3 - With custom tag:
-    $ airborne-cli create-remote-files \\
+    $ airborne-devkit create-remote-files \\
       -p android \\
       -t "v1.2.0" \\
       --upload
@@ -440,19 +440,19 @@ program
 Examples:
 
 1. Create remote file records for Android (will prompt for base URL):
-   $ airborne-cli create-remote-files -p android
+   $ airborne-devkit create-remote-files -p android
 
 2. Upload iOS files directly to Airborne server:
-   $ airborne-cli create-remote-files -p ios --upload
+   $ airborne-devkit create-remote-files -p ios --upload
 
 3. Create remote files with custom tag:
-   $ airborne-cli create-remote-files -p android -t "release-1.0.0"
+   $ airborne-devkit create-remote-files -p android -t "release-1.0.0"
 
 4. Process files in specific directory:
-   $ airborne-cli create-remote-files ./my-project -p android --upload
+   $ airborne-devkit create-remote-files ./my-project -p android --upload
 
 5. Upload files with tag:
-   $ airborne-cli create-remote-files -p ios --upload -t "beta-2.1.0"
+   $ airborne-devkit create-remote-files -p ios --upload -t "beta-2.1.0"
 
 Workflow:
 - Without --upload: Creates file records pointing to external URLs (you'll be prompted for base URL)
@@ -529,13 +529,13 @@ program
   used for OTA deployments to your React Native applications.
 
   Usage 1 - Interactive mode:
-    $ airborne-cli create-remote-package
+    $ airborne-devkit create-remote-package
 
   Usage 2 - With platform specified:
-    $ airborne-cli create-remote-package -p android
+    $ airborne-devkit create-remote-package -p android
 
   Usage 3 - With custom tag:
-    $ airborne-cli create-remote-package \\
+    $ airborne-devkit create-remote-package \\
       -p ios \\
       -t "production-v1.2.0"
 
@@ -571,19 +571,19 @@ program
 Examples:
 
 1. Create package interactively:
-   $ airborne-cli create-remote-package
+   $ airborne-devkit create-remote-package
 
 2. Create Android package:
-   $ airborne-cli create-remote-package -p android
+   $ airborne-devkit create-remote-package -p android
 
 3. Create iOS package with version tag:
-   $ airborne-cli create-remote-package -p ios -t "v2.1.0"
+   $ airborne-devkit create-remote-package -p ios -t "v2.1.0"
 
 4. Create package from specific directory:
-   $ airborne-cli create-remote-package ./my-rn-project -p android
+   $ airborne-devkit create-remote-package ./my-rn-project -p android
 
 5. Create production package with descriptive tag:
-   $ airborne-cli create-remote-package \\
+   $ airborne-devkit create-remote-package \\
      -p android \\
      -t "production-release-2024-01-15"
 
@@ -647,7 +647,7 @@ program
   and stores the authentication tokens locally for use with subsequent commands.
 
   Usage:
-    $ airborne-cli login \\
+    $ airborne-devkit login \\
       --client_id <your-client-id> \\
       --client_secret <your-client-secret>
 
@@ -669,17 +669,17 @@ program
 Examples:
 
 1. Login in current directory:
-   $ airborne-cli login \\
+   $ airborne-devkit login \\
      --client_id "your_client_id_here" \\
      --client_secret "your_client_secret_here"
 
 2. Login and store tokens in specific directory:
-   $ airborne-cli login ./my-project \\
+   $ airborne-devkit login ./my-project \\
      --client_id "your_client_id_here" \\
      --client_secret "your_client_secret_here"
 
 3. Using environment variables:
-   $ airborne-cli login \\
+   $ airborne-devkit login \\
      --client_id "$AIRBORNE_CLIENT_ID" \\
      --client_secret "$AIRBORNE_CLIENT_SECRET"
 
