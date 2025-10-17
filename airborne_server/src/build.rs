@@ -354,7 +354,8 @@ async fn create_and_upload_build(
                     r#"<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="{}.{}.assets" />"#,
-                    &org, &app
+                    &org.replace("-", "."),
+                    &app.replace("-", ".")
                 )
                 .as_bytes(),
             )
