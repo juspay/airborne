@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.6.1 - 2025-10-17
+#### Bug Fixes
+- not using aws endpoint since it is a reserved env - (e42a681) - george.james
+
+- - -
+
 ## airborne_server-v0.6.0 - 2025-10-16
 #### Bug Fixes
 - aar content and structure fix - (c47ad68) - george.james

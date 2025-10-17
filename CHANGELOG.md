@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.10.1 - 2025-10-17
+### Package updates
+- airborne_react_native bumped to airborne_react_native-v0.1.1
+- airborne_server bumped to airborne_server-v0.6.1
+- airborne_cli bumped to airborne_cli-v0.1.1
+- airborne_server_clients bumped to airborne_server_clients-v0.1.1
+### Global changes
+#### Bug Fixes
+- fix release pipeline - (9e0d102) - george.james
+
+- - -
+
 ## v0.10.0 - 2025-10-16
 ### Package updates
 - airborne_core_cli bumped to airborne_core_cli-v0.1.0
