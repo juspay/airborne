@@ -2,14 +2,13 @@
 import useSWR from "swr";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import UsersLoading from "@/app/users/loading";
 import { UserManagement, type AccessLevel, type User } from "@/components/user-management";
 
 type OrgUsers = { users: User[] };
 
 export default function ApplicationUsersPage() {
   const { token, org, app, getAppAccess, getOrgAccess, updateOrgs } = useAppContext();
-  const { data, isLoading, error, mutate } = useSWR<OrgUsers>(
+  const { data, error, mutate } = useSWR<OrgUsers>(
     token && org ? "/organisations/applications/user/list" : null,
     (url: string) => apiFetch<any>(url, {}, { token, org, app })
   );
@@ -39,10 +38,6 @@ export default function ApplicationUsersPage() {
     mutate();
     updateOrgs();
   };
-
-  if (isLoading) {
-    return <UsersLoading />;
-  }
 
   if (error) {
     return <div className="p-6">Error loading users</div>;
