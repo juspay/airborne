@@ -48,6 +48,14 @@ import {
 import json from "highlight.js/lib/languages/json";
 import hljs from "highlight.js";
 import "highlight.js/styles/vs2015.css";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 hljs.registerLanguage("json", json);
 
@@ -66,6 +74,23 @@ type TargetingRule = {
   dimension: string;
   operator: "equals";
   values: string;
+};
+
+type ReleaseConfigRequest = {
+  config: {
+    traffic_percentage: number;
+    boot_timeout: number;
+    release_config_timeout: number;
+    properties: Record<string, any>;
+  };
+  package: {
+    properties: Record<string, any>;
+    important: string[];
+    lazy: string[];
+  };
+  dimensions?: Record<string, string | string[]>;
+  resources: string[];
+  package_id?: string;
 };
 
 const convertBackendDataToFields = (data: BackendPropertiesResponse): SchemaField[] => {
@@ -122,6 +147,9 @@ export default function CreateReleasePage() {
   const [resourceCurrentPage, setResourceCurrentPage] = useState(1);
 
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
+
+  const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState<boolean>(false);
+  const [releaseConfig, setReleaseConfig] = useState<ReleaseConfigRequest | null>(null);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -592,6 +620,42 @@ export default function CreateReleasePage() {
     setResourceCurrentPage(1); // Reset to first page when searching
   };
 
+  const createReleaseConfig = (): ReleaseConfigRequest | undefined => {
+    let properties: Record<string, any> = {};
+    try {
+      properties = propertiesJSON.trim() ? JSON.parse(propertiesJSON) : {};
+    } catch {
+      toastWarning("Invalid JSON", "Package properties must be valid JSON");
+      return undefined;
+    }
+
+    const configProps: Record<string, any> = { ...remoteConfigValues };
+
+    const dimensionsObj: Record<string, any> = {};
+    targetingRules.forEach((r) => {
+      if (!r.dimension || r.values.length === 0) return;
+      dimensionsObj[r.dimension] = r.values.length === 1 ? r.values[0] : r.values;
+    });
+
+    const body: ReleaseConfigRequest = {
+      config: {
+        traffic_percentage: rolloutPercentage,
+        boot_timeout: bootTimeout,
+        release_config_timeout: releaseConfigTimeout,
+        properties: configProps,
+      },
+      package: { properties, important: importantFiles, lazy: lazyFiles },
+      dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
+      resources: Array.from(selectedResources),
+    };
+
+    if (selectedPackage) {
+      body.package_id = `version:${selectedPackage.version}`;
+    }
+
+    return body;
+  };
+
   const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
     const items = [];
     const maxVisiblePages = 5;
@@ -848,41 +912,9 @@ export default function CreateReleasePage() {
     );
   };
 
-  const handleSubmit = async () => {
-    let properties: Record<string, any> = {};
+  const handleSubmit = async (release_config: ReleaseConfigRequest) => {
     try {
-      properties = propertiesJSON.trim() ? JSON.parse(propertiesJSON) : {};
-    } catch {
-      toastWarning("Invalid JSON", "Package properties must be valid JSON");
-      return;
-    }
-
-    // Use remote config values as the config properties
-    const configProps: Record<string, any> = { ...remoteConfigValues };
-
-    const dimensionsObj: Record<string, any> = {};
-    targetingRules.forEach((r) => {
-      if (!r.dimension || r.values.length === 0) return;
-      // simplify: only "in" semantics
-      dimensionsObj[r.dimension] = r.values.length === 1 ? r.values[0] : r.values;
-    });
-
-    const body: any = {
-      config: {
-        traffic_percentage: rolloutPercentage,
-        boot_timeout: bootTimeout,
-        release_config_timeout: releaseConfigTimeout,
-        properties: configProps,
-      },
-      package: { properties, important: importantFiles, lazy: lazyFiles },
-      dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
-      resources: Array.from(selectedResources),
-    };
-    if (selectedPackage) {
-      body.package_id = `version:${selectedPackage.version}`;
-    }
-    try {
-      await apiFetch("/releases", { method: "POST", body }, { token, org, app });
+      await apiFetch("/releases", { method: "POST", body: release_config }, { token, org, app });
       router.push(`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases`);
     } catch (e: any) {
       console.log("Release creation fail", e);
@@ -1512,12 +1544,68 @@ export default function CreateReleasePage() {
               Next Step
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={!canProceedToStep(1)}>
+            <Button
+              onClick={() => {
+                const config = createReleaseConfig();
+                if (config) {
+                  setReleaseConfig(config);
+                  setIsConfirmationDialogOpen(true);
+                }
+              }}
+              disabled={!canProceedToStep(1)}
+            >
               Create Release
             </Button>
           )}
         </div>
       </div>
+      {isConfirmationDialogOpen && releaseConfig && (
+        <Dialog open={isConfirmationDialogOpen} onOpenChange={setIsConfirmationDialogOpen}>
+          <DialogContent className="max-w-2xl md:max-w-4xl lg:max-w-6xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Confirm Release</DialogTitle>
+              <DialogDescription>Please confirm the details below before creating the release.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 mt-4 overflow-y-auto max-h-[calc(80vh-200px)]">
+              <div>
+                <span className="font-semibold">Organization:</span> {org}
+              </div>
+              <div>
+                <span className="font-semibold">Application:</span> {app}
+              </div>
+              <div>
+                <span className="font-semibold">Release Config:</span>
+                <div className="mt-2 max-h-48 md:max-h-64 lg:max-h-80 overflow-x-auto overflow-y-auto rounded-md border border-gray-200">
+                  <pre className="whitespace-pre p-4 text-sm md:text-base">
+                    <code
+                      className="language-json"
+                      dangerouslySetInnerHTML={{
+                        __html: hljs.highlight(JSON.stringify(releaseConfig, null, 2), { language: "json" }).value,
+                      }}
+                    />
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-6 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setIsConfirmationDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => {
+                  handleSubmit(releaseConfig);
+                  setIsConfirmationDialogOpen(false);
+                }}
+              >
+                Confirm
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
