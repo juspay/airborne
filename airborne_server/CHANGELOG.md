@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.7.0 - 2025-10-17
+#### Features
+- PICAF-30659: replace - with . in android manifest - (e5bb848) - george.james
+
+- - -
+
 ## airborne_server-v0.6.1 - 2025-10-17
 #### Bug Fixes
 - not using aws endpoint since it is a reserved env - (e42a681) - george.james

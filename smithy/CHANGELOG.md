@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## smithy-v0.1.1 - 2025-10-17
+#### Bug Fixes
+- npm releases - (6d08891) - Yash Rajput
+
+- - -
+
+## v0.10.1 - 2025-10-17
+#### Miscellaneous Chores
+- **(version)** v0.10.1 [skip ci] - (47c2ede) - Airborne Bot
+
+- - -
+
 ## smithy-v0.1.0 - 2025-10-16
 #### Features
 - added airborne cli - (545c8a7) - yash.rajput.001

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.2 - 2025-10-17
+#### Bug Fixes
+- npm releases - (6d08891) - Yash Rajput
+
+- - -
+
 ## airborne_cli-v0.1.1 - 2025-10-17
 #### Bug Fixes
 - fix release pipeline - (9e0d102) - george.james

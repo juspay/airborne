@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.11.0 - 2025-10-17
+### Package updates
+- airborne_server bumped to airborne_server-v0.7.0
+- smithy bumped to smithy-v0.1.1
+- airborne_cli bumped to airborne_cli-v0.1.2
+- airborne_core_cli bumped to airborne_core_cli-v0.1.1
+- airborne_server_clients bumped to airborne_server_clients-v0.1.2
+### Global changes
+#### Bug Fixes
+- npm releases - (6d08891) - Yash Rajput
+
+- - -
+
 ## v0.10.1 - 2025-10-17
 ### Package updates
 - airborne_react_native bumped to airborne_react_native-v0.1.1
