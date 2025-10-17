@@ -39,6 +39,7 @@ import `in`.juspay.airborne.utils.OTAUtils
 import `in`.juspay.airborne.constants.LogCategory
 import `in`.juspay.airborne.constants.LogLevel
 import `in`.juspay.airborne.constants.LogSubCategory
+import `in`.juspay.airborne.ota.Constants.BACKUPS_DIR
 import okhttp3.Response
 import okhttp3.ResponseBody
 import org.json.JSONException
@@ -70,6 +71,7 @@ internal class UpdateTask(
     private val releaseConfigUrl: String,
     private val fileProviderService: FileProviderService,
     private var localReleaseConfig: ReleaseConfig?,
+    private val blacklistedReleases: Set<String> = emptySet(),
     private val fileLock: Any,
     private val tracker: TrackerCallback,
     private val netUtils: NetUtils,
@@ -114,6 +116,9 @@ internal class UpdateTask(
     // TODO Move to storing in main app dir & remove this var.
     private var resourceSaveFuture: Future<Unit>? = null
 
+    private val packageBackupDir = "$BACKUPS_DIR/${PACKAGE_DIR_NAME}_backup"
+    private var isCancelled = false
+
     init {
         trackers.add(tracker)
         val sortedHeaders = (rcHeaders ?: emptyMap()).toSortedMap()
@@ -149,6 +154,13 @@ internal class UpdateTask(
         }
     }
 
+    fun cancel() {
+        isCancelled = true
+        packageUpdate?.cancel(true)
+        resourceUpdate?.futures?.forEach { it.cancel(true) }
+        Log.d(TAG, "UpdateTask cancelled.")
+    }
+
     private fun setCurrentResult(
         version: String? = null,
         config: ReleaseConfig.Config? = null,
@@ -176,7 +188,7 @@ internal class UpdateTask(
 
     private fun runInternal() {
         val fetched = fetchReleaseConfig()
-        var shouldDownloadCurLazySplits = false
+        var shouldDownloadCurLazySplits = true
         if (fetched == null) {
             // Unable to fetch so exiting.
             currentResult = UpdateResult.Error.RCFetchError
@@ -379,7 +391,14 @@ internal class UpdateTask(
                 val serialized = String(body.bytes(), StandardCharsets.UTF_8)
                 try {
                     val releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
+                    if (blacklistedReleases.contains(releaseConfig.pkg.version)) {
+                        Log.d(TAG, "Release config version ${releaseConfig.version} is blacklisted, skipping update")
+                        trackInfo("release_config_blacklisted", JSONObject().put("version", releaseConfig.version))
+                        trackReleaseConfigFetchResult(fr, startTime)
+                        return null
+                    }
                     trackReleaseConfigFetchResult(fr, startTime)
+//                    checkAndCreateDefaultRestorePoint()
                     releaseConfig
                 } catch (e: Exception) {
                     Log.e(
@@ -709,6 +728,10 @@ internal class UpdateTask(
                 Log.d(TAG, "Starting lazy split downloads.")
                 val downloads = splits.map {
                     doAsync {
+                        if(isCancelled){
+                            Log.d(TAG, "Cancelled, skipping download for ${it.filePath}")
+                            return@doAsync Result.Ok(Unit)
+                        }
                         val result = if (it.isDownloaded == true) {
                             Result.Ok(Unit)
                         } else {
@@ -832,6 +855,13 @@ internal class UpdateTask(
         state.remove(key.name)
         savePersistentState(state)
     }
+
+    // ------ ROLLBACK -----
+//    private fun checkAndCreateDefaultRestorePoint() {
+//        if (!fileProviderService.getFileFromInternalStorage("$packageBackupDir/default/.keep").exists()) {
+//            applicationManager.backupPackage("default")
+//        }
+//    }
 
     // ----- NETWORK-UTILS -----
     private fun downloadFile(
