@@ -49,7 +49,6 @@ pub struct Environment {
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
-    pub aws_endpoint_url: String,
 }
 pub trait AppError: std::error::Error + Send + Sync + 'static {
     fn code(&self) -> &'static str;

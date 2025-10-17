@@ -28,10 +28,6 @@ pub async fn calculate_checksum(byte_arr: Vec<u8>) -> String {
     hex::encode(hasher.finalize())
 }
 
-pub fn create_s3_file_url(aws_endpoint_url: &str, bucket_name: &str, s3_path: &str) -> String {
-    format!("{}/{}/{}", aws_endpoint_url, bucket_name, s3_path)
-}
-
 pub fn create_s3_file_path(
     org_id: &str,
     app_id: &str,
@@ -40,7 +36,7 @@ pub fn create_s3_file_path(
     file_name: &str,
 ) -> String {
     format!(
-        "{}/{}/{}/{}/{}",
+        "assets/{}/{}/{}/{}/{}",
         org_id, app_id, file_id, version, file_name
     )
 }

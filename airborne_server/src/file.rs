@@ -724,11 +724,7 @@ async fn upload_file(
         }
     }
 
-    let full_url = utils::create_s3_file_url(
-        &state.env.aws_endpoint_url,
-        &state.env.bucket_name,
-        &s3_path,
-    );
+    let full_url = format!("{}/{}", &state.env.public_url, &s3_path);
 
     let result = handle.await;
     match result {
@@ -930,11 +926,7 @@ async fn upload_bulk_files(
             .await
             {
                 Ok(_) => {
-                    let file_url = utils::create_s3_file_url(
-                        &state.env.aws_endpoint_url,
-                        &state.env.bucket_name,
-                        &s3_path,
-                    );
+                    let file_url = format!("{}/{}", &state.env.public_url, &s3_path,);
                     let pool = state.db_pool.clone();
                     let file_id = created_file.id;
 
