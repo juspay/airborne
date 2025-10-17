@@ -432,22 +432,13 @@ export default function CreateReleasePage() {
         const data = (res.data || []) as any[];
         console.log("dims", data);
 
-        // Filter out dimensions that are dependencies of cohort dimensions
-        const cohortDependencies = new Set();
-        data.forEach((d) => {
-          if (d.dimension_type === "cohort" && d.depends_on) {
-            cohortDependencies.add(d.depends_on);
-          }
-        });
-
-        const dims: any = data
-          .filter((d) => !cohortDependencies.has(d.dimension)) // Hide dependency dimensions
-          .map((d) => ({
-            dimension: d.dimension,
-            values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
-            type: d.dimension_type,
-            depends_on: d.depends_on,
-          }));
+        // Include all dimensions - both cohort and dependency dimensions are now selectable
+        const dims: any = data.map((d) => ({
+          dimension: d.dimension,
+          values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
+          type: d.dimension_type,
+          depends_on: d.depends_on,
+        }));
         setDimensions(dims);
       })
       .catch(() => setDimensions([]));
@@ -558,17 +549,116 @@ export default function CreateReleasePage() {
     }
   };
 
+  // Helper function to find cohort dimensions that depend on a given dimension
+  const findDependentCohortDimensions = (selectedDimension: string) => {
+    return dimensions.filter((dim) => dim.type === "cohort" && dim.depends_on === selectedDimension);
+  };
+
+  // Helper function to check if a cohort dimension is required by any selected dependency dimension
+  const isRequiredCohortDimension = (cohortDimension: string) => {
+    const cohortDim = dimensions.find((d) => d.dimension === cohortDimension && d.type === "cohort");
+    if (!cohortDim?.depends_on) return false;
+
+    // Check if there's any targeting rule that uses the dependency dimension this cohort depends on
+    return targetingRules.some((rule) => rule.dimension === cohortDim.depends_on);
+  };
+
   const addRule = () => setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: "" }]);
-  const removeRule = (i: number) => setTargetingRules((r) => r.filter((_, idx) => idx !== i));
-  const updateRule = (i: number, patch: Partial<TargetingRule>) =>
-    setTargetingRules((r) => r.map((rule, idx) => (idx === i ? { ...rule, ...patch } : rule)));
+  const removeRule = (i: number) => {
+    const ruleToRemove = targetingRules[i];
+
+    // Prevent removal if this is a required cohort dimension
+    if (isRequiredCohortDimension(ruleToRemove.dimension)) {
+      toastWarning(
+        "Cannot remove required cohort dimension",
+        `This cohort dimension is required because you have selected its dependency dimension. Remove the dependency dimension first.`
+      );
+      return;
+    }
+
+    // If removing a dependency dimension, also remove its dependent cohort dimensions
+    const dependentCohorts = findDependentCohortDimensions(ruleToRemove.dimension);
+    const cohortDimensionsToRemove = dependentCohorts.map((c) => c.dimension);
+
+    setTargetingRules((rules) => {
+      const newRules = rules.filter((rule, idx) => {
+        // Remove the current rule
+        if (idx === i) return false;
+        // Remove any cohort dimensions that depend on the removed dimension
+        if (cohortDimensionsToRemove.includes(rule.dimension)) return false;
+        return true;
+      });
+
+      // Show notification if cohort dimensions were also removed
+      if (cohortDimensionsToRemove.length > 0) {
+        toastWarning("Dependent cohort dimensions removed", `Also removed: ${cohortDimensionsToRemove.join(", ")}`);
+      }
+
+      return newRules;
+    });
+  };
+  const updateRule = (i: number, patch: Partial<TargetingRule>) => {
+    setTargetingRules((currentRules) => {
+      const updatedRules = currentRules.map((rule, idx) => (idx === i ? { ...rule, ...patch } : rule));
+
+      // If we're updating the dimension and it's a dependency dimension, auto-add required cohort dimensions
+      if (patch.dimension) {
+        const selectedDimension = patch.dimension;
+        const dependentCohorts = findDependentCohortDimensions(selectedDimension);
+
+        if (dependentCohorts.length > 0) {
+          // Check which cohort dimensions are not already in the targeting rules
+          const existingDimensions = new Set(updatedRules.map((rule) => rule.dimension));
+
+          const newCohortRules = dependentCohorts
+            .filter((cohort) => !existingDimensions.has(cohort.dimension))
+            .map((cohort) => ({
+              dimension: cohort.dimension,
+              operator: "equals" as const,
+              values: "",
+            }));
+
+          // Add the new cohort rules if any
+          if (newCohortRules.length > 0) {
+            // Load cohorts for the newly added cohort dimensions
+            newCohortRules.forEach((cohortRule) => {
+              loadCohortsForDimension(cohortRule.dimension);
+            });
+
+            // Show notification about auto-added cohorts
+            const cohortNames = newCohortRules.map((r) => r.dimension).join(", ");
+            toastWarning(
+              `Auto-added cohort dimension${newCohortRules.length > 1 ? "s" : ""}: ${cohortNames}`,
+              `These cohort dimensions are required when targeting by ${selectedDimension}`
+            );
+
+            return [...updatedRules, ...newCohortRules];
+          }
+        }
+      }
+
+      return updatedRules;
+    });
+  };
+
+  // Helper function to validate targeting rules
+  const validateTargetingRules = () => {
+    // If no targeting rules, that's valid (means release goes to all users)
+    if (targetingRules.length === 0) {
+      return true;
+    }
+
+    // Check that all rules have both dimension and values filled
+    return targetingRules.every((rule) => rule.dimension.trim() !== "" && rule.values.trim() !== "");
+  };
 
   const canProceedToStep = (step: number) => {
     switch (step) {
       case 1:
         return true; // Configuration step - always can proceed
       case 2:
-        return true; // Targeting step - always can proceed
+        // Targeting step - validate all targeting rules are complete
+        return validateTargetingRules();
       case 3:
         // Remote config step - validate all fields
         if (schemaFields.length > 0) {
@@ -1023,6 +1113,10 @@ export default function CreateReleasePage() {
                     <div>
                       <h4 className="font-medium">Targeting Rules</h4>
                       <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <Info className="inline h-3 w-3 mr-1" />
+                        Selecting a dependency dimension will automatically add its required cohort dimensions
+                      </p>
                     </div>
                     {releases.length > 0 && (
                       <Button variant="outline" onClick={() => addRule()}>
@@ -1048,11 +1142,25 @@ export default function CreateReleasePage() {
                         const isCohortDimension = selectedDim?.type === "cohort";
                         const cohortOptions = isCohortDimension ? cohorts[rule.dimension] || [] : [];
 
+                        const isRequired = isRequiredCohortDimension(rule.dimension);
+
                         return (
                           <Card key={idx} className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                               <div className="space-y-2">
-                                <Label>Dimension</Label>
+                                <Label>
+                                  Dimension
+                                  {isRequired && (
+                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                      Required
+                                    </Badge>
+                                  )}
+                                  {selectedDim?.type === "cohort" && selectedDim?.depends_on && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      → depends on {selectedDim.depends_on}
+                                    </span>
+                                  )}
+                                </Label>
                                 <Select
                                   value={rule.dimension}
                                   onValueChange={async (v) => {
@@ -1067,18 +1175,28 @@ export default function CreateReleasePage() {
                                     <SelectValue placeholder="Select dimension" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {dimensions.map((d) => (
-                                      <SelectItem key={d.dimension} value={d.dimension}>
-                                        <div className="flex items-center gap-2">
-                                          {d.dimension}
-                                          {d.type === "cohort" && (
-                                            <Badge variant="secondary" className="text-xs">
-                                              Cohort
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      </SelectItem>
-                                    ))}
+                                    {dimensions.map((d) => {
+                                      const isDepencyForCohorts = dimensions.some(
+                                        (dim) => dim.type === "cohort" && dim.depends_on === d.dimension
+                                      );
+                                      return (
+                                        <SelectItem key={d.dimension} value={d.dimension}>
+                                          <div className="flex items-center gap-2">
+                                            {d.dimension}
+                                            {d.type === "cohort" && (
+                                              <Badge variant="secondary" className="text-xs">
+                                                Cohort
+                                              </Badge>
+                                            )}
+                                            {isDepencyForCohorts && (
+                                              <Badge variant="outline" className="text-xs">
+                                                Dependency
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </SelectItem>
+                                      );
+                                    })}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -1129,7 +1247,16 @@ export default function CreateReleasePage() {
                                 )}
                               </div>
                               <div className="flex items-end">
-                                <Button variant="outline" onClick={() => removeRule(idx)}>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => removeRule(idx)}
+                                  disabled={isRequired}
+                                  title={
+                                    isRequired
+                                      ? "Cannot remove required cohort dimension"
+                                      : "Remove this targeting rule"
+                                  }
+                                >
                                   Remove
                                 </Button>
                               </div>
