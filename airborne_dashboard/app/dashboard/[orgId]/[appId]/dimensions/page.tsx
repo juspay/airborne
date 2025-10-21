@@ -24,6 +24,7 @@ import { hasAppAccess } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export type Dimension = {
   dimension: string;
@@ -48,6 +49,7 @@ export default function DimensionsPage() {
   const { toast } = useToast();
   const params = useParams();
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formData, setFormData] = useState<DimensionFormData>({
     key: "",
@@ -76,7 +78,7 @@ export default function DimensionsPage() {
             d.description?.toLowerCase().includes(searchQuery.toLowerCase())
         )
         .sort((a, b) => a.position - b.position),
-    [dimensions, searchQuery]
+    [dimensions, debouncedSearchQuery]
   );
 
   // Available dimensions for cohort depends_on (exclude cohort dimensions)
