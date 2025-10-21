@@ -13,6 +13,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { hasAppAccess } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 export type ApiRelease = {
   id: string;
@@ -26,6 +27,7 @@ export type ApiRelease = {
 };
 
 export default function ReleasesPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
@@ -102,26 +104,35 @@ export default function ReleasesPage() {
               {releases
                 .filter((r) => (filterStatus === "all" ? true : r.experiment?.status === filterStatus))
                 .map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow
+                    key={r.id}
+                    className="cursor-pointer hover:bg-muted "
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`
+                      )
+                    }
+                  >
                     <TableCell className="font-mono text-sm">
-                      <Link
-                        href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`}
-                        className="hover:text-primary"
-                      >
-                        {r.id}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{r.package?.version ?? "—"}</TableCell>
-                    <TableCell>
-                      {r.experiment?.status != "INPROGRESS" && (
-                        <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
-                      )}
-                      {r.experiment?.status == "INPROGRESS" && (
-                        <Badge variant="outline">Ramping to {r.experiment?.traffic_percentage || "—"}%</Badge>
-                      )}
+                      <div className="block w-full h-full">{r.id}</div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                      <div className="block w-full h-full">{r.package?.version ?? "—"}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="block w-full h-full">
+                        {r.experiment?.status != "INPROGRESS" && (
+                          <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
+                        )}
+                        {r.experiment?.status == "INPROGRESS" && (
+                          <Badge variant="outline">Ramping to {r.experiment?.traffic_percentage || "—"}%</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="block w-full h-full">
+                        {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                      </div>
                     </TableCell>
                     {/* <TableCell className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => rampRelease(r.id)}>

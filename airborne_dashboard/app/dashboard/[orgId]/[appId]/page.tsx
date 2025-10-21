@@ -108,21 +108,26 @@ export default function ApplicationDetailPage() {
                             `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`
                           )
                         }
+                        className="cursor-pointer hover:bg-muted "
                       >
                         <TableCell className="font-mono text-sm">
-                          <Link
-                            href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(r.id)}`}
-                            className="hover:text-primary"
-                          >
-                            {r.id}
-                          </Link>
+                          <div className="block w-full h-full">{r.id}</div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{r.package?.version ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{r?.experiment?.status || "—"}</Badge>
-                        </TableCell>
+
                         <TableCell className="text-muted-foreground">
-                          {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                          <div className="block w-full h-full">{r.package?.version ?? "—"}</div>
+                        </TableCell>
+
+                        <TableCell>
+                          <div className="block w-full h-full">
+                            <Badge variant="outline">{r?.experiment?.status || "—"}</Badge>
+                          </div>
+                        </TableCell>
+
+                        <TableCell className="text-muted-foreground">
+                          <div className="block w-full h-full">
+                            {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
