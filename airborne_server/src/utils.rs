@@ -20,7 +20,10 @@ pub mod document;
 pub mod encryption;
 pub mod keycloak;
 pub mod kms;
+pub mod metrics;
+pub mod redis;
 pub mod s3;
+pub mod superposition_provider;
 pub mod transaction_manager;
 pub mod workspace;
 
