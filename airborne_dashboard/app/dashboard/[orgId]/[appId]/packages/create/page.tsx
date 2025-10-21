@@ -624,9 +624,6 @@ export default function CreatePackagePage() {
             </Button>
           ) : (
             <>
-              <Button variant="outline" onClick={() => onCreate(true)} disabled={isSubmitting}>
-                Save as Draft
-              </Button>
               <Button
                 onClick={() => onCreate()}
                 disabled={!canProceedToStep(1) || !canProceedToStep(2) || isSubmitting}
