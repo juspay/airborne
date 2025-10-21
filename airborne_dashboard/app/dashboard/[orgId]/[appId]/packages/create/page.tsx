@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
 import { hasAppAccess } from "@/lib/utils";
 import { notFound } from "next/navigation";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 type ApiFile = { id?: string; file_path: string; url: string; version: number; tag?: string; size?: number };
 
@@ -45,10 +46,12 @@ export default function CreatePackagePage() {
   const [packageProperties] = useState("{}");
   const [selectedIndexFile, setSelectedIndexFile] = useState<ApiFile | null>(null);
   const [indexFileSearch, setIndexFileSearch] = useState("");
+  const debouncedIndexFileQuery = useDebouncedValue(indexFileSearch, 500);
   const [indexFileCurrentPage, setIndexFileCurrentPage] = useState(1);
 
   // Step 2: Package Files
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSeachQuery = useDebouncedValue(searchQuery, 500);
   const [packageFileCurrentPage, setPackageFileCurrentPage] = useState(1);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,7 +70,7 @@ export default function CreatePackagePage() {
     error: indexFileError,
     isLoading: indexFileLoading,
   } = useSWR(
-    token && org && app && currentStep === 1 ? ["/file/list", indexFileSearch, indexFileCurrentPage] : null,
+    token && org && app && currentStep === 1 ? ["/file/list", debouncedIndexFileQuery, indexFileCurrentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
@@ -80,7 +83,7 @@ export default function CreatePackagePage() {
   );
 
   const { data, error, isLoading } = useSWR(
-    token && org && app && currentStep === 2 ? ["/file/list", searchQuery, packageFileCurrentPage] : null,
+    token && org && app && currentStep === 2 ? ["/file/list", debouncedSeachQuery, packageFileCurrentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
