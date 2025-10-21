@@ -20,10 +20,12 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { OrganisationsList } from "../page";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export default function ApplicationsPage() {
   const { token, org, logout, getOrgAccess } = useAppContext();
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", description: "" });
 
@@ -36,7 +38,9 @@ export default function ApplicationsPage() {
     [data, org]
   );
 
-  const filtered = apps.filter((a) => a.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filtered = useMemo(() => {
+    return apps.filter((a) => a.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [apps, debouncedSearchQuery]);
 
   const handleCreate = async () => {
     await apiFetch(

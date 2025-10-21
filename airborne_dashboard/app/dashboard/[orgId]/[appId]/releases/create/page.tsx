@@ -56,6 +56,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 hljs.registerLanguage("json", json);
 
@@ -129,6 +130,7 @@ export default function CreateReleasePage() {
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}");
 
   const [pkgSearch, setPkgSearch] = useState("");
+  const debouncedPackageSearch = useDebouncedValue(pkgSearch, 500);
   const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(null);
 
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -144,6 +146,7 @@ export default function CreateReleasePage() {
   // Resource-related state
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
   const [resourceSearch, setResourceSearch] = useState("");
+  const debouncedResourcesSearch = useDebouncedValue(resourceSearch, 500);
   const [resourceCurrentPage, setResourceCurrentPage] = useState(1);
 
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
@@ -476,7 +479,7 @@ export default function CreateReleasePage() {
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 6 ? ["/file/list", resourceSearch, resourceCurrentPage] : null,
+    token && org && app && currentStep === 6 ? ["/file/list", debouncedResourcesSearch, resourceCurrentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
@@ -492,7 +495,7 @@ export default function CreateReleasePage() {
 
   const filteredPackages = useMemo(
     () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
-    [packages, pkgSearch]
+    [packages, debouncedPackageSearch]
   );
 
   // Get resource data from API response
