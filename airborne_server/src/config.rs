@@ -67,6 +67,9 @@ pub struct AppConfig {
     pub superposition_user_token: Option<String>,
     pub superposition_org_token: Option<String>,
     pub enable_authenticated_superposition: bool,
+    pub superposition_clear_unused_providers: bool,
+    pub superposition_unused_provider_ttl: u64,
+    pub superposition_unused_provider_check_interval: u64,
 
     // Feature flags
     pub enabled_oidc_idps: Vec<String>,
@@ -87,6 +90,12 @@ pub struct AppConfig {
     // Migration settings
     pub superposition_migration_strategy: String,
     pub migrations_to_run_on_boot: String,
+
+    // Redis
+    pub redis_url: Option<String>,
+
+    // Victoria Metrics
+    pub victoria_metrics_url: String,
 }
 
 impl AppConfig {
@@ -210,6 +219,18 @@ impl AppConfig {
                 "ENABLE_AUTHENTICATED_SUPERPOSITION",
                 false,
             ),
+            superposition_clear_unused_providers: parse_env(
+                "SUPERPOSITION_CLEAR_UNUSED_PROVIDERS",
+                false,
+            ),
+            superposition_unused_provider_ttl: parse_env(
+                "SUPERPOSITION_UNUSED_PROVIDER_TTL",
+                43200,
+            ),
+            superposition_unused_provider_check_interval: parse_env(
+                "SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL",
+                1500,
+            ),
 
             // Feature flags
             enabled_oidc_idps,
@@ -233,6 +254,12 @@ impl AppConfig {
                 Some("PATCH"),
             )?,
             migrations_to_run_on_boot: get_env("MIGRATIONS_TO_RUN_ON_BOOT", Some(""))?,
+
+            // Redis
+            redis_url: get_optional("REDIS_URL"),
+
+            // Victoria Metrics
+            victoria_metrics_url: get_env("VICTORIA_METRICS_INSERT_URL", Some(""))?,
         })
     }
 }

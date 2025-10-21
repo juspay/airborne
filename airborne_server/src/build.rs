@@ -319,6 +319,7 @@ async fn create_and_upload_build(
         // Get file details from database
         let files = get_files_by_file_keys_async(
             state.db_pool.clone(),
+            &state.redis_cache,
             org.clone(),
             app.clone(),
             all_files.clone(),
@@ -1148,6 +1149,7 @@ async fn generate(
     // Get workspace name
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         arguments.application.clone(),
         arguments.organisation.clone(),
     )

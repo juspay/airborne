@@ -22,6 +22,7 @@ bytes = "1"
 casbin = "2.20.0"
 chrono = { workspace = true }
 diesel-adapter = "1.2.0"
+dashmap = "=6.1.0"
 diesel = { version = "2.2", features = [
     "postgres",
     "r2d2",
@@ -39,15 +40,20 @@ http = "0.2.12"
 http-body = "1.0.1"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
+lazy_static = "=1.5.0"
 log = "0.4.27"
 openidconnect = "4.0.1"
+open-feature = "=0.2.7"
+prometheus = "=0.14.0"
 r2d2 = "=0.8.10"
+redis = { version = "0.32.7", features = ["tokio-comp", "aio", "connection-manager"] }
 reqwest = { version = "^0.12.5", features = ["blocking", "stream"] }
 rustls = { version = "0.23.5" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.10"
 superposition_sdk = "0.99.2"
+superposition_provider = "0.99.2"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 inventory = "0.3"
