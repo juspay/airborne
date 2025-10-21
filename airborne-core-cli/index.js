@@ -1607,7 +1607,7 @@ program
   It is typically the first command you should run before using any other commands.
 
   Usage:
-    $ example-cli configure --base-url <api-url>
+    $ airborne-core-cli configure --base-url <api-url>
 
   Parameters:
       -u, --base-url <url> (required)
@@ -1617,13 +1617,13 @@ program
   Examples:
 
   1. Setting the base URL for production:
-    $ example-cli configure --base-url https://api.example.com
+    $ airborne-core-cli configure --base-url https://api.example.com
 
   2. Setting the base URL for local development:
-    $ example-cli configure --base-url http://localhost:3000
+    $ airborne-core-cli configure --base-url http://localhost:3000
 
   3. Overriding an existing configuration:
-    $ example-cli configure -u https://staging.example.com
+    $ airborne-core-cli configure -u https://staging.example.com
 
 `)
   .usage('--base-url <url>')
