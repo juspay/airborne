@@ -19,9 +19,12 @@ pub mod encryption;
 pub mod interceptor;
 pub mod keycloak;
 pub mod kms;
+pub mod metrics;
 pub mod migrations;
+pub mod redis;
 pub mod s3;
 pub mod semver;
+pub mod superposition_provider;
 pub mod workspace;
 
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
