@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Search, UserPlus, MoreVertical, Trash2, ArrowRight } from "lucide-react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export type AccessLevel = "owner" | "admin" | "write" | "read";
 
@@ -88,6 +89,7 @@ export function UserManagement({
   entityType = "organisation",
 }: UserManagementProps) {
   const [search, setSearch] = React.useState("");
+  const debouncedSearch = useDebouncedValue(search, 500);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [newUser, setNewUser] = React.useState("");
   const [newUserAccess, setNewUserAccess] = React.useState<AccessLevel>("read");
@@ -95,7 +97,9 @@ export function UserManagement({
   const [userToRemove, setUserToRemove] = React.useState<string | null>(null);
 
   const canUpdate = canUpdateUsers(entityType, currentUserOrgAccess, currentUserAppAccess);
-  const filteredUsers = users.filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
+  }, [users, debouncedSearch]);
 
   const handleAddUser = async () => {
     if (!newUser.trim()) return;

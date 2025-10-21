@@ -13,6 +13,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { hasAppAccess } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 type ApiPackage = {
   index: string;
@@ -23,10 +24,11 @@ type ApiPackage = {
 
 export default function PackagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSeachQuery = useDebouncedValue(searchQuery, 500);
   const [filterStatus, setFilterStatus] = useState("all");
   const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
 
-  const { data } = useSWR(token && org && app ? ["/packages/list", searchQuery] : null, async () =>
+  const { data } = useSWR(token && org && app ? ["/packages/list", debouncedSeachQuery] : null, async () =>
     apiFetch<any>("/packages/list", { query: { offset: 0, limit: 50 } }, { token, org, app })
   );
   const packages: ApiPackage[] = data?.packages || [];

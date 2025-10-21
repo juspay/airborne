@@ -28,6 +28,7 @@ import { FileCreationModal } from "@/components/file-creation-modal";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { hasAppAccess } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 type ApiFile = {
   id: string;
@@ -51,13 +52,14 @@ type ApiResponse = {
 export default function FilesPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSeachQuery = useDebouncedValue(searchQuery, 500);
   const [filterType, setFilterType] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const perPage = 10;
 
   const { data, error, mutate, isLoading } = useSWR(
-    token && org && app ? ["/file/list", searchQuery, currentPage] : null,
+    token && org && app ? ["/file/list", debouncedSeachQuery, currentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
