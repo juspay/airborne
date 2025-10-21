@@ -21,8 +21,10 @@ use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use http::{HeaderValue, StatusCode};
 use log::info;
+use open_feature::EvaluationContext;
 use serde_json::Value;
-use std::collections::{BTreeMap, HashMap};
+use std::{collections::HashMap, sync::Arc};
+use superposition_provider::SuperpositionProvider;
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::VariantType::Experimental;
 
@@ -86,6 +88,7 @@ async fn get_release(
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -164,6 +167,7 @@ async fn get_release(
 
         let files_result = utils::get_files_by_file_keys_async(
             state.db_pool.clone(),
+            &state.redis_cache,
             organisation.clone(),
             application.clone(),
             all_files,
@@ -336,6 +340,7 @@ async fn create_release(
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -607,6 +612,7 @@ async fn list_releases(
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -733,6 +739,7 @@ async fn list_releases(
 
             let files_result = utils::get_files_by_file_keys_async(
                 state.db_pool.clone(),
+                &state.redis_cache,
                 organisation.clone(),
                 application.clone(),
                 all_files.clone(),
@@ -868,8 +875,8 @@ async fn list_releases(
 
     Ok(Json(PaginatedResponse {
         data: releases,
-        total_items: experiments_list.total_items as u64,
-        total_pages: experiments_list.total_pages as u32,
+        total_items: experiments_list.total_items.unwrap_or(0) as u64,
+        total_pages: experiments_list.total_pages.unwrap_or(0) as u32,
     }))
 }
 
@@ -899,6 +906,7 @@ async fn ramp_release(
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -1004,6 +1012,7 @@ async fn conclude_release(
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -1117,6 +1126,28 @@ async fn serve_release_v2(
     serve_release_handler(path, req, query, state).await
 }
 
+async fn get_release_config_from_provider(
+    provider: &Arc<SuperpositionProvider>,
+    evaluation_context: &EvaluationContext,
+) -> Result<OpenFeatureReleaseConfig, ABError> {
+    let config = provider
+        .resolve_full_config(evaluation_context)
+        .await
+        .map_err(|e| {
+            log::error!("Error getting superposition keys: {:?}", e);
+            ABError::InternalServerError("Failed to resolve full config".to_string())
+        })?;
+
+    let of_release_config: OpenFeatureReleaseConfig = serde_json::from_value(
+        dotted_docs_to_nested(config.iter().map(|(k, v)| (k.clone(), v.clone())))?,
+    )
+    .map_err(|e| {
+        ABError::InternalServerError(format!("Failed to deserialize release config: {}", e))
+    })?;
+
+    Ok(of_release_config)
+}
+
 async fn serve_release_handler(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
@@ -1124,7 +1155,6 @@ async fn serve_release_handler(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
     let (organisation, application) = path.into_inner();
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let span = tracing::Span::current();
     span.record("org_id", tracing::field::display(&organisation));
@@ -1137,18 +1167,29 @@ async fn serve_release_handler(
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
     .await
     .map_err(|e| ABError::NotFound(format!("Failed to get workspace name: {}", e)))?;
 
-    let context: HashMap<String, Value> = req
+    let context: HashMap<String, String> = req
         .headers()
         .get("x-dimension")
         .and_then(|val| val.to_str().ok())
         .map(utils::parse_kv_string)
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .iter()
+        .map(|(k, v)| {
+            (k.clone(), {
+                match v {
+                    Value::String(s) => s.clone(),
+                    _ => v.to_string(),
+                }
+            })
+        })
+        .collect();
 
     // If toss not sent fallback to
     let toss = query.into_inner().toss.unwrap_or("99".into());
@@ -1159,109 +1200,44 @@ async fn serve_release_handler(
     );
     info!("Context for serving release: {:?}", context);
 
-    let applicable_variants = context.iter().fold(
-        state
-            .superposition_client
-            .applicable_variants()
-            .workspace_id(workspace_name.clone())
-            .org_id(superposition_org_id_from_env.clone())
-            .identifier(toss),
-        |builder, (key, value)| {
-            builder.context(
-                key.clone(),
-                Document::String(value.as_str().unwrap_or("").to_string()),
-            )
-        },
-    );
-    let applicable_variants = if applicable_variants.get_context().is_none() {
-        applicable_variants.set_context(Some(HashMap::new()))
-    } else {
-        applicable_variants
+    let workspace_handle = state.provider_registry.get_or_init(&workspace_name).await?;
+
+    let provider = workspace_handle.provider.clone();
+
+    let evaluation_context = EvaluationContext {
+        custom_fields: context.iter().fold(HashMap::new(), |mut acc, (k, v)| {
+            acc.insert(
+                k.clone(),
+                open_feature::EvaluationContextFieldValue::String(v.clone()),
+            );
+            acc
+        }),
+        targeting_key: Some(toss.clone()),
     };
-    let applicable_variants = applicable_variants.send().await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to get applicable variants: {}", e))
-    })?;
 
-    let applicable_variants_ids = applicable_variants
-        .data
-        .iter()
-        .map(|v| Document::from(v.id.clone()))
-        .collect::<Vec<_>>();
+    log::info!("Final evaluation Context {:?}", evaluation_context);
 
-    let resolved_config_builder = context.iter().fold(
-        state
-            .superposition_client
-            .get_resolved_config()
-            .workspace_id(workspace_name.clone())
-            .org_id(superposition_org_id_from_env.clone())
-            .context("variantIds", Document::from(applicable_variants_ids)),
-        |builder, (key, value)| {
-            builder.context(
-                key.clone(),
-                Document::String(value.as_str().unwrap_or("").to_string()),
-            )
-        },
-    );
+    let of_release_config =
+        get_release_config_from_provider(&provider, &evaluation_context).await?;
 
-    let resolved_config = resolved_config_builder.send().await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to get resolved config: {}", e))
-    })?;
-
-    let config_document = resolved_config.config;
-
-    let rc_package_important =
-        utils::extract_files_from_configs(&config_document, "package.important")
-            .unwrap_or_default();
-    let rc_package_lazy =
-        utils::extract_files_from_configs(&config_document, "package.lazy").unwrap_or_default();
-    let rc_resources =
-        utils::extract_files_from_configs(&config_document, "resources").unwrap_or_default();
-    let rc_index =
-        utils::extract_file_from_configs(&config_document, "package.index").unwrap_or_default();
-    let rc_version =
-        utils::extract_string_from_configs(&config_document, "config.version").unwrap_or_default();
-    let rc_boot_timeout =
-        utils::extract_integer_from_configs::<i64>(&config_document, "config.boot_timeout");
-    let rc_release_config_timeout = utils::extract_integer_from_configs::<i64>(
-        &config_document,
-        "config.release_config_timeout",
-    );
-    let opt_rc_config_properties = config_document.as_ref().and_then(|doc| {
-        if let Document::Object(obj) = doc {
-            Some(
-                obj.iter()
-                    .filter_map(|(k, v)| {
-                        if k.starts_with("config.properties.") {
-                            Some((
-                                k.strip_prefix("config.properties.").unwrap().to_string(),
-                                v.clone(),
-                            ))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<BTreeMap<_, _>>(),
-            )
-        } else {
-            None
-        }
-    });
-
-    if rc_version == "0.0.0" {
+    if of_release_config.config.version == "0.0.0" {
         return Err(ABError::NotFound("No release yet".to_string()));
     }
 
     let (index_file, important_files, lazy_files, resource_files) = {
-        let all_files = rc_package_important
+        let all_files = of_release_config
+            .package
+            .important
             .iter()
-            .chain(rc_package_lazy.iter())
-            .chain(rc_resources.iter())
-            .chain([rc_index.clone()].iter())
+            .chain(of_release_config.package.lazy.iter())
+            .chain(of_release_config.resources.iter())
+            .chain([of_release_config.package.index.clone()].iter())
             .cloned()
             .collect::<Vec<String>>();
 
         let files_result = utils::get_files_by_file_keys_async(
             state.db_pool.clone(),
+            &state.redis_cache,
             organisation,
             application.clone(),
             all_files,
@@ -1269,7 +1245,9 @@ async fn serve_release_handler(
         .await;
 
         if let Ok(files) = files_result {
-            let important_files: Vec<ServeFile> = rc_package_important
+            let important_files: Vec<ServeFile> = of_release_config
+                .package
+                .important
                 .iter()
                 .filter_map(|file_key| {
                     let (file_path, _, _) = parse_file_key(file_key);
@@ -1284,7 +1262,9 @@ async fn serve_release_handler(
                 })
                 .collect();
 
-            let lazy_files: Vec<ServeFile> = rc_package_lazy
+            let lazy_files: Vec<ServeFile> = of_release_config
+                .package
+                .lazy
                 .iter()
                 .filter_map(|file_key| {
                     let (file_path, _, _) = parse_file_key(file_key);
@@ -1299,7 +1279,8 @@ async fn serve_release_handler(
                 })
                 .collect();
 
-            let resource_files: Vec<ServeFile> = rc_resources
+            let resource_files: Vec<ServeFile> = of_release_config
+                .resources
                 .iter()
                 .filter_map(|file_key| {
                     let (file_path, _, _) = parse_file_key(file_key);
@@ -1315,7 +1296,7 @@ async fn serve_release_handler(
                 .collect();
 
             let index_file: ServeFile = {
-                let (file_path, _, _) = parse_file_key(&rc_index);
+                let (file_path, _, _) = parse_file_key(&of_release_config.package.index);
                 files
                     .iter()
                     .find(|file| file.file_path == file_path.clone())
@@ -1346,43 +1327,14 @@ async fn serve_release_handler(
         }
     };
 
-    let pkg_version =
-        utils::extract_integer_from_configs::<i64>(&config_document, "package.version");
-
-    let opt_rc_package_properties = &config_document.as_ref().and_then(|doc| {
-        if let Document::Object(obj) = doc {
-            obj.get("package.properties")
-                .and_then(utils::document_to_value)
-        } else {
-            None
-        }
-    });
-
-    let nested_config_props_result =
-        dotted_docs_to_nested(opt_rc_config_properties.unwrap_or_default().into_iter());
-    let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
-        info!(
-            "Failed to convert dotted docs to nested structure: {:?}",
-            err
-        );
-        Value::Object(serde_json::Map::new())
-    });
-
     let release_response = ServeReleaseResponse {
         version: "2".to_string(),
-        config: Config {
-            boot_timeout: rc_boot_timeout as u32,
-            release_config_timeout: rc_release_config_timeout as u32,
-            version: rc_version.clone(),
-            properties: Some(nested_config_props_response),
-        },
+        config: of_release_config.config,
         package: ServePackage {
-            name: application.clone(),
-            version: pkg_version.to_string(),
+            name: of_release_config.package.name,
+            version: of_release_config.package.version.to_string(),
             index: index_file,
-            properties: opt_rc_package_properties
-                .clone()
-                .unwrap_or(serde_json::Value::default()),
+            properties: of_release_config.package.properties,
             important: important_files,
             lazy: lazy_files,
         },
@@ -1423,6 +1375,7 @@ async fn update_release(
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )

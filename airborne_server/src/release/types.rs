@@ -47,7 +47,7 @@ pub struct ServePackage {
     pub lazy: Vec<ServeFile>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Config {
     pub boot_timeout: u32,
     pub release_config_timeout: u32,
@@ -184,4 +184,21 @@ pub struct ListExperimentsQuery {
     pub count: Option<i64>,
     pub all: bool,
     pub status: Option<ExperimentStatusType>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OpenFeaturePackage {
+    pub name: String,
+    pub version: i32,
+    pub index: String,
+    pub properties: Value,
+    pub important: Vec<String>,
+    pub lazy: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OpenFeatureReleaseConfig {
+    pub config: Config,
+    pub package: OpenFeaturePackage,
+    pub resources: Vec<String>,
 }
