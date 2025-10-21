@@ -458,24 +458,13 @@ export default function CreateReleasePage() {
     apiFetch<any>("/organisations/applications/dimension/list", {}, { token, org, app })
       .then((res) => {
         const data = (res.data || []) as any[];
-        console.log("dims", data);
 
-        // Filter out dimensions that are dependencies of cohort dimensions
-        const cohortDependencies = new Set();
-        data.forEach((d) => {
-          if (d.dimension_type === "cohort" && d.depends_on) {
-            cohortDependencies.add(d.depends_on);
-          }
-        });
-
-        const dims: any = data
-          .filter((d) => !cohortDependencies.has(d.dimension)) // Hide dependency dimensions
-          .map((d) => ({
-            dimension: d.dimension,
-            values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
-            type: d.dimension_type,
-            depends_on: d.depends_on,
-          }));
+        const dims: any = data.map((d) => ({
+          dimension: d.dimension,
+          values: Object.values((d.schema?.properties || {}).value?.enum || d.values || []),
+          type: d.dimension_type,
+          depends_on: d.depends_on,
+        }));
         setDimensions(dims);
       })
       .catch(() => setDimensions([]));
