@@ -39,14 +39,18 @@ use serde_json::json;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
+    time::Duration,
 };
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::dashboard::configuration;
 use crate::middleware::auth::Auth;
 use crate::middleware::request::request_id_mw;
+use crate::{
+    dashboard::configuration, utils::redis::RedisCache,
+    utils::superposition_provider::ProviderRegistry,
+};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -76,6 +80,7 @@ async fn main() -> std::io::Result<()> {
         std::env::var("SUPERPOSITION_ORG_ID").expect("SUPERPOSITION_ORG_ID must be set");
     let bucket_name = std::env::var("AWS_BUCKET").expect("AWS_BUCKET must be set");
     let public_url = std::env::var("PUBLIC_ENDPOINT").expect("PUBLIC_ENDPOINT must be set");
+    let redis_url = std::env::var("REDIS_URL").expect("REDIS_URL must be set");
     let port =
         std::env::var("PORT").map_or(8081, |v| v.parse().expect("PORT must be a valid number"));
     let enable_google_signin = std::env::var("ENABLE_GOOGLE_SIGNIN")
@@ -113,6 +118,23 @@ async fn main() -> std::io::Result<()> {
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
+
+    let clear_unused_providers = std::env::var("SUPERPOSITION_CLEAR_UNUSED_PROVIDER")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
+    let unused_provider_ttl =
+        std::env::var("SUPERPOSITION_UNUSED_PROVIDER_TTL").map_or(43200, |v| {
+            v.parse()
+                .expect("SUPERPOSITION_UNUSED_PROVIDER_TTL must be a valid number")
+        });
+
+    let unused_provider_check_interval =
+        std::env::var("SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL").map_or(1500, |v| {
+            v.parse()
+                .expect("SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL must be a valid number")
+        });
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -169,7 +191,7 @@ async fn main() -> std::io::Result<()> {
         secret: secret.clone(),
         realm,
         bucket_name,
-        superposition_org_id: superposition_org_id_env,
+        superposition_org_id: superposition_org_id_env.clone(),
         enable_google_signin,
         organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
@@ -218,13 +240,45 @@ async fn main() -> std::io::Result<()> {
             .build(),
     );
 
+    // Initialize Redis client
+    let redis_client =
+        redis::Client::open(redis_url.as_str()).expect("Failed to create Redis client");
+
+    let redis_cache = RedisCache::new(redis_client, "airborne".to_string())
+        .await
+        .expect("Failed to create Redis cache instance");
+
+    let provider_url = cac_url + "/";
+
+    let provider_registry = Arc::new(ProviderRegistry::new(
+        superposition_org_id_env.clone(),
+        "your_bearer_token_here".to_string(),
+        provider_url.clone(),
+    ));
+
+    if clear_unused_providers {
+        info!("Starting unused superposition provider eviction task with TTL {} seconds and check interval {} seconds", unused_provider_ttl, unused_provider_check_interval);
+
+        let provider_registry_clone = provider_registry.clone();
+        tokio::spawn(async move {
+            provider_registry_clone
+                .run_ttl_eviction(
+                    Duration::from_secs(unused_provider_ttl),
+                    Duration::from_secs(unused_provider_check_interval),
+                )
+                .await;
+        });
+    }
+
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
         db_pool: pool,
+        redis_cache,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
+        provider_registry,
     });
 
     // Start the background cleanup job for transaction reconciliation

@@ -49,6 +49,7 @@ async fn list_cohorts_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -95,6 +96,7 @@ async fn create_cohort_checkpoint_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -271,6 +273,7 @@ async fn create_cohort_group_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -370,6 +373,7 @@ async fn get_cohort_priority_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -445,6 +449,7 @@ async fn update_cohort_priority_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
