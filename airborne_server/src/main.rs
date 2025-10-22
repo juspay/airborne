@@ -25,7 +25,10 @@ mod types;
 mod user;
 mod utils;
 
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::{
+    web::{self, PathConfig, QueryConfig},
+    App, HttpResponse, HttpServer,
+};
 use aws_sdk_s3::config::Builder;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
@@ -238,6 +241,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::from_fn(request_id_mw))
             .wrap(TracingLogger::default())
             .app_data(web::Data::from(app_state.clone()))
+            .app_data(PathConfig::default().error_handler(middleware::path_error_handler))
+            .app_data(QueryConfig::default().error_handler(middleware::query_error_handler))
             .app_data(web::JsonConfig::default().error_handler(middleware::json_error_handler))
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())

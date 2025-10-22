@@ -173,16 +173,19 @@ export default function CohortsPage() {
 
     const releasePromises = cohortSchema.enum.map(async (cohort) => {
       try {
-        const result = await apiFetch<{ releases: Release[] }>(
+        const result = await apiFetch<{ data: Release[] }>(
           "/releases/list",
           {
             headers: {
               "x-dimension": `${selectedDimension}=${cohort}`,
             },
+            query: {
+              all: true,
+            },
           },
           { token, org, app }
         );
-        return { cohort, releases: result.releases || [] };
+        return { cohort, releases: result.data || [] };
       } catch (error) {
         console.error(`Failed to load releases for cohort ${cohort}:`, error);
         return { cohort, releases: [] };

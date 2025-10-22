@@ -22,7 +22,7 @@ use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use http::{HeaderName, HeaderValue};
 use keycloak::KeycloakError;
 use log::error;
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 use superposition_sdk::Client;
 use thiserror::Error;
 
@@ -340,5 +340,63 @@ where
         }
 
         res
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedResponse<T> {
+    pub data: Vec<T>,
+    pub total_items: u64,
+    pub total_pages: u32,
+}
+
+impl<T> PaginatedResponse<T> {
+    pub fn all(data: Vec<T>) -> Self {
+        Self {
+            total_pages: 1,
+            total_items: data.len() as u64,
+            data,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum PaginatedQuery {
+    All,
+    Paginated { page: u32, count: u32 },
+}
+
+impl<'de> Deserialize<'de> for PaginatedQuery {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Helper {
+            count: Option<u32>,
+            page: Option<u32>,
+            all: Option<bool>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+        if helper.all.unwrap_or_default() && (helper.page.is_some() || helper.count.is_some()) {
+            Err(serde::de::Error::custom(
+                "'all' cannot be used with 'page' or 'count'".to_string(),
+            ))
+        } else if helper.all == Some(true) {
+            Ok(Self::All)
+        } else {
+            let page = helper.page.unwrap_or(1);
+            let count = helper.count.unwrap_or(10);
+
+            if page < 1 {
+                return Err(serde::de::Error::custom("'page' must be at least 1"));
+            }
+            if count < 1 {
+                return Err(serde::de::Error::custom("'count' must be at least 1"));
+            }
+
+            Ok(Self::Paginated { page, count })
+        }
     }
 }
