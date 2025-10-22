@@ -13,6 +13,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { hasAppAccess } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export type ApiRelease = {
   id: string;
@@ -27,10 +28,11 @@ export type ApiRelease = {
 
 export default function ReleasesPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSeachQuery = useDebouncedValue(searchQuery, 500);
   const [filterStatus, setFilterStatus] = useState("all");
   const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
 
-  const { data } = useSWR(token && org && app ? ["/releases/list", searchQuery] : null, async () =>
+  const { data } = useSWR(token && org && app ? ["/releases/list", debouncedSeachQuery] : null, async () =>
     apiFetch<any>("/releases/list", {}, { token, org, app })
   );
   const releases: ApiRelease[] = data?.releases || [];
