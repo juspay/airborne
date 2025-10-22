@@ -14,7 +14,7 @@
 
 use actix_web::{
     error, get, post, put,
-    web::{self, Json, Path},
+    web::{self, Json, Path, Query},
     HttpResponse, Scope,
 };
 use aws_smithy_types::Document;
@@ -29,7 +29,7 @@ use crate::{
     file::utils::parse_file_key,
     middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
     release::types::*,
-    types::{ABError, AppState},
+    types::{ABError, AppState, PaginatedQuery, PaginatedResponse},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
 
@@ -583,10 +583,12 @@ async fn create_release(
 
 #[get("/list")]
 async fn list_releases(
+    pagination_query: Query<PaginatedQuery>,
+    release_query: Query<ListReleaseQuery>,
     req: actix_web::HttpRequest,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ListReleaseResponse>, ABError> {
+) -> actix_web::Result<Json<PaginatedResponse<CreateReleaseResponse>>, ABError> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -609,6 +611,8 @@ async fn list_releases(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
+    let status = release_query.status.clone().map(|s| s.into());
+
     let context: HashMap<String, Value> = req
         .headers()
         .get("x-dimension")
@@ -616,14 +620,28 @@ async fn list_releases(
         .map(utils::parse_kv_string)
         .unwrap_or_default();
 
-    let experiments_list = utils::list_experiments_by_context(
-        superposition_org_id_from_env.clone(),
-        workspace_name.clone(),
+    let mut query = ListExperimentsQuery {
+        superposition_org_id: superposition_org_id_from_env.clone(),
+        workspace_name: workspace_name.clone(),
         context,
-        false,
-        state.clone(),
-    )
-    .await?;
+        strict_mode: false,
+        page: None,
+        count: None,
+        all: false,
+        status,
+    };
+
+    match *pagination_query {
+        PaginatedQuery::All => {
+            query.all = true;
+        }
+        PaginatedQuery::Paginated { page: p, count: c } => {
+            query.page = Some(p.into());
+            query.count = Some(c.into());
+        }
+    }
+
+    let experiments_list = utils::list_experiments_by_context(query, state.clone()).await?;
 
     let experiments = experiments_list.data();
 
@@ -846,9 +864,11 @@ async fn list_releases(
         releases.push(release_response);
     }
 
-    releases.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    Ok(Json(ListReleaseResponse { releases }))
+    Ok(Json(PaginatedResponse {
+        data: releases,
+        total_items: experiments_list.total_items as u64,
+        total_pages: experiments_list.total_pages as u32,
+    }))
 }
 
 #[post("/{release_id}/ramp")]

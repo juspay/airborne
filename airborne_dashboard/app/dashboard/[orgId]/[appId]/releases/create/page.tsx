@@ -30,6 +30,8 @@ import {
   Settings,
   Cog,
   Copy,
+  Package,
+  Plus,
 } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
@@ -106,6 +108,8 @@ export default function CreateReleasePage() {
 
   const [pkgSearch, setPkgSearch] = useState("");
   const debouncedPackageSearch = useDebouncedValue(pkgSearch, 500);
+  const [pkgPage, setPkgPage] = useState(1);
+  const pkgCount = 10;
   const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(null);
 
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -117,6 +121,8 @@ export default function CreateReleasePage() {
   >([]);
   const [cohorts, setCohorts] = useState<Record<string, string[]>>({});
   const [packages, setPackages] = useState<Pkg[]>([]);
+  const [totalPackagesPage, setTotalPackagesPage] = useState(0);
+  const [pkgLoading, setPkgLoading] = useState(true);
 
   // Resource-related state
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
@@ -323,10 +329,16 @@ export default function CreateReleasePage() {
   // Load packages list
   useEffect(() => {
     if (!token || !org || !app) return;
-    apiFetch<any>("/packages/list", { query: { offset: 0, limit: 100 } }, { token, org, app })
+    setPkgLoading(true);
+    apiFetch<any>(
+      "/packages/list",
+      { query: { page: pkgPage, count: pkgCount, search: pkgSearch ? pkgSearch : undefined } },
+      { token, org, app }
+    )
       .then((res) => {
-        const loadedPackages = res.packages || [];
+        const loadedPackages = res.data || [];
         setPackages(loadedPackages);
+        setTotalPackagesPage(res.total_pages);
 
         // Handle package selection from clone data
         if (isClone) {
@@ -383,8 +395,9 @@ export default function CreateReleasePage() {
           }
         }
       })
-      .catch(() => setPackages([]));
-  }, [token, org, app, searchParams]);
+      .catch(() => setPackages([]))
+      .finally(() => setPkgLoading(false));
+  }, [token, org, app, searchParams, pkgCount, pkgPage, debouncedPackageSearch]);
 
   useEffect(() => {
     if (selectedPackage) {
@@ -472,14 +485,9 @@ export default function CreateReleasePage() {
   );
 
   const { data } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
-    apiFetch<any>("/releases/list", {}, { token, org, app })
+    apiFetch<any>("/releases/list", { query: { page: 1, count: 1 } }, { token, org, app })
   );
-  const releases: ApiRelease[] = data?.releases || [];
-
-  const filteredPackages = useMemo(
-    () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
-    [packages, debouncedPackageSearch]
-  );
+  const releases: ApiRelease[] = data?.data || [];
 
   // Get resource data from API response
   const allResources = resourceData?.files || [];
@@ -1253,47 +1261,110 @@ export default function CreateReleasePage() {
                     <Input
                       placeholder="Search packages..."
                       value={pkgSearch}
-                      onChange={(e) => setPkgSearch(e.target.value)}
+                      onChange={(e) => {
+                        setPkgSearch(e.target.value);
+                        setPkgPage(1);
+                      }}
                       className="pl-10"
                     />
                   </div>
                 </div>
+                {pkgLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      <span className="text-muted-foreground">Loading packages...</span>
+                    </div>
+                  </div>
+                ) : packages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No packages found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {pkgSearch.trim() !== ""
+                        ? `No packages found matching "${pkgSearch}".`
+                        : "You haven't created any packages yet."}
+                    </p>
+                    {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && pkgSearch.trim() === "" && (
+                      <Button asChild className="gap-2">
+                        <Link
+                          href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Create your first package
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead>Version</TableHead>
+                        <TableHead>Tag</TableHead>
+                        <TableHead>Index</TableHead>
+                        <TableHead>Files</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {packages.map((p) => {
+                        const key = `${p.tag}:${p.version}`;
+                        const checked = selectedPackage
+                          ? selectedPackage.version === p.version && selectedPackage.tag === p.tag
+                          : false;
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(isChecked) => setSelectedPackage(isChecked ? p : null)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{p.version}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{p.tag}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{p.index}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>Version</TableHead>
-                      <TableHead>Tag</TableHead>
-                      <TableHead>Index</TableHead>
-                      <TableHead>Files</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPackages.map((p) => {
-                      const key = `${p.tag}:${p.version}`;
-                      const checked = selectedPackage
-                        ? selectedPackage.version === p.version && selectedPackage.tag === p.tag
-                        : false;
-                      return (
-                        <TableRow key={key}>
-                          <TableCell>
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(isChecked) => setSelectedPackage(isChecked ? p : null)}
-                            />
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{p.version}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{p.tag}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{p.index}</TableCell>
-                          <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                {totalPackagesPage > 1 && (
+                  <div className="mt-4">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (pkgPage > 1) setPkgPage(pkgPage - 1);
+                            }}
+                            className={pkgPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                          />
+                        </PaginationItem>
+
+                        {renderPaginationItems(pkgPage, totalPackagesPage, setPkgPage)}
+
+                        <PaginationItem>
+                          <PaginationNext
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (pkgPage < totalPackagesPage) setPkgPage(pkgPage + 1);
+                            }}
+                            className={pkgPage >= totalPackagesPage ? "pointer-events-none opacity-50" : ""}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
 
                 <div className="mt-6 space-y-2 hidden">
                   <Label>Package Properties (JSON)</Label>
