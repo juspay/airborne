@@ -114,6 +114,11 @@ async fn main() -> std::io::Result<()> {
     let backlog = std::env::var("BACKLOG")
         .map_or(1024, |v| v.parse().expect("BACKLOG must be a valid number"));
 
+    let run_pending_migrations = std::env::var("RUN_DB_MIGRATIONS")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
     let mut force_path_style = false;
@@ -126,10 +131,15 @@ async fn main() -> std::io::Result<()> {
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
-    let mut conn = db::establish_connection(&aws_kms_client).await;
-    conn.run_pending_migrations(MIGRATIONS)
-        .expect("Failed to run pending migrations");
+    if run_pending_migrations {
+        info!("Running pending database migrations");
+        let mut conn = db::establish_connection(&aws_kms_client).await;
+        conn.run_pending_migrations(MIGRATIONS)
+            .expect("Failed to run pending migrations");
+    }
+
     // Initialize DB pool
+    info!("Creating db pool");
     let pool = db::establish_pool(&aws_kms_client).await;
     let secret = decrypt_kms(&aws_kms_client, enc_sec).await;
 
