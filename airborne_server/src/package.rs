@@ -2,7 +2,9 @@ pub mod utils;
 use crate::{
     package::{types::*, utils::parse_package_key},
     run_blocking,
-    types::{ABError, WithHeaders},
+    types::{
+        WithHeaders, {ABError, PaginatedQuery, PaginatedResponse},
+    },
     utils::db::{
         models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
         schema::hyperotaserver::{
@@ -11,8 +13,8 @@ use crate::{
                 tag as file_tag, version as file_version,
             },
             packages_v2::{
-                app_id as package_app_id, org_id as package_org_id, table as packages_table,
-                tag as package_tag, version as package_version,
+                app_id as package_app_id, index as package_index, org_id as package_org_id,
+                table as packages_table, tag as package_tag, version as package_version,
             },
         },
     },
@@ -205,11 +207,12 @@ async fn get_package(
 
 #[get("/list")]
 async fn list_packages(
-    input: Query<ListPackagesInput>,
+    pagination_query: Query<PaginatedQuery>,
+    package_query: Query<ListPackageQuery>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> airborne_types::Result<Json<ListPackagesOutput>> {
-    let ListPackagesInput { offset, limit } = input.into_inner();
+) -> airborne_types::Result<Json<PaginatedResponse<Package>>> {
+    let search = package_query.search.clone();
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -223,55 +226,68 @@ async fn list_packages(
         }),
     }?;
 
-    // sanitize / defaults
-    let offset_val = offset.unwrap_or(0).max(0) as i64;
-    let limit_val = limit.unwrap_or(10).clamp(1, 100) as i64; // default 10, max 100
-
     let pool = state.db_pool.clone();
 
-    let (total_count, rows) = run_blocking!({
+    let response = run_blocking!({
         let mut conn = pool.get()?;
 
-        // 1) total count
-        let total_count: i64 = packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
-            .select(count_star())
-            .first(&mut conn)?;
+        let build_base_query = || {
+            let mut base_query = packages_table
+                .filter(package_org_id.eq(&organisation))
+                .filter(package_app_id.eq(&application))
+                .into_boxed();
 
-        // 2) fetch one page
-        let rows: Vec<PackageV2Entry> = packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
-            .order(package_version.desc())
-            .offset(offset_val)
-            .limit(limit_val)
-            .select(PackageV2Entry::as_select())
-            .load(&mut conn)?;
+            if let Some(ref search_str) = search {
+                let pattern = format!("%{}%", search_str);
+                base_query = base_query.filter(package_index.ilike(pattern));
+            }
 
-        Ok((total_count, rows))
+            base_query
+        };
+
+        match *pagination_query {
+            PaginatedQuery::All => {
+                let rows: Vec<PackageV2Entry> = build_base_query()
+                    .order(package_version.desc())
+                    .select(PackageV2Entry::as_select())
+                    .load(&mut conn)?;
+                Ok::<_, ABError>(PaginatedResponse::all(
+                    rows.into_iter()
+                        .map(utils::db_response_to_package)
+                        .collect(),
+                ))
+            }
+            PaginatedQuery::Paginated { page, count } => {
+                let total_count: i64 = build_base_query()
+                    .select(count_star())
+                    .first::<i64>(&mut conn)?;
+
+                let page = page as i64;
+                let count = count as i64;
+                let offset = (page - 1) * count;
+
+                let rows: Vec<PackageV2Entry> = build_base_query()
+                    .offset(offset)
+                    .limit(count)
+                    .order(package_version.desc())
+                    .select(PackageV2Entry::as_select())
+                    .load(&mut conn)?;
+
+                let packages: Vec<Package> = rows
+                    .into_iter()
+                    .map(utils::db_response_to_package)
+                    .collect();
+
+                let total_pages = (total_count + count - 1) / count;
+
+                Ok(PaginatedResponse {
+                    data: packages,
+                    total_items: total_count as u64,
+                    total_pages: total_pages as u32,
+                })
+            }
+        }
     })?;
 
-    // 3) map to your public DTO
-    let packages: Vec<Package> = rows
-        .into_iter()
-        .map(utils::db_response_to_package)
-        .collect();
-
-    // 4) build pagination
-    let total_pages = ((total_count + limit_val - 1) / limit_val) as i32;
-    let page_number = (offset_val / limit_val + 1) as i32;
-    let next_offset =
-        (offset_val + limit_val < total_count).then(|| (offset_val + limit_val) as i32);
-    let prev_offset = (offset_val >= limit_val).then(|| (offset_val - limit_val) as i32);
-
-    let out = ListPackagesOutput {
-        packages,
-        page_number,
-        next_offset,
-        prev_offset,
-        total_pages,
-    };
-
-    Ok(Json(out))
+    Ok(Json(response))
 }

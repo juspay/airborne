@@ -1,6 +1,6 @@
 use actix_web::{
     delete, get, post, put,
-    web::{self, Json, Path, ReqData},
+    web::{self, Json, Path, Query, ReqData},
     Scope,
 };
 use serde::Serialize;
@@ -154,7 +154,7 @@ async fn create_dimension_api(
 #[get("/list")]
 async fn list_dimensions_api(
     auth_response: ReqData<AuthResponse>,
-    query: web::Query<ListDimensionsQuery>,
+    query: Query<ListDimensionsQuery>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ListDimensionsResponse>> {
     let auth_response = auth_response.into_inner();
@@ -440,7 +440,7 @@ async fn create_release_view_api(
 #[get("/release-view/list")]
 async fn list_release_views_api(
     auth_response: ReqData<AuthResponse>,
-    query: web::Query<ListReleaseViewsQuery>,
+    query: Query<ListReleaseViewsQuery>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ListReleaseViewsResponse>> {
     let auth_response = auth_response.into_inner();
