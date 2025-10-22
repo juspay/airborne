@@ -3252,18 +3252,32 @@
         "io.airborne.server#ListPackagesRequest": {
             "type": "structure",
             "members": {
-                "offset": {
+                "page": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Offset for pagination",
-                        "smithy.api#httpQuery": "offset"
+                        "smithy.api#documentation": "Offset for pagination (default: 1)",
+                        "smithy.api#httpQuery": "page"
                     }
                 },
-                "limit": {
+                "count": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Limit for pagination",
-                        "smithy.api#httpQuery": "limit"
+                        "smithy.api#documentation": "Limit for pagination (default: 50)",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search term for filtering packages using index file path",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "If true, fetch all packages without pagination",
+                        "smithy.api#httpQuery": "all"
                     }
                 },
                 "organisation": {
@@ -3290,36 +3304,38 @@
         "io.airborne.server#ListPackagesResponse": {
             "type": "structure",
             "members": {
-                "packages": {
+                "data": {
                     "target": "io.airborne.server#PackageList",
                     "traits": {
                         "smithy.api#documentation": "List of packages",
                         "smithy.api#required": {}
                     }
                 },
-                "page_number": {
+                "page": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Number of page",
+                        "smithy.api#documentation": "Current page number",
                         "smithy.api#required": {}
                     }
                 },
-                "next_offset": {
+                "count": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Next offset for pagination"
-                    }
-                },
-                "prev_offset": {
-                    "target": "smithy.api#Integer",
-                    "traits": {
-                        "smithy.api#documentation": "Previous offset for pagination"
+                        "smithy.api#documentation": "Count of releases per page",
+                        "smithy.api#required": {}
                     }
                 },
                 "total_pages": {
                     "target": "smithy.api#Integer",
                     "traits": {
                         "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of items",
                         "smithy.api#required": {}
                     }
                 }
@@ -3364,6 +3380,34 @@
                         "smithy.api#httpHeader": "x-dimension"
                     }
                 },
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Page number for pagination (default: 1)",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Count of releases per page for pagination (default: 50)",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "If true, fetch all releases without pagination",
+                        "smithy.api#httpQuery": "all"
+                    }
+                },
+                "status": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Status to filter releases",
+                        "smithy.api#httpQuery": "status"
+                    }
+                },
                 "organisation": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -3385,10 +3429,38 @@
         "io.airborne.server#ListReleasesResponse": {
             "type": "structure",
             "members": {
-                "releases": {
+                "data": {
                     "target": "io.airborne.server#GetReleaseResponseList",
                     "traits": {
                         "smithy.api#documentation": "List of releases",
+                        "smithy.api#required": {}
+                    }
+                },
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Current page number",
+                        "smithy.api#required": {}
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Count of releases per page",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of items",
                         "smithy.api#required": {}
                     }
                 }

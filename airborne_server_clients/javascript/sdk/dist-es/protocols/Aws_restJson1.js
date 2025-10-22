@@ -207,8 +207,10 @@ export const se_ListPackagesCommand = async (input, context) => {
     });
     b.bp("/api/packages/list");
     const query = map({
-        [_of]: [() => input.offset !== void 0, () => (input[_of].toString())],
-        [_l]: [() => input.limit !== void 0, () => (input[_l].toString())],
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
     });
     let body;
     b.m("GET")
@@ -225,9 +227,16 @@ export const se_ListReleasesCommand = async (input, context) => {
         [_xa]: input[_a],
     });
     b.bp("/api/releases/list");
+    const query = map({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+        [_st]: [, input[_st]],
+    });
     let body;
     b.m("GET")
         .h(headers)
+        .q(query)
         .b(body);
     return b.build();
 };
@@ -546,10 +555,10 @@ export const de_ListPackagesCommand = async (output, context) => {
     });
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
-        'next_offset': __expectInt32,
-        'packages': _json,
-        'page_number': __expectInt32,
-        'prev_offset': __expectInt32,
+        'count': __expectInt32,
+        'data': _json,
+        'page': __expectInt32,
+        'total_items': __expectInt32,
         'total_pages': __expectInt32,
     });
     Object.assign(contents, doc);
@@ -564,7 +573,11 @@ export const de_ListReleasesCommand = async (output, context) => {
     });
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
-        'releases': _ => de_GetReleaseResponseList(_, context),
+        'count': __expectInt32,
+        'data': _ => de_GetReleaseResponseList(_, context),
+        'page': __expectInt32,
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
     });
     Object.assign(contents, doc);
     return contents;
@@ -893,16 +906,16 @@ const deserializeMetadata = (output) => ({
 });
 const collectBodyString = (streamBody, context) => collectBody(streamBody, context).then(body => context.utf8Encoder(body));
 const _a = "application";
+const _al = "all";
 const _c = "count";
 const _ch = "checksum";
 const _d = "dimension";
 const _fp = "file_path";
-const _l = "limit";
 const _o = "organisation";
-const _of = "offset";
 const _p = "page";
 const _pp = "per_page";
 const _s = "search";
+const _st = "status";
 const _t = "tag";
 const _xa = "x-application";
 const _xc = "x-checksum";

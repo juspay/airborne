@@ -41,13 +41,21 @@ structure Package {
 
 /// List packages request
 structure ListPackagesRequest {
-    /// Offset for pagination
-    @httpQuery("offset")
-    offset: Integer
+    /// Offset for pagination (default: 1)
+    @httpQuery("page")
+    page: Integer
 
-    /// Limit for pagination
-    @httpQuery("limit")
-    limit: Integer
+    /// Limit for pagination (default: 50)
+    @httpQuery("count")
+    count: Integer
+
+    /// Search term for filtering packages using index file path
+    @httpQuery("search")
+    search: String
+
+    /// If true, fetch all packages without pagination
+    @httpQuery("all")
+    all: Boolean
 
     /// Name of the organisation
     @httpHeader("x-organisation")
@@ -69,21 +77,23 @@ list PackageList {
 structure ListPackagesResponse {
     /// List of packages
     @required
-    packages: PackageList
+    data: PackageList
 
-    /// Number of page
+    /// Current page number
     @required
-    page_number: Integer
+    page: Integer
 
-    /// Next offset for pagination
-    next_offset: Integer
-
-    /// Previous offset for pagination
-    prev_offset: Integer
+    /// Count of releases per page
+    @required
+    count: Integer
 
     /// Total number of pages
     @required
     total_pages: Integer
+
+    /// Total number of items
+    @required
+    total_items: Integer
 }
 
 /// Create package request operation

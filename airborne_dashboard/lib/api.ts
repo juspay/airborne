@@ -6,7 +6,7 @@ type FetchOptions = {
   headers?: Record<string, string>;
   body?: any;
   requireAuth?: boolean;
-  query?: Record<string, string | number | undefined>;
+  query?: Record<string, string | number | undefined | boolean>;
   showErrorToast?: boolean; // New option to control error toast display
 };
 

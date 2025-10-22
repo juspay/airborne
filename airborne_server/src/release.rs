@@ -14,7 +14,7 @@
 
 use actix_web::{
     error, get, post, put,
-    web::{self, Json, Path},
+    web::{self, Json, Path, Query},
     HttpResponse, Scope,
 };
 use aws_smithy_types::Document;
@@ -29,7 +29,7 @@ use crate::{
     file::utils::parse_file_key,
     middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
     release::types::*,
-    types::{ABError, AppState},
+    types::{ABError, AppState, PaginatedResponse},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
 
@@ -583,10 +583,11 @@ async fn create_release(
 
 #[get("/list")]
 async fn list_releases(
+    query: Query<ListReleaseQuery>,
     req: actix_web::HttpRequest,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> actix_web::Result<Json<ListReleaseResponse>, ABError> {
+) -> actix_web::Result<Json<PaginatedResponse<CreateReleaseResponse>>, ABError> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -609,6 +610,12 @@ async fn list_releases(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
+    let ListReleaseQuery { pagination, status } = query.into_inner();
+    let page = pagination.page;
+    let count = pagination.count;
+    let all = pagination.all;
+    let status = status.map(|s| s.into());
+
     let context: HashMap<String, Value> = req
         .headers()
         .get("x-dimension")
@@ -617,10 +624,16 @@ async fn list_releases(
         .unwrap_or_default();
 
     let experiments_list = utils::list_experiments_by_context(
-        superposition_org_id_from_env.clone(),
-        workspace_name.clone(),
-        context,
-        false,
+        ListExperimentsQuery {
+            superposition_org_id: superposition_org_id_from_env.clone(),
+            workspace_name: workspace_name.clone(),
+            context,
+            strict_mode: false,
+            page: Some(page.into()),
+            count: Some(count.into()),
+            all,
+            status,
+        },
         state.clone(),
     )
     .await?;
@@ -846,9 +859,16 @@ async fn list_releases(
         releases.push(release_response);
     }
 
-    releases.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    let response_page = if all { 1 } else { page };
+    let response_count = releases.len() as u32;
 
-    Ok(Json(ListReleaseResponse { releases }))
+    Ok(Json(PaginatedResponse {
+        data: releases,
+        page: response_page,
+        count: response_count,
+        total_items: experiments_list.total_items as u64,
+        total_pages: experiments_list.total_pages as u32,
+    }))
 }
 
 #[post("/{release_id}/ramp")]
