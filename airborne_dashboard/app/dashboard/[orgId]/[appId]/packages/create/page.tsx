@@ -50,7 +50,8 @@ export default function CreatePackagePage() {
   // Step 2: Package Files
   const [searchQuery, setSearchQuery] = useState("");
   const [packageFileCurrentPage, setPackageFileCurrentPage] = useState(1);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [selectedFiles, setSelectedFiles] = useState<Map<string, string>>(new Map()); // Map<file_path, file_id>
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -102,23 +103,25 @@ export default function CreatePackagePage() {
   const availableFiles = useMemo(() => {
     if (!selectedIndexFile) return files;
     return files.filter((f) => {
-      const indexKey = selectedIndexFile.id || `${selectedIndexFile.file_path}@${selectedIndexFile.version}`;
-      const fileKey = f.id || `${f.file_path}@${f.version}`;
+      const indexKey = selectedIndexFile.id || `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`;
+      const fileKey = f.id || `${f.file_path}@version:${f.version}`;
       return fileKey !== indexKey;
     });
   }, [files, selectedIndexFile]);
 
-  const toggle = (f: ApiFile) => {
-    const key = f.id || `${f.file_path}@${f.version}`;
-    setSelected((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  const toggle = (fileId: string) => {
+    const file_path = fileId.split("@version:")[0];
 
-  const selectedList = useMemo(() => {
-    return availableFiles.filter((f) => {
-      const key = f.id || `${f.file_path}@${f.version}`;
-      return selected[key];
+    setSelectedFiles((prev) => {
+      const newMap = new Map(prev);
+      if (newMap.has(file_path)) {
+        newMap.delete(file_path);
+      } else {
+        newMap.set(file_path, fileId);
+      }
+      return newMap;
     });
-  }, [availableFiles, selected]);
+  };
 
   const canProceedToStep = (step: number) => {
     switch (step) {
@@ -253,7 +256,7 @@ export default function CreatePackagePage() {
         return;
       }
 
-      const fileIds = selectedList.map((f) => f.id || f.file_path);
+      const fileIds = Array.from(selectedFiles.values());
       const indexPath = selectedIndexFile ? `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}` : "";
 
       await apiFetch(
@@ -395,11 +398,11 @@ export default function CreatePackagePage() {
                         </TableHeader>
                         <TableBody>
                           {indexFiles.map((f) => {
-                            const key = f.id || `${f.file_path}@${f.version}`;
+                            const key = f.id || `${f.file_path}@version:${f.version}`;
                             const isSelected =
                               selectedIndexFile &&
                               (selectedIndexFile.id ||
-                                `${selectedIndexFile.file_path}@${selectedIndexFile.version}`) === key;
+                                `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`) === key;
                             return (
                               <TableRow key={key}>
                                 <TableCell>
@@ -516,13 +519,35 @@ export default function CreatePackagePage() {
                         </TableHeader>
                         <TableBody>
                           {availableFiles.map((f) => {
-                            const key = f.id || `${f.file_path}@${f.version}`;
+                            const fileId = f.id || `${f.file_path}@version:${f.version}`;
+                            const selectedFileId = selectedFiles.get(f.file_path);
+                            const isThisVersionSelected = selectedFileId === fileId;
+                            const isAnotherVersionSelected = selectedFileId && selectedFileId !== fileId;
+                            const isSameAsIndexFile = selectedIndexFile && f.file_path === selectedIndexFile.file_path;
+
                             return (
-                              <TableRow key={key}>
+                              <TableRow
+                                key={fileId}
+                                className={isAnotherVersionSelected || isSameAsIndexFile ? "opacity-50" : ""}
+                              >
                                 <TableCell>
-                                  <Checkbox checked={!!selected[key]} onCheckedChange={() => toggle(f)} />
+                                  <Checkbox
+                                    checked={isThisVersionSelected}
+                                    disabled={!!isAnotherVersionSelected || !!isSameAsIndexFile}
+                                    onCheckedChange={() => toggle(fileId)}
+                                  />
                                 </TableCell>
-                                <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                                <TableCell className="font-mono text-sm">
+                                  {f.file_path}
+                                  {isAnotherVersionSelected && (
+                                    <div className="text-xs text-amber-600 mt-1">Another version already selected</div>
+                                  )}
+                                  {isSameAsIndexFile && (
+                                    <div className="text-xs text-amber-600 mt-1">
+                                      Another version is selected as the index file
+                                    </div>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-muted-foreground">{f.version}</TableCell>
                                 <TableCell className="text-muted-foreground">{f.tag || "—"}</TableCell>
                               </TableRow>
@@ -576,20 +601,29 @@ export default function CreatePackagePage() {
                   </div>
                 )}
 
-                {selectedList.length > 0 && (
+                {selectedFiles.size > 0 && (
                   <div className="mt-4 space-y-2">
-                    <Label>Selected Files ({selectedList.length})</Label>
+                    <Label>Selected Files ({selectedFiles.size})</Label>
                     <div className="max-h-40 overflow-y-auto space-y-1">
-                      {selectedList.map((f) => {
-                        const key = f.id || `${f.file_path}@${f.version}`;
+                      {Array.from(selectedFiles.values()).map((fileId) => {
+                        const [file_path, versionPart] = fileId.split("@version:");
                         return (
-                          <div key={key} className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm">
+                          <div
+                            key={file_path}
+                            className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                          >
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
-                              <span className="font-mono">{f.file_path}</span>
-                              <span className="text-muted-foreground">(v{f.version})</span>
+                              <span className="font-mono">{file_path}</span>
+                              {versionPart && <span className="text-muted-foreground">(Version {versionPart})</span>}
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => toggle(f)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                toggle(fileId);
+                              }}
+                            >
                               Remove
                             </Button>
                           </div>
