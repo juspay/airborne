@@ -5,6 +5,7 @@ use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use superposition_sdk::types::ExperimentStatusType;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateReleaseRequest {
@@ -86,9 +87,29 @@ pub struct ReleaseExperiment {
     pub status: String,
 }
 
-#[derive(Serialize)]
-pub struct ListReleaseResponse {
-    pub releases: Vec<CreateReleaseResponse>,
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum ReleaseStatus {
+    Created,
+    Inprogress,
+    Concluded,
+    Discarded,
+}
+
+impl From<ReleaseStatus> for ExperimentStatusType {
+    fn from(status: ReleaseStatus) -> Self {
+        match status {
+            ReleaseStatus::Created => Self::Created,
+            ReleaseStatus::Inprogress => Self::Inprogress,
+            ReleaseStatus::Concluded => Self::Concluded,
+            ReleaseStatus::Discarded => Self::Discarded,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct ListReleaseQuery {
+    pub status: Option<ReleaseStatus>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -152,4 +173,15 @@ pub struct BuildOverrides {
     pub final_properties: Option<Value>,
     pub control_overrides: HashMap<String, Document>,
     pub experimental_overrides: HashMap<String, Document>,
+}
+
+pub struct ListExperimentsQuery {
+    pub superposition_org_id: String,
+    pub workspace_name: String,
+    pub context: HashMap<String, Value>,
+    pub strict_mode: bool,
+    pub page: Option<i64>,
+    pub count: Option<i64>,
+    pub all: bool,
+    pub status: Option<ExperimentStatusType>,
 }
