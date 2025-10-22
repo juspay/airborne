@@ -23,17 +23,21 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
   const fetchRelease = async () => {
     setLoading(true);
     try {
-      const { releases }: { releases: ApiRelease[] } = await apiFetch(
+      const { data }: { data: ApiRelease[] } = await apiFetch(
         `/releases/list`,
         {
           headers: {
             "x-dimension": dimensionHeader,
           },
+          query: {
+            page: 1,
+            count: 5,
+          },
         },
         { token, org, app }
       );
 
-      setReleases(releases);
+      setReleases(data);
     } catch (err) {
       console.log(err);
     } finally {
