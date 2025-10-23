@@ -12,6 +12,7 @@ export * from "./ListFilesCommand";
 export * from "./ListOrganisationsCommand";
 export * from "./ListPackagesCommand";
 export * from "./ListReleasesCommand";
+export * from "./ListVersionsCommand";
 export * from "./PostLoginCommand";
 export * from "./RequestOrganisationCommand";
 export * from "./ServeReleaseCommand";
