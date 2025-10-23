@@ -74,6 +74,11 @@ import {
   ListReleasesCommandOutput,
 } from "./commands/ListReleasesCommand";
 import {
+  ListVersionsCommand,
+  ListVersionsCommandInput,
+  ListVersionsCommandOutput,
+} from "./commands/ListVersionsCommand";
+import {
   PostLoginCommand,
   PostLoginCommandInput,
   PostLoginCommandOutput,
@@ -121,6 +126,7 @@ const commands = {
   ListOrganisationsCommand,
   ListPackagesCommand,
   ListReleasesCommand,
+  ListVersionsCommand,
   PostLoginCommand,
   RequestOrganisationCommand,
   ServeReleaseCommand,
@@ -368,6 +374,23 @@ export interface Airborne {
     args: ListReleasesCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: ListReleasesCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link ListVersionsCommand}
+   */
+  listVersions(
+    args: ListVersionsCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<ListVersionsCommandOutput>;
+  listVersions(
+    args: ListVersionsCommandInput,
+    cb: (err: any, data?: ListVersionsCommandOutput) => void
+  ): void;
+  listVersions(
+    args: ListVersionsCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: ListVersionsCommandOutput) => void
   ): void;
 
   /**

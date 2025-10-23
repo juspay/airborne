@@ -650,12 +650,17 @@ export interface ListFilesRequest {
      */
     page?: number | undefined;
     /**
-     * Number of files per page
+     * Number of versions per page
      * @public
      */
-    per_page?: number | undefined;
+    count?: number | undefined;
     /**
-     * Search query to filter files
+     * Fetch all files without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Search query to filter file versions
      * @public
      */
     search?: string | undefined;
@@ -671,40 +676,51 @@ export interface ListFilesRequest {
     application: string | undefined;
 }
 /**
+ * Represents a file entry
+ * @public
+ */
+export interface FileResponseListItem {
+    /**
+     * Path where the file is stored on sdk
+     * @public
+     */
+    file_path: string | undefined;
+    /**
+     * id of the latest file
+     * @public
+     */
+    id: string | undefined;
+    /**
+     * version of the latest file
+     * @public
+     */
+    version: number | undefined;
+    /**
+     * total versions of the file
+     * @public
+     */
+    total_versions: number | undefined;
+}
+/**
  * List files response
  * @public
  */
 export interface ListFilesResponse {
     /**
-     * Name of the organisation
-     * @public
-     */
-    organisation: string | undefined;
-    /**
-     * Name of the application
-     * @public
-     */
-    application: string | undefined;
-    /**
      * List of files
      * @public
      */
-    files: (CreateFileResponse)[] | undefined;
+    data: (FileResponseListItem)[] | undefined;
     /**
-     * Total number of files
+     * Total number of pages
      * @public
      */
-    total: number | undefined;
+    total_pages: number | undefined;
     /**
-     * Current page number
+     * Total number of items
      * @public
      */
-    page: number | undefined;
-    /**
-     * Number of files per page
-     * @public
-     */
-    per_page: number | undefined;
+    total_items: number | undefined;
 }
 /**
  * List organisations response
@@ -833,6 +849,89 @@ export interface ListReleasesResponse {
      * @public
      */
     total_items: number | undefined;
+}
+/**
+ * @public
+ */
+export interface FileVersionItem {
+    /**
+     * Version number of the file
+     * @public
+     */
+    version: number | undefined;
+    /**
+     * tag of the version
+     * @public
+     */
+    tag?: string | undefined;
+    /**
+     * Date of creation
+     * @public
+     */
+    created_at: string | undefined;
+    /**
+     * Id of the file
+     * @public
+     */
+    id: string | undefined;
+}
+/**
+ * List of version responses
+ * @public
+ */
+export interface ListVersionResponse {
+    /**
+     * List of versions
+     * @public
+     */
+    data: (FileVersionItem)[] | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
+}
+/**
+ * List versions request
+ * @public
+ */
+export interface ListVersionsRequest {
+    filepath: string | undefined;
+    /**
+     * Page number for pagination
+     * @public
+     */
+    page?: number | undefined;
+    /**
+     * Number of versions per page
+     * @public
+     */
+    count?: number | undefined;
+    /**
+     * Fetch all file versions without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Search query to filter file versions
+     * @public
+     */
+    search?: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
 }
 /**
  * User credentials for login
