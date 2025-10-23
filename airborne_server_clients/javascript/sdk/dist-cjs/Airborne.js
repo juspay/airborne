@@ -16,6 +16,7 @@ const ListFilesCommand_1 = require("./commands/ListFilesCommand");
 const ListOrganisationsCommand_1 = require("./commands/ListOrganisationsCommand");
 const ListPackagesCommand_1 = require("./commands/ListPackagesCommand");
 const ListReleasesCommand_1 = require("./commands/ListReleasesCommand");
+const ListVersionsCommand_1 = require("./commands/ListVersionsCommand");
 const PostLoginCommand_1 = require("./commands/PostLoginCommand");
 const RequestOrganisationCommand_1 = require("./commands/RequestOrganisationCommand");
 const ServeReleaseCommand_1 = require("./commands/ServeReleaseCommand");
@@ -38,6 +39,7 @@ const commands = {
     ListOrganisationsCommand: ListOrganisationsCommand_1.ListOrganisationsCommand,
     ListPackagesCommand: ListPackagesCommand_1.ListPackagesCommand,
     ListReleasesCommand: ListReleasesCommand_1.ListReleasesCommand,
+    ListVersionsCommand: ListVersionsCommand_1.ListVersionsCommand,
     PostLoginCommand: PostLoginCommand_1.PostLoginCommand,
     RequestOrganisationCommand: RequestOrganisationCommand_1.RequestOrganisationCommand,
     ServeReleaseCommand: ServeReleaseCommand_1.ServeReleaseCommand,
