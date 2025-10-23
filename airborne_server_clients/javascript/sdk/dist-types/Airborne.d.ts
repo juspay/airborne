@@ -13,6 +13,7 @@ import { ListFilesCommandInput, ListFilesCommandOutput } from "./commands/ListFi
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "./commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "./commands/ListReleasesCommand";
+import { ListVersionsCommandInput, ListVersionsCommandOutput } from "./commands/ListVersionsCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "./commands/PostLoginCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
@@ -107,6 +108,12 @@ export interface Airborne {
     listReleases(args: ListReleasesCommandInput, options?: __HttpHandlerOptions): Promise<ListReleasesCommandOutput>;
     listReleases(args: ListReleasesCommandInput, cb: (err: any, data?: ListReleasesCommandOutput) => void): void;
     listReleases(args: ListReleasesCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListReleasesCommandOutput) => void): void;
+    /**
+     * @see {@link ListVersionsCommand}
+     */
+    listVersions(args: ListVersionsCommandInput, options?: __HttpHandlerOptions): Promise<ListVersionsCommandOutput>;
+    listVersions(args: ListVersionsCommandInput, cb: (err: any, data?: ListVersionsCommandOutput) => void): void;
+    listVersions(args: ListVersionsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListVersionsCommandOutput) => void): void;
     /**
      * @see {@link PostLoginCommand}
      */
