@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,14 +26,16 @@ import { toastWarning } from "@/hooks/use-toast";
 import { hasAppAccess } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Autocomplete } from "@/components/autocomplete";
 
 type ApiFile = { id?: string; file_path: string; url: string; version: number; tag?: string; size?: number };
 
-type ApiResponse = {
-  files: ApiFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
+type ApiResponse<T> = {
+  data: T[];
+  total_items: number;
+  total_pages: number;
+  page: number;
+  count: number;
 };
 
 export default function CreatePackagePage() {
@@ -55,6 +57,10 @@ export default function CreatePackagePage() {
   const [packageFileCurrentPage, setPackageFileCurrentPage] = useState(1);
   const [selectedFiles, setSelectedFiles] = useState<Map<string, string>>(new Map()); // Map<file_path, file_id>
 
+  const [tagInput, setTagInput] = useState("");
+  const debouncedTagInput = useDebouncedValue(tagInput, 500);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -73,44 +79,59 @@ export default function CreatePackagePage() {
   } = useSWR(
     token && org && app && currentStep === 1 ? ["/file/list", debouncedIndexFileQuery, indexFileCurrentPage] : null,
     async () =>
-      apiFetch<ApiResponse>(
+      apiFetch<ApiResponse<ApiFile>>(
         "/file/list",
         {
           method: "GET",
-          query: { search: indexFileSearch || undefined, page: indexFileCurrentPage, per_page: perPage },
+          query: {
+            search: indexFileSearch || undefined,
+            page: indexFileCurrentPage,
+            count: perPage,
+            tag: selectedTag || undefined,
+          },
         },
         { token, org, app }
       )
   );
 
   const { data, error, isLoading } = useSWR(
-    token && org && app && currentStep === 2 ? ["/file/list", debouncedSeachQuery, packageFileCurrentPage] : null,
+    token && org && app && currentStep === 2
+      ? ["/file/list", debouncedSeachQuery, packageFileCurrentPage, selectedTag]
+      : null,
     async () =>
-      apiFetch<ApiResponse>(
+      apiFetch<ApiResponse<ApiFile>>(
         "/file/list",
-        { method: "GET", query: { search: searchQuery || undefined, page: packageFileCurrentPage, per_page: perPage } },
+        {
+          method: "GET",
+          query: {
+            search: searchQuery || undefined,
+            page: packageFileCurrentPage,
+            count: perPage,
+            tag: selectedTag || undefined,
+          },
+        },
         { token, org, app }
       )
   );
 
-  const indexFiles: ApiFile[] = indexFileData?.files || [];
-  const files: ApiFile[] = data?.files || [];
+  const { data: tags, isLoading: tagsLoading } = useSWR(
+    token && org && app ? ["/file/tag/list", debouncedTagInput] : null,
+    async () =>
+      apiFetch<ApiResponse<string>>(
+        "/file/tag/list",
+        { method: "GET", query: { search: tagInput || undefined, page: 1, count: 50 } },
+        { token, org, app }
+      )
+  );
+
+  const indexFiles: ApiFile[] = indexFileData?.data || [];
+  const files: ApiFile[] = data?.data || [];
 
   // Pagination data
-  const indexFileTotal = indexFileData?.total || 0;
-  const indexFileTotalPages = Math.ceil(indexFileTotal / perPage);
-  const packageFileTotal = data?.total || 0;
-  const packageFileTotalPages = Math.ceil(packageFileTotal / perPage);
-
-  // Filter out the selected index file from package files
-  const availableFiles = useMemo(() => {
-    if (!selectedIndexFile) return files;
-    return files.filter((f) => {
-      const indexKey = selectedIndexFile.id || `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`;
-      const fileKey = f.id || `${f.file_path}@version:${f.version}`;
-      return fileKey !== indexKey;
-    });
-  }, [files, selectedIndexFile]);
+  const indexFileTotal = indexFileData?.total_items || 0;
+  const indexFileTotalPages = indexFileData?.total_pages || 0;
+  const packageFileTotal = data?.total_items || 0;
+  const packageFileTotalPages = data?.total_pages || 0;
 
   const toggle = (fileId: string) => {
     const file_path = fileId.split("@version:")[0];
@@ -284,6 +305,58 @@ export default function CreatePackagePage() {
     }
   }
 
+  const selectAllFiles = async () => {
+    try {
+      const { data: allFiles } = await apiFetch<ApiResponse<ApiFile>>(
+        "/file/list",
+        {
+          method: "GET",
+          query: {
+            search: searchQuery || undefined,
+            all: true,
+            tag: selectedTag || undefined,
+          },
+        },
+        { token, org, app }
+      );
+
+      const latestFilesMap = new Map<string, ApiFile>();
+      allFiles.forEach((file) => {
+        // Skip the index file
+        if (selectedIndexFile && file.file_path === selectedIndexFile.file_path) return;
+
+        const existing = latestFilesMap.get(file.file_path);
+        if (!existing || file.version > existing.version) {
+          latestFilesMap.set(file.file_path, file);
+        }
+      });
+
+      // Update selection while respecting manual selections
+      setSelectedFiles((prev) => {
+        const updated = new Map(prev);
+
+        latestFilesMap.forEach((file, path) => {
+          const fileId = file.id || `${file.file_path}@version:${file.version}`;
+          const selectedFileId = prev.get(path);
+          const isAnotherVersionSelected = selectedFileId && selectedFileId !== fileId;
+
+          // Only select this latest version if no version is already manually selected
+          if (!selectedFileId || !isAnotherVersionSelected) {
+            updated.set(path, fileId);
+          }
+        });
+
+        return updated;
+      });
+    } catch (error) {
+      console.error("Failed to fetch all files for select all:", error);
+    }
+  };
+
+  const deselectAllFiles = () => {
+    setSelectedFiles(new Map());
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center gap-4 mb-8">
@@ -389,7 +462,7 @@ export default function CreatePackagePage() {
                       Showing {Math.min(perPage, indexFiles.length)} of {indexFileTotal} files
                       {indexFileCurrentPage > 1 && ` (page ${indexFileCurrentPage})`}
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className="max-h-112 overflow-y-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -484,33 +557,71 @@ export default function CreatePackagePage() {
                 <CardDescription>Choose additional files to include in this package</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search files..."
-                      value={searchQuery}
-                      onChange={(e) => handlePackageFileSearchChange(e.target.value)}
-                      className="pl-10"
-                    />
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium">Bulk Actions</p>
+                    <p className="text-xs text-muted-foreground">
+                      &quot;Select All&quot; selects the latest versions or files matching the current tag/search,
+                      respecting manual selections. &quot;Deselect All&quot; clears all selections.
+                    </p>
                   </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={selectAllFiles} disabled={files.length === 0}>
+                      Select All
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={deselectAllFiles} disabled={selectedFiles.size === 0}>
+                      Deselect All
+                    </Button>
+                  </div>
+                </div>
+                <div className="my-4 space-y-3 ">
+                  <div className="flex gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search files..."
+                        value={searchQuery}
+                        onChange={(e) => handlePackageFileSearchChange(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
+                    {/* Tag Autocomplete */}
+                    <div className="w-64">
+                      <Autocomplete
+                        inputValue={tagInput}
+                        setInputValue={setTagInput}
+                        selectedItem={selectedTag}
+                        setSelectedItem={setSelectedTag}
+                        items={tags?.data}
+                        loading={tagsLoading}
+                      />
+                    </div>
+                  </div>
+                  {/* Active Tag Filter Indicator */}
+                  {selectedTag && (
+                    <div className="text-sm text-muted-foreground">
+                      Filtering by tag: <span className="font-medium text-foreground">{selectedTag}</span>
+                    </div>
+                  )}
                 </div>
 
                 {error ? (
                   <div className="text-red-600">Failed to load files</div>
                 ) : isLoading ? (
                   <div>Loading…</div>
-                ) : availableFiles.length === 0 ? (
+                ) : files.length === 0 ? (
                   <div className="text-sm text-muted-foreground">
                     {searchQuery ? "No files found matching your search" : "No additional files available"}
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground">
-                      Showing {Math.min(perPage, availableFiles.length)} of {packageFileTotal} files
+                      Showing {Math.min(perPage, files.length)} of {packageFileTotal} files
                       {packageFileCurrentPage > 1 && ` (page ${packageFileCurrentPage})`}
                     </div>
-                    <div className="max-h-96 overflow-y-auto">
+                    <div>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -521,33 +632,41 @@ export default function CreatePackagePage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {availableFiles.map((f) => {
+                          {files.map((f) => {
                             const fileId = f.id || `${f.file_path}@version:${f.version}`;
                             const selectedFileId = selectedFiles.get(f.file_path);
                             const isThisVersionSelected = selectedFileId === fileId;
                             const isAnotherVersionSelected = selectedFileId && selectedFileId !== fileId;
-                            const isSameAsIndexFile = selectedIndexFile && f.file_path === selectedIndexFile.file_path;
-
+                            const isIndexFile = selectedIndexFile && f.id === selectedIndexFile.id;
+                            const isSameAsIndexFile =
+                              selectedIndexFile && !isIndexFile && f.file_path === selectedIndexFile.file_path;
                             return (
                               <TableRow
                                 key={fileId}
-                                className={isAnotherVersionSelected || isSameAsIndexFile ? "opacity-50" : ""}
+                                className={
+                                  isAnotherVersionSelected || isSameAsIndexFile || isIndexFile ? "opacity-50" : ""
+                                }
                               >
                                 <TableCell>
                                   <Checkbox
                                     checked={isThisVersionSelected}
-                                    disabled={!!isAnotherVersionSelected || !!isSameAsIndexFile}
+                                    disabled={!!isAnotherVersionSelected || !!isSameAsIndexFile || !!isIndexFile}
                                     onCheckedChange={() => toggle(fileId)}
                                   />
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">
                                   {f.file_path}
                                   {isAnotherVersionSelected && (
-                                    <div className="text-xs text-amber-600 mt-1">Another version already selected</div>
+                                    <div className="text-xs text-amber-600 mt-1">Another version already selected.</div>
+                                  )}
+                                  {isIndexFile && (
+                                    <div className="text-xs text-red-600 mt-1">
+                                      This file is selected as the index file.
+                                    </div>
                                   )}
                                   {isSameAsIndexFile && (
                                     <div className="text-xs text-amber-600 mt-1">
-                                      Another version is selected as the index file
+                                      Another version is selected as the index file.
                                     </div>
                                   )}
                                 </TableCell>
@@ -607,7 +726,7 @@ export default function CreatePackagePage() {
                 {selectedFiles.size > 0 && (
                   <div className="mt-4 space-y-2">
                     <Label>Selected Files ({selectedFiles.size})</Label>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
+                    <div className="max-h-120 overflow-y-auto space-y-1">
                       {Array.from(selectedFiles.values()).map((fileId) => {
                         const [file_path, versionPart] = fileId.split("@version:");
                         return (

@@ -381,7 +381,9 @@ export const se_ListFilesCommand = async(
   b.bp("/api/file/list");
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
-    [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
+    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
+    [_t]: [,input[_t]!],
     [_s]: [,input[_s]!],
   });
   let body: any;
@@ -867,12 +869,11 @@ export const de_ListFilesCommand = async(
   });
   const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
   const doc = take(data, {
-    'application': __expectString,
-    'files': _ => de_FileResponseList(_, context),
-    'organisation': __expectString,
+    'count': __expectInt32,
+    'data': _ => de_FileResponseList(_, context),
     'page': __expectInt32,
-    'per_page': __expectInt32,
-    'total': __expectInt32,
+    'total_items': __expectInt32,
+    'total_pages': __expectInt32,
   });
   Object.assign(contents, doc);
   return contents;
@@ -1501,7 +1502,6 @@ const de_CommandError = async(
   const _fp = "file_path";
   const _o = "organisation";
   const _p = "page";
-  const _pp = "per_page";
   const _s = "search";
   const _st = "status";
   const _t = "tag";

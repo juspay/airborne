@@ -653,7 +653,17 @@ export interface ListFilesRequest {
      * Number of files per page
      * @public
      */
-    per_page?: number | undefined;
+    count?: number | undefined;
+    /**
+     * Fetch all files without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Tag to filter files
+     * @public
+     */
+    tag?: string | undefined;
     /**
      * Search query to filter files
      * @public
@@ -676,35 +686,30 @@ export interface ListFilesRequest {
  */
 export interface ListFilesResponse {
     /**
-     * Name of the organisation
-     * @public
-     */
-    organisation: string | undefined;
-    /**
-     * Name of the application
-     * @public
-     */
-    application: string | undefined;
-    /**
      * List of files
      * @public
      */
-    files: (CreateFileResponse)[] | undefined;
-    /**
-     * Total number of files
-     * @public
-     */
-    total: number | undefined;
+    data: (CreateFileResponse)[] | undefined;
     /**
      * Current page number
      * @public
      */
     page: number | undefined;
     /**
-     * Number of files per page
+     * Count of releases per page
      * @public
      */
-    per_page: number | undefined;
+    count: number | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
 }
 /**
  * List organisations response

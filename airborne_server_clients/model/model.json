@@ -3097,11 +3097,25 @@
                         "smithy.api#httpQuery": "page"
                     }
                 },
-                "per_page": {
+                "count": {
                     "target": "smithy.api#Integer",
                     "traits": {
                         "smithy.api#documentation": "Number of files per page",
-                        "smithy.api#httpQuery": "per_page"
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Fetch all files without pagination",
+                        "smithy.api#httpQuery": "all"
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tag to filter files",
+                        "smithy.api#httpQuery": "tag"
                     }
                 },
                 "search": {
@@ -3135,31 +3149,10 @@
         "io.airborne.server#ListFilesResponse": {
             "type": "structure",
             "members": {
-                "organisation": {
-                    "target": "smithy.api#String",
-                    "traits": {
-                        "smithy.api#documentation": "Name of the organisation",
-                        "smithy.api#required": {}
-                    }
-                },
-                "application": {
-                    "target": "smithy.api#String",
-                    "traits": {
-                        "smithy.api#documentation": "Name of the application",
-                        "smithy.api#required": {}
-                    }
-                },
-                "files": {
+                "data": {
                     "target": "io.airborne.server#FileResponseList",
                     "traits": {
                         "smithy.api#documentation": "List of files",
-                        "smithy.api#required": {}
-                    }
-                },
-                "total": {
-                    "target": "smithy.api#Integer",
-                    "traits": {
-                        "smithy.api#documentation": "Total number of files",
                         "smithy.api#required": {}
                     }
                 },
@@ -3170,10 +3163,24 @@
                         "smithy.api#required": {}
                     }
                 },
-                "per_page": {
+                "count": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Number of files per page",
+                        "smithy.api#documentation": "Count of releases per page",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of items",
                         "smithy.api#required": {}
                     }
                 }

@@ -12,7 +12,7 @@ use actix_web::{
 };
 use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
-use diesel::prelude::*;
+use diesel::{dsl::count_distinct, prelude::*};
 use futures_util::StreamExt;
 use log::info;
 use serde_json::json;
@@ -25,7 +25,7 @@ use crate::{
     file::types::*,
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     run_blocking,
-    types::{ABError, AppState},
+    types::{ABError, AppState, PaginatedQuery, PaginatedResponse},
     utils::{
         db::{
             models::{FileEntry as DbFile, NewFileEntry},
@@ -44,6 +44,7 @@ pub fn add_routes() -> Scope {
         .service(list_files)
         .service(get_file)
         .service(update_file)
+        .service(list_tags)
 }
 
 fn db_file_to_response(file: &DbFile) -> FileResponse {
@@ -362,7 +363,7 @@ async fn list_files(
     query: Query<FileListQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<Json<FileListResponse>, ABError> {
+) -> Result<Json<PaginatedResponse<FileResponse>>, ABError> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -377,65 +378,88 @@ async fn list_files(
     }?;
 
     let pool = state.db_pool.clone();
-    let search_term = query.search.clone();
-    let page = query.page.unwrap_or(1);
-    let per_page = query.per_page.unwrap_or(50).min(200);
+
+    let search_term = query.pagination.search.clone();
+    let page = query.pagination.page;
+    let count = query.pagination.count;
+    let tag_value = query.tag.clone();
+    let all = query.pagination.all;
 
     let (file_list, total) = run_blocking!({
         let mut conn = pool.get()?;
 
-        let base_query = files
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application));
+        let build_base_query = || {
+            let mut base_query = files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .into_boxed();
 
-        let search_filter = if let Some(search_term) = &search_term {
-            let search_pattern = format!("%{}%", search_term);
-            Some((search_pattern.clone(), search_pattern))
-        } else {
-            None
+            if let Some(ref term) = search_term {
+                let pattern = format!("%{}%", term);
+                base_query = base_query.filter(
+                    file_path
+                        .ilike(pattern.clone())
+                        .or(url.ilike(pattern.clone())),
+                );
+            }
+
+            if let Some(ref tag_val) = tag_value {
+                if tag_val.to_lowercase() == "untagged" {
+                    base_query = base_query.filter(tag.is_null());
+                } else if !tag_val.is_empty() {
+                    base_query = base_query.filter(tag.eq(tag_val));
+                }
+            }
+
+            base_query
         };
 
-        let total = if let Some((ref pattern1, ref pattern2)) = search_filter {
-            base_query
-                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-                .count()
-                .get_result::<i64>(&mut conn)? as usize
-        } else {
-            base_query.count().get_result::<i64>(&mut conn)? as usize
-        };
+        let total: i64 = build_base_query().count().get_result(&mut conn)?;
 
-        let offset = ((page - 1) * per_page) as i64;
+        let mut data_query = build_base_query();
 
-        let file_list = if let Some((ref pattern1, ref pattern2)) = search_filter {
-            base_query
-                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
+        if !all {
+            let offset_val = ((page - 1) * count) as i64;
+            data_query = data_query
                 .order(created_at.desc())
-                .limit(per_page as i64)
-                .offset(offset)
-                .select(DbFile::as_select())
-                .load::<DbFile>(&mut conn)?
+                .limit(count as i64)
+                .offset(offset_val);
         } else {
-            base_query
-                .order(created_at.desc())
-                .limit(per_page as i64)
-                .offset(offset)
-                .select(DbFile::as_select())
-                .load::<DbFile>(&mut conn)?
-        };
+            data_query = data_query.order(created_at.desc());
+        }
+
+        let file_list = data_query
+            .select(DbFile::as_select())
+            .load::<DbFile>(&mut conn)?;
 
         Ok((file_list, total))
     })?;
+
+    let response_page = if all { 1 } else { page };
+    let response_count = file_list.len() as u32;
+    let limit_val = if all {
+        total.max(1)
+    } else {
+        count.max(1) as i64
+    };
+
+    let total_pages = if total == 0 {
+        0
+    } else {
+        ((total + limit_val - 1) / limit_val) as u32
+    };
 
     let files_response = file_list
         .into_iter()
         .map(|f| db_file_to_response(&f))
         .collect();
 
-    Ok(Json(FileListResponse {
-        files: files_response,
-        total,
-        page: Some(page),
-        per_page: Some(per_page),
+    Ok(Json(PaginatedResponse {
+        data: files_response,
+        total_items: total as u64,
+        page: response_page,
+        count: response_count,
+        total_pages,
     }))
 }
 
@@ -964,4 +988,111 @@ async fn upload_bulk_files(
     }
 
     Ok(HttpResponse::Ok().json(BulkFileUploadResponse { uploaded, skipped }))
+}
+
+#[get("/tag/list")]
+async fn list_tags(
+    query: Query<PaginatedQuery>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<PaginatedResponse<String>>, ABError> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
+
+    let pool = state.db_pool.clone();
+    let search_term = query.search.clone();
+    let page = query.page;
+    let count = query.count;
+    let all = query.all;
+
+    let (results, total) = run_blocking!({
+        let mut conn = pool.get()?;
+        // Check if "untagged" matches the search term for autocomplete
+        let include_untagged = if let Some(ref term) = search_term {
+            "untagged".to_lowercase().contains(&term.to_lowercase())
+        } else {
+            true // Include untagged when no search term
+        };
+
+        let build_base_query = || {
+            let mut base_query = files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .into_boxed();
+
+            if let Some(ref term) = search_term {
+                let pattern = format!("%{}%", term);
+                if include_untagged {
+                    // Include both matching tags and NULL tags (for untagged autocomplete)
+                    base_query = base_query.filter(tag.ilike(pattern).or(tag.is_null()));
+                } else {
+                    // Only search non-NULL tags
+                    base_query = base_query.filter(tag.ilike(pattern));
+                }
+            }
+
+            base_query
+        };
+
+        // Total distinct tags
+        let total_count: i64 = build_base_query()
+            .select(count_distinct(tag))
+            .get_result(&mut conn)?;
+
+        // Fetch paginated results
+        let tag_results: Vec<Option<String>> = if all {
+            build_base_query()
+                .select(tag)
+                .distinct()
+                .order(tag.asc())
+                .load(&mut conn)?
+        } else {
+            build_base_query()
+                .select(tag)
+                .distinct()
+                .order(tag.asc())
+                .limit(count as i64)
+                .offset(((page - 1) * count) as i64)
+                .load(&mut conn)?
+        };
+
+        Ok((tag_results, total_count))
+    })?;
+
+    let tag_response: Vec<String> = results
+        .into_iter()
+        .map(|t| t.unwrap_or_else(|| "Untagged".to_string()))
+        .collect();
+
+    let response_page = if all { 1 } else { page };
+    let response_count = tag_response.len() as u32;
+    let limit_val = if all {
+        total.max(1)
+    } else {
+        count.max(1) as i64
+    };
+
+    let total_pages = if total == 0 {
+        0
+    } else {
+        ((total + limit_val - 1) / limit_val) as u32
+    };
+
+    Ok(Json(PaginatedResponse {
+        data: tag_response,
+        total_items: total as u64,
+        page: response_page,
+        count: response_count,
+        total_pages,
+    }))
 }

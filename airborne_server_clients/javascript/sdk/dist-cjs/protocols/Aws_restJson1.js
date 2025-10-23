@@ -192,7 +192,9 @@ const se_ListFilesCommand = async (input, context) => {
     b.bp("/api/file/list");
     const query = (0, smithy_client_1.map)({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+        [_t]: [, input[_t]],
         [_s]: [, input[_s]],
     });
     let body;
@@ -555,12 +557,11 @@ const de_ListFilesCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
-        'application': smithy_client_1.expectString,
-        'files': _ => de_FileResponseList(_, context),
-        'organisation': smithy_client_1.expectString,
+        'count': smithy_client_1.expectInt32,
+        'data': _ => de_FileResponseList(_, context),
         'page': smithy_client_1.expectInt32,
-        'per_page': smithy_client_1.expectInt32,
-        'total': smithy_client_1.expectInt32,
+        'total_items': smithy_client_1.expectInt32,
+        'total_pages': smithy_client_1.expectInt32,
     });
     Object.assign(contents, doc);
     return contents;
@@ -956,7 +957,6 @@ const _d = "dimension";
 const _fp = "file_path";
 const _o = "organisation";
 const _p = "page";
-const _pp = "per_page";
 const _s = "search";
 const _st = "status";
 const _t = "tag";

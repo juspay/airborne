@@ -9,6 +9,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 
+use crate::types::PaginatedQuery;
+
 #[derive(Serialize, Deserialize)]
 pub struct FileRequest {
     pub file_path: String,
@@ -58,14 +60,6 @@ pub struct FileResponse {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct FileListResponse {
-    pub files: Vec<FileResponse>,
-    pub total: usize,
-    pub page: Option<u32>,
-    pub per_page: Option<u32>,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct BulkFileResponse {
     pub created_files: Vec<FileResponse>,
     pub skipped_files: Vec<String>,
@@ -75,9 +69,9 @@ pub struct BulkFileResponse {
 
 #[derive(Deserialize)]
 pub struct FileListQuery {
-    pub page: Option<u32>,
-    pub per_page: Option<u32>,
-    pub search: Option<String>,
+    #[serde(flatten)]
+    pub pagination: PaginatedQuery,
+    pub tag: Option<String>,
 }
 
 #[derive(Deserialize)]
