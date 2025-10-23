@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,7 @@ import json from "highlight.js/lib/languages/json";
 import hljs from "highlight.js";
 import "highlight.js/styles/vs2015.css";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Autocomplete } from "@/components/autocomplete";
 
 hljs.registerLanguage("json", json);
 
@@ -62,13 +63,15 @@ type ResourceFile = {
   created_at?: string;
   tag: string;
   checksum: string;
+  version: number;
 };
 
-type ApiResponse = {
-  files: ResourceFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
+type ApiResponse<T> = {
+  data: T[];
+  total_items: number;
+  total_pages: number;
+  page: number;
+  count: number;
 };
 
 type TargetingRule = {
@@ -154,13 +157,17 @@ export default function EditReleasePage() {
   const [packages, setPackages] = useState<Pkg[]>([]);
 
   // Resource-related state
-  const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
+  const [selectedResources, setSelectedResources] = useState<Map<string, string>>(new Map());
   const [resourceSearch, setResourceSearch] = useState("");
   const debouncedResourceSearch = useDebouncedValue(resourceSearch, 500);
   const [resourceCurrentPage, setResourceCurrentPage] = useState(1);
 
+  const [tagInput, setTagInput] = useState("");
+  const debouncedTagInput = useDebouncedValue(tagInput, 500);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
   const router = useRouter();
-  const perPage = 50;
+  const perPage = 10;
 
   useEffect(() => {
     if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
@@ -305,34 +312,50 @@ export default function EditReleasePage() {
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 5 ? ["/file/list", debouncedResourceSearch, resourceCurrentPage] : null,
+    token && org && app && currentStep === 5
+      ? ["/file/list", debouncedResourceSearch, resourceCurrentPage, selectedTag]
+      : null,
     async () =>
-      apiFetch<ApiResponse>(
+      apiFetch<ApiResponse<ResourceFile>>(
         "/file/list",
-        { method: "GET", query: { search: resourceSearch || undefined, page: resourceCurrentPage, per_page: perPage } },
+        {
+          method: "GET",
+          query: {
+            search: resourceSearch || undefined,
+            page: resourceCurrentPage,
+            count: perPage,
+            tag: selectedTag || undefined,
+          },
+        },
         { token, org, app }
       )
   );
 
   // Get resource data from API response
-  const allResources = resourceData?.files || [];
-  const resourceTotal = resourceData?.total || 0;
-  const resourceTotalPages = Math.ceil(resourceTotal / perPage);
+  const allResources = resourceData?.data || [];
+  const resourceTotal = resourceData?.total_items || 0;
+  const resourceTotalPages = resourceData?.total_pages || 0;
+
+  const { data: tags, isLoading: tagsLoading } = useSWR(
+    token && org && app ? ["/file/tag/list", debouncedTagInput] : null,
+    async () =>
+      apiFetch<ApiResponse<string>>(
+        "/file/tag/list",
+        { method: "GET", query: { search: tagInput || undefined, page: 1, count: 50 } },
+        { token, org, app }
+      )
+  );
 
   // Filter resources excluding package files and index file by file path only
-  const packageFilePaths = new Set([
-    // Add file paths from current package files
-    ...files.map((f) => f.file_path),
-    // Add index file path if selected package has an index
-    ...(selectedPackage?.index ? [parseFileRef(selectedPackage.index).filePath] : []),
-    // Add file paths from all package files
-    ...(selectedPackage?.files || []).map((fileRef) => parseFileRef(fileRef).filePath),
+  const packageFilePaths = new Map<string, string>([
+    // Add index file if it exists
+    ...(selectedPackage?.index ? [[parseFileRef(selectedPackage.index).filePath, selectedPackage.index] as const] : []),
+    // Add all other files
+    ...(selectedPackage?.files || []).map((fileId) => {
+      const { filePath } = parseFileRef(fileId);
+      return [filePath, fileId] as const;
+    }),
   ]);
-
-  const availableResources = useMemo(
-    () => allResources.filter((r) => !packageFilePaths.has(r.file_path)),
-    [allResources, selectedPackage]
-  );
 
   const importantFiles = Object.entries(filePriority)
     .filter(([, v]) => v === "important")
@@ -366,20 +389,6 @@ export default function EditReleasePage() {
     }
   }, [release]);
 
-  useEffect(() => {
-    if (availableResources.length > 0) {
-      const selected = new Set<string>();
-
-      release.resources.forEach((res) => {
-        const match = availableResources.find((ar) => ar.file_path === res.file_path && ar.checksum === res.checksum);
-        if (match) {
-          selected.add(match.id);
-        }
-      });
-      setSelectedResources(selected);
-    }
-  }, [availableResources]);
-
   const canProceedToStep = (step: number) => {
     switch (step) {
       case 1:
@@ -407,6 +416,62 @@ export default function EditReleasePage() {
   const handleResourceSearchChange = (value: string) => {
     setResourceSearch(value);
     setResourceCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleToggleResources = (fileId: string) => {
+    const file_path = fileId.split("@version:")[0];
+
+    setSelectedResources((prev) => {
+      const newMap = new Map(prev);
+      if (newMap.has(file_path)) {
+        newMap.delete(file_path);
+      } else {
+        newMap.set(file_path, fileId);
+      }
+      return newMap;
+    });
+  };
+
+  const selectAllResources = async () => {
+    const { data: allFiles } = await apiFetch<ApiResponse<ResourceFile>>(
+      "/file/list",
+      {
+        method: "GET",
+        query: {
+          search: resourceSearch || undefined,
+          all: true,
+          tag: selectedTag || undefined,
+        },
+      },
+      { token, org, app }
+    );
+    const latestFilesMap = new Map<string, ResourceFile>();
+    allFiles.forEach((file) => {
+      if (packageFilePaths.has(file.file_path)) return;
+      const existing = latestFilesMap.get(file.file_path);
+      if (!existing || file.version > existing.version) {
+        latestFilesMap.set(file.file_path, file);
+      }
+    });
+
+    setSelectedResources((prev) => {
+      const updated = new Map(prev);
+      latestFilesMap.forEach((file, path) => {
+        const fileId = file.id;
+        const selectedFileId = prev.get(path);
+        const isAnotherVersionSelected = selectedFileId && selectedFileId !== fileId;
+
+        // Only select this latest version if no version is already manually selected
+        if (!selectedFileId || !isAnotherVersionSelected) {
+          updated.set(path, fileId);
+        }
+      });
+
+      return updated;
+    });
+  };
+  const deselectAllResources = () => {
+    setSelectedResources(new Map());
   };
 
   const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
@@ -693,7 +758,7 @@ export default function EditReleasePage() {
       },
       package: { properties, important: importantFiles, lazy: lazyFiles },
       dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
-      resources: Array.from(selectedResources),
+      resources: Array.from(selectedResources.values()),
     };
     if (selectedPackage) {
       body.package_id = `version:${selectedPackage.version}`;
@@ -1029,32 +1094,41 @@ export default function EditReleasePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {files.map((f) => {
-                      const id = f.id || `${f.file_path}@version:${f.version}`;
-                      return (
-                        <TableRow key={id}>
-                          <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                          <TableCell className="text-muted-foreground">{f.tag}</TableCell>
-                          <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={filePriority[id] || "important"}
-                              onValueChange={(val: "important" | "lazy") => {
-                                setFilePriority((prev) => ({ ...prev, [id]: val }));
-                              }}
-                            >
-                              <SelectTrigger className="w-36">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="important">Important</SelectItem>
-                                <SelectItem value="lazy">Lazy</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {files.length > 0 ? (
+                      files.map((f) => {
+                        const id = f.id || `${f.file_path}@version:${f.version}`;
+                        return (
+                          <TableRow key={id}>
+                            <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                            <TableCell className="text-muted-foreground">{f.tag}</TableCell>
+                            <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={filePriority[id] || "important"}
+                                onValueChange={(val: "important" | "lazy") => {
+                                  setFilePriority((prev) => ({ ...prev, [id]: val }));
+                                  console.log("Updated file priorities", filePriority);
+                                }}
+                              >
+                                <SelectTrigger className="w-36">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="important">Important</SelectItem>
+                                  <SelectItem value="lazy">Lazy</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-4">
+                          No files available.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -1070,23 +1144,71 @@ export default function EditReleasePage() {
                 <CardDescription>Choose additional files to include as resources in this release</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search resources..."
-                      value={resourceSearch}
-                      onChange={(e) => handleResourceSearchChange(e.target.value)}
-                      className="pl-10"
-                    />
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium">Bulk Actions</p>
+                    <p className="text-xs text-muted-foreground">
+                      &quot;Select All&quot; selects the latest versions or resources matching the current tag/search,
+                      respecting manual selections. &quot;Deselect All&quot; clears all selections.
+                    </p>
                   </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllResources}
+                      disabled={allResources.length === 0}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={deselectAllResources}
+                      disabled={selectedResources.size === 0}
+                    >
+                      Deselect All
+                    </Button>
+                  </div>
+                </div>
+                <div className="my-4 space-y-3 ">
+                  <div className="flex gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search resources..."
+                        value={resourceSearch}
+                        onChange={(e) => handleResourceSearchChange(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+
+                    {/* Tag Autocomplete */}
+                    <div className="w-64">
+                      <Autocomplete
+                        inputValue={tagInput}
+                        setInputValue={setTagInput}
+                        selectedItem={selectedTag}
+                        setSelectedItem={setSelectedTag}
+                        items={tags?.data}
+                        loading={tagsLoading}
+                      />
+                    </div>
+                  </div>
+                  {/* Active Tag Filter Indicator */}
+                  {selectedTag && (
+                    <div className="text-sm text-muted-foreground">
+                      Filtering by tag: <span className="font-medium text-foreground">{selectedTag}</span>
+                    </div>
+                  )}
                 </div>
 
                 {resourceError ? (
                   <div className="text-red-600">Failed to load resources</div>
                 ) : resourceLoading ? (
                   <div>Loading resources...</div>
-                ) : availableResources.length === 0 ? (
+                ) : allResources.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="mx-auto h-8 w-8 mb-2" />
                     <p className="text-sm">
@@ -1096,43 +1218,62 @@ export default function EditReleasePage() {
                 ) : (
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground">
-                      Showing {Math.min(perPage, availableResources.length)} available of {resourceTotal} files (Package
-                      files and index file are excluded)
+                      Showing {Math.min(perPage, allResources.length)} available of {resourceTotal} files (Package files
+                      and index file are excluded)
                       {resourceCurrentPage > 1 && ` (page ${resourceCurrentPage})`}
                     </div>
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[50px]"></TableHead>
-                          <TableHead>File Path</TableHead>
+                          <TableHead>File</TableHead>
+                          <TableHead>Version</TableHead>
                           <TableHead>Tag</TableHead>
-                          <TableHead>Created</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {availableResources.map((resource) => {
-                          const isSelected = selectedResources.has(resource.id);
+                        {allResources.map((resource) => {
+                          const fileId = resource.id || `${resource.file_path}@version:${resource.version}`;
+                          const selectedResourceId = selectedResources.get(resource.file_path);
+
+                          const isSelectedVersion = selectedResourceId === fileId;
+                          const isDifferentVersionSelected = selectedResourceId && selectedResourceId !== fileId;
+
+                          const packageResourceId = packageFilePaths.get(resource.file_path);
+                          const isVersionInPackage = packageResourceId === fileId;
+                          const isDifferentVersionInPackage = packageResourceId && packageResourceId !== fileId;
+
                           return (
                             <TableRow key={resource.id}>
                               <TableCell>
                                 <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={(checked) => {
-                                    const newSelected = new Set(selectedResources);
-                                    if (checked) {
-                                      newSelected.add(resource.id);
-                                    } else {
-                                      newSelected.delete(resource.id);
-                                    }
-                                    setSelectedResources(newSelected);
-                                  }}
+                                  checked={isSelectedVersion}
+                                  disabled={
+                                    !!isDifferentVersionSelected ||
+                                    !!isVersionInPackage ||
+                                    !!isDifferentVersionInPackage
+                                  }
+                                  onCheckedChange={() => handleToggleResources(fileId)}
                                 />
                               </TableCell>
-                              <TableCell className="font-mono text-sm">{resource.file_path}</TableCell>
-                              <TableCell className="text-muted-foreground">{resource.tag}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : "—"}
+                              <TableCell className="font-mono text-sm">
+                                {resource.file_path}
+                                {isDifferentVersionSelected && (
+                                  <div className="text-xs text-amber-600 mt-1">Another version already selected.</div>
+                                )}
+                                {isVersionInPackage && (
+                                  <div className="text-xs text-amber-600 mt-1">
+                                    This file is included in the package.
+                                  </div>
+                                )}
+                                {isDifferentVersionInPackage && (
+                                  <div className="text-xs text-amber-600 mt-1">
+                                    Another version of this file is selected in package.
+                                  </div>
+                                )}
                               </TableCell>
+                              <TableCell className="text-muted-foreground">{resource.version}</TableCell>
+                              <TableCell className="text-muted-foreground">{resource.tag || "—"}</TableCell>
                             </TableRow>
                           );
                         })}
@@ -1271,7 +1412,13 @@ export default function EditReleasePage() {
             </Link>
           </Button>
           {currentStep > 1 && (
-            <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCurrentStep((s) => s - 1);
+                setSelectedResources(new Map());
+              }}
+            >
               Previous
             </Button>
           )}

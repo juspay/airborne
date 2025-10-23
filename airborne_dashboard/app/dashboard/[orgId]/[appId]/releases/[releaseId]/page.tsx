@@ -317,66 +317,64 @@ export default function ReleaseDetailPage() {
                   </Button>
 
                   {release.experiment.status !== "CONCLUDED" && (
-                    <>
-                      <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" disabled={isRamping}>
-                            <TrendingUp className="h-4 w-4 mr-2" />
+                    <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" disabled={isRamping}>
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          {isRamping ? "Ramping..." : "Ramp"}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Ramp Release</DialogTitle>
+                          <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
+                        </DialogHeader>
+                        <Input
+                          type="number"
+                          value={trafficPct}
+                          min={0}
+                          max={50}
+                          onChange={(e) => setTrafficPct(Number(e.target.value))}
+                          className="mb-4"
+                        />
+                        <DialogFooter className="justify-end gap-2">
+                          <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
                             {isRamping ? "Ramping..." : "Ramp"}
                           </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Ramp Release</DialogTitle>
-                            <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
-                          </DialogHeader>
-                          <Input
-                            type="number"
-                            value={trafficPct}
-                            min={0}
-                            max={50}
-                            onChange={(e) => setTrafficPct(Number(e.target.value))}
-                            className="mb-4"
-                          />
-                          <DialogFooter className="justify-end gap-2">
-                            <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
-                              {isRamping ? "Ramping..." : "Ramp"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-
-                      <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button disabled={isConcluding}>
-                            <CheckCircle className="h-4 w-4 mr-2" />
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {release.experiment.status === "INPROGRESS" && (
+                    <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button disabled={isConcluding}>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          {isConcluding ? "Concluding..." : "Conclude"}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Conclude Release</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to conclude this release? This will roll out to 100% and finalize the
+                            deployment.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="justify-end gap-2">
+                          <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
                             {isConcluding ? "Concluding..." : "Conclude"}
                           </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Conclude Release</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to conclude this release? This will roll out to 100% and finalize
-                              the deployment.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter className="justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
-                              {isConcluding ? "Concluding..." : "Conclude"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   )}
-
                   {release.experiment.status === "INPROGRESS" && (
                     <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
                       <DialogTrigger asChild>

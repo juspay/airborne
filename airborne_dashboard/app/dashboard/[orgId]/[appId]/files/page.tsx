@@ -43,10 +43,11 @@ type ApiFile = {
 };
 
 type ApiResponse = {
-  files: ApiFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
+  data: ApiFile[];
+  total_items: number;
+  total_pages: number;
+  page: number;
+  count: number;
 };
 
 export default function FilesPage() {
@@ -63,14 +64,14 @@ export default function FilesPage() {
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
-        { method: "GET", query: { search: searchQuery || undefined, page: currentPage, per_page: perPage } },
+        { method: "GET", query: { search: searchQuery || undefined, page: currentPage, count: perPage } },
         { token, org, app }
       )
   );
 
-  const files: ApiFile[] = data?.files || [];
-  const total = data?.total || 0;
-  const totalPages = Math.ceil(total / perPage);
+  const files: ApiFile[] = data?.data || [];
+  const total = data?.total_items || 0;
+  const totalPages = data?.total_pages || 0;
 
   async function updateTag(f: ApiFile) {
     const currentKey = f.id || f.file_path;

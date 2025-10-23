@@ -78,8 +78,16 @@ structure ListFilesRequest {
     page: Integer
 
     /// Number of files per page
-    @httpQuery("per_page")
-    per_page: Integer
+    @httpQuery("count")
+    count: Integer
+
+    /// Fetch all files without pagination
+    @httpQuery("all")
+    all: Boolean
+
+    /// Tag to filter files
+    @httpQuery("tag")
+    tag: String
 
     /// Search query to filter files
     @httpQuery("search")
@@ -104,29 +112,17 @@ list FileResponseList {
 
 /// List files response
 structure ListFilesResponse {
-    /// Name of the organisation
-    @required
-    organisation: String
-
-    /// Name of the application
-    @required
-    application: String
-
     /// List of files
     @required
-    files: FileResponseList
+    data: FileResponseList
 
-    /// Total number of files
+    /// Total number of pages
     @required
-    total: Integer
+    total_pages: Integer
 
-    /// Current page number
+    /// Total number of items
     @required
-    page: Integer
-
-    /// Number of files per page
-    @required
-    per_page: Integer
+    total_items: Integer
 }
 
 /// Represents a streaming binary blob
