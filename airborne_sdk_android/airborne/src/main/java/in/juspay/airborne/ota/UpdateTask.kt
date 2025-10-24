@@ -378,8 +378,9 @@ internal class UpdateTask(
                 val body = fr.v.second
                 val serialized = String(body.bytes(), StandardCharsets.UTF_8)
                 try {
-                    val releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
+                    var releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
                     trackReleaseConfigFetchResult(fr, startTime)
+                    releaseConfig = transformReleaseConfig(releaseConfig)
                     releaseConfig
                 } catch (e: Exception) {
                     Log.e(
@@ -396,6 +397,27 @@ internal class UpdateTask(
                 null
             }
         }
+    }
+
+    private fun transformReleaseConfig(releaseConfig: ReleaseConfig): ReleaseConfig {
+        val localResources = localReleaseConfig?.resources.orEmpty()
+        val localPackageImportantRes = localReleaseConfig?.pkg?.important.orEmpty()
+        val newResources = releaseConfig.resources.filter { it !in localResources && it !in localPackageImportantRes }
+
+        if (newResources.isEmpty()) return releaseConfig
+
+        val updatedResources = ReleaseConfig.ResourceManifest(releaseConfig.resources - newResources.toSet())
+
+        val updatedPackage = releaseConfig.pkg.copy(
+            important = releaseConfig.pkg.important + newResources
+        )
+
+        Log.d(TAG, "Transformed release config with new resources: $newResources")
+
+        return releaseConfig.copy(
+            pkg = updatedPackage,
+            resources = updatedResources
+        )
     }
 
     fun copyTempPkg(): ReleaseConfig.PackageManifest? {
