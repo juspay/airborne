@@ -82,6 +82,7 @@ async fn put_properties_schema_api(
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -436,6 +437,7 @@ async fn get_properties_schema_api(
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -598,6 +600,7 @@ async fn list_properties_api(
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )

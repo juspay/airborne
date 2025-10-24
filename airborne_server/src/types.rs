@@ -12,26 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use actix_web::http::StatusCode;
 use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use log::error;
+use open_feature::EvaluationError;
 use serde::Serialize;
 use superposition_sdk::Client;
 use thiserror::Error;
 
-use crate::utils::db;
+use crate::{
+    utils::superposition_provider::{ProviderRegistry, RegistryError},
+    utils::{db, redis::RedisCache},
+};
 
 #[derive(Clone)]
 pub struct AppState {
     pub env: Environment,
     pub db_pool: db::DbPool,
+    pub redis_cache: RedisCache,
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
     pub superposition_client: Client,
     pub sheets_hub: Option<
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
+    pub provider_registry: Arc<ProviderRegistry>,
 }
 
 #[derive(Clone, Debug)]
@@ -102,6 +110,24 @@ impl From<DieselErr> for ABError {
 
             _other => ABError::InternalServerError("service error".into()),
         }
+    }
+}
+
+impl From<RegistryError> for ABError {
+    fn from(err: RegistryError) -> Self {
+        match err {
+            RegistryError::ProviderInitFailed(e) => {
+                error!("{:?}", e);
+                ABError::InternalServerError("service error".into())
+            }
+        }
+    }
+}
+
+impl From<EvaluationError> for ABError {
+    fn from(err: EvaluationError) -> Self {
+        error!("Evaluation error: {:?}", err);
+        ABError::InternalServerError("feature flag evaluation error".into())
     }
 }
 
