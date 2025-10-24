@@ -16,9 +16,9 @@ import { hasAppAccess } from "@/lib/utils";
 export default function ApplicationDetailPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
   const { data } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
-    apiFetch<any>("/releases/list", {}, { token, org, app })
+    apiFetch<any>("/releases/list", { query: { page: 1, count: 5 } }, { token, org, app })
   );
-  const releases: ApiRelease[] = data?.releases || [];
+  const releases: ApiRelease[] = data?.data || [];
 
   const router = useRouter();
 
@@ -100,7 +100,7 @@ export default function ApplicationDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {releases.slice(0, 5).map((r) => (
+                    {releases.map((r) => (
                       <TableRow
                         key={r.id}
                         onClick={() =>

@@ -653,7 +653,17 @@ export interface ListFilesRequest {
      * Number of files per page
      * @public
      */
-    per_page?: number | undefined;
+    count?: number | undefined;
+    /**
+     * Fetch all files without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Tag to filter files
+     * @public
+     */
+    tag?: string | undefined;
     /**
      * Search query to filter files
      * @public
@@ -676,35 +686,30 @@ export interface ListFilesRequest {
  */
 export interface ListFilesResponse {
     /**
-     * Name of the organisation
-     * @public
-     */
-    organisation: string | undefined;
-    /**
-     * Name of the application
-     * @public
-     */
-    application: string | undefined;
-    /**
      * List of files
      * @public
      */
-    files: (CreateFileResponse)[] | undefined;
-    /**
-     * Total number of files
-     * @public
-     */
-    total: number | undefined;
+    data: (CreateFileResponse)[] | undefined;
     /**
      * Current page number
      * @public
      */
     page: number | undefined;
     /**
-     * Number of files per page
+     * Count of releases per page
      * @public
      */
-    per_page: number | undefined;
+    count: number | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
 }
 /**
  * List organisations response
@@ -723,15 +728,25 @@ export interface ListOrganisationsResponse {
  */
 export interface ListPackagesRequest {
     /**
-     * Offset for pagination
+     * Offset for pagination (default: 1)
      * @public
      */
-    offset?: number | undefined;
+    page?: number | undefined;
     /**
-     * Limit for pagination
+     * Limit for pagination (default: 50)
      * @public
      */
-    limit?: number | undefined;
+    count?: number | undefined;
+    /**
+     * Search term for filtering packages using index file path
+     * @public
+     */
+    search?: string | undefined;
+    /**
+     * If true, fetch all packages without pagination
+     * @public
+     */
+    all?: boolean | undefined;
     /**
      * Name of the organisation
      * @public
@@ -752,27 +767,27 @@ export interface ListPackagesResponse {
      * List of packages
      * @public
      */
-    packages: (Package)[] | undefined;
+    data: (Package)[] | undefined;
     /**
-     * Number of page
+     * Current page number
      * @public
      */
-    page_number: number | undefined;
+    page: number | undefined;
     /**
-     * Next offset for pagination
+     * Count of releases per page
      * @public
      */
-    next_offset?: number | undefined;
-    /**
-     * Previous offset for pagination
-     * @public
-     */
-    prev_offset?: number | undefined;
+    count: number | undefined;
     /**
      * Total number of pages
      * @public
      */
     total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
 }
 /**
  * @public
@@ -783,6 +798,26 @@ export interface ListReleasesRequest {
      * @public
      */
     dimension?: string | undefined;
+    /**
+     * Page number for pagination (default: 1)
+     * @public
+     */
+    page?: number | undefined;
+    /**
+     * Count of releases per page for pagination (default: 50)
+     * @public
+     */
+    count?: number | undefined;
+    /**
+     * If true, fetch all releases without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Status to filter releases
+     * @public
+     */
+    status?: string | undefined;
     /**
      * Name of the organisation
      * @public
@@ -802,7 +837,27 @@ export interface ListReleasesResponse {
      * List of releases
      * @public
      */
-    releases: (GetReleaseResponse)[] | undefined;
+    data: (GetReleaseResponse)[] | undefined;
+    /**
+     * Current page number
+     * @public
+     */
+    page: number | undefined;
+    /**
+     * Count of releases per page
+     * @public
+     */
+    count: number | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
 }
 /**
  * User credentials for login

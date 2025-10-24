@@ -192,7 +192,9 @@ const se_ListFilesCommand = async (input, context) => {
     b.bp("/api/file/list");
     const query = (0, smithy_client_1.map)({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+        [_t]: [, input[_t]],
         [_s]: [, input[_s]],
     });
     let body;
@@ -222,8 +224,10 @@ const se_ListPackagesCommand = async (input, context) => {
     });
     b.bp("/api/packages/list");
     const query = (0, smithy_client_1.map)({
-        [_of]: [() => input.offset !== void 0, () => (input[_of].toString())],
-        [_l]: [() => input.limit !== void 0, () => (input[_l].toString())],
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
     });
     let body;
     b.m("GET")
@@ -241,9 +245,16 @@ const se_ListReleasesCommand = async (input, context) => {
         [_xa]: input[_a],
     });
     b.bp("/api/releases/list");
+    const query = (0, smithy_client_1.map)({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+        [_st]: [, input[_st]],
+    });
     let body;
     b.m("GET")
         .h(headers)
+        .q(query)
         .b(body);
     return b.build();
 };
@@ -546,12 +557,11 @@ const de_ListFilesCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
-        'application': smithy_client_1.expectString,
-        'files': _ => de_FileResponseList(_, context),
-        'organisation': smithy_client_1.expectString,
+        'count': smithy_client_1.expectInt32,
+        'data': _ => de_FileResponseList(_, context),
         'page': smithy_client_1.expectInt32,
-        'per_page': smithy_client_1.expectInt32,
-        'total': smithy_client_1.expectInt32,
+        'total_items': smithy_client_1.expectInt32,
+        'total_pages': smithy_client_1.expectInt32,
     });
     Object.assign(contents, doc);
     return contents;
@@ -581,10 +591,10 @@ const de_ListPackagesCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
-        'next_offset': smithy_client_1.expectInt32,
-        'packages': smithy_client_1._json,
-        'page_number': smithy_client_1.expectInt32,
-        'prev_offset': smithy_client_1.expectInt32,
+        'count': smithy_client_1.expectInt32,
+        'data': smithy_client_1._json,
+        'page': smithy_client_1.expectInt32,
+        'total_items': smithy_client_1.expectInt32,
         'total_pages': smithy_client_1.expectInt32,
     });
     Object.assign(contents, doc);
@@ -600,7 +610,11 @@ const de_ListReleasesCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
-        'releases': _ => de_GetReleaseResponseList(_, context),
+        'count': smithy_client_1.expectInt32,
+        'data': _ => de_GetReleaseResponseList(_, context),
+        'page': smithy_client_1.expectInt32,
+        'total_items': smithy_client_1.expectInt32,
+        'total_pages': smithy_client_1.expectInt32,
     });
     Object.assign(contents, doc);
     return contents;
@@ -936,16 +950,15 @@ const deserializeMetadata = (output) => ({
 });
 const collectBodyString = (streamBody, context) => (0, smithy_client_1.collectBody)(streamBody, context).then(body => context.utf8Encoder(body));
 const _a = "application";
+const _al = "all";
 const _c = "count";
 const _ch = "checksum";
 const _d = "dimension";
 const _fp = "file_path";
-const _l = "limit";
 const _o = "organisation";
-const _of = "offset";
 const _p = "page";
-const _pp = "per_page";
 const _s = "search";
+const _st = "status";
 const _t = "tag";
 const _xa = "x-application";
 const _xc = "x-checksum";

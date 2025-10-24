@@ -135,6 +135,22 @@ structure ListReleasesRequest {
     @httpHeader("x-dimension")
     dimension: String
 
+    /// Page number for pagination (default: 1)
+    @httpQuery("page")
+    page: Integer
+
+    /// Count of releases per page for pagination (default: 50)
+    @httpQuery("count")
+    count: Integer
+
+    /// If true, fetch all releases without pagination
+    @httpQuery("all")
+    all: Boolean
+
+    /// Status to filter releases
+    @httpQuery("status")
+    status: String
+
     /// Name of the organisation
     @httpHeader("x-organisation")
     @required
@@ -163,7 +179,23 @@ list GetReleaseResponseList {
 structure ListReleasesResponse {
     /// List of releases
     @required
-    releases: GetReleaseResponseList
+    data: GetReleaseResponseList
+
+    /// Current page number
+    @required
+    page: Integer
+
+    /// Count of releases per page
+    @required
+    count: Integer
+
+    /// Total number of pages
+    @required
+    total_pages: Integer
+
+    /// Total number of items
+    @required
+    total_items: Integer
 }
 
 structure GetReleaseRequest {

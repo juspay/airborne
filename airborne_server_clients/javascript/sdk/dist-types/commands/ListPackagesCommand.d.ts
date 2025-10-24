@@ -35,15 +35,17 @@ declare const ListPackagesCommand_base: {
  * // const { AirborneClient, ListPackagesCommand } = require("airborne-server-sdk"); // CommonJS import
  * const client = new AirborneClient(config);
  * const input = { // ListPackagesRequest
- *   offset: Number("int"),
- *   limit: Number("int"),
+ *   page: Number("int"),
+ *   count: Number("int"),
+ *   search: "STRING_VALUE",
+ *   all: true || false,
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
  * const command = new ListPackagesCommand(input);
  * const response = await client.send(command);
  * // { // ListPackagesResponse
- * //   packages: [ // PackageList // required
+ * //   data: [ // PackageList // required
  * //     { // Package
  * //       tag: "STRING_VALUE",
  * //       version: Number("int"), // required
@@ -53,10 +55,10 @@ declare const ListPackagesCommand_base: {
  * //       ],
  * //     },
  * //   ],
- * //   page_number: Number("int"), // required
- * //   next_offset: Number("int"),
- * //   prev_offset: Number("int"),
+ * //   page: Number("int"), // required
+ * //   count: Number("int"), // required
  * //   total_pages: Number("int"), // required
+ * //   total_items: Number("int"), // required
  * // };
  *
  * ```

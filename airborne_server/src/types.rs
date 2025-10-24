@@ -16,7 +16,7 @@ use actix_web::http::StatusCode;
 use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use log::error;
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 use superposition_sdk::Client;
 use thiserror::Error;
 
@@ -205,4 +205,62 @@ macro_rules! run_blocking {
 #[derive(Serialize)]
 pub struct ListResponse<T> {
     pub data: T,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedResponse<T> {
+    pub data: Vec<T>,
+    pub page: u32,
+    pub count: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct PaginatedQuery {
+    #[serde(deserialize_with = "deserialize_min_1")]
+    pub page: u32,
+    #[serde(deserialize_with = "deserialize_min_1")]
+    pub count: u32,
+    pub search: Option<String>,
+    #[serde(deserialize_with = "deserialize_bool")]
+    pub all: bool,
+}
+
+fn deserialize_min_1<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    // Try parsing as signed integer first
+    let parsed = s.parse::<i64>().map_err(serde::de::Error::custom)?;
+    // Clamp negatives and zero to 1
+    Ok(parsed.max(1) as u32)
+}
+
+fn deserialize_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    match s.to_lowercase().as_str() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        other => Err(serde::de::Error::custom(format!(
+            "Invalid boolean value: {}",
+            other
+        ))),
+    }
+}
+
+impl Default for PaginatedQuery {
+    fn default() -> Self {
+        Self {
+            page: 1,
+            count: 50,
+            search: None,
+            all: false,
+        }
+    }
 }
