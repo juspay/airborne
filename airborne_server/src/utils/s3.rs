@@ -3,6 +3,7 @@ use aws_sdk_s3::{
     error::BoxError, operation::put_object::PutObjectOutput, primitives::ByteStream,
     types::ChecksumAlgorithm, Client,
 };
+use log::info;
 
 pub async fn push_file_byte_arr(
     s3_client: &Client,
@@ -30,8 +31,8 @@ pub async fn stream_file(
     file_size: i64,
     checksum: String,
 ) -> Result<PutObjectOutput, BoxError> {
-    println!("Uploading file: {}", filename);
-    println!("Uploading File: {}", file_size);
+    info!("Uploading file: {}", filename);
+    info!("Uploading File: {}", file_size);
     s3_client
         .put_object()
         .bucket(bucket_name)

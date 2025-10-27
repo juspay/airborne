@@ -10,6 +10,7 @@ use serde_json::Value;
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
+use crate::file::utils::download_file_content;
 use crate::release::utils::get_files_by_file_keys_async;
 use crate::utils::db::schema::hyperotaserver::builds::{
     application as app_column, dsl::*, organisation as org_column, release_id as release_id_column,
@@ -175,19 +176,6 @@ struct Arguments {
     application: String,
     dimensions: HashMap<String, Value>,
     _force: bool,
-}
-
-async fn download_file_content(url: &str) -> Result<Vec<u8>, ABError> {
-    let client = reqwest::Client::new();
-    let response = client.get(url).send().await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to download file from {}: {}", url, e))
-    })?;
-
-    let bytes = response.bytes().await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to read file content from {}: {}", url, e))
-    })?;
-
-    Ok(bytes.to_vec())
 }
 
 struct File {
@@ -547,7 +535,7 @@ async fn build(
     config_document: Option<Document>,
     state: web::Data<AppState>,
 ) -> Result<String, ABError> {
-    println!(
+    info!(
         "Starting build for {}/{} with release version {}",
         org, app, release_version
     );
@@ -573,7 +561,7 @@ async fn build(
     // Generate new semver version by incrementing the last part
     let new_build_version =
         increment_build_version(latest_build_version.as_deref(), &release_version);
-    println!("Creating new build: {}", new_build_version);
+    info!("Creating new build: {}", new_build_version);
 
     let new_build = NewBuildEntry {
         build_version: new_build_version.clone(),
@@ -683,7 +671,7 @@ async fn generate(
         release::utils::extract_string_from_configs(&config_document, "config.version")
             .unwrap_or_default();
 
-    println!("release_version: {}", release_version);
+    info!("release_version: {}", release_version);
 
     if release_version.is_empty() {
         return Err(ABError::InternalServerError(
@@ -762,7 +750,7 @@ async fn generate(
                     });
 
                     // Return existing latest build version
-                    println!(
+                    info!(
                         "Returning latest available build: {}",
                         build_entry.build_version
                     );
@@ -783,7 +771,7 @@ async fn generate(
                             state_clone
                         ).await?;
 
-                    println!("Created new build version: {}", new_build_version);
+                    info!("Created new build version: {}", new_build_version);
 
                     Ok(BuildResponse {
                         version: new_build_version,
