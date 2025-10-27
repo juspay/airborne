@@ -1492,7 +1492,6 @@ async fn update_release(
 
     let updated_experiment_response = updated_experiment_response.send().await.map_err(|e| {
         info!("Failed to update experiment: {:?}", e);
-        println!("Failed to update experiment: {:?}", e);
         ABError::InternalServerError("Failed to update experiment in Superposition".to_string())
     })?;
 

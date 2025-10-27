@@ -17,6 +17,10 @@ const nextConfig = {
         source: "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token)/:path*",
         destination: `${backend}/api/:api/:path*`,
       },
+      {
+        source: "/release/:path*",
+        destination: `${backend}/release/:path*`,
+      },
     ];
   },
   eslint: {

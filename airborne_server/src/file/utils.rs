@@ -1,25 +1,47 @@
 use base64::{engine::general_purpose, Engine as _};
-use futures_util::StreamExt;
+use log::info;
 use sha2::{Digest, Sha256 as checksum_algorithm};
+
+use crate::types::ABError;
 
 pub async fn download_and_checksum(
     file_url: &str,
 ) -> Result<(u64, String), Box<dyn std::error::Error>> {
+    let bytes = download_and_calculate_filesize(file_url).await?;
+    Ok((bytes.1, calculate_checksum(bytes.0).await))
+}
+
+pub async fn download_file_content(url: &str) -> Result<Vec<u8>, ABError> {
+    let bytes = download_and_calculate_filesize(url).await?;
+    Ok(bytes.0)
+}
+
+pub async fn download_and_calculate_filesize(url: &str) -> Result<(Vec<u8>, u64), ABError> {
+    info!("Downloading file from url, {:?}", url);
     let client = reqwest::Client::new();
-    let resp = client.get(file_url).send().await?;
-    let mut stream = resp.bytes_stream();
+    let response = client
+        .get(url)
+        .header("User-Agent", "Airborne-Rust/1.0")
+        .send()
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to download file from {}: {}", url, e))
+        })?
+        .error_for_status()
+        .map_err(|e| {
+            ABError::InternalServerError(format!(
+                "Received error status while downloading {}: {}",
+                url, e
+            ))
+        })?;
 
-    let mut hasher = checksum_algorithm::new();
-    let mut total_bytes = 0u64;
+    let bytes = response.bytes().await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to read file content from {}: {}", url, e))
+    })?;
 
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        total_bytes += chunk.len() as u64;
-        hasher.update(&chunk);
-    }
+    let file_size = bytes.len() as u64;
 
-    let file_checksum = hasher.finalize();
-    Ok((total_bytes, hex::encode(file_checksum)))
+    Ok((bytes.to_vec(), file_size))
 }
 
 pub async fn calculate_checksum(byte_arr: Vec<u8>) -> String {
