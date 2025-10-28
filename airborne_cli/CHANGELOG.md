@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.3 - 2025-10-28
+#### Bug Fixes
+- ensure directoryPath defaults to current working directory - (7404ed8) - Yash Rajput
+
+- - -
+
+## v0.13.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.13.0 [skip ci] - (bdbd374) - Airborne Bot
+
+- - -
+
+## v0.12.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.12.0 [skip ci] - (c3041a8) - Airborne Bot
+
+- - -
+
+## v0.11.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.11.1 [skip ci] - (210c3f8) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.1.2 - 2025-10-17
 #### Bug Fixes
 - npm releases - (6d08891) - Yash Rajput

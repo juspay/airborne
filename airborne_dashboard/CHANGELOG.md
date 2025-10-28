@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.8.1 - 2025-10-28
+#### Bug Fixes
+- update appId context before children mount in dashboard - (f6c2b4e) - Yash Rajput
+
+- - -
+
+## v0.13.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.13.0 [skip ci] - (bdbd374) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.8.0 - 2025-10-28
 #### Bug Fixes
 - File download only when 2xx and unify download logic - (cd79b13) - yuvrajjsingh0
