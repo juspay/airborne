@@ -2,6 +2,37 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.8.0 - 2025-10-28
+#### Bug Fixes
+- File download only when 2xx and unify download logic - (cd79b13) - yuvrajjsingh0
+- remove save as draft from package creation - (d6ac20e) - Yash Rajput
+- username not present for google auth users - (0c50dfc) - Yash Rajput
+- remove search bar from header - (71f99cd) - Yash Rajput
+- ensure all files are selected across paginated file lists - (a1703e5) - Yash Rajput
+- make entire release row clickable - (94a3b8f) - Yash Rajput
+#### Features
+- inject gsa to aws using kms - (ab1724a) - yuvrajjsingh0
+
+- - -
+
+## v0.11.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.11.1 [skip ci] - (210c3f8) - Airborne Bot
+
+- - -
+
+## v0.11.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.11.0 [skip ci] - (984bb54) - Airborne Bot
+
+- - -
+
+## v0.10.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.10.1 [skip ci] - (47c2ede) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.7.0 - 2025-10-16
 #### Features
 - make tag optional for files and packages - (dc88a99) - yash.rajput.001

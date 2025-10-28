@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_core_cli-v0.1.2 - 2025-10-28
+#### Bug Fixes
+- make CLI name dynamic in configure command - (13ab4b7) - Yash Rajput
+
+- - -
+
+## v0.11.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.11.1 [skip ci] - (210c3f8) - Airborne Bot
+
+- - -
+
 ## airborne_core_cli-v0.1.1 - 2025-10-17
 #### Bug Fixes
 - npm releases - (6d08891) - Yash Rajput

@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.12.0 - 2025-10-28
+### Package updates
+- airborne_core_cli bumped to airborne_core_cli-v0.1.2
+- airborne_server_clients bumped to airborne_server_clients-v0.1.3
+- airborne_dashboard bumped to airborne_dashboard-v0.8.0
+- airborne_server bumped to airborne_server-v0.8.0
+### Global changes
+#### Bug Fixes
+- make CLI name dynamic in configure command - (13ab4b7) - Yash Rajput
+
+- - -
+
 ## v0.11.1 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.7.1

@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.8.0 - 2025-10-28
+#### Bug Fixes
+- File download only when 2xx and unify download logic - (cd79b13) - yuvrajjsingh0
+- username not present for google auth users - (0c50dfc) - Yash Rajput
+#### Features
+- inject gsa to aws using kms - (ab1724a) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.7.1 - 2025-10-22
 #### Bug Fixes
 - run db migrations under flag - (1d1beaf) - yuvrajjsingh0
