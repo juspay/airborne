@@ -56,6 +56,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 hljs.registerLanguage("json", json);
 
@@ -129,6 +130,7 @@ export default function CreateReleasePage() {
   const [propertiesJSON, setPropertiesJSON] = useState<string>("{}");
 
   const [pkgSearch, setPkgSearch] = useState("");
+  const debouncedPackageSearch = useDebouncedValue(pkgSearch, 500);
   const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(null);
 
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -144,7 +146,14 @@ export default function CreateReleasePage() {
   // Resource-related state
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
   const [resourceSearch, setResourceSearch] = useState("");
+  const debouncedResourcesSearch = useDebouncedValue(resourceSearch, 500);
   const [resourceCurrentPage, setResourceCurrentPage] = useState(1);
+
+  // File priorities pagination state
+  const [filesCurrentPage, setFilesCurrentPage] = useState(1);
+  const [filesSearch, setFilesSearch] = useState("");
+  const debouncedFilesSearch = useDebouncedValue(filesSearch, 300);
+  const filesPerPage = 10;
 
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
 
@@ -476,7 +485,7 @@ export default function CreateReleasePage() {
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 6 ? ["/file/list", resourceSearch, resourceCurrentPage] : null,
+    token && org && app && currentStep === 6 ? ["/file/list", debouncedResourcesSearch, resourceCurrentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
@@ -492,7 +501,19 @@ export default function CreateReleasePage() {
 
   const filteredPackages = useMemo(
     () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
-    [packages, pkgSearch]
+    [packages, debouncedPackageSearch]
+  );
+
+  // Calculate filtered and paginated files for step 5
+  const filteredFiles = useMemo(
+    () => files.filter((f) => f.file_path.toLowerCase().includes(filesSearch.toLowerCase())),
+    [files, debouncedFilesSearch]
+  );
+
+  const filesTotalPages = Math.ceil(filteredFiles.length / filesPerPage);
+  const paginatedFiles = useMemo(
+    () => filteredFiles.slice((filesCurrentPage - 1) * filesPerPage, filesCurrentPage * filesPerPage),
+    [filteredFiles, filesCurrentPage, filesPerPage]
   );
 
   // Get resource data from API response
@@ -643,6 +664,11 @@ export default function CreateReleasePage() {
     }
 
     return body;
+  };
+
+  const handleFilesSearchChange = (value: string) => {
+    setFilesSearch(value);
+    setFilesCurrentPage(1); // Reset to first page when searching
   };
 
   const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
@@ -1341,45 +1367,112 @@ export default function CreateReleasePage() {
                   <Info className="h-4 w-4 text-blue-600" />
                   <div className="text-sm">All files default to Important. Switch to Lazy to defer loading.</div>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>File</TableHead>
-                      <TableHead>Tag</TableHead>
-                      <TableHead>Version</TableHead>
-                      <TableHead>Priority</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {files.map((f) => {
-                      const id = f.id || `${f.file_path}@version:${f.version}`;
-                      return (
-                        <TableRow key={id}>
-                          <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                          <TableCell className="text-muted-foreground">{f.tag}</TableCell>
-                          <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={filePriority[id] || "important"}
-                              onValueChange={(val: "important" | "lazy") => {
-                                setFilePriority((prev) => ({ ...prev, [id]: val }));
-                                console.log("Updated file priorities", filePriority);
-                              }}
-                            >
-                              <SelectTrigger className="w-36">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="important">Important</SelectItem>
-                                <SelectItem value="lazy">Lazy</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
+
+                {files.length > 0 && (
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search files..."
+                        value={filesSearch}
+                        onChange={(e) => handleFilesSearchChange(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {files.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="mx-auto h-8 w-8 mb-2" />
+                    <p className="text-sm">No files available.</p>
+                  </div>
+                ) : filteredFiles.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="mx-auto h-8 w-8 mb-2" />
+                    <p className="text-sm">No files found matching your search.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {Math.min(filesPerPage, filteredFiles.length)} of {filteredFiles.length} files
+                      {filesCurrentPage > 1 && ` (page ${filesCurrentPage})`}
+                      {filesSearch && ` matching "${filesSearch}"`}
+                    </div>
+
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>File</TableHead>
+                          <TableHead>Tag</TableHead>
+                          <TableHead>Version</TableHead>
+                          <TableHead>Priority</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedFiles.map((f) => {
+                          const id = f.id || `${f.file_path}@version:${f.version}`;
+                          return (
+                            <TableRow key={id}>
+                              <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                              <TableCell className="text-muted-foreground">{f.tag}</TableCell>
+                              <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                              <TableCell>
+                                <Select
+                                  value={filePriority[id] || "important"}
+                                  onValueChange={(val: "important" | "lazy") => {
+                                    setFilePriority((prev) => ({ ...prev, [id]: val }));
+                                  }}
+                                >
+                                  <SelectTrigger className="w-36">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="important">Important</SelectItem>
+                                    <SelectItem value="lazy">Lazy</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+
+                    {/* Files Pagination */}
+                    {filesTotalPages > 1 && (
+                      <div className="mt-4">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (filesCurrentPage > 1) setFilesCurrentPage(filesCurrentPage - 1);
+                                }}
+                                className={filesCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                              />
+                            </PaginationItem>
+
+                            {renderPaginationItems(filesCurrentPage, filesTotalPages, setFilesCurrentPage)}
+
+                            <PaginationItem>
+                              <PaginationNext
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (filesCurrentPage < filesTotalPages) setFilesCurrentPage(filesCurrentPage + 1);
+                                }}
+                                className={filesCurrentPage >= filesTotalPages ? "pointer-events-none opacity-50" : ""}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
