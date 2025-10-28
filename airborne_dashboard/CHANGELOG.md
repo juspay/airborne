@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.8.3 - 2025-10-28
+#### Bug Fixes
+- Allow Release on dependency dimension of cohort dimension - (f8cbf22) - yuvrajjsingh0
+
+- - -
+
 ## airborne_dashboard-v0.8.2 - 2025-10-28
 #### Bug Fixes
 - added release confirmation dialog - (7d5f93e) - Yash Rajput
