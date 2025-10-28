@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.13.0 - 1970-01-01
+### Package updates
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.1.0
+### Global changes
+
+- - -
+
 ## v0.12.0 - 2025-10-28
 ### Package updates
 - airborne_core_cli bumped to airborne_core_cli-v0.1.2

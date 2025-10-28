@@ -2,6 +2,102 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.1.0 - 2025-10-28
+#### Features
+- added support for local assets ios (dev server) - (582db37) - yash.rajput.001
+
+- - -
+
+## v0.12.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.12.0 [skip ci] - (c3041a8) - Airborne Bot
+
+- - -
+
+## v0.11.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.11.1 [skip ci] - (210c3f8) - Airborne Bot
+
+- - -
+
+## v0.11.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.11.0 [skip ci] - (984bb54) - Airborne Bot
+
+- - -
+
+## v0.10.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.10.1 [skip ci] - (47c2ede) - Airborne Bot
+
+- - -
+
+## v0.10.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.10.0 [skip ci] - (3816e12) - Airborne Bot
+
+- - -
+
+## v0.9.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.9.1 [skip ci] - (8635d5e) - Airborne Bot
+
+- - -
+
+## v0.9.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.9.0 [skip ci] - (5c9c2d5) - Airborne Bot
+
+- - -
+
+## v0.8.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.8.0 [skip ci] - (1802df0) - Airborne Bot
+
+- - -
+
+## v0.7.4 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.7.4 [skip ci] - (15ee23e) - Airborne Bot
+
+- - -
+
+## v0.7.3 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.7.3 [skip ci] - (6c03f7d) - Airborne Bot
+
+- - -
+
+## v0.7.2 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.7.2 [skip ci] - (b89e65c) - Airborne Bot
+
+- - -
+
+## v0.7.1 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.7.1 [skip ci] - (c7b2500) - Airborne Bot
+
+- - -
+
+## v0.7.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.7.0 [skip ci] - (2107c1b) - Airborne Bot
+
+- - -
+
+## v0.6.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.6.0 [skip ci] - (e227b97) - Airborne Bot
+
+- - -
+
+## v0.5.0 - 2025-10-28
+#### Miscellaneous Chores
+- **(version)** v0.5.0 [skip ci] - (04079d4) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.0.2 - 2025-10-03
 #### Bug Fixes
 - header imports & package name - (618566d) - Balaganesh S
