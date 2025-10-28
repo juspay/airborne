@@ -1,6 +1,6 @@
 {
   "name": "airborne_dashboard",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "description": "Frontend for Airborne",
   "private": true,
   "scripts": {

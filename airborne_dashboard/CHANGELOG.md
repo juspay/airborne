@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.8.2 - 2025-10-28
+#### Bug Fixes
+- added release confirmation dialog - (7d5f93e) - Yash Rajput
+
+- - -
+
 ## airborne_dashboard-v0.8.1 - 2025-10-28
 #### Bug Fixes
 - update appId context before children mount in dashboard - (f6c2b4e) - Yash Rajput
