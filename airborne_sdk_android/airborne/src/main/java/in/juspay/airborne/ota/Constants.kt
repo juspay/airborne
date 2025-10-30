@@ -20,6 +20,11 @@ internal object Constants {
     const val APP_DIR = "app"
     const val PACKAGE_DIR_NAME = "package"
     const val RESOURCES_DIR_NAME = "resources"
+    const val BACKUP_DIR = "airborne-backup"
+    const val BACKUP_TEMP = "backup_temp"
+    const val BACKUP_MAIN = "backup"
+    const val ROLLBACK_IN_PROGRESS = "rollback_in_progress"
+    const val BLACKLISTED_VERSIONS = "blacklisted_versions"
     const val RC_VERSION_FILE_NAME = "rc_version.txt"
     const val PACKAGE_MANIFEST_FILE_NAME = "pkg.json"
     const val CONFIG_FILE_NAME = "config.json"
@@ -40,4 +45,6 @@ internal object Constants {
         lazy = emptyList()
     )
     val DEFAULT_RESOURCES = ReleaseConfig.ResourceManifest(emptyList())
+    const val BACKUP_STAGE = "backup_stage"
+    const val BACKUP_INPLACE = "backup_inplace"
 }
