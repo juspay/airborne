@@ -53,6 +53,7 @@
     if ([indexDict isKindOfClass:[NSDictionary class]]) {
         _index = [[AJPResource alloc] initWithDictionary:indexDict error:nil];
     } else {
+        _index = [[AJPResource alloc] initWithDictionary:@{@"url": @"", @"file_path": @""} error:error];
         if (error) {
             *error = [NSError errorWithDomain:@"ManifestError" code:301 userInfo:@{NSLocalizedDescriptionKey: @"Invalid index resource"}];
         }
@@ -88,16 +89,6 @@
             *error = [NSError errorWithDomain:@"ManifestError" code:303 userInfo:@{NSLocalizedDescriptionKey: @"Invalid lazy packages"}];
         }
     }
-}
-
-- (instancetype)initWithFileUtil:(AJPFileUtil*)fileUtil error:(NSError **)error {
-    self = [super init];
-    NSData *data = [fileUtil getFileDataFromBundle:APP_PACKAGE_FILE_NAME error:nil];
-    NSDictionary *jsonObject = data ? [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:error] : [NSDictionary new];
-    if (jsonObject && [jsonObject isKindOfClass:[NSDictionary class]]) {
-        [self defaultInitWithDictionary:jsonObject error:error];
-    }
-    return self;
 }
 
 // Implement new methods for accessing splits

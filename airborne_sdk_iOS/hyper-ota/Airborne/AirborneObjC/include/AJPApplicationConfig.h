@@ -6,11 +6,6 @@
 //
 
 #import <Foundation/Foundation.h>
-#if SWIFT_PACKAGE
-#import "AJPFileUtil.h"
-#else
-#import <Airborne/AJPFileUtil.h>
-#endif
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -21,7 +16,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSNumber* releaseConfigTimeout;
 @property (nonatomic, strong) NSDictionary *properties;
 
-- (instancetype _Nullable)initWithError:(NSError * _Nullable *) jsonError fileUtil:(AJPFileUtil *)fileUtil;
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary error:(NSError * _Nullable *)error;
 - (NSDictionary *)toDictionary;
 

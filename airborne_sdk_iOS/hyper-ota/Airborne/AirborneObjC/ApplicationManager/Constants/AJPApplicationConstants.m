@@ -17,10 +17,6 @@ NSString *const JUSPAY_RESOURCE_DIR = @"JuspayResources";
 NSString *const JUSPAY_MAIN_DIR = @"main";
 NSString *const JUSPAY_TEMP_DIR = @"temp";
 
-NSString *const APP_CONFIG_FILE_NAME = @"app-config.json";
-NSString *const APP_PACKAGE_FILE_NAME = @"app-pkg.json";
-NSString *const APP_RESOURCES_FILE_NAME = @"app-resources.json";
-
 NSString *const APP_CONFIG_DATA_FILE_NAME = @"app-config.dat";
 
 NSString *const APP_PACKAGE_DATA_FILE_NAME = @"app-pkg.dat";

@@ -9,10 +9,8 @@
 
 #if SWIFT_PACKAGE
 #import "AJPResource.h"
-#import "AJPFileUtil.h"
 #else
 #import <Airborne/AJPResource.h>
-#import <Airborne/AJPFileUtil.h>
 #endif
 
 NS_ASSUME_NONNULL_BEGIN
@@ -22,7 +20,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonnull) NSDictionary<NSString*, AJPResource *>* resources;
 
 - (instancetype _Nullable)initWithDictionary:(NSDictionary *)dictionary error:(NSError * _Nullable *)error;
-- (instancetype)initWithFileUtil:(AJPFileUtil *)fileUtil error:(NSError * _Nullable *)error;
 - (id)toDictionary;
 
 @end

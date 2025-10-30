@@ -21,12 +21,9 @@
         }
         
         _config = [[AJPApplicationConfig alloc] initWithDictionary:dictionary[@"config"] error:error];
-        if (*error != nil) {
-            return;
-        }
         
         _package = [[AJPApplicationPackage alloc] initWithDictionary:dictionary[@"package"] error:error];
-        
+
         _resources = [[AJPApplicationResources alloc] initWithDictionary:dictionary[@"resources"] error:error];
     }
 }

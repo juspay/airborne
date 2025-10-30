@@ -47,16 +47,6 @@
     self.resources = [resources copy];
 }
 
-- (instancetype)initWithFileUtil:(AJPFileUtil *)fileUtil error:(NSError **)error {
-    self = [super init];
-    NSData *data = [fileUtil getFileDataFromBundle:APP_RESOURCES_FILE_NAME error:nil];
-    NSDictionary *jsonObject = data ? [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:error] : [NSDictionary new];
-    if (jsonObject && [jsonObject isKindOfClass:[NSArray class]]) {
-        [self defaultInitWithDict:jsonObject error:error];
-    }
-    return self;
-}
-
 - (void)encodeWithCoder:(NSCoder *)aCoder {
     [aCoder encodeObject:self.resources forKey:@"resources"];
 }

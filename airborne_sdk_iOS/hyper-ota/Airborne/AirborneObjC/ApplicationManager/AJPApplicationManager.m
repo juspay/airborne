@@ -204,7 +204,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             AJPApplicationManifest* manifest = [[AJPApplicationManifest alloc] initWithData:data error:&error];
             if (manifest != nil) {
                 if (self.config == nil && manifest.config != nil) {
-                        self.config = manifest.config;
+                    self.config = manifest.config;
                 }
                 if (self.package == nil && manifest.config != nil) {
                     self.package = manifest.package;
@@ -217,7 +217,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         
         if (self.config == nil) {
             NSError* newErr = nil;
-            self.config = [[AJPApplicationConfig alloc] initWithError:&newErr fileUtil:self.fileUtil];
+            self.config = [[AJPApplicationConfig alloc] initWithDictionary:@{} error:&newErr];
             if(self.config == nil || newErr!=nil) {
                 NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
                 logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
@@ -227,25 +227,25 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         }
         
         if (self.package == nil) {
-                NSError* newErr = nil;
-                self.package = [[AJPApplicationPackage alloc] initWithFileUtil:self.fileUtil error:&newErr];
-                if (self.package == nil || newErr != nil) {
-                    NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
-                    logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
-                    logVal[@"file_name"] = @"package.json";
-                    [self.tracker trackError:@"release_config_read_failed" value:logVal];
-                }
+            NSError* newErr = nil;
+            self.package = [[AJPApplicationPackage alloc] initWithDictionary:@{} error:&newErr];
+            if (self.package == nil || newErr != nil) {
+                NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
+                logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
+                logVal[@"file_name"] = @"package.json";
+                [self.tracker trackError:@"release_config_read_failed" value:logVal];
+            }
         }
         
         if (self.resources == nil) {
-                NSError* newErr = nil;
-                self.resources = [[AJPApplicationResources alloc] initWithFileUtil:self.fileUtil error:&newErr];
-                if(self.resources == nil || newErr != nil) {
-                    NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
-                    logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
-                    logVal[@"file_name"] = @"resources.json";
-                    [self.tracker trackError:@"release_config_read_failed" value:logVal];
-                }
+            NSError* newErr = nil;
+            self.resources = [[AJPApplicationResources alloc] initWithDictionary:@{} error:&newErr];
+            if(self.resources == nil || newErr != nil) {
+                NSMutableDictionary* logVal = [NSMutableDictionary dictionary];
+                logVal[@"error"] = newErr == nil ? @"reason unknown":[newErr localizedDescription];
+                logVal[@"file_name"] = @"resources.json";
+                [self.tracker trackError:@"release_config_read_failed" value:logVal];
+            }
         }
 
         [self.tracker trackInfo:@"bundled_release_config" value:[@{@"release_config":@"Read bundled release_config.json"} mutableCopy]];

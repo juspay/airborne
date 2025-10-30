@@ -11,9 +11,11 @@
 #if SWIFT_PACKAGE
 #import "AJPApplicationManifest.h"
 #import "AJPRemoteFileUtil.h"
+#import "AJPFileUtil.h"
 #else
 #import <Airborne/AJPApplicationManifest.h>
 #import <Airborne/AJPRemoteFileUtil.h>
+#import <Airborne/AJPFileUtil.h>
 #endif
 
 /**
