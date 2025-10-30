@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 export interface OrganisationsList {
   organisations: { name: string; applications: { application: string; organisation: string }[] }[];
@@ -17,7 +18,7 @@ export interface OrganisationsList {
 
 export default function DashboardHome() {
   const router = useRouter();
-  const { org, app, setOrg, setApp, token, logout, config } = useAppContext();
+  const { org, app, setOrg, setApp, token, logout, config, loadingConfig } = useAppContext();
   const [reqOrgName, setReqOrgName] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -140,7 +141,9 @@ export default function DashboardHome() {
   if (orgList.length === 0) {
     return (
       <div className="mt-10">
-        {config?.organisation_creation_disabled ? (
+        {loadingConfig ? (
+          <Loader2 className="mx-auto my-16 h-8 w-8 animate-spin text-muted-foreground" />
+        ) : config?.organisation_creation_disabled ? (
           orgRequestSuccess ? (
             <Card className="mx-auto max-w-lg shadow-lg border-green-200 bg-green-50">
               <CardHeader>

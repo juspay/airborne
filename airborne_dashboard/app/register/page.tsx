@@ -15,7 +15,7 @@ import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { toastWarning } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, notFound } from "next/navigation";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,11 +31,17 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setToken, setUser, token, config } = useAppContext();
+  const { setToken, setUser, token, config, loadingConfig } = useAppContext();
 
   useEffect(() => {
     if (token) router.replace("/dashboard");
   }, [token]);
+
+  useEffect(() => {
+    if (config && !config.signin_enabled) {
+      notFound();
+    }
+  }, [config]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +93,10 @@ export default function RegisterPage() {
     "Team collaboration tools",
     "Enterprise-grade security",
   ];
+
+  if (loadingConfig) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center p-4">
@@ -174,7 +184,7 @@ export default function RegisterPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Google Sign Up */}
-              {config?.google_signin_enabled && (
+              {!loadingConfig && config?.google_signin_enabled && (
                 <>
                   <Button
                     variant="outline"
