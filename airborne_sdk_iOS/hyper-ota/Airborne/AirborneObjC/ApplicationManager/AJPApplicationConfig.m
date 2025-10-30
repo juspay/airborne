@@ -98,14 +98,4 @@
     return self;
 }
 
-- (instancetype)initWithError:(NSError **)jsonError fileUtil:(AJPFileUtil *)fileUtil{
-    self = [super init];
-    NSData *data = [fileUtil getFileDataFromBundle:APP_CONFIG_FILE_NAME error:nil];
-    NSDictionary *jsonObject = data ? [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:jsonError] : [NSDictionary new];
-    if (jsonObject && [jsonObject isKindOfClass:[NSDictionary class]]) {
-        [self defaultInitWithDictionary:jsonObject error:jsonError];
-    }
-    return self;
-}
-
 @end
