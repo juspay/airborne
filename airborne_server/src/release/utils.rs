@@ -21,7 +21,7 @@ use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
 use http::{uri::PathAndQuery, Uri};
-use log::info;
+use log::{debug, info};
 use serde_json::Value;
 use superposition_sdk::{operation::list_experiment::ListExperimentOutput, types::Variant};
 use url::form_urlencoded;
@@ -41,6 +41,7 @@ use crate::{
         DbPool,
     },
     utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
+    utils::redis::RedisCache,
 };
 
 pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<Vec<String>> {
@@ -74,24 +75,6 @@ pub fn extract_string_from_configs(opt_obj: &Option<Document>, key: &str) -> Opt
 
 pub fn extract_file_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<String> {
     extract_string_from_configs(opt_obj, key)
-}
-
-pub fn extract_integer_from_configs<T>(opt_obj: &Option<Document>, key: &str) -> T
-where
-    T: Default + From<i64> + From<u32>,
-{
-    opt_obj
-        .as_ref()
-        .and_then(|doc| {
-            if let Document::Object(obj) = doc {
-                obj.get(key)
-                    .and_then(document_to_value)
-                    .and_then(|v| v.as_i64().map(|i| T::from(i)))
-            } else {
-                None
-            }
-        })
-        .unwrap_or_default()
 }
 
 pub fn extract_files_from_experiment(
@@ -168,6 +151,7 @@ pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key
 
 pub async fn get_files_by_file_keys_async(
     pool: DbPool,
+    redis_cache: &RedisCache,
     organisation: String,
     application: String,
     file_paths: Vec<String>,
@@ -176,43 +160,107 @@ pub async fn get_files_by_file_keys_async(
         return Ok(vec![]);
     }
 
-    run_blocking!({
-        let mut conn = pool.get()?;
+    let mut cached_files: Vec<FileEntry> = Vec::new();
+    let mut missing_file_keys: Vec<String> = Vec::new();
 
-        let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+    // Check Redis cache for each file
+    for file_key in &file_paths {
+        let cache_key = redis_cache.key(&organisation, &application, &["file_entry", file_key]);
 
-        for file_id in &file_paths {
-            let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
+        match redis_cache.get::<FileEntry>(&cache_key).await {
+            Ok(Some(file_entry)) => {
+                debug!("Cache hit for file: {}", file_key);
+                cached_files.push(file_entry);
+            }
+            Ok(None) => {
+                debug!("Cache miss for file: {}", file_key);
+                missing_file_keys.push(file_key.clone());
+            }
+            Err(e) => {
+                debug!(
+                    "Cache error for file {}: {:?}, falling back to DB",
+                    file_key, e
+                );
+                missing_file_keys.push(file_key.clone());
+            }
+        }
+    }
 
-            if let Some(v) = ver_opt {
-                file_conds.push(Box::new(
-                    file_dsl_path.eq(fp.clone()).and(file_dsl_version.eq(v)),
-                ));
-            } else if let Some(t) = tag_opt {
-                file_conds.push(Box::new(
-                    file_dsl_path
-                        .eq(fp.clone())
-                        .and(file_dsl_tag.is_not_distinct_from(t.clone())),
-                ));
+    // Fetch missing files from database
+    let db_files = if !missing_file_keys.is_empty() {
+        debug!("Fetching {} files from database", missing_file_keys.len());
+        // Clone for use in the macro and after it
+        let org_clone = organisation.clone();
+        let app_clone = application.clone();
+
+        let db_result = run_blocking!({
+            let mut conn = pool.get()?;
+
+            let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
+
+            for file_id in &missing_file_keys {
+                let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
+
+                if let Some(v) = ver_opt {
+                    file_conds.push(Box::new(
+                        file_dsl_path.eq(fp.clone()).and(file_dsl_version.eq(v)),
+                    ));
+                } else if let Some(t) = tag_opt {
+                    file_conds.push(Box::new(
+                        file_dsl_path
+                            .eq(fp.clone())
+                            .and(file_dsl_tag.is_not_distinct_from(t.clone())),
+                    ));
+                } else {
+                    return Err(ABError::BadRequest("Invalid file key format".to_string()));
+                }
+            }
+
+            let combined = file_conds
+                .into_iter()
+                .reduce(|a, b| Box::new(a.or(b)))
+                .unwrap_or(Box::new(file_dsl_path.eq("")));
+
+            let files: Vec<FileEntry> = files_table
+                .into_boxed::<Pg>()
+                .filter(file_dsl_org_id.eq(&org_clone))
+                .filter(file_dsl_app_id.eq(&app_clone))
+                .filter(combined)
+                .load(&mut conn)?;
+
+            Ok(files)
+        })?;
+
+        // Cache the fetched files in Redis
+        for file_entry in &db_result {
+            let file_key = format!("{}@version:{}", file_entry.file_path, file_entry.version);
+
+            let cache_key =
+                redis_cache.key(&organisation, &application, &["file_entry", &file_key]);
+            debug!("Caching file {}: {:?}", file_key, file_entry);
+
+            // Cache for 3 days
+            const FILE_CACHE_TTL: usize = 259200;
+
+            if let Err(e) = redis_cache
+                .set_ex(&cache_key, file_entry, FILE_CACHE_TTL)
+                .await
+            {
+                debug!("Failed to cache file {}: {:?}", file_key, e);
             } else {
-                return Err(ABError::BadRequest("Invalid file key format".to_string()));
+                debug!("Cached file: {}", file_key);
             }
         }
 
-        let combined = file_conds
-            .into_iter()
-            .reduce(|a, b| Box::new(a.or(b)))
-            .unwrap_or(Box::new(file_dsl_path.eq("")));
+        db_result
+    } else {
+        Vec::new()
+    };
 
-        let files: Vec<FileEntry> = files_table
-            .into_boxed::<Pg>()
-            .filter(file_dsl_org_id.eq(&organisation))
-            .filter(file_dsl_app_id.eq(&application))
-            .filter(combined)
-            .load(&mut conn)?;
+    let mut all_files = cached_files;
+    all_files.extend(db_files);
 
-        Ok(files)
-    })
+    Ok(all_files)
 }
 
 pub fn build_release_experiment_from_experiment(
@@ -658,6 +706,7 @@ pub async fn build_overrides(
 
     let files = get_files_by_file_keys_async(
         state.db_pool.clone(),
+        &state.redis_cache,
         organisation.clone(),
         application.clone(),
         combined_files.clone(),

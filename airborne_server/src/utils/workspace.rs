@@ -14,17 +14,16 @@
 
 use crate::utils::db::{models::WorkspaceName, schema::hyperotaserver::workspace_names, DbPool};
 use crate::{run_blocking, types::ABError};
-use actix_web::error;
 use diesel::prelude::*;
 
 /// Get the workspace name for Superposition based on organization and application
 /// This retrieves the workspace name that was created during application setup
 /// which follows the format: {application_name}{generated_id}
-pub async fn get_workspace_name_for_application(
+async fn get_workspace_name_for_application_db(
     pool: DbPool,
     application: String,
     organisation: String,
-) -> Result<String, actix_web::Error> {
+) -> Result<String, ABError> {
     let workspace_result = run_blocking!({
         let mut conn = pool.get()?;
         let result = workspace_names::table
@@ -38,7 +37,29 @@ pub async fn get_workspace_name_for_application(
 
     match workspace_result {
         Ok(name) => Ok(name.workspace_name),
-        Err(ABError::NotFound(_)) => Err(error::ErrorNotFound("workspace not found")),
-        Err(e) => Err(error::ErrorInternalServerError(e.to_string())),
+        Err(ABError::NotFound(_)) => Err(ABError::NotFound("workspace not found".to_owned())),
+        Err(e) => Err(ABError::InternalServerError(e.to_string())),
     }
+}
+
+pub async fn get_workspace_name_for_application(
+    db_pool: crate::utils::db::DbPool,
+    redis_cache: &crate::utils::redis::RedisCache,
+    application: String,
+    organisation: String,
+) -> Result<String, ABError> {
+    let cache_key = redis_cache.key(&organisation, &application, &["workspace_name"]);
+
+    const WEEK: usize = 7 * 24 * 60 * 60; // 604800
+
+    redis_cache
+        .get_or_try_set::<String, _, _>(&cache_key, WEEK, || async {
+            get_workspace_name_for_application_db(
+                db_pool,
+                application.to_owned(),
+                organisation.to_owned(),
+            )
+            .await
+        })
+        .await
 }
