@@ -25,7 +25,10 @@ mod types;
 mod user;
 mod utils;
 
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::{
+    web::{self, PathConfig, QueryConfig},
+    App, HttpResponse, HttpServer,
+};
 use aws_sdk_s3::config::Builder;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
@@ -44,9 +47,9 @@ use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
-use crate::dashboard::configuration;
 use crate::middleware::auth::Auth;
 use crate::middleware::request::request_id_mw;
+use crate::{dashboard::configuration, types::ABError};
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
@@ -238,6 +241,14 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::from_fn(request_id_mw))
             .wrap(TracingLogger::default())
             .app_data(web::Data::from(app_state.clone()))
+            .app_data(
+                PathConfig::default()
+                    .error_handler(|err, _| ABError::BadRequest(err.to_string()).into()),
+            )
+            .app_data(
+                QueryConfig::default()
+                    .error_handler(|err, _| ABError::BadRequest(err.to_string()).into()),
+            )
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())
             .service(docs::add_routes())

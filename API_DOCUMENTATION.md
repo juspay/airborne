@@ -896,7 +896,7 @@ x-application: <application_name>
 
 **Query Parameters:**
 - `page` (optional): Page number (default: 1)
-- `per_page` (optional): Items per page (default: 50, max: 200)
+- `count` (optional): Items per page default: 10
 - `search` (optional): Search term to filter files
 
 **Response Schema:**
@@ -910,15 +910,13 @@ x-application: <application_name>
         "$ref": "#/components/schemas/FileResponse"
       }
     },
-    "total": {
+    "total_items": {
       "type": "integer",
       "description": "Total number of files"
     },
-    "page": {
-      "type": "integer"
-    },
-    "per_page": {
-      "type": "integer"
+    "total_pages": {
+      "type": "integer",
+       "description": "Total number of pages"
     }
   }
 }
@@ -1042,31 +1040,29 @@ x-application: <application_name>
 ```
 
 **Query Parameters:**
-- `offset` (optional): Number of items to skip (default: 0)
-- `limit` (optional): Number of items to return (default: 10, max: 100)
+- `pages` (optional): Number of page (default: 1)
+- `count` (optional): Number of items per page (default: 50)
+- `search` (optional): Search index file name to filter packages
+- `all` (optional): If true, fetches all packages without pagination
 
 **Response Schema:**
 ```json
 {
   "type": "object",
   "properties": {
-    "packages": {
+    "data": {
       "type": "array",
       "items": {
         "$ref": "#/components/schemas/Package"
       }
     },
-    "page_number": {
-      "type": "integer"
-    },
-    "next_offset": {
-      "type": "integer"
-    },
-    "prev_offset": {
-      "type": "integer"
+    "total_items": {
+      "type": "integer",
+      "example": 125
     },
     "total_pages": {
-      "type": "integer"
+      "type": "integer",
+      "example": 13
     }
   }
 }
@@ -1866,16 +1862,31 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
+**Query Parameters:**
+- `pages` (optional): Number of page (default: 1)
+- `count` (optional): Number of items per page (default: 50)
+- `status` (optional): Filter by status of release
+- `all` (optional): If true, fetches all packages without pagination
+
+
 **Response Schema:**
 ```json
 {
   "type": "object",
   "properties": {
-    "releases": {
+    "data": {
       "type": "array",
       "items": {
         "$ref": "#/components/schemas/CreateReleaseResponse"
       }
+    },
+    "total_items": {
+      "type": "integer",
+      "example": 125
+    },
+    "total_pages": {
+      "type": "integer",
+      "example": 13
     }
   }
 }

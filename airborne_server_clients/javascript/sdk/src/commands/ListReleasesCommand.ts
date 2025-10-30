@@ -44,13 +44,17 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * const client = new AirborneClient(config);
  * const input = { // ListReleasesRequest
  *   dimension: "STRING_VALUE",
+ *   page: Number("int"),
+ *   count: Number("int"),
+ *   all: true || false,
+ *   status: "STRING_VALUE",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
  * const command = new ListReleasesCommand(input);
  * const response = await client.send(command);
  * // { // ListReleasesResponse
- * //   releases: [ // GetReleaseResponseList // required
+ * //   data: [ // GetReleaseResponseList // required
  * //     { // GetReleaseResponse
  * //       id: "STRING_VALUE",
  * //       created_at: "STRING_VALUE",
@@ -106,6 +110,8 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //       },
  * //     },
  * //   ],
+ * //   total_pages: Number("int"), // required
+ * //   total_items: Number("int"), // required
  * // };
  *
  * ```

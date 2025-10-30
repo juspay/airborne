@@ -1,7 +1,7 @@
 import fs from "fs";
 import { promises as fsPromises } from "fs";
 import path from "path";
-import { CreateApplicationCommand, CreateDimensionCommand, CreateFileCommand, CreateOrganisationCommand, CreatePackageCommand, CreateReleaseCommand, DeleteDimensionCommand, GetReleaseCommand, GetUserCommand, ListDimensionsCommand, ListFilesCommand, ListOrganisationsCommand, ListPackagesCommand, ListReleasesCommand, PostLoginCommand, RequestOrganisationCommand, ServeReleaseCommand, ServeReleaseV2Command, UpdateDimensionCommand, UploadFileCommand, AirborneClient } from "airborne-server-sdk"
+import { CreateApplicationCommand, CreateDimensionCommand, CreateFileCommand, CreateOrganisationCommand, CreatePackageCommand, CreateReleaseCommand, DeleteDimensionCommand, GetReleaseCommand, GetUserCommand, ListDimensionsCommand, ListFilesCommand, ListOrganisationsCommand, ListPackagesCommand, ListReleasesCommand, ListVersionsCommand, PostLoginCommand, RequestOrganisationCommand, ServeReleaseCommand, ServeReleaseV2Command, UpdateDimensionCommand, UploadFileCommand, AirborneClient } from "airborne-server-sdk"
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -467,6 +467,30 @@ export async function ListReleasesAction(paramsFile, options){
   
   const client = await getClient(options.token, true);
   const command = new ListReleasesCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function ListVersionsAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["filepath","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(options.token, true);
+  const command = new ListVersionsCommand(finalOptions);
   return await client.send(command);
 }
 
