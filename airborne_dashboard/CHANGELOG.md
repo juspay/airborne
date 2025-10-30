@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.8.4 - 2025-10-30
+#### Bug Fixes
+- add debouncing to all search inputs - (60a6b56) - Yash Rajput
+
+- - -
+
 ## airborne_dashboard-v0.8.3 - 2025-10-28
 #### Bug Fixes
 - Allow Release on dependency dimension of cohort dimension - (f8cbf22) - yuvrajjsingh0
