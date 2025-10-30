@@ -14,3 +14,18 @@
 
 pub mod auth;
 pub mod request;
+use crate::types::ABError;
+use actix_web::{error::JsonPayloadError, Error, HttpRequest};
+
+pub fn json_error_handler(err: JsonPayloadError, _req: &HttpRequest) -> Error {
+    let message = match &err {
+        JsonPayloadError::ContentType => "Unsupported Content Type",
+        JsonPayloadError::Overflow { limit: _ } | JsonPayloadError::OverflowKnownLength { .. } => {
+            "Payload Too Large"
+        }
+        JsonPayloadError::Deserialize(_) => "Bad Input",
+        _ => "Bad Request",
+    };
+
+    Error::from(ABError::BadRequest(message.to_string()))
+}

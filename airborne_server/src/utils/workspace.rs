@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::run_blocking;
+use crate::types::Result;
 use crate::utils::db::{models::WorkspaceName, schema::hyperotaserver::workspace_names, DbPool};
-use crate::{run_blocking, types::ABError};
-use actix_web::error;
 use diesel::prelude::*;
 
 /// Get the workspace name for Superposition based on organization and application
@@ -24,7 +24,7 @@ pub async fn get_workspace_name_for_application(
     pool: DbPool,
     application: String,
     organisation: String,
-) -> Result<String, actix_web::Error> {
+) -> Result<String> {
     let workspace_result = run_blocking!({
         let mut conn = pool.get()?;
         let result = workspace_names::table
@@ -38,7 +38,6 @@ pub async fn get_workspace_name_for_application(
 
     match workspace_result {
         Ok(name) => Ok(name.workspace_name),
-        Err(ABError::NotFound(_)) => Err(error::ErrorNotFound("workspace not found")),
-        Err(e) => Err(error::ErrorInternalServerError(e.to_string())),
+        Err(e) => Err(e),
     }
 }

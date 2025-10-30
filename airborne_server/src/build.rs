@@ -18,7 +18,7 @@ use crate::utils::db::schema::hyperotaserver::builds::{
 use crate::utils::s3::push_file_byte_arr;
 use crate::{
     release, run_blocking,
-    types::{ABError, AppState},
+    types::{ABError, AppState, Result},
     utils::{
         db::models::{BuildEntry, NewBuildEntry},
         workspace::get_workspace_name_for_application,
@@ -205,7 +205,7 @@ async fn create_and_upload_build(
     new_build_version: String,
     config_document: Option<Document>,
     state: web::Data<AppState>,
-) -> Result<(), ABError> {
+) -> Result<()> {
     // Extract files from config
     let package_index =
         crate::release::utils::extract_file_from_configs(&config_document, "package.index")
@@ -534,7 +534,7 @@ async fn build(
     release_version: String,
     config_document: Option<Document>,
     state: web::Data<AppState>,
-) -> Result<String, ABError> {
+) -> Result<String> {
     info!(
         "Starting build for {}/{} with release version {}",
         org, app, release_version
@@ -599,7 +599,7 @@ async fn extract_args(
     path: web::Path<(String, String)>,
     state: web::Data<AppState>,
     req: actix_web::HttpRequest,
-) -> Result<Arguments, ABError> {
+) -> Result<Arguments> {
     let _conn = state
         .db_pool
         .get()
@@ -629,10 +629,7 @@ async fn extract_args(
     })
 }
 
-async fn generate(
-    arguments: Arguments,
-    state: web::Data<AppState>,
-) -> Result<BuildResponse, ABError> {
+async fn generate(arguments: Arguments, state: web::Data<AppState>) -> Result<BuildResponse> {
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     // Get workspace name (similar to serve_release)
@@ -787,7 +784,7 @@ async fn serve_version(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     // Where do I save the last updated aar / zip?
     // S3 can just dump to archive/org/app/zip/release-id.zip?
     // S3 can just dump to archive/org/app/aar/version.aar/pom/hashes,
@@ -814,7 +811,7 @@ async fn serve_zip(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     // Extract args
     let _args = extract_args(path, state.clone(), req).await?;
     let org_id = _args.organisation.clone();
@@ -861,7 +858,7 @@ async fn serve_aar(
     path: web::Path<(String, String)>,
     req: actix_web::HttpRequest,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     // Extract args
     let _args = extract_args(path, state.clone(), req).await?;
     let org_id = _args.organisation.clone();

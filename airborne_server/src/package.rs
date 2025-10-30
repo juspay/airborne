@@ -20,13 +20,13 @@ use crate::{
 use actix_web::{
     get, post,
     web::{self, Query},
-    HttpResponse, Result, Scope,
+    HttpResponse, Scope,
 };
 
 use crate::{
     file::utils::parse_file_key,
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
-    types::AppState,
+    types::{AppState, Result},
 };
 use diesel::expression::BoxableExpression;
 use diesel::pg::Pg;
@@ -48,7 +48,7 @@ async fn create_package(
     req: web::Json<CreatePackageInput>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -149,7 +149,7 @@ async fn get_package(
     query: Query<GetPackageQuery>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     let package_id = query.into_inner().package_key;
     let (opt_pkg_version, mut opt_pkg_tag) = parse_package_key(&package_id);
 
@@ -204,7 +204,7 @@ async fn list_packages(
     input: Query<ListPackagesInput>,
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> Result<HttpResponse, ABError> {
+) -> Result<HttpResponse> {
     let ListPackagesInput { offset, limit } = input.into_inner();
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)

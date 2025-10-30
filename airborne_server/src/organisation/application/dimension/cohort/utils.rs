@@ -2,7 +2,7 @@ use crate::{
     organisation::application::dimension::cohort::types::{
         DefinitionMap, DefinitionValue, JsonLogicKey,
     },
-    types::ABError,
+    types::{ABError, Result},
     utils::document::document_to_json_value,
 };
 use aws_smithy_types::Document;
@@ -26,9 +26,7 @@ fn key_str_to_enum(s: &str) -> Option<JsonLogicKey> {
 }
 
 /// Parse a Document::Object into DefinitionMap, enforcing the And/Leaf rule.
-pub fn parse_definition_map_object(
-    obj: &HashMap<String, Document>,
-) -> Result<DefinitionMap, ABError> {
+pub fn parse_definition_map_object(obj: &HashMap<String, Document>) -> Result<DefinitionMap> {
     let mut out: DefinitionMap = HashMap::new();
 
     for (k, v) in obj {
