@@ -9,10 +9,8 @@
 
 #if SWIFT_PACKAGE
 #import "AJPResource.h"
-#import "AJPFileUtil.h"
 #else
 #import <Airborne/AJPResource.h>
-#import <Airborne/AJPFileUtil.h>
 #endif
 
 
@@ -28,7 +26,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<AJPResource*> *important;
 @property (nonatomic, strong) NSArray<AJPLazyResource*> *lazy;
 
-- (instancetype _Nullable)initWithFileUtil:(AJPFileUtil *)fileUtil error:(NSError * _Nullable *)error;
 - (instancetype)initWithDictionary:(NSDictionary *)dictionary error:(NSError * _Nullable *)error;
 
 - (NSArray<AJPResource *> *)allImportantSplits;
