@@ -48,7 +48,7 @@ export async function apiFetch<T>(
     });
 
     // Handle different HTTP status codes
-    if ((res.status === 401 || res.status === 403) && !path.includes("login") && !path.includes("oauth")) {
+    if (res.status === 401 && !path.includes("login") && !path.includes("oauth")) {
       // Handle unauthorized access
       console.error("Unauthorized access - redirecting to login");
       localStorage.clear();

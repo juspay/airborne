@@ -96,10 +96,10 @@ pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> Resul
         if access_level.level >= access.access {
             Ok(access_level.name)
         } else {
-            Err(ABError::Unauthorized("Access Level too low".to_string()))
+            Err(ABError::Forbidden("Access Level too low".to_string()))
         }
     } else {
-        Err(ABError::Unauthorized("Missing header".to_string()))
+        Err(ABError::BadRequest("Missing header".to_string()))
     }
 }
 
@@ -197,7 +197,7 @@ where
                                                 });
                                             }
                                             None => {
-                                                return Err(ABError::Unauthorized(
+                                                return Err(ABError::Forbidden(
                                                     "No Access to Application".to_string(),
                                                 )
                                                 .into())
@@ -213,7 +213,7 @@ where
                                             });
                                         }
                                         None => {
-                                            return Err(ABError::Unauthorized(
+                                            return Err(ABError::Forbidden(
                                                 "No Access to Application".to_string(),
                                             )
                                             .into());
