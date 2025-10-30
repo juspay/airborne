@@ -21,7 +21,15 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setToken, setUser, setOrg: setOrganisation, setApp: setApplication, token, config } = useAppContext();
+  const {
+    setToken,
+    setUser,
+    setOrg: setOrganisation,
+    setApp: setApplication,
+    token,
+    config,
+    loadingConfig,
+  } = useAppContext();
   const router = useRouter();
 
   useEffect(() => {
@@ -109,7 +117,7 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Google Sign In */}
-            {config?.google_signin_enabled && (
+            {!loadingConfig && config?.google_signin_enabled && (
               <>
                 <Button
                   variant="outline"

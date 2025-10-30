@@ -27,7 +27,8 @@ type AppContextType = {
   setUser: (u: User) => void;
   logout: () => void;
   signOut: () => void; // add alias for compatibility
-  config: Configuration | null;
+  config: Configuration | undefined;
+  loadingConfig: boolean;
   organisations: Organisations[];
   getOrgAccess: (orgName: string | null) => string[];
   getAppAccess: (orgName: string | null, appName: string | null) => string[];
@@ -38,6 +39,7 @@ type AppContextType = {
 interface Configuration {
   google_signin_enabled: boolean;
   organisation_creation_disabled: boolean;
+  signin_enabled: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -53,11 +55,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [app, setAppState] = useState<string | null>(null);
   const [user, setUserState] = useState<User>(null);
   const [loading, setLoading] = useState(true);
-  const [config, setConfig] = useState<Configuration | null>(null);
-  const fetchConfig = async () => {
-    const res: Configuration = await apiFetch("/dashboard/configuration");
-    setConfig(res);
-  };
+  const { data: config, isLoading: loadingConfig } = useSWR<Configuration>("/dashboard/configuration", apiFetch);
 
   const fetchOrganisations = async () => {
     if (!token) return { organisations: [] };
@@ -74,7 +72,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppState(localStorage.getItem(LS_APP));
     const u = localStorage.getItem(LS_USER);
     if (u) setUserState(JSON.parse(u));
-    fetchConfig();
     setLoading(false);
   }, []);
 
@@ -137,13 +134,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       logout,
       signOut: logout, // add alias for compatibility
       config,
+      loadingConfig,
       organisations,
       getOrgAccess,
       getAppAccess,
       updateOrgs: mutate,
       loadingAccess: isLoading,
     }),
-    [token, org, app, user, loading, config, organisations, mutate, isLoading]
+    [token, org, app, user, loading, config, organisations, mutate, isLoading, loadingConfig]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

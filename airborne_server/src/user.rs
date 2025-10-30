@@ -79,6 +79,10 @@ async fn create_user(
     req: Json<UserCredentials>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
+    if !state.env.enable_signin {
+        return Err(ABError::NotFound("Route not found".to_string()));
+    }
+
     info!("[CREATE_USER] Attempting to create user: {}", req.name);
 
     // Get Keycloak Admin Token
@@ -548,6 +552,10 @@ async fn oauth_signup(
     json_req: Json<OAuthRequest>,
     state: web::Data<AppState>,
 ) -> actix_web::Result<Json<User>, ABError> {
+    if !state.env.enable_signin {
+        return Err(ABError::NotFound("Route not found".to_string()));
+    }
+
     if !state.env.enable_google_signin {
         return Err(ABError::BadRequest(
             "Google Sign-in is disabled".to_string(),

@@ -82,6 +82,10 @@ async fn main() -> std::io::Result<()> {
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
+    let enable_signin = std::env::var("ENABLE_SIGN_IN")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
     let organisation_creation_disabled = std::env::var("ORGANISATION_CREATION_DISABLED")
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
@@ -171,6 +175,7 @@ async fn main() -> std::io::Result<()> {
         bucket_name,
         superposition_org_id: superposition_org_id_env,
         enable_google_signin,
+        enable_signin,
         organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
         cloudfront_distribution_id: cf_distribution_id.clone(),
