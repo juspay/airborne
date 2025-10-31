@@ -109,6 +109,7 @@ pub fn add_routes() -> Scope {
         .service(organisation_add_user)
         .service(organisation_update_user)
         .service(organisation_remove_user)
+        .service(Scope::new("/invite").service(invite::add_routes()))
 }
 
 // Request and Response Types
