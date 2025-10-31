@@ -22,6 +22,7 @@ use actix_web::{
     web::{self, Json},
     HttpMessage, HttpRequest, Scope,
 };
+use lettre::{message::{header::ContentType, Mailbox}, Message, Transport};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -297,6 +298,43 @@ async fn organisation_add_user(
         find_target_user(&admin, &realm, &body.user),
         find_organization(&admin, &realm, &organisation)
     );
+
+    if target_user.as_ref().is_err_and(|e| matches!(e, OrgError::UserNotFound(_))) {
+        let mut context = tera::Context::new();
+        context.insert("name", &body.user);
+        context.insert("organization", &organisation);
+        context.insert("role", &role_name);
+        info!("Templates loaded: {:?}", &state.tera.get_template_names().collect::<Vec<_>>());
+        // Render HTML body
+        let html_body = &state.tera.render("org_invitation.html", &context).map_err(|e| {
+            OrgError::Internal(format!("Template rendering error: {}", e))
+        })?;
+
+        let text_body = &state.tera.render("org_invitation.txt", &context).map_err(|e| {
+            OrgError::Internal(format!("Template rendering error: {}", e))
+        })?;
+
+        let email = Message::builder()
+            .from(Mailbox::new(Some("Airborne Onboarding".to_owned()), "no-reply@airborne.io".parse().unwrap()))
+            .to(Mailbox::new(Some("Yuvraj".to_owned()), "yuvrajjsingh0@gmail.com".parse().unwrap()))
+            .subject(format!("Invitation to join {} on Airborne", &organisation))
+            .multipart(
+                lettre::message::MultiPart::alternative()
+                    .singlepart(
+                        lettre::message::SinglePart::plain(text_body.clone()),
+                    )
+                    .singlepart(
+                        lettre::message::SinglePart::html(html_body.clone()),
+                    )
+            )
+            .unwrap();
+        let mailer = &state.mailer;
+        match mailer.send(&email) {
+            Ok(_) => info!("Email sent successfully!"),
+            Err(e) => info!("Could not send email: {:?}", e),
+        };
+        return Err(target_user.err().unwrap());
+    }
 
     let target_user = target_user?;
     let org_context = org_context?;

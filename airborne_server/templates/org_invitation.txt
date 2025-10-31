@@ -1,0 +1,45 @@
+✈️ AIRBORNE - You're invited!
+
+Hello,
+
+You've been invited to join {{ organization }} on Airborne with {{ role }} access.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT YOU'LL GET ACCESS TO:
+
+🚀 Deploy and manage applications seamlessly
+📊 Real-time analytics and performance monitoring  
+🔒 Enterprise-grade security and access controls
+👥 Collaborate with your team members
+📱 Mobile and web deployment capabilities
+⚡ Advanced targeting and rollout controls
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEXT STEPS:
+
+Ready to get started? Accept your invitation to join the team:
+
+👉 Accept Invitation: [INVITATION_LINK]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  IMPORTANT: This invitation will expire in 7 days. If you have any 
+questions or need assistance, please reach out to your team administrator 
+or our support team.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This email was sent by Airborne on behalf of {{ organization }}.
+
+If you believe this email was sent to you by mistake, you can safely 
+ignore it.
+
+Learn more: https://airborne.juspay.in
+Contact Support: support@juspay.in
+Documentation: https://docs.airborne.juspay.in
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Airborne by Juspay Technologies  

@@ -15,9 +15,11 @@
 use actix_web::http::StatusCode;
 use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
+use lettre::SmtpTransport;
 use log::error;
 use serde::Serialize;
 use superposition_sdk::Client;
+use tera::Tera;
 use thiserror::Error;
 
 use crate::utils::db;
@@ -32,6 +34,8 @@ pub struct AppState {
     pub sheets_hub: Option<
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
+    pub mailer: SmtpTransport,
+    pub tera: Tera,
 }
 
 #[derive(Clone, Debug)]

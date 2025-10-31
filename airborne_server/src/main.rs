@@ -34,8 +34,10 @@ use google_sheets4::{
     yup_oauth2::{self, ServiceAccountAuthenticator},
     Sheets,
 };
+use lettre::{transport::smtp::authentication::Credentials, SmtpTransport};
 use log::info;
 use serde_json::json;
+use tera::Tera;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
@@ -152,6 +154,22 @@ async fn main() -> std::io::Result<()> {
         None
     };
 
+    // Setup email transporter
+    // let creds = Credentials::new("smtp_username".to_owned(), "smtp_password".to_owned());
+
+    // let mailer = SmtpTransport::relay("smtp://127.0.0.1:1025")
+    //     .unwrap()
+    //     .credentials(creds)
+    //     .build();
+    let mailer = SmtpTransport::builder_dangerous("127.0.0.1")
+        .port(1025)
+        .build();
+
+    let tera = Tera::new("templates/**/*").map_err(|e| {
+        println!("Parsing error(s): {}", e);
+        std::io::Error::new(std::io::ErrorKind::Other, "Template parsing error")
+    })?;
+
     // Initialize DB pool
     info!("Creating db pool");
     let pool = db::establish_pool(&aws_kms_client).await;
@@ -225,6 +243,8 @@ async fn main() -> std::io::Result<()> {
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
+        mailer,
+        tera,
     });
 
     // Start the background cleanup job for transaction reconciliation

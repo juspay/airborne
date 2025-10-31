@@ -34,6 +34,7 @@ http = "0.2.12"
 http-body = "1.0.1"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
+lettre = "=0.11.19"
 log = "0.4.27"
 r2d2 = "=0.8.10"
 reqwest = { version = "^0.12.5", features = ["blocking", "stream"] }
@@ -42,6 +43,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.10"
 superposition_sdk = "0.91.1"
+tera = "=1.20.1"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
