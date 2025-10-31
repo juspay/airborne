@@ -1,45 +1,23 @@
-✈️ AIRBORNE - You're invited!
+Hi,
 
-Hello,
+You’ve been invited to join {{ organization }} on Airborne as a {{ role }}.
 
-You've been invited to join {{ organization }} on Airborne with {{ role }} access.
+With this access, you’ll be able to:
+1. Deploy and manage applications seamlessly
+2. Monitor performance and analytics in real time
+3. Benefit from enterprise-grade security and access controls
+4. Collaborate with your team members
+5. Manage mobile and web deployments
+6. Use advanced rollout and targeting controls
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To get started, please accept your invitation here: http://localhost:3000/register?token={{ token }}&mode=invitation
 
-WHAT YOU'LL GET ACCESS TO:
-
-🚀 Deploy and manage applications seamlessly
-📊 Real-time analytics and performance monitoring  
-🔒 Enterprise-grade security and access controls
-👥 Collaborate with your team members
-📱 Mobile and web deployment capabilities
-⚡ Advanced targeting and rollout controls
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-NEXT STEPS:
-
-Ready to get started? Accept your invitation to join the team:
-
-👉 Accept Invitation: [INVITATION_LINK]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️  IMPORTANT: This invitation will expire in 7 days. If you have any 
-questions or need assistance, please reach out to your team administrator 
-or our support team.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+This invitation will expire in 7 days. If you have any questions or need assistance, contact your team administrator or reach out to our support team at support@juspay.in.
 
 This email was sent by Airborne on behalf of {{ organization }}.
+If you believe this was sent to you by mistake, you can safely ignore it.
 
-If you believe this email was sent to you by mistake, you can safely 
-ignore it.
-
-Learn more: https://airborne.juspay.in
-Contact Support: support@juspay.in
+Learn more about Airborne: https://airborne.juspay.in
 Documentation: https://docs.airborne.juspay.in
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Airborne by Juspay Technologies  
+—
+The Airborne Team
