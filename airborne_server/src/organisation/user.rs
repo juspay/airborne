@@ -27,13 +27,20 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    impl_response_error, middleware::auth::{
+    impl_response_error,
+    middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
-    }, organisation::user::invite::{create_new_invite, find_existing_pending_invite, generate_invite_token, update_existing_invite}, types::{ABError, ABErrorCodes, AppError, AppState, HasLabel}, utils::{
+    },
+    organisation::user::invite::{
+        create_new_invite, find_existing_pending_invite, generate_invite_token,
+        update_existing_invite,
+    },
+    types::{ABError, ABErrorCodes, AppError, AppState, HasLabel},
+    utils::{
         db::models::InviteRole,
         keycloak::{find_org_group, find_user_by_username, prepare_user_action},
         mail::Mail,
-    }
+    },
 };
 
 use self::{
@@ -315,23 +322,30 @@ async fn organisation_add_user(
     {
         // User doesn't exist - handle invite flow
         let invite_role = body.access.to_invite_role();
-        
+
         // Check if there's an existing pending invite for same org, email, and role
-        match find_existing_pending_invite(&state.db_pool, &organisation, &body.user, &invite_role).await {
+        match find_existing_pending_invite(&state.db_pool, &organisation, &body.user, &invite_role)
+            .await
+        {
             Ok(Some(existing_invite)) => {
                 // Update existing invite with new token and timestamp
                 let new_token = generate_invite_token();
-                match update_existing_invite(&state.db_pool, existing_invite.id, new_token.clone()).await {
+                match update_existing_invite(&state.db_pool, existing_invite.id, new_token.clone())
+                    .await
+                {
                     Ok(_updated_invite) => {
-                        info!("Updated existing invite for {} in org {}", &body.user, &organisation);
-                        
+                        info!(
+                            "Updated existing invite for {} in org {}",
+                            &body.user, &organisation
+                        );
+
                         // Send email with updated invite
                         let mut context = tera::Context::new();
                         context.insert("name", &body.user);
                         context.insert("organization", &organisation);
                         context.insert("role", &role_name);
                         context.insert("token", &new_token);
-                        
+
                         let mail = Mail::new(
                             &state.mailer,
                             &state.tera,
@@ -341,12 +355,14 @@ async fn organisation_add_user(
                             "org_invitation.txt".to_string(),
                             Some("org_invitation.html".to_string()),
                         );
-                        
+
                         match mail.send() {
                             Ok(_) => info!("Invitation email sent to {}", &body.user),
-                            Err(e) => info!("Failed to send invitation email to {}: {}", &body.user, e),
+                            Err(e) => {
+                                info!("Failed to send invitation email to {}: {}", &body.user, e)
+                            }
                         }
-                        
+
                         return Ok(Json(UserOperationResponse {
                             user: body.user,
                             success: true,
@@ -354,10 +370,10 @@ async fn organisation_add_user(
                         }));
                     }
                     Err(e) => {
-                        return Err(OrgError::Internal(format!("Failed to update invite: {}", e)));
+                        return Err(OrgError::Internal(e.message().to_string()));
                     }
                 }
-            },
+            }
             Ok(None) => {
                 // No existing invite - create new one
                 let new_token = generate_invite_token();
@@ -367,17 +383,22 @@ async fn organisation_add_user(
                     body.user.clone(),
                     invite_role,
                     new_token.clone(),
-                ).await {
+                )
+                .await
+                {
                     Ok(_new_invite) => {
-                        info!("Created new invite for {} in org {}", &body.user, &organisation);
-                        
+                        info!(
+                            "Created new invite for {} in org {}",
+                            &body.user, &organisation
+                        );
+
                         // Send email with new invite
                         let mut context = tera::Context::new();
                         context.insert("name", &body.user);
                         context.insert("organization", &organisation);
                         context.insert("role", &role_name);
                         context.insert("token", &new_token);
-                        
+
                         let mail = Mail::new(
                             &state.mailer,
                             &state.tera,
@@ -387,12 +408,14 @@ async fn organisation_add_user(
                             "org_invitation.txt".to_string(),
                             Some("org_invitation.html".to_string()),
                         );
-                        
+
                         match mail.send() {
                             Ok(_) => info!("Invitation email sent to {}", &body.user),
-                            Err(e) => info!("Failed to send invitation email to {}: {}", &body.user, e),
+                            Err(e) => {
+                                info!("Failed to send invitation email to {}: {}", &body.user, e)
+                            }
                         }
-                        
+
                         return Ok(Json(UserOperationResponse {
                             user: body.user,
                             success: true,
@@ -400,12 +423,12 @@ async fn organisation_add_user(
                         }));
                     }
                     Err(e) => {
-                        return Err(OrgError::Internal(format!("Failed to create invite: {}", e)));
+                        return Err(OrgError::Internal(e.message().to_string()));
                     }
                 }
-            },
+            }
             Err(e) => {
-                return Err(OrgError::Internal(format!("Failed to check existing invites: {}", e)));
+                return Err(OrgError::Internal(e.message().to_string()));
             }
         }
     }
