@@ -38,6 +38,7 @@ type AppContextType = {
 interface Configuration {
   google_signin_enabled: boolean;
   organisation_creation_disabled: boolean;
+  is_demo: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);

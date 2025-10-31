@@ -23,6 +23,7 @@ use actix_web::{
     web::{self, Json},
     HttpRequest, Scope,
 };
+use google_sheets4::api::ValueRange;
 use keycloak::{
     types::{CredentialRepresentation, UserRepresentation},
     KeycloakAdmin,
@@ -39,6 +40,7 @@ pub fn add_routes(path: &str) -> Scope {
         .service(oauth_login)
         .service(get_oauth_url)
         .service(oauth_signup)
+        .service(request_create_user)
         .service(Scope::new("").wrap(Auth).service(get_user))
 }
 
@@ -610,4 +612,58 @@ async fn oauth_signup(
         user_resp.user_id
     );
     Ok(user_resp)
+}
+
+#[derive(Deserialize)]
+pub struct AccountCreationRequest {
+    pub name: String,
+    pub email: String,
+}
+
+#[post("/request-account")]
+async fn request_create_user(
+    req: Json<AccountCreationRequest>,
+    state: web::Data<AppState>,
+) -> Result<Json<()>, ABError> {
+    info!("Received account creation request");
+
+    let google_sheet_values = ValueRange {
+        major_dimension: None,
+        range: None,
+        values: Some(vec![vec![
+            serde_json::Value::String(req.name.clone()),
+            serde_json::Value::String(req.email.clone()),
+        ]]),
+    };
+
+    match state.sheets_hub {
+        Some(ref hub) => {
+            info!(
+                "Attempting to append account request to Google Sheet: {}",
+                state.env.google_spreadsheet_id
+            );
+
+            hub.spreadsheets()
+                .values_append(
+                    google_sheet_values,
+                    &state.env.google_spreadsheet_id,
+                    "'Request Sheet'!A1:G1000",
+                )
+                .value_input_option("USER_ENTERED")
+                .doit()
+                .await
+                .map_err(|e| {
+                    info!("Google Sheet append failed : {:?}", e);
+                    ABError::InternalServerError(format!(" Google Sheet error: {:?}", e))
+                })?;
+        }
+        None => {
+            return Err(ABError::InternalServerError(
+                "Google Sheets hub is not configured".to_string(),
+            ));
+        }
+    }
+
+    info!("Account request successfully handled");
+    Ok(Json(()))
 }

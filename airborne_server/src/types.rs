@@ -46,6 +46,7 @@ pub struct Environment {
     pub bucket_name: String,
     pub superposition_org_id: String,
     pub enable_google_signin: bool,
+    pub is_demo: bool,
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,

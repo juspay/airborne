@@ -28,6 +28,7 @@ pub fn add_routes() -> Scope {
 struct Configuration {
     google_signin_enabled: bool,
     organisation_creation_disabled: bool,
+    is_demo: bool,
 }
 
 #[get("")]
@@ -38,6 +39,7 @@ async fn get_global_configurations(
     let config = Configuration {
         google_signin_enabled: state.env.enable_google_signin,
         organisation_creation_disabled: state.env.organisation_creation_disabled,
+        is_demo: state.env.is_demo,
     };
 
     Ok(Json(config))
