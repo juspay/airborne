@@ -34,15 +34,15 @@ use google_sheets4::{
     yup_oauth2::{self, ServiceAccountAuthenticator},
     Sheets,
 };
-use lettre::{transport::smtp::authentication::Credentials, SmtpTransport};
+use lettre::SmtpTransport;
 use log::info;
 use serde_json::json;
-use tera::Tera;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
 };
 use superposition_sdk::config::Config as SrsConfig;
+use tera::Tera;
 use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
@@ -167,7 +167,7 @@ async fn main() -> std::io::Result<()> {
 
     let tera = Tera::new("templates/**/*").map_err(|e| {
         println!("Parsing error(s): {}", e);
-        std::io::Error::new(std::io::ErrorKind::Other, "Template parsing error")
+        std::io::Error::other("Template parsing error")
     })?;
 
     // Initialize DB pool

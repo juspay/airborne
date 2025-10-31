@@ -7,9 +7,9 @@ CREATE TABLE hyperotaserver.organisation_invites (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id TEXT NOT NULL,
     email TEXT NOT NULL,
-    role invite_role NOT NULL,
+    role hyperotaserver.invite_role NOT NULL,
     token TEXT NOT NULL,
-    status invite_status NOT NULL DEFAULT 'pending',
+    status hyperotaserver.invite_status NOT NULL DEFAULT 'pending',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
