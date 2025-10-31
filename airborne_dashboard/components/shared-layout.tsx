@@ -38,6 +38,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "./ui/label";
 import { OrganisationsList } from "@/app/dashboard/page";
 import { hasAppAccess } from "@/lib/utils";
+import { SignupBanner } from "./shared-banner";
 
 interface SharedLayoutProps {
   children: React.ReactNode;
@@ -47,7 +48,7 @@ interface SharedLayoutProps {
 type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, logout, getOrgAccess, getAppAccess } = useAppContext();
+  const { org, app, user, token, logout, getOrgAccess, getAppAccess, config } = useAppContext();
   const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
   const router = useRouter();
@@ -158,6 +159,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background h-full">
+      {config?.is_demo && <SignupBanner />}
       <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
         <div className="flex h-20 items-center px-6">
           <div className="flex items-center gap-4">

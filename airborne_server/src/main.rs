@@ -86,8 +86,12 @@ async fn main() -> std::io::Result<()> {
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
+    let is_demo = std::env::var("IS_DEMO")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
 
-    let spreadsheet_id = if organisation_creation_disabled {
+    let spreadsheet_id = if organisation_creation_disabled || is_demo {
         std::env::var("GOOGLE_SPREADSHEET_ID")
             .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true")
     } else {
@@ -133,7 +137,9 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to run pending migrations");
     }
 
-    let gsa_creds: Option<yup_oauth2::ServiceAccountKey> = if organisation_creation_disabled {
+    let gsa_creds: Option<yup_oauth2::ServiceAccountKey> = if organisation_creation_disabled
+        || is_demo
+    {
         let creds_from_path = if let Ok(path) = std::env::var("GCP_SERVICE_ACCOUNT_PATH") {
             yup_oauth2::read_service_account_key(path).await.ok()
         } else {
@@ -172,6 +178,7 @@ async fn main() -> std::io::Result<()> {
         superposition_org_id: superposition_org_id_env,
         enable_google_signin,
         organisation_creation_disabled,
+        is_demo,
         google_spreadsheet_id: spreadsheet_id.clone(),
         cloudfront_distribution_id: cf_distribution_id.clone(),
     };
@@ -186,7 +193,7 @@ async fn main() -> std::io::Result<()> {
 
     // Configure Google Sheets
     let mut hub = None;
-    if organisation_creation_disabled {
+    if organisation_creation_disabled || is_demo {
         rustls::crypto::ring::default_provider()
             .install_default()
             .expect("Failed to install rustls crypto provider");
