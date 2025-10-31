@@ -22,7 +22,6 @@ use actix_web::{
     web::{self, Json},
     HttpMessage, HttpRequest, Scope,
 };
-use lettre::{message::Mailbox, Address, Message, Transport};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -33,7 +32,10 @@ use crate::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
     },
     types::{ABError, ABErrorCodes, AppError, AppState, HasLabel},
-    utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
+    utils::{
+        keycloak::{find_org_group, find_user_by_username, prepare_user_action},
+        mail::Mail,
+    },
 };
 
 use self::{
@@ -311,40 +313,20 @@ async fn organisation_add_user(
             "Templates loaded: {:?}",
             &state.tera.get_template_names().collect::<Vec<_>>()
         );
-        // Render HTML body
-        let html_body = &state
-            .tera
-            .render("org_invitation.html", &context)
-            .map_err(|e| OrgError::Internal(format!("Template rendering error: {}", e)))?;
 
-        let text_body = &state
-            .tera
-            .render("org_invitation.txt", &context)
-            .map_err(|e| OrgError::Internal(format!("Template rendering error: {}", e)))?;
-
-        let email = Message::builder()
-            .from(Mailbox::new(
-                Some("Airborne Onboarding".to_owned()),
-                "no-reply@airborne.io".parse().unwrap(),
-            ))
-            .to(Mailbox::new(
-                Some("".to_string()),
-                body.user
-                    .parse::<Address>()
-                    .map_err(|e| OrgError::Internal(format!("Invalid email address: {}", e)))?,
-            ))
-            .subject(format!("Invitation to join {} on Airborne", &organisation))
-            .multipart(
-                lettre::message::MultiPart::alternative()
-                    .singlepart(lettre::message::SinglePart::plain(text_body.clone()))
-                    .singlepart(lettre::message::SinglePart::html(html_body.clone())),
-            )
-            .map_err(|e| OrgError::Internal(format!("Email building error: {}", e)))?;
-        let mailer = &state.mailer;
-        match mailer.send(&email) {
-            Ok(_) => info!("Email sent successfully!"),
-            Err(e) => info!("Could not send email: {:?}", e),
-        };
+        let mail = Mail::new(
+            &state.mailer,
+            &state.tera,
+            context,
+            body.user.clone(),
+            "You're invited to join an Airborne organization".to_string(),
+            "org_invitation.txt".to_string(),
+            Some("org_invitation.html".to_string()),
+        );
+        match mail.send() {
+            Ok(_) => info!("Invitation email sent to {}", &body.user),
+            Err(e) => info!("Failed to send invitation email to {}: {}", &body.user, e),
+        }
 
         return Err(target_user.err().unwrap());
     }
