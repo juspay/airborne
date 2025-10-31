@@ -9,16 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Lock, Eye, EyeOff, User, Check } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Mail, Lock, Eye, EyeOff, User, Check, UserPlus } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { toastWarning } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { validateInviteToken } from "@/lib/invitation";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -33,14 +36,59 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { setToken, setUser, token, config } = useAppContext();
 
+  // Invite-related state
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{
+    organization: string;
+    role: string;
+    email: string;
+  } | null>(null);
+  const [isLoadingInvite, setIsLoadingInvite] = useState(false);
+
   useEffect(() => {
     if (token) router.replace("/dashboard");
-  }, [token]);
+
+    // Check for invite token in URL params
+    const inviteTokenParam = searchParams?.get("invite_token");
+    const redirectToParam = searchParams?.get("redirect_to");
+
+    if (inviteTokenParam) {
+      setInviteToken(inviteTokenParam);
+      setRedirectTo(redirectToParam);
+
+      // Fetch invite details to prefill the email
+      fetchInviteDetails(inviteTokenParam);
+    }
+
+    async function fetchInviteDetails(token: string) {
+      setIsLoadingInvite(true);
+      try {
+        const details = await validateInviteToken(token);
+        setInviteInfo({
+          organization: details.organization,
+          role: details.role,
+          email: details.email,
+        });
+
+        // Prefill the email in the form
+        setFormData((prev) => ({
+          ...prev,
+          email: details.email,
+        }));
+      } catch (error) {
+        console.error("Failed to fetch invite details:", error);
+        // If invite is invalid, we can still let them register normally
+      } finally {
+        setIsLoadingInvite(false);
+      }
+    }
+  }, [token, searchParams]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      toastWarning("Password Mismatch", "Passwords don't match");
+      toastWarning("Password Mismatch", "Passwords don&rsquo;t match");
       return;
     }
     setIsLoading(true);
@@ -53,7 +101,13 @@ export default function RegisterPage() {
       const token = res?.user_token?.access_token || "";
       setToken(token);
       setUser({ user_id: res?.user_id, name: formData.email, is_super_admin: res?.is_super_admin || false });
-      window.location.href = "/dashboard";
+
+      // If there&rsquo;s an invite token, redirect to the invitation page after registration
+      if (inviteToken && redirectTo) {
+        window.location.href = redirectTo;
+      } else {
+        window.location.href = "/dashboard";
+      }
     } catch (e: any) {
       console.log("User Register Error", e);
       // Error toast will be shown automatically by apiFetch
@@ -169,10 +223,42 @@ export default function RegisterPage() {
 
           <Card className="border-0 shadow-lg">
             <CardHeader className="space-y-1 pb-4">
-              <CardTitle className="text-xl font-[family-name:var(--font-space-grotesk)]">Create account</CardTitle>
-              <CardDescription>Get started with your free account</CardDescription>
+              <CardTitle className="text-xl font-[family-name:var(--font-space-grotesk)]">
+                {inviteToken ? "Complete your invitation" : "Create account"}
+              </CardTitle>
+              <CardDescription>
+                {inviteToken
+                  ? "Finish setting up your account to join the organization"
+                  : "Get started with your free account"}
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Invite Information */}
+              {inviteToken && (
+                <Alert className="border-primary/20 bg-primary/5">
+                  <UserPlus className="h-4 w-4" />
+                  <AlertDescription>
+                    {isLoadingInvite ? (
+                      <div className="space-y-1">
+                        <p className="font-medium">Loading invitation details...</p>
+                      </div>
+                    ) : inviteInfo ? (
+                      <div className="space-y-1">
+                        <p className="font-medium">You&rsquo;ve been invited to join:</p>
+                        <p className="text-sm">
+                          <strong>{inviteInfo.organization}</strong> as {inviteInfo.role}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Email: {inviteInfo.email}</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <p className="font-medium">Processing invitation...</p>
+                        <p className="text-sm">Complete registration to join the organization</p>
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
               {/* Google Sign Up */}
               {config?.google_signin_enabled && (
                 <>
@@ -250,10 +336,11 @@ export default function RegisterPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="john@company.com"
+                      placeholder={inviteInfo?.email || "john@company.com"}
                       value={formData.email}
                       onChange={(e) => updateFormData("email", e.target.value)}
                       className="pl-10"
+                      disabled={inviteInfo?.email === formData.email}
                       required
                     />
                   </div>

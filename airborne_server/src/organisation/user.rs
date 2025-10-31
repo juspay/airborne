@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod invite;
 mod transaction;
-mod types;
+pub mod types;
 mod utils;
 
 use actix_web::{
@@ -27,27 +28,30 @@ use crate::{
     middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, OWNER, READ, WRITE,
     },
-    organisation::{types::OrgError, user::types::*},
-    types as airborne_types,
-    types::{ABError, AppState},
+    organisation::{
+        application::{self, user::find_application},
+        types::OrgError,
+        user::{transaction::add_user_with_transaction, types::*},
+    },
+    types::{self as airborne_types, ABError, AppState},
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
 };
 
 use self::{
     transaction::{
-        add_user_with_transaction, get_user_current_role, remove_user_with_transaction,
-        update_user_with_transaction,
+        get_user_current_role, remove_user_with_transaction, update_user_with_transaction,
     },
     utils::{check_role_hierarchy, is_last_owner, validate_access_level},
 };
 
 pub fn add_routes() -> Scope {
     Scope::new("")
-        .service(organisation_list_users)
         .service(organisation_add_user)
+        .service(organisation_list_users)
         .service(organisation_update_user)
         .service(organisation_remove_user)
         .service(organisation_transfer_ownership)
+        .service(Scope::new("/invite").service(invite::add_routes()))
 }
 
 /// Get organization context and validate user permissions
@@ -150,6 +154,13 @@ async fn organisation_add_user(
     body: Json<UserRequest>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<UserOperationResponse>> {
+    if state.env.enable_organisation_invite {
+        return Err(ABError::Forbidden(
+            "Organization invitations are enabled, kindly invite user to your organisation."
+                .to_string(),
+        ));
+    }
+
     let body = body.into_inner();
 
     // Get organization context and validate requester's permissions
@@ -210,10 +221,40 @@ async fn organisation_add_user(
         body.user, organisation, role_name
     );
 
+    for app_access in body.applications.unwrap_or_default() {
+        let app_context = find_application(&admin, &realm, &org_context.org_id, &app_access.name)
+            .await
+            .map_err(|e| {
+                ABError::NotFound(format!(
+                    "Failed to find application {}: {}",
+                    app_access.name, e
+                ))
+            })?;
+
+        application::user::add_user_with_transaction(
+            &admin,
+            &realm,
+            &app_context,
+            &target_user,
+            match app_access.level {
+                AccessLvl::Admin => "admin",
+                AccessLvl::Write => "write",
+                AccessLvl::Read => "read",
+            },
+        )
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!(
+                "Failed to add user to application {}: {}",
+                app_access.name, e
+            ))
+        })?;
+    }
+
     Ok(Json(UserOperationResponse {
         user: body.user,
         success: true,
-        operation: "add".to_string(),
+        operation: "add_user".to_string(),
     }))
 }
 

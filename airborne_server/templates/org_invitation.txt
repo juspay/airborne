@@ -1,0 +1,22 @@
+Hi,
+
+You’ve been invited to join {{ organization }} on Airborne as a {{ role }}.
+
+Airborne helps you to:
+1. Deploy and manage applications seamlessly
+2. Monitor performance and analytics in real time
+3. Benefit from enterprise-grade security and access controls
+4. Collaborate with your team members
+5. Explore advanced rollout and targeting controls
+
+To get started, please accept your invitation here: {{ invitation_url }}
+
+This invitation will expire in 7 days. If you have any questions or need assistance, contact your team administrator or reach out to our support team at superposition@juspay.in.
+
+This email was sent by Airborne on behalf of {{ organization }}.
+If you believe this was sent to you by mistake, you can safely ignore it.
+
+Learn more about Airborne: https://airborne.juspay.in
+Documentation: https://airborne.juspay.in/docs/home
+—
+The Airborne Team

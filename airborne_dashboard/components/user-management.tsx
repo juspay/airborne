@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Search, UserPlus, MoreVertical, Trash2, ArrowRight, Crown } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { toastSuccess, toastError } from "@/hooks/use-toast";
 
 export type AccessLevel = "owner" | "admin" | "write" | "read";
 
@@ -30,9 +31,11 @@ export interface UserManagementProps {
   onUpdateUser: (user: string, access: AccessLevel) => Promise<void>;
   onRemoveUser: (user: string) => Promise<void>;
   onTransferOwnership?: (user: string) => Promise<void>;
+  onInviteCreated?: () => void; // Callback for when an invitation is created
   title?: string;
   description?: string;
   entityType?: "organisation" | "application";
+  hideAddUserButton?: boolean; // New prop to hide the add user button
 }
 
 const ACCESS_LEVELS: { value: AccessLevel; label: string; color: string }[] = [
@@ -57,7 +60,7 @@ const getAccessLevelRoles = (level: AccessLevel): AccessLevel[] => {
   }
 };
 
-const canUpdateUsers = (
+export const canUpdateUsers = (
   entityType: "organisation" | "application",
   orgAccess: string[],
   appAccess?: string[]
@@ -86,9 +89,11 @@ export function UserManagement({
   onUpdateUser,
   onRemoveUser,
   onTransferOwnership,
+  onInviteCreated,
   title = "User Management",
   description = "Manage users and their access levels",
   entityType = "organisation",
+  hideAddUserButton = false,
 }: UserManagementProps) {
   const [search, setSearch] = React.useState("");
   const debouncedSearch = useDebouncedValue(search, 500);
@@ -99,6 +104,7 @@ export function UserManagement({
   const [userToRemove, setUserToRemove] = React.useState<string | null>(null);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = React.useState(false);
   const [userToTransfer, setUserToTransfer] = React.useState<string | null>(null);
+  const [isInviting, setIsInviting] = React.useState(false);
 
   const canUpdate = canUpdateUsers(entityType, currentUserOrgAccess, currentUserAppAccess);
   const filteredUsers = useMemo(() => {
@@ -108,13 +114,25 @@ export function UserManagement({
   const handleAddUser = async () => {
     if (!newUser.trim()) return;
 
+    setIsInviting(true);
     try {
       await onAddUser(newUser.trim(), newUserAccess);
       setNewUser("");
       setNewUserAccess("read");
       setIsAddDialogOpen(false);
-    } catch (error) {
+
+      // Show success toast
+      toastSuccess("Invitation Sent", `Successfully sent invitation to ${newUser.trim()} with ${newUserAccess} access`);
+
+      // Notify parent component that an invitation was created
+      onInviteCreated?.();
+    } catch (error: any) {
       console.error("Failed to add user:", error);
+
+      // Show error toast
+      toastError("Failed to Send Invitation", error?.message || "Could not send invitation. Please try again.");
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -181,7 +199,7 @@ export function UserManagement({
               <CardTitle>{title}</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">{description}</p>
             </div>
-            {canUpdate && (
+            {canUpdate && !hideAddUserButton && (
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
@@ -191,16 +209,12 @@ export function UserManagement({
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add New User</DialogTitle>
+                    <DialogTitle>Invite user to Organisation</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium">Username</label>
-                      <Input
-                        placeholder="Enter username"
-                        value={newUser}
-                        onChange={(e) => setNewUser(e.target.value)}
-                      />
+                      <label className="text-sm font-medium">Email</label>
+                      <Input placeholder="Enter email" value={newUser} onChange={(e) => setNewUser(e.target.value)} />
                     </div>
                     <div>
                       <label className="text-sm font-medium">Access Level</label>
@@ -227,11 +241,11 @@ export function UserManagement({
                       </Select>
                     </div>
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                      <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isInviting}>
                         Cancel
                       </Button>
-                      <Button onClick={handleAddUser} disabled={!newUser.trim()}>
-                        Add User
+                      <Button onClick={handleAddUser} disabled={!newUser.trim() || isInviting}>
+                        {isInviting ? "Sending..." : "Invite"}
                       </Button>
                     </div>
                   </div>
