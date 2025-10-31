@@ -22,7 +22,7 @@ use actix_web::{
     web::{self, Json},
     HttpMessage, HttpRequest, Scope,
 };
-use lettre::{message::{header::ContentType, Mailbox}, Message, Transport};
+use lettre::{message::{header::ContentType, Mailbox}, Address, Message, Transport};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -316,7 +316,9 @@ async fn organisation_add_user(
 
         let email = Message::builder()
             .from(Mailbox::new(Some("Airborne Onboarding".to_owned()), "no-reply@airborne.io".parse().unwrap()))
-            .to(Mailbox::new(Some("Yuvraj".to_owned()), "yuvrajjsingh0@gmail.com".parse().unwrap()))
+            .to(Mailbox::new(Some("".to_string()), body.user.parse::<Address>().map_err(|e| {
+                OrgError::Internal(format!("Invalid email address: {}", e))
+            })?))
             .subject(format!("Invitation to join {} on Airborne", &organisation))
             .multipart(
                 lettre::message::MultiPart::alternative()
@@ -327,7 +329,7 @@ async fn organisation_add_user(
                         lettre::message::SinglePart::html(html_body.clone()),
                     )
             )
-            .unwrap();
+            .map_err(|e| OrgError::Internal(format!("Email building error: {}", e)))?;
         let mailer = &state.mailer;
         match mailer.send(&email) {
             Ok(_) => info!("Email sent successfully!"),
