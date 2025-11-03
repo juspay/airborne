@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::Write;
+use std::str::FromStr;
 
 use actix_web::{get, web, HttpResponse, Scope};
 use aws_smithy_types::Document;
@@ -13,9 +14,11 @@ use zip::ZipWriter;
 use crate::file::utils::download_file_content;
 use crate::release::utils::get_files_by_file_keys_async;
 use crate::utils::db::schema::hyperotaserver::builds::{
-    application as app_column, dsl::*, organisation as org_column, release_id as release_id_column,
+    application as app_column, build_version, dsl::builds, organisation as org_column,
+    release_id as release_id_column,
 };
 use crate::utils::s3::push_file_byte_arr;
+use crate::utils::semver::SemVer;
 use crate::{
     release, run_blocking,
     types::{ABError, AppState},
@@ -34,14 +37,14 @@ pub fn add_routes() -> Scope {
 
 #[derive(Serialize)]
 struct BuildResponse {
-    version: String,
+    version: SemVer,
 }
 
 fn get_android_root_path(prefix: &String, org: &String, app: &String) -> String {
     format!("builds/{0}/{1}/{2}/airborne-assets/", prefix, org, app)
 }
 
-fn get_aar_path(prefix: &String, org: &String, app: &String, new_build_version: &String) -> String {
+fn get_aar_path(prefix: &String, org: &String, app: &String, new_build_version: &SemVer) -> String {
     format!(
         "{0}{1}/airborne-assets-{1}.aar",
         get_android_root_path(prefix, org, app),
@@ -49,7 +52,7 @@ fn get_aar_path(prefix: &String, org: &String, app: &String, new_build_version: 
     )
 }
 
-fn get_pom_path(prefix: &String, org: &String, app: &String, new_build_version: &String) -> String {
+fn get_pom_path(prefix: &String, org: &String, app: &String, new_build_version: &SemVer) -> String {
     format!(
         "{0}{1}/airborne-assets-{1}.pom",
         get_android_root_path(prefix, org, app),
@@ -64,7 +67,7 @@ fn get_maven_metadata_path(prefix: &String, org: &String, app: &String) -> Strin
     )
 }
 
-fn generate_pom_content(org: &String, app: &String, version: &String) -> String {
+fn generate_pom_content(org: &String, app: &String, version: &SemVer) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -82,7 +85,7 @@ fn generate_pom_content(org: &String, app: &String, version: &String) -> String 
     )
 }
 
-fn parse_existing_maven_metadata(metadata_content: &str) -> Vec<String> {
+fn parse_existing_maven_metadata(metadata_content: &str) -> Result<Vec<SemVer>, ABError> {
     // Simple XML parsing to extract version numbers
     let mut versions = Vec::new();
 
@@ -90,25 +93,27 @@ fn parse_existing_maven_metadata(metadata_content: &str) -> Vec<String> {
     for line in metadata_content.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("<version>") && trimmed.ends_with("</version>") {
-            let version = trimmed
+            if let Some(v) = trimmed
                 .strip_prefix("<version>")
                 .and_then(|s| s.strip_suffix("</version>"))
-                .map(|s| s.to_string());
-
-            if let Some(v) = version {
+            {
                 if !v.is_empty() {
-                    versions.push(v);
+                    let semver = SemVer::from_str(v).map_err(|e| {
+                        log::warn!("Invalid version '{}': {}", v, e);
+                        ABError::BadRequest(format!("Invalid version '{}': {}", v, e))
+                    })?;
+                    versions.push(semver);
                 }
             }
         }
     }
 
     versions.sort();
-    versions
+    Ok(versions)
 }
 
-fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<String>) -> String {
-    let default_version = String::from("1.0.1");
+fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<SemVer>) -> String {
+    let default_version = SemVer::default();
     let latest_version = versions.last().unwrap_or(&default_version);
     let versions_xml = versions
         .iter()
@@ -143,29 +148,20 @@ fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<Str
     )
 }
 
-fn get_zip_path(org: &String, app: &String, new_build_version: &String) -> String {
+fn get_zip_path(org: &String, app: &String, new_build_version: &SemVer) -> String {
     format!("builds/{}/{}/{}.zip", org, app, new_build_version)
 }
 
-fn increment_build_version(latest_version: Option<&str>, _release_version: &str) -> String {
+fn increment_build_version(latest_version: Option<SemVer>) -> SemVer {
     match latest_version {
-        Some(version) => {
-            // Parse the existing version to extract the base (1.0) and increment the last number
-            let parts: Vec<&str> = version.split('.').collect();
-            if parts.len() == 3 {
-                if let (Some(base), Ok(last_num)) = (
-                    parts.get(0..2).map(|slice| slice.join(".")),
-                    parts[2].parse::<u32>(),
-                ) {
-                    return format!("{}.{}", base, last_num + 1);
-                }
-            }
-            // If version doesn't match expected format, start with 1.0.1
-            "1.0.1".to_string()
+        Some(mut version) => {
+            // Increment the patch version
+            version.patch += 1;
+            version
         }
         None => {
             // No existing version, start with 1.0.1
-            "1.0.1".to_string()
+            SemVer::default()
         }
     }
 }
@@ -202,7 +198,7 @@ fn sanitize_path(path: &str, replace_with_hyphen: bool) -> String {
 async fn create_and_upload_build(
     org: String,
     app: String,
-    new_build_version: String,
+    new_build_version: &SemVer,
     config_document: Option<Document>,
     state: web::Data<AppState>,
 ) -> Result<(), ABError> {
@@ -429,7 +425,7 @@ async fn create_and_upload_build(
         })?;
 
         // Upload zip file to S3
-        let s3_path = get_zip_path(&org, &app, &new_build_version);
+        let s3_path = get_zip_path(&org, &app, new_build_version);
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -441,7 +437,7 @@ async fn create_and_upload_build(
             ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
         })?;
 
-        let aar_path = get_aar_path(&String::from("hyper-sdk"), &org, &app, &new_build_version);
+        let aar_path = get_aar_path(&String::from("hyper-sdk"), &org, &app, new_build_version);
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -454,8 +450,8 @@ async fn create_and_upload_build(
         })?;
 
         // Generate and upload POM file
-        let pom_content = generate_pom_content(&org, &app, &new_build_version);
-        let pom_path = get_pom_path(&String::from("hyper-sdk"), &org, &app, &new_build_version);
+        let pom_content = generate_pom_content(&org, &app, new_build_version);
+        let pom_path = get_pom_path(&String::from("hyper-sdk"), &org, &app, new_build_version);
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -495,7 +491,10 @@ async fn create_and_upload_build(
                     ))
                 })?;
 
-                parse_existing_maven_metadata(&metadata_content)
+                parse_existing_maven_metadata(&metadata_content).unwrap_or_else(|e| {
+                    log::warn!("Failed to parse maven metadata: {}", e);
+                    Vec::new()
+                })
             }
             Err(_) => {
                 // No existing metadata, start with empty list
@@ -505,7 +504,7 @@ async fn create_and_upload_build(
 
         // Merge existing versions with new version
         let mut versions = existing_versions;
-        if !versions.contains(&new_build_version) {
+        if !versions.contains(new_build_version) {
             versions.push(new_build_version.clone());
             versions.sort();
         }
@@ -531,13 +530,13 @@ async fn create_and_upload_build(
 async fn build(
     org: String,
     app: String,
-    release_version: String,
+    release_id: String,
     config_document: Option<Document>,
     state: web::Data<AppState>,
-) -> Result<String, ABError> {
+) -> Result<SemVer, ABError> {
     info!(
-        "Starting build for {}/{} with release version {}",
-        org, app, release_version
+        "Starting build for {}/{} with release id {}",
+        org, app, release_id
     );
 
     let pool = state.db_pool.clone();
@@ -551,7 +550,7 @@ async fn build(
             .filter(app_column.eq(&app_clone))
             .order(build_version.desc())
             .select(build_version)
-            .first::<String>(&mut conn)
+            .first::<SemVer>(&mut conn)
             .optional()
             .map_err(|e| {
                 ABError::InternalServerError(format!("Failed to query latest build version: {}", e))
@@ -559,29 +558,20 @@ async fn build(
     })?;
 
     // Generate new semver version by incrementing the last part
-    let new_build_version =
-        increment_build_version(latest_build_version.as_deref(), &release_version);
+    let new_build_version = increment_build_version(latest_build_version);
     info!("Creating new build: {}", new_build_version);
 
     let new_build = NewBuildEntry {
         build_version: new_build_version.clone(),
         organisation: org.clone(),
         application: app.clone(),
-        release_id: release_version,
+        release_id,
     };
 
     // Create and upload build in a separate task
     let state_clone = state.clone();
-    let new_build_version_clone = new_build_version.clone();
 
-    create_and_upload_build(
-        org,
-        app,
-        new_build_version_clone,
-        config_document,
-        state_clone,
-    )
-    .await?;
+    create_and_upload_build(org, app, &new_build_version, config_document, state_clone).await?;
 
     let pool = state.db_pool.clone();
     run_blocking!({
@@ -667,13 +657,13 @@ async fn generate(
     let config_document = resolved_config.config;
 
     // Extract release version from config (similar to serve_release)
-    let release_version =
+    let release_id =
         release::utils::extract_string_from_configs(&config_document, "config.version")
             .unwrap_or_default();
 
-    info!("release_version: {}", release_version);
+    info!("release_id: {}", release_id);
 
-    if release_version.is_empty() {
+    if release_id.is_empty() {
         return Err(ABError::InternalServerError(
             "Failed to extract release version from config".to_string(),
         ));
@@ -682,14 +672,14 @@ async fn generate(
     let pool = state.db_pool.clone();
     let org = arguments.organisation.clone();
     let app = arguments.application.clone();
-    let release_version_interal = release_version.clone();
+    let release_id_interal = release_id.clone();
     // Check if build already exists for this release version
     let existing_build = run_blocking!({
         let mut conn = pool.get()?;
         builds
             .filter(org_column.eq(&org))
             .filter(app_column.eq(&app))
-            .filter(release_id_column.eq(&release_version_interal))
+            .filter(release_id_column.eq(&release_id_interal))
             .first::<BuildEntry>(&mut conn)
             .optional()
             .map_err(|e| {
@@ -730,14 +720,14 @@ async fn generate(
                 Some(build_entry) => {
                     // Spawn build thread only if build entry is present
                     let build_args = arguments.clone();
-                    let release_version_clone = release_version.clone();
+                    let release_id_clone = release_id.clone();
                     let config_document_clone = config_document.clone();
                     let state_clone = state.clone();
                     tokio::spawn(async move {
                         if let Err(e) = build(
                             build_args.organisation.clone(),
                             build_args.application.clone(),
-                            release_version_clone,
+                            release_id_clone,
                             config_document_clone,
                             state_clone,
                         )
@@ -766,7 +756,7 @@ async fn generate(
                         build(
                             arguments.organisation.clone(),
                             arguments.application.clone(),
-                            release_version.clone(),
+                            release_id.clone(),
                             config_document_clone,
                             state_clone
                         ).await?;

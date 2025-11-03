@@ -7,6 +7,7 @@ use crate::utils::db::schema::hyperotaserver::{
     builds, cleanup_outbox, configs, files, packages, packages_v2, release_views, releases,
     user_credentials, workspace_names,
 };
+use crate::utils::semver::SemVer;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct File {
@@ -165,7 +166,7 @@ pub struct ReleaseViewEntry {
 #[diesel(table_name = builds)]
 pub struct BuildEntry {
     pub id: uuid::Uuid,
-    pub build_version: String,
+    pub build_version: SemVer,
     pub organisation: String,
     pub application: String,
     pub release_id: String,
@@ -175,7 +176,7 @@ pub struct BuildEntry {
 #[derive(Insertable)]
 #[diesel(table_name = builds)]
 pub struct NewBuildEntry {
-    pub build_version: String,
+    pub build_version: SemVer,
     pub organisation: String,
     pub application: String,
     pub release_id: String,
