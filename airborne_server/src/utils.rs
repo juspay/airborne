@@ -21,6 +21,7 @@ pub mod encryption;
 pub mod keycloak;
 pub mod kms;
 pub mod s3;
+pub mod semver;
 pub mod transaction_manager;
 pub mod workspace;
 
