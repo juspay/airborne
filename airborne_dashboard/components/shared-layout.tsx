@@ -47,11 +47,18 @@ interface SharedLayoutProps {
 type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, logout, getOrgAccess, getAppAccess } = useAppContext();
+  const { org, app, user, token, logout, getOrgAccess, getAppAccess, config } = useAppContext();
   const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
   const router = useRouter();
   const [createFileOpen, setCreateFileOpen] = useState(false);
+  const [reqOrgName, setReqOrgName] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [appStoreLink, setAppStoreLink] = useState("");
+  const [playStoreLink, setPlayStoreLink] = useState("");
+  const [orgRequestSuccess, setOrgRequestSuccess] = useState(false);
+
   // pathname is used in the useIsActive function below
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const pathname = usePathname();
@@ -67,6 +74,54 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   }[] = orgsData?.organisations || [];
 
   const appsForOrg = organisations.find((o) => o.name === org)?.applications?.map((a) => a.application) || [];
+  const resetOrgRequestForm = () => {
+    setReqOrgName("");
+    setName("");
+    setEmail("");
+    setAppStoreLink("");
+    setPlayStoreLink("");
+  };
+  const onRequestOrg = async () => {
+    try {
+      await apiFetch(
+        "/organisations/request",
+        {
+          method: "POST",
+          body: {
+            organisation_name: reqOrgName,
+            name,
+            email,
+            app_store_link: appStoreLink,
+            play_store_link: playStoreLink,
+          },
+        },
+        {
+          token,
+        }
+      );
+
+      // Save request data to local storage
+      const requestData = {
+        organisation_name: reqOrgName,
+        name,
+        email,
+        app_store_link: appStoreLink,
+        play_store_link: playStoreLink,
+        requested_at: new Date().toISOString(),
+      };
+      localStorage.setItem("org_request_data", JSON.stringify(requestData));
+
+      // Show success message
+      setOrgRequestSuccess(true);
+      resetOrgRequestForm();
+      setTimeout(() => {
+        setOrgRequestSuccess(false);
+        setIsOrgCreateModelOpen(false);
+      }, 3000);
+    } catch (err) {
+      console.error("Error while requesting organisation:", err);
+    }
+  };
 
   const navigationItems: NavItem[] = appIdPath
     ? [
@@ -188,12 +243,22 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem
-                      onClick={() => setIsOrgCreateModelOpen(true)}
-                      className="my-1 cursor-pointer rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 focus:bg-primary/90"
-                    >
-                      + Create Organisation
-                    </DropdownMenuItem>
+                    {config?.organisation_creation_disabled && !user?.is_super_admin ? (
+                      <DropdownMenuItem
+                        onClick={() => setIsOrgCreateModelOpen(true)}
+                        className="my-1 cursor-pointer rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 focus:bg-primary/90"
+                      >
+                        + Request Organisation
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={() => setIsOrgCreateModelOpen(true)}
+                        className="my-1 cursor-pointer rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 focus:bg-primary/90"
+                      >
+                        + Create Organisation
+                      </DropdownMenuItem>
+                    )}
+
                     {organisations.map((o) => (
                       <DropdownMenuItem
                         key={o.name}
@@ -324,31 +389,96 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
       {isOrgCreateModelOpen && (
         <Dialog open={isOrgCreateModelOpen} onOpenChange={setIsOrgCreateModelOpen}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create Organisation</DialogTitle>
-              <DialogDescription>Please enter the name of your organisation.</DialogDescription>
-            </DialogHeader>
+            {config?.organisation_creation_disabled && !user?.is_super_admin ? (
+              <>
+                {orgRequestSuccess ? (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Request Sent</DialogTitle>
+                      <DialogDescription>Your organisation request has been sent successfully.</DialogDescription>
+                    </DialogHeader>
+                  </>
+                ) : (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Request Organisation</DialogTitle>
+                      <DialogDescription>Fill out the form below to request a new organisation.</DialogDescription>
+                    </DialogHeader>
 
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="orgName">Organisation Name</Label>
-                <Input
-                  id="orgName"
-                  placeholder="Acme Corp"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                />
-              </div>
-            </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="orgName">Organisation name*</Label>
+                        <Input id="orgName" value={reqOrgName} onChange={(e) => setReqOrgName(e.target.value)} />
+                      </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsOrgCreateModelOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={onCreateOrg} disabled={!orgName.trim()}>
-                Create
-              </Button>
-            </DialogFooter>
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Your name*</Label>
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email*</Label>
+                        <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="appStoreLink">App Store Link</Label>
+                        <Input
+                          id="appStoreLink"
+                          value={appStoreLink}
+                          onChange={(e) => setAppStoreLink(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="playStoreLink">Play Store Link</Label>
+                        <Input
+                          id="playStoreLink"
+                          value={playStoreLink}
+                          onChange={(e) => setPlayStoreLink(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsOrgCreateModelOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={onRequestOrg} disabled={!reqOrgName.trim() || !name.trim() || !email.trim()}>
+                        Request
+                      </Button>
+                    </DialogFooter>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <DialogHeader>
+                  <DialogTitle>Create Organisation</DialogTitle>
+                  <DialogDescription>Please enter the name of your organisation.</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="orgName">Organisation Name</Label>
+                    <Input
+                      id="orgName"
+                      placeholder="Acme Corp"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsOrgCreateModelOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={onCreateOrg} disabled={!orgName.trim()}>
+                    Create
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
       )}

@@ -52,7 +52,7 @@ export default function RegisterPage() {
       });
       const token = res?.user_token?.access_token || "";
       setToken(token);
-      setUser({ user_id: res?.user_id, name: formData.email });
+      setUser({ user_id: res?.user_id, name: formData.email, is_super_admin: res?.is_super_admin || false });
       window.location.href = "/dashboard";
     } catch (e: any) {
       console.log("User Register Error", e);

@@ -77,6 +77,7 @@ pub struct AuthResponse {
     pub admin_token: KeycloakAdminToken, // This is holding token and not admin since admin deos not have clone
     pub organisation: Option<AccessLevel>,
     pub application: Option<AccessLevel>,
+    pub is_super_admin: bool,
     pub username: String,
 }
 
@@ -160,30 +161,37 @@ where
                             Ok(token_data) => {
                                 let mut organisation = None;
                                 let mut application = None;
-                                if let Some(org) = org {
-                                    let client = reqwest::Client::new();
-                                    let admin = KeycloakAdmin::new(
-                                        &env.keycloak_url.clone(),
-                                        token.clone(),
-                                        client,
-                                    );
-                                    let user_groups: Vec<keycloak::types::GroupRepresentation> =
-                                        admin
-                                            .realm_users_with_user_id_groups_get(
-                                                &env.realm.clone(),
-                                                &token_data.claims.sub,
-                                                None,
-                                                None,
-                                                None,
-                                                None,
-                                            )
-                                            .await
-                                            .map_err(|e| ABError::Unauthorized(e.to_string()))?;
 
-                                    let user_groups: Vec<String> = user_groups
-                                        .iter()
-                                        .filter_map(|group| group.path.clone())
-                                        .collect();
+                                // Fetch user groups from Keycloak
+                                let client = reqwest::Client::new();
+                                let admin = KeycloakAdmin::new(
+                                    &env.keycloak_url.clone(),
+                                    token.clone(),
+                                    client,
+                                );
+                                let user_groups: Vec<keycloak::types::GroupRepresentation> = admin
+                                    .realm_users_with_user_id_groups_get(
+                                        &env.realm.clone(),
+                                        &token_data.claims.sub,
+                                        None,
+                                        None,
+                                        None,
+                                        None,
+                                    )
+                                    .await
+                                    .map_err(|e| ABError::Unauthorized(e.to_string()))?;
+
+                                let user_groups: Vec<String> = user_groups
+                                    .iter()
+                                    .filter_map(|group| group.path.clone())
+                                    .collect();
+
+                                // Check super admin status
+                                let is_super_admin =
+                                    user_groups.contains(&"/super_admin".to_string());
+
+                                // Check organization and application access if org header is present
+                                if let Some(org) = org {
                                     if let Some(app) = app {
                                         let access = get_access_level(
                                             &user_groups,
@@ -226,6 +234,7 @@ where
                                     admin_token: token,
                                     organisation,
                                     application,
+                                    is_super_admin,
                                     username: token_data
                                         .claims
                                         .preferred_username

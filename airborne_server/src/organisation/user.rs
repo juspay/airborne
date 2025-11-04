@@ -29,7 +29,7 @@ use thiserror::Error;
 use crate::{
     impl_response_error,
     middleware::auth::{
-        validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ, WRITE,
+        validate_required_access, validate_user, Access, AuthResponse, ADMIN, OWNER, READ, WRITE,
     },
     types::{ABError, ABErrorCodes, AppError, AppState, HasLabel},
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
@@ -99,6 +99,7 @@ pub fn add_routes() -> Scope {
         .service(organisation_add_user)
         .service(organisation_update_user)
         .service(organisation_remove_user)
+        .service(organisation_transfer_ownership)
 }
 
 // Request and Response Types
@@ -579,4 +580,124 @@ async fn organisation_list_users(
     );
 
     Ok(Json(ListUsersResponse { users: user_infos }))
+}
+
+#[post("/transfer-ownership")]
+async fn organisation_transfer_ownership(
+    req: HttpRequest,
+    body: Json<RemoveUserRequest>,
+    state: web::Data<AppState>,
+) -> Result<Json<UserOperationResponse>, OrgError> {
+    let user = body.user.clone();
+    info!("[TRANSFER_OWNERSHIP] Starting ownership transfer");
+
+    // Get organization context and validate requester's permissions
+    let (org_name, auth) = get_org_context(&req, OWNER, "transfer ownership").await?;
+    let requester_id = &auth.sub;
+
+    // Prepare Keycloak admin client
+    let (admin, realm) = prepare_user_action(&req, state.clone())
+        .await
+        .map_err(|e| OrgError::Internal(e.to_string()))?;
+
+    // Validate the requested access level
+    let (role_name, _access_level) = validate_access_level("owner")?;
+    // Find target user and organization
+    let target_user = find_target_user(&admin, &realm, &user).await?;
+    let org_context = find_organization(&admin, &realm, &org_name).await?;
+
+    if requester_id == &target_user.user_id {
+        return Err(OrgError::PermissionDenied(
+            "Cannot transfer ownership to yourself".to_string(),
+        ));
+    }
+
+    // Check if requester has permission to modify this user (hierarchy check)
+    check_role_hierarchy(
+        &admin,
+        &realm,
+        &org_context.group_id,
+        requester_id,
+        &target_user.user_id,
+    )
+    .await?;
+    let current_role =
+        get_user_current_role(&admin, &realm, &org_context, &target_user.user_id).await?;
+
+    // Use transaction function to update user to owner
+    update_user_with_transaction(
+        &admin,
+        &realm,
+        &org_context,
+        &target_user,
+        &role_name,
+        &current_role,
+        &state,
+    )
+    .await?;
+
+    info!("[TRANSFER_OWNERSHIP] Target user promoted to owner");
+
+    let requester_context = UserContext {
+        user_id: requester_id.to_string(),
+        username: auth.username.clone(),
+    };
+
+    // Demote requester to admin - if this fails, rollback the target user promotion
+    let demote_result = update_user_with_transaction(
+        &admin,
+        &realm,
+        &org_context,
+        &requester_context,
+        "admin",
+        "owner",
+        &state,
+    )
+    .await;
+
+    if let Err(e) = demote_result {
+        info!(
+            "[TRANSFER_OWNERSHIP] Failed to demote requester, rolling back target user promotion"
+        );
+
+        // Rollback: revert target user to their original role
+        if let Err(rollback_err) = update_user_with_transaction(
+            &admin,
+            &realm,
+            &org_context,
+            &target_user,
+            &current_role,
+            &role_name,
+            &state,
+        )
+        .await
+        {
+            // If rollback also fails, log the error and return critical failure
+            log::error!(
+                "[TRANSFER_OWNERSHIP] CRITICAL: Rollback failed - target user stuck as owner: {}",
+                rollback_err
+            );
+            return Err(OrgError::Internal(format!(
+                "Ownership transfer failed and rollback failed. Target user may be stuck as owner. Original error: {}. Rollback error: {}",
+                e, rollback_err
+            )));
+        }
+
+        info!(
+            "[TRANSFER_OWNERSHIP] Successfully rolled back target user to {}",
+            current_role
+        );
+        return Err(OrgError::Internal(format!(
+            "Failed to demote current owner to admin: {}",
+            e
+        )));
+    }
+
+    info!("[TRANSFER_OWNERSHIP] Previous owner demoted to admin - transfer complete");
+
+    Ok(Json(UserOperationResponse {
+        user,
+        success: true,
+        operation: "Transfer Ownership".to_string(),
+    }))
 }
