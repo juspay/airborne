@@ -555,9 +555,16 @@ pub async fn get_user_current_role(
     for group in user_groups {
         if let Some(path) = group.path {
             if path.starts_with(&org_path) && path != org_path {
-                // Extract role name from path
-                if let Some(role) = path.split('/').next_back() {
-                    if !role.is_empty() {
+                let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+                let org_parts: Vec<&str> = org_path.split('/').filter(|s| !s.is_empty()).collect();
+
+                // If it's exactly one level deeper than org_path, it's a direct child
+                if parts.len() == org_parts.len() + 1 {
+                    if let Some(role) = parts.last() {
+                        info!(
+                            "[GET_USER_CURRENT_ROLE] Found user role from path {}: role={}",
+                            path, role
+                        );
                         user_roles.push(role.to_string());
                     }
                 }

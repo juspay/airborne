@@ -186,24 +186,7 @@ async fn create_organisation(
     let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
     let realm = state.env.realm.clone();
 
-    // Get user's groups
-    let group_representations = admin
-        .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to fetch user groups: {:?}", e))
-        })?;
-
-    // Extract group paths
-    let group_paths: Vec<String> = group_representations
-        .iter()
-        .filter_map(|g| g.path.clone())
-        .collect();
-
-    // Parse groups into organizations
-    let organizations = parse_user_organizations(group_paths);
-
-    if organizations.is_empty() && state.env.organisation_creation_disabled {
+    if state.env.organisation_creation_disabled && !auth_response.is_super_admin {
         return Err(ABError::BadRequest(
             "You do not have permission to create new organisation".to_string(),
         ));
@@ -357,6 +340,10 @@ fn parse_user_organizations(groups: Vec<String>) -> Vec<Organisation> {
     for group in groups {
         let path = group.trim_matches('/'); // Remove leading/trailing slashes
         let parts: Vec<&str> = path.split('/').collect();
+
+        if path == "super_admin" {
+            continue;
+        }
 
         if parts.is_empty() {
             continue;

@@ -32,6 +32,12 @@ export default function OrganisationUsersPage() {
     updateOrgs();
   };
 
+  const transferOwnership = async (user: string) => {
+    await apiFetch("/organisations/user/transfer-ownership", { method: "POST", body: { user } }, { token, org });
+    mutate();
+    updateOrgs();
+  };
+
   if (isLoading) {
     return <UsersLoading />;
   }
@@ -48,6 +54,7 @@ export default function OrganisationUsersPage() {
         onAddUser={addUser}
         onUpdateUser={updateUser}
         onRemoveUser={removeUser}
+        onTransferOwnership={transferOwnership}
         title="Organisation Users"
         description="Manage users and their access levels for this organisation"
         entityType="organisation"

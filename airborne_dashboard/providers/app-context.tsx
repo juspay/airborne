@@ -13,7 +13,7 @@ interface Organisations {
 interface OrganisationsList {
   organisations: Organisations[];
 }
-type User = { name: string; user_id?: string } | null;
+type User = { name: string; user_id?: string; is_super_admin: boolean } | null;
 
 type AppContextType = {
   loading: boolean;

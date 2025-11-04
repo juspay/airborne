@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, UserPlus, MoreVertical, Trash2, ArrowRight } from "lucide-react";
+import { Search, UserPlus, MoreVertical, Trash2, ArrowRight, Crown } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 export type AccessLevel = "owner" | "admin" | "write" | "read";
@@ -29,6 +29,7 @@ export interface UserManagementProps {
   onAddUser: (user: string, access: AccessLevel) => Promise<void>;
   onUpdateUser: (user: string, access: AccessLevel) => Promise<void>;
   onRemoveUser: (user: string) => Promise<void>;
+  onTransferOwnership?: (user: string) => Promise<void>;
   title?: string;
   description?: string;
   entityType?: "organisation" | "application";
@@ -84,6 +85,7 @@ export function UserManagement({
   onAddUser,
   onUpdateUser,
   onRemoveUser,
+  onTransferOwnership,
   title = "User Management",
   description = "Manage users and their access levels",
   entityType = "organisation",
@@ -95,6 +97,8 @@ export function UserManagement({
   const [newUserAccess, setNewUserAccess] = React.useState<AccessLevel>("read");
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false);
   const [userToRemove, setUserToRemove] = React.useState<string | null>(null);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = React.useState(false);
+  const [userToTransfer, setUserToTransfer] = React.useState<string | null>(null);
 
   const canUpdate = canUpdateUsers(entityType, currentUserOrgAccess, currentUserAppAccess);
   const filteredUsers = useMemo(() => {
@@ -120,6 +124,28 @@ export function UserManagement({
     } catch (error) {
       console.error("Failed to update user access:", error);
     }
+  };
+
+  const handleTransferOwnership = async (user: string) => {
+    setUserToTransfer(user);
+    setIsTransferDialogOpen(true);
+  };
+
+  const confirmTransferOwnership = async () => {
+    if (!userToTransfer || !onTransferOwnership) return;
+
+    try {
+      await onTransferOwnership(userToTransfer);
+      setIsTransferDialogOpen(false);
+      setUserToTransfer(null);
+    } catch (error) {
+      console.error("Failed to transfer ownership:", error);
+    }
+  };
+
+  const cancelTransferOwnership = () => {
+    setIsTransferDialogOpen(false);
+    setUserToTransfer(null);
   };
 
   const handleRemoveUser = async (user: string) => {
@@ -270,6 +296,38 @@ export function UserManagement({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-80 bg-white dark:bg-[#111115]">
+                            {entityType === "organisation" && currentUserOrgAccess.includes("owner") ? (
+                              <DropdownMenuItem
+                                onClick={() => handleTransferOwnership(user.username)}
+                                className="flex-col cursor-pointer items-start p-3 hover:!bg-gray-100 dark:hover:!bg-[#1c1c21] border-b border-gray-200 dark:border-gray-700"
+                              >
+                                <div className="flex items-center gap-2 w-full">
+                                  <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                    <svg
+                                      className="w-4 h-4 text-purple-600 dark:text-purple-300"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+                                      />
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1">
+                                    <span className="text-sm font-medium text-gray-900 dark:text-[#edeef5]">
+                                      Transfer Ownership
+                                    </span>
+                                    <p className="text-xs text-muted-foreground dark:text-[#8d8e9b] mt-1">
+                                      Make {user.username} the new owner of this organisation
+                                    </p>
+                                  </div>
+                                </div>
+                              </DropdownMenuItem>
+                            ) : null}
                             {availableAccessLevels.map((level) => {
                               const config = ACCESS_LEVELS.find((l) => l.value === level)!;
                               const newRoles = getAccessLevelRoles(level);
@@ -349,6 +407,83 @@ export function UserManagement({
               <Button variant="destructive" onClick={confirmRemoveUser}>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Remove User
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-purple-600" />
+              Transfer Ownership
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-3">
+                <svg
+                  className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+                <div>
+                  <h4 className="font-semibold text-amber-800 dark:text-amber-200">
+                    Warning: This action is irreversible
+                  </h4>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    This will permanently transfer ownership to another user.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                You are about to transfer ownership of this {entityType} to{" "}
+                <strong className="text-foreground">{userToTransfer}</strong>.
+              </p>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">What will happen:</h4>
+                <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                  <li className="flex items-start gap-2">
+                    <span className="text-xs mt-1">•</span>
+                    <span>
+                      <strong>{userToTransfer}</strong> will become the new owner
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-xs mt-1">•</span>
+                    <span>You will lose all owner privileges</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-xs mt-1">•</span>
+                    <span>Your access level will be changed to admin</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-xs mt-1">•</span>
+                    <span>This action cannot be undone</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={cancelTransferOwnership}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmTransferOwnership}>
+                <Crown className="h-4 w-4 mr-2" />
+                Transfer Ownership
               </Button>
             </div>
           </div>

@@ -41,7 +41,7 @@ export default function LoginPage() {
       });
       const token = res?.user_token?.access_token || "";
       setToken(token);
-      setUser({ user_id: res?.user_id, name });
+      setUser({ user_id: res?.user_id, name, is_super_admin: res?.is_super_admin || false });
       // default org/app selection from response if present
       const org = res?.organisations?.[0]?.name || "";
       const app = res?.organisations?.[0]?.applications?.[0]?.application || "";

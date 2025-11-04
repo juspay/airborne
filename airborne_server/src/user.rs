@@ -203,6 +203,7 @@ pub async fn login_implementation(
             .map_err(|e| ABError::InternalServerError(e.to_string()))?;
         let mut user_resp = get_user_impl(
             AuthResponse {
+                is_super_admin: false,
                 sub: token_data.claims.sub,
                 admin_token,
                 organisation: None,
@@ -235,6 +236,7 @@ pub struct User {
     user_id: String,
     username: String,
     organisations: Vec<Organisation>,
+    is_super_admin: bool,
     user_token: Option<UserToken>,
 }
 
@@ -291,6 +293,10 @@ fn parse_groups(user_id: String, username: String, groups: Vec<String>) -> User 
         let path = group.trim_matches('/'); // Remove leading/trailing slashes
         let parts: Vec<&str> = path.split('/').collect();
 
+        if path == "super_admin" {
+            continue;
+        }
+
         let access = parts.last().unwrap().to_string();
 
         let organisation_name = parts[0].to_string();
@@ -339,7 +345,7 @@ fn parse_groups(user_id: String, username: String, groups: Vec<String>) -> User 
             organisation.access.push(access);
         }
     }
-
+    let is_super_admin = groups.contains(&"/super_admin".to_string());
     info!(
         "[PARSE_GROUPS] Finished parsing. Found {} organisations",
         organisations.len()
@@ -347,6 +353,7 @@ fn parse_groups(user_id: String, username: String, groups: Vec<String>) -> User 
     User {
         user_id,
         username,
+        is_super_admin,
         organisations: organisations.into_values().collect(),
         user_token: None,
     }
@@ -512,6 +519,7 @@ async fn oauth_login(
     let mut user_resp = get_user_impl(
         AuthResponse {
             sub: token_data.claims.sub.clone(),
+            is_super_admin: false,
             admin_token,
             organisation: None,
             application: None,
@@ -583,6 +591,7 @@ async fn oauth_signup(
     // The user account is automatically created in Keycloak when they sign in with Google
     let mut user_resp = get_user_impl(
         AuthResponse {
+            is_super_admin: false,
             sub: token_data.claims.sub,
             admin_token,
             organisation: None,

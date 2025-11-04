@@ -22,13 +22,16 @@ export default function OAuthCallback() {
 
         // Determine the correct endpoint based on the action
         const endpoint = oauthAction === "signup" ? "/users/oauth/signup" : "/users/oauth/login";
-        const res = await apiFetch<{ user_id: string; user_token: any; username: string }>(endpoint, {
-          method: "POST",
-          body: { code, state },
-        });
+        const res = await apiFetch<{ user_id: string; user_token: any; username: string; is_super_admin: boolean }>(
+          endpoint,
+          {
+            method: "POST",
+            body: { code, state },
+          }
+        );
         console.log("token exchange", oauthAction, res);
         setToken(res.user_token?.access_token || "");
-        setUser({ user_id: res.user_id, name: res.username }); // OAuth users will get name from API response
+        setUser({ user_id: res.user_id, name: res.username, is_super_admin: res.is_super_admin }); // OAuth users will get name from API response
         window.location.replace("/dashboard");
       } catch (e: any) {
         console.log("Google Callback Error", e);
