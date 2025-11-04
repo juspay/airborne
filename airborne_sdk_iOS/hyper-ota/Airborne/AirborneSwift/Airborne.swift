@@ -329,6 +329,31 @@ extension AirborneServices {
     @objc public func getFileContent(atPath path: String) -> String? {
         return applicationManager?.readPackageFile(path)
     }
+
+    /**
+     * Creates a restore point for the current OTA state.
+     *
+     * This method backs up the current application state so it can be restored later if needed.
+     * The backup includes all packages, resources, and configuration files.
+     *
+     * @return true if the backup was created successfully, false otherwise
+     */
+    @objc public func createRestorePoint() -> Bool {
+        return applicationManager?.createRestorePoint() ?? false
+    }
+
+    /**
+     * Rolls back the OTA update to the last backed up version.
+     *
+     * This method restores the application to the previous state from the backup.
+     * The current version will be added to the blacklisted versions to prevent re-download.
+     * If no backup exists, the current app directory will be cleaned up.
+     *
+     * @return true if the rollback was successful, false otherwise
+     */
+    @objc public func rollbackOTA() -> Bool {
+        return applicationManager?.rollbackOTA() ?? false
+    }
 }
 
 // MARK: - AJPApplicationManagerDelegate Conformance

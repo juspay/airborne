@@ -39,6 +39,16 @@ extern NSString *const LAZY_PACKAGE_NOTIFICATION;
 
 extern NSString *const APPL_MANAGER_SUB_CAT;
 
+// Backup and Rollback Constants
+extern NSString *const JUSPAY_BACKUP_DIR;
+extern NSString *const JUSPAY_BACKUP_TEMP_DIR;
+extern NSString *const JUSPAY_BACKUP_MAIN_DIR;
+
+extern NSString *const BACKUP_STAGE_KEY;
+extern NSString *const BACKUP_INPLACE_KEY;
+extern NSString *const ROLLBACK_IN_PROGRESS_KEY;
+extern NSString *const BLACKLISTED_VERSIONS_KEY;
+
 @end
 
 #endif /* AJPApplicationConstants_h */

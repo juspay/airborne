@@ -175,6 +175,23 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSString *)getPathForPackageFile:(NSString *)fileName;
 
+/**
+ * Creates a restore point for the current OTA state.
+ * This method backs up the current application state so it can be restored later if needed.
+ *
+ * @return YES if the backup was created successfully, NO otherwise.
+ */
+- (BOOL)createRestorePoint;
+
+/**
+ * Rolls back the OTA update to the last backed up version.
+ * This method restores the application to the previous state from the backup.
+ * The current version will be added to the blacklisted versions to prevent re-download.
+ *
+ * @return YES if the rollback was successful, NO otherwise.
+ */
+- (BOOL)rollbackOTA;
+
 @end
 
 NS_ASSUME_NONNULL_END

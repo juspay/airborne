@@ -693,13 +693,13 @@ class ApplicationManager(
             }
         }
 
-        // We don't want to rollback this package as this is being rolled back now.
+        // We don't want to backup this package as this is being rolled back now.
         if (backupStage == BACKUP_STAGES.STARTED.name) {
             workspace.writeToSharedPreference(Constants.BACKUP_STAGE, "")
         }
         var rollbackSuccess = false
         val files = fps.listFilesRecursive(backupMainDir)
-        if (files?.isEmpty() ?: true) {
+        if (files == null || files.isEmpty()) {
             trackInfo("rollback_failed", JSONObject().put("reason", "Backup folder is empty"))
         } else {
             files.forEach { name ->

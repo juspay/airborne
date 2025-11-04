@@ -20,7 +20,7 @@ internal object Constants {
     const val APP_DIR = "app"
     const val PACKAGE_DIR_NAME = "package"
     const val RESOURCES_DIR_NAME = "resources"
-    const val BACKUP_DIR = "airborne-backup"
+    const val BACKUP_DIR = "airborne_backup"
     const val BACKUP_TEMP = "backup_temp"
     const val BACKUP_MAIN = "backup"
     const val ROLLBACK_IN_PROGRESS = "rollback_in_progress"

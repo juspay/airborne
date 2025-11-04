@@ -22,6 +22,13 @@ typedef NS_ENUM(NSInteger, DownloadStatus) {
     FAILED
 };
 
+typedef NS_ENUM(NSInteger, AJPBackupStage) {
+    AJPBackupStageStarted,
+    AJPBackupStageCopyToBackupInProgress,
+    AJPBackupStageDone,
+    AJPBackupStageFailed
+};
+
 @implementation AJPDownloadResult
 
 - (instancetype) initWithManifest:(AJPApplicationManifest* _Nonnull)releaseConfig result:(NSString* _Nonnull)result error:(NSString* _Nullable)error {
@@ -84,6 +91,22 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 @property (nonatomic, strong) AJPApplicationTracker* tracker;
 @property (nonatomic, strong) AJPFileUtil* fileUtil;
 @property (nonatomic, strong) AJPRemoteFileUtil* remoteFileUtil;
+
+// Backup and Rollback private methods
+- (void)writeToUserDefaults:(NSString *)key value:(NSString *)value;
+- (NSString *)readFromUserDefaults:(NSString *)key defaultValue:(NSString *)defaultValue;
+- (NSString *)backupStageToString:(AJPBackupStage)stage;
+- (AJPBackupStage)stringToBackupStage:(NSString *)stageString;
+- (void)completeRollback;
+- (void)checkIfBackupPending;
+- (NSArray<NSString *> *)readReleaseConfigFromDir:(NSString *)dirPath;
+- (BOOL)backupOTA;
+- (BOOL)backupInternalWithStage:(AJPBackupStage)stage;
+- (NSArray<NSString *> *)getAllFilesInDirectoryRecursively:(NSString *)dirPath;
+- (void)deleteDirectoryRecursively:(NSString *)dirPath;
+- (NSArray *)getRolledBackVersions;
+- (void)addToRolledBackVersions:(NSDictionary *)versionDict;
+- (NSString *)calculateResourcesHash:(NSDictionary<NSString*, AJPResource*> *)resources;
 
 @end
 
@@ -255,6 +278,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     _availableLazySplits = [self dictionaryFromResources:self.package.lazy];
     _availableResources = [NSMutableDictionary dictionaryWithDictionary:self.resources.resources];
     [self.tracker trackInfo:@"init_with_local_config_versions" value:[@{@"package_version":self.package.version, @"config_version":self.config.version} mutableCopy]];
+
+    // Handle recovery mechanisms
+    [self completeRollback];
 }
 
 - (void)handleTempPackageInstallation {
@@ -1346,6 +1372,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     } else {
         [self.tracker trackInfo:@"package_update_result" value:[@{@"result" : @"FAILED", @"reason" : @"package copy failed", @"time_taken" : [NSNumber numberWithDouble:(([[NSDate date] timeIntervalSince1970] * 1000) - startTime)]}mutableCopy]];
     }
+
+    // Check if backup is pending after package update (regardless of success/failure)
+    [self checkIfBackupPending];
 }
 
 - (void)updatePackageInTemp:(AJPApplicationPackage *)package {
@@ -1928,8 +1957,526 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     for (AJPResource *resource in resources) {
         dictionary[resource.filePath] = resource;
     }
-    
+
     return dictionary;
+}
+
+#pragma mark - Backup and Rollback Implementation
+
+- (NSArray<NSString *> *)readReleaseConfigFromDir:(NSString *)dirPath {
+    NSArray<NSString *> *fileNames = @[APP_CONFIG_DATA_FILE_NAME, APP_PACKAGE_DATA_FILE_NAME, APP_RESOURCES_DATA_FILE_NAME];
+    NSMutableArray<NSString *> *contents = [NSMutableArray array];
+
+    // In iOS, manifest files are stored in JuspayManifests subdirectory
+    NSString *manifestsPath = [dirPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+
+    for (NSString *fileName in fileNames) {
+        NSString *content = [self.fileUtil loadFile:fileName folder:manifestsPath withLocalAssets:NO error:nil];
+        [contents addObject:content ?: @""];
+    }
+
+    return [contents copy];
+}
+
+- (BOOL)createRestorePoint {
+    return [self backupOTA];
+}
+
+- (BOOL)backupOTA {
+    NSString *currentStage = [self readFromUserDefaults:BACKUP_STAGE_KEY defaultValue:@""];
+
+    NSString *backupMainPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_BACKUP_MAIN_DIR inFolder:JUSPAY_BACKUP_DIR];
+    NSString *backupTempPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_BACKUP_TEMP_DIR inFolder:JUSPAY_BACKUP_DIR];
+
+    // Read current and backup release configs to compare
+    // In iOS, we need to read from the JuspayManifests directory where manifest files are stored
+    NSString *currentManifestsPath = [self.fileUtil fullPathInStorageForFilePath:@"" inFolder:JUSPAY_MANIFEST_DIR];
+
+    NSArray<NSString *> *backupConfig = [self readReleaseConfigFromDir:backupMainPath];
+    NSArray<NSString *> *currentConfig = [self readReleaseConfigFromDir:currentManifestsPath];
+
+    // Check if backup is already up to date
+    if ([currentStage isEqualToString:[self backupStageToString:AJPBackupStageDone]] &&
+        [backupConfig isEqualToArray:currentConfig]) {
+        [self.tracker trackInfo:@"backup_already_current" value:[@{@"reason": @"Backup is already up to date"} mutableCopy]];
+        return YES;
+    }
+
+    // Handle interrupted backup
+    if ([currentStage isEqualToString:[self backupStageToString:AJPBackupStageCopyToBackupInProgress]]) {
+        NSString *backupTempManifestsPath = [backupTempPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+        NSArray<NSString *> *tempConfig = [self readReleaseConfigFromDir:backupTempManifestsPath];
+
+        if ([currentConfig isEqualToArray:tempConfig]) {
+            return [self backupInternalWithStage:AJPBackupStageCopyToBackupInProgress];
+        } else {
+            return [self backupInternalWithStage:AJPBackupStageStarted];
+        }
+    }
+
+    AJPBackupStage stage = AJPBackupStageStarted;
+    if ([currentStage isEqualToString:@""] || [currentStage isEqualToString:[self backupStageToString:AJPBackupStageFailed]]) {
+        stage = AJPBackupStageStarted;
+    } else {
+        stage = [self stringToBackupStage:currentStage];
+    }
+
+    return [self backupInternalWithStage:stage];
+}
+
+- (BOOL)backupInternalWithStage:(AJPBackupStage)stage {
+    NSString *backupTempPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_BACKUP_TEMP_DIR inFolder:JUSPAY_BACKUP_DIR];
+    NSString *backupMainPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_BACKUP_MAIN_DIR inFolder:JUSPAY_BACKUP_DIR];
+
+    AJPBackupStage internalStage = stage;
+
+    // Stage 1: Copy app directory to backup temp
+    if (internalStage == AJPBackupStageStarted) {
+        [self.tracker trackInfo:@"backup_started" value:[@{@"stage": @"copying_to_temp"} mutableCopy]];
+
+        // Clean up existing temp directory
+        [self deleteDirectoryRecursively:backupTempPath];
+        [self writeToUserDefaults:BACKUP_STAGE_KEY value:[self backupStageToString:AJPBackupStageStarted]];
+
+        // Copy both JuspayManifests and JuspayPackages directories to backup temp
+        NSString *manifestsPath = [self.fileUtil fullPathInStorageForFilePath:@"" inFolder:JUSPAY_MANIFEST_DIR];
+        NSString *packagesPath = [self.fileUtil fullPathInStorageForFilePath:@"" inFolder:JUSPAY_PACKAGE_DIR];
+
+        BOOL tempCopySuccess = YES;
+
+        // Copy JuspayManifests directory
+        NSArray<NSString *> *manifestFiles = [self getAllFilesInDirectoryRecursively:manifestsPath];
+        for (NSString *relativePath in manifestFiles) {
+            NSString *sourcePath = [manifestsPath stringByAppendingPathComponent:relativePath];
+            NSString *destPath = [backupTempPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+            destPath = [destPath stringByAppendingPathComponent:relativePath];
+
+            // Ensure destination directory exists
+            NSString *destDir = [destPath stringByDeletingLastPathComponent];
+            [self.fileUtil createFolderIfDoesNotExist:destDir];
+
+            // Copy file
+            NSError *error = nil;
+            NSData *fileData = [NSData dataWithContentsOfFile:sourcePath options:0 error:&error];
+            if (fileData && [fileData writeToFile:destPath options:NSDataWritingAtomic error:&error]) {
+                // Success
+            } else {
+                tempCopySuccess = NO;
+                [self.tracker trackError:@"backup_manifest_copy_failed" value:[@{@"file": relativePath, @"error": error ? error.localizedDescription : @"Unknown error"} mutableCopy]];
+                break;
+            }
+        }
+
+        // Copy JuspayPackages directory if manifest copy succeeded
+        if (tempCopySuccess) {
+            NSArray<NSString *> *packageFiles = [self getAllFilesInDirectoryRecursively:packagesPath];
+            for (NSString *relativePath in packageFiles) {
+                NSString *sourcePath = [packagesPath stringByAppendingPathComponent:relativePath];
+                NSString *destPath = [backupTempPath stringByAppendingPathComponent:JUSPAY_PACKAGE_DIR];
+                destPath = [destPath stringByAppendingPathComponent:relativePath];
+
+                // Ensure destination directory exists
+                NSString *destDir = [destPath stringByDeletingLastPathComponent];
+                [self.fileUtil createFolderIfDoesNotExist:destDir];
+
+                // Copy file
+                NSError *error = nil;
+                NSData *fileData = [NSData dataWithContentsOfFile:sourcePath options:0 error:&error];
+                if (fileData && [fileData writeToFile:destPath options:NSDataWritingAtomic error:&error]) {
+                    // Success
+                } else {
+                    tempCopySuccess = NO;
+                    [self.tracker trackError:@"backup_package_copy_failed" value:[@{@"file": relativePath, @"error": error ? error.localizedDescription : @"Unknown error"} mutableCopy]];
+                    break;
+                }
+            }
+        }
+
+        if (tempCopySuccess) {
+            internalStage = AJPBackupStageCopyToBackupInProgress;
+            [self writeToUserDefaults:BACKUP_STAGE_KEY value:[self backupStageToString:AJPBackupStageCopyToBackupInProgress]];
+        } else {
+            [self writeToUserDefaults:BACKUP_STAGE_KEY value:[self backupStageToString:AJPBackupStageFailed]];
+            [self.tracker trackError:@"backup_failed" value:[@{@"stage": @"temp_copy"} mutableCopy]];
+            return NO;
+        }
+    }
+
+    // Stage 2: Move from temp to main backup
+    if (internalStage == AJPBackupStageCopyToBackupInProgress) {
+        [self.tracker trackInfo:@"backup_moving_to_main" value:[@{@"stage": @"moving_to_main"} mutableCopy]];
+        [self writeToUserDefaults:BACKUP_STAGE_KEY value:[self backupStageToString:AJPBackupStageCopyToBackupInProgress]];
+
+        // Clean up existing main backup
+        [self deleteDirectoryRecursively:backupMainPath];
+
+        // Move temp to main
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        NSError *moveError = nil;
+        BOOL moveSuccess = [fileManager moveItemAtPath:backupTempPath toPath:backupMainPath error:&moveError];
+
+        if (moveSuccess) {
+            [self writeToUserDefaults:BACKUP_STAGE_KEY value:[self backupStageToString:AJPBackupStageDone]];
+            [self writeToUserDefaults:BACKUP_INPLACE_KEY value:@"true"];
+            [self.tracker trackInfo:@"backup_completed" value:[@{@"result": @"success"} mutableCopy]];
+            return YES;
+        } else {
+            [self writeToUserDefaults:BACKUP_INPLACE_KEY value:@"false"];
+            [self writeToUserDefaults:BACKUP_STAGE_KEY value:[self backupStageToString:AJPBackupStageFailed]];
+            [self deleteDirectoryRecursively:backupMainPath];
+            [self.tracker trackError:@"backup_failed" value:[@{@"stage": @"move_to_main", @"error": moveError ? moveError.localizedDescription : @"Unknown error"} mutableCopy]];
+            return NO;
+        }
+    }
+
+    [self.tracker trackInfo:@"backup_completed" value:[@{@"result": @"success"} mutableCopy]];
+    return YES;
+}
+
+- (NSArray<NSString *> *)getAllFilesInDirectoryRecursively:(NSString *)dirPath {
+    NSMutableArray<NSString *> *allFiles = [NSMutableArray array];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+
+    NSDirectoryEnumerator *enumerator = [fileManager enumeratorAtPath:dirPath];
+    for (NSString *relativePath in enumerator) {
+        NSString *fullPath = [dirPath stringByAppendingPathComponent:relativePath];
+
+        BOOL isDirectory = NO;
+        if ([fileManager fileExistsAtPath:fullPath isDirectory:&isDirectory] && !isDirectory) {
+            [allFiles addObject:relativePath];
+        }
+    }
+
+    return [allFiles copy];
+}
+
+- (void)deleteDirectoryRecursively:(NSString *)dirPath {
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if ([fileManager fileExistsAtPath:dirPath]) {
+        NSError *error = nil;
+        [fileManager removeItemAtPath:dirPath error:&error];
+        if (error) {
+            [self.tracker trackError:@"directory_delete_failed" value:[@{@"path": dirPath, @"error": error.localizedDescription} mutableCopy]];
+        }
+    }
+}
+
+#pragma mark - Version Blacklisting
+
+- (NSArray *)getRolledBackVersions {
+    NSString *blacklistedJson = [self readFromUserDefaults:BLACKLISTED_VERSIONS_KEY defaultValue:@"[]"];
+    NSError *error = nil;
+    NSData *jsonData = [blacklistedJson dataUsingEncoding:NSUTF8StringEncoding];
+    NSArray *versions = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
+
+    if (error || versions == nil) {
+        [self writeToUserDefaults:BLACKLISTED_VERSIONS_KEY value:@"[]"];
+        return @[];
+    }
+
+    return versions ?: @[];
+}
+
+- (void)addToRolledBackVersions:(NSDictionary *)versionDict {
+    NSMutableArray *storedVersions = [[self getRolledBackVersions] mutableCopy];
+    [storedVersions addObject:versionDict];
+
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:storedVersions options:0 error:&error];
+    if (!error) {
+        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        [self writeToUserDefaults:BLACKLISTED_VERSIONS_KEY value:jsonString];
+        [self.tracker trackInfo:@"version_blacklisted" value:[@{@"version": versionDict} mutableCopy]];
+    }
+}
+
+- (NSString *)calculateResourcesHash:(NSDictionary<NSString*, AJPResource*> *)resources {
+    // Create a consistent JSON representation
+    NSMutableArray *resourceArray = [NSMutableArray array];
+    NSArray *sortedKeys = [[resources allKeys] sortedArrayUsingSelector:@selector(compare:)];
+
+    for (NSString *key in sortedKeys) {
+        AJPResource *resource = resources[key];
+        [resourceArray addObject:[resource toDictionary]];
+    }
+
+    NSError *error = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:resourceArray options:0 error:&error];
+    if (error) {
+        return @"";
+    }
+
+    // Simple hash calculation (you can replace with SHA256 if needed)
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    return [NSString stringWithFormat:@"%lu", (unsigned long)[jsonString hash]];
+}
+
+#pragma mark - Rollback Implementation
+
+- (BOOL)rollbackOTA {
+    [self writeToUserDefaults:ROLLBACK_IN_PROGRESS_KEY value:@"true"];
+    [self.tracker trackInfo:@"rollback_initiated" value:[@{
+        @"rc_version": self.config.version ?: @"",
+        @"config_version": self.config.version ?: @"",
+        @"pkg_version": self.package.version ?: @""
+    } mutableCopy]];
+    
+    NSString *backupStage = [self readFromUserDefaults:BACKUP_STAGE_KEY defaultValue:@""];
+    NSString *backupInplace = [self readFromUserDefaults:BACKUP_INPLACE_KEY defaultValue:@"false"];
+    
+    NSString *backupMainPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_BACKUP_MAIN_DIR inFolder:JUSPAY_BACKUP_DIR];
+    NSString *manifestsPath = [self.fileUtil fullPathInStorageForFilePath:@"" inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *packagesPath = [self.fileUtil fullPathInStorageForFilePath:@"" inFolder:JUSPAY_PACKAGE_DIR];
+    
+    // Check if backup is valid
+    if ([backupInplace isEqualToString:@"false"] ||
+        [backupStage isEqualToString:[self backupStageToString:AJPBackupStageCopyToBackupInProgress]]) {
+        [self.tracker trackError:@"rollback_failed" value:[@{@"reason": @"No valid backup found, deleting app dir"} mutableCopy]];
+        
+        // Delete everything and clean up backup
+        [self deleteDirectoryRecursively:manifestsPath];
+        [self deleteDirectoryRecursively:packagesPath];
+        [self deleteDirectoryRecursively:backupMainPath];
+        [self writeToUserDefaults:BACKUP_STAGE_KEY value:@""];
+        [self writeToUserDefaults:ROLLBACK_IN_PROGRESS_KEY value:@"false"];
+        return YES; // Consider this "successful" cleanup
+    }
+    
+    // Check if current and backup have same versions and delete identical components
+    if ([backupInplace isEqualToString:@"true"]) {
+        NSArray<NSString *> *backupConfig = [self readReleaseConfigFromDir:backupMainPath];
+        NSString *currentManifestsPath = [self.fileUtil fullPathInStorageForFilePath:@"" inFolder:JUSPAY_MANIFEST_DIR];
+        NSArray<NSString *> *currentConfig = [self readReleaseConfigFromDir:currentManifestsPath];
+        
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        
+        // Compare config versions - only delete if they are identical
+        NSString *backupConfigContent = backupConfig[0];
+        NSString *currentConfigContent = currentConfig[0];
+        
+        if (backupConfigContent && currentConfigContent &&
+            ![backupConfigContent isEqualToString:@""] && ![currentConfigContent isEqualToString:@""] &&
+            [backupConfigContent isEqualToString:currentConfigContent]) {
+            // Versions are the same, delete both current and backup config files
+            NSString *currentConfigPath = [self.fileUtil fullPathInStorageForFilePath:APP_CONFIG_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR];
+            NSString *backupConfigPath = [backupMainPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+            backupConfigPath = [backupConfigPath stringByAppendingPathComponent:APP_CONFIG_DATA_FILE_NAME];
+            
+            [fileManager removeItemAtPath:currentConfigPath error:nil];
+            [fileManager removeItemAtPath:backupConfigPath error:nil];
+            [self.tracker trackInfo:@"rollback_same_config_deleted" value:[@{@"reason": @"Current and backup config versions are identical"} mutableCopy]];
+        }
+        
+        // Compare package versions - only delete if they are identical
+        NSString *backupPackageContent = backupConfig[1];
+        NSString *currentPackageContent = currentConfig[1];
+        
+        if (backupPackageContent && currentPackageContent &&
+            ![backupPackageContent isEqualToString:@""] && ![currentPackageContent isEqualToString:@""] &&
+            [backupPackageContent isEqualToString:currentPackageContent]) {
+            // Versions are the same, delete both current and backup package files
+            NSString *currentPackagePath = [self.fileUtil fullPathInStorageForFilePath:APP_PACKAGE_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR];
+            NSString *backupPackagePath = [backupMainPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+            backupPackagePath = [backupPackagePath stringByAppendingPathComponent:APP_PACKAGE_DATA_FILE_NAME];
+            
+            [fileManager removeItemAtPath:currentPackagePath error:nil];
+            [fileManager removeItemAtPath:backupPackagePath error:nil];
+            
+            // Also delete package splits since package versions are identical
+            for (AJPResource *resource in [self.package allSplits]) {
+                NSString *currentSplitPath = [packagesPath stringByAppendingPathComponent:resource.filePath];
+                NSString *backupSplitPath = [backupMainPath stringByAppendingPathComponent:JUSPAY_PACKAGE_DIR];
+                backupSplitPath = [backupSplitPath stringByAppendingPathComponent:resource.filePath];
+
+                [fileManager removeItemAtPath:currentSplitPath error:nil];
+                [fileManager removeItemAtPath:backupSplitPath error:nil];
+            }
+            [self.tracker trackInfo:@"rollback_same_package_deleted" value:[@{@"reason": @"Current and backup package versions are identical"} mutableCopy]];
+        }
+        
+        // Compare resource versions - only delete if they are identical
+        NSString *backupResourcesContent = backupConfig[2];
+        NSString *currentResourcesContent = currentConfig[2];
+        
+        if (backupResourcesContent && currentResourcesContent &&
+            ![backupResourcesContent isEqualToString:@""] && ![currentResourcesContent isEqualToString:@""] &&
+            [backupResourcesContent isEqualToString:currentResourcesContent]) {
+            // Resources are the same, delete both current and backup resource files
+            NSString *currentResourcesPath = [self.fileUtil fullPathInStorageForFilePath:APP_RESOURCES_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR];
+            NSString *backupResourcesPath = [backupMainPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+            backupResourcesPath = [backupResourcesPath stringByAppendingPathComponent:APP_RESOURCES_DATA_FILE_NAME];
+            
+            [fileManager removeItemAtPath:currentResourcesPath error:nil];
+            [fileManager removeItemAtPath:backupResourcesPath error:nil];
+            
+            // Also delete resource files since resource versions are identical
+            for (NSString *key in self.resources.resources) {
+                AJPResource *resource = self.resources.resources[key];
+                NSString *currentResourcePath = [packagesPath stringByAppendingPathComponent:resource.filePath];
+                NSString *backupResourcePath = [backupMainPath stringByAppendingPathComponent:JUSPAY_PACKAGE_DIR];
+                backupResourcePath = [backupResourcePath stringByAppendingPathComponent:resource.filePath];
+
+                [fileManager removeItemAtPath:currentResourcePath error:nil];
+                [fileManager removeItemAtPath:backupResourcePath error:nil];
+            }
+            [self.tracker trackInfo:@"rollback_same_resources_deleted" value:[@{@"reason": @"Current and backup resource versions are identical"} mutableCopy]];
+        }
+    }
+
+    // We don't want to backup this package as this is being rolled back now.
+    if ([backupStage isEqualToString:[self backupStageToString:AJPBackupStageStarted]]) {
+        [self writeToUserDefaults:BACKUP_STAGE_KEY value:@""];
+    }
+
+    // Perform the actual rollback
+    BOOL rollbackSuccess = YES;
+    NSString *backupManifestsPath = [backupMainPath stringByAppendingPathComponent:JUSPAY_MANIFEST_DIR];
+    NSString *backupPackagesPath = [backupMainPath stringByAppendingPathComponent:JUSPAY_PACKAGE_DIR];
+
+    // Get backup files from both directories
+    NSArray<NSString *> *backupManifestFiles = [self getAllFilesInDirectoryRecursively:backupManifestsPath];
+    NSArray<NSString *> *backupPackageFiles = [self getAllFilesInDirectoryRecursively:backupPackagesPath];
+
+    if (backupManifestFiles.count == 0 && backupPackageFiles.count == 0) {
+        [self.tracker trackError:@"rollback_failed" value:[@{@"reason": @"Backup folder is empty"} mutableCopy]];
+        rollbackSuccess = NO;
+    } else {
+        // Copy manifest files from backup to current JuspayManifests directory
+        for (NSString *relativePath in backupManifestFiles) {
+            NSString *backupFilePath = [backupManifestsPath stringByAppendingPathComponent:relativePath];
+            NSString *destFilePath = [manifestsPath stringByAppendingPathComponent:relativePath];
+
+            // Ensure destination directory exists
+            NSString *destDir = [destFilePath stringByDeletingLastPathComponent];
+            [self.fileUtil createFolderIfDoesNotExist:destDir];
+
+            // Copy file
+            NSError *error = nil;
+            NSData *fileData = [NSData dataWithContentsOfFile:backupFilePath options:0 error:&error];
+            if (fileData && [fileData writeToFile:destFilePath options:NSDataWritingAtomic error:&error]) {
+                // Success
+            } else {
+                rollbackSuccess = NO;
+                [self.tracker trackError:@"rollback_manifest_failed" value:[@{
+                    @"reason": [NSString stringWithFormat:@"Failed to copy manifest file %@", relativePath],
+                    @"error": error ? error.localizedDescription : @"Unknown error"
+                } mutableCopy]];
+                break;
+            }
+        }
+
+        // Copy package files from backup to current JuspayPackages directory if manifest copy succeeded
+        if (rollbackSuccess) {
+            for (NSString *relativePath in backupPackageFiles) {
+                NSString *backupFilePath = [backupPackagesPath stringByAppendingPathComponent:relativePath];
+                NSString *destFilePath = [packagesPath stringByAppendingPathComponent:relativePath];
+
+                // Ensure destination directory exists
+                NSString *destDir = [destFilePath stringByDeletingLastPathComponent];
+                [self.fileUtil createFolderIfDoesNotExist:destDir];
+
+                // Copy file
+                NSError *error = nil;
+                NSData *fileData = [NSData dataWithContentsOfFile:backupFilePath options:0 error:&error];
+                if (fileData && [fileData writeToFile:destFilePath options:NSDataWritingAtomic error:&error]) {
+                    // Success
+                } else {
+                    rollbackSuccess = NO;
+                    [self.tracker trackError:@"rollback_package_failed" value:[@{
+                        @"reason": [NSString stringWithFormat:@"Failed to copy package file %@", relativePath],
+                        @"error": error ? error.localizedDescription : @"Unknown error"
+                    } mutableCopy]];
+                    break;
+                }
+            }
+        }
+    }
+
+    // Clean up if rollback failed
+    if (!rollbackSuccess) {
+        [self deleteDirectoryRecursively:manifestsPath];
+        [self deleteDirectoryRecursively:packagesPath];
+    }
+
+    [self writeToUserDefaults:ROLLBACK_IN_PROGRESS_KEY value:@"false"];
+
+    if (rollbackSuccess) {
+        [self.tracker trackInfo:@"rollback_success" value:[@{@"result": @"success"} mutableCopy]];
+    }
+
+    // Add current version to blacklisted versions
+    NSString *resourcesHash = [self calculateResourcesHash:self.resources.resources];
+    NSDictionary *versionInfo = @{
+        @"configVersion": self.config.version ?: @"",
+        @"pkgVersion": self.package.version ?: @"",
+        @"resHash": resourcesHash
+    };
+    [self addToRolledBackVersions:versionInfo];
+
+    return rollbackSuccess;
+}
+
+- (void)completeRollback {
+    NSString *rollbackInProgress = [self readFromUserDefaults:ROLLBACK_IN_PROGRESS_KEY defaultValue:@"false"];
+    if ([rollbackInProgress isEqualToString:@"true"]) {
+        [self rollbackOTA];
+    }
+}
+
+- (void)checkIfBackupPending {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSString *stage = [self readFromUserDefaults:BACKUP_STAGE_KEY defaultValue:@""];
+        if ([stage isEqualToString:@""] ||
+            [stage isEqualToString:[self backupStageToString:AJPBackupStageDone]] ||
+            [stage isEqualToString:[self backupStageToString:AJPBackupStageFailed]]) {
+            return;
+        }
+        [self backupOTA];
+    });
+}
+
+#pragma mark - Persistent Storage Utilities
+
+- (void)writeToUserDefaults:(NSString *)key value:(NSString *)value {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *workspaceKey = [NSString stringWithFormat:@"%@_%@", self.workspace, key];
+    [defaults setObject:value forKey:workspaceKey];
+    [defaults synchronize];
+}
+
+- (NSString *)readFromUserDefaults:(NSString *)key defaultValue:(NSString *)defaultValue {
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *workspaceKey = [NSString stringWithFormat:@"%@_%@", self.workspace, key];
+    NSString *value = [defaults stringForKey:workspaceKey];
+    return value ? value : defaultValue;
+}
+
+- (NSString *)backupStageToString:(AJPBackupStage)stage {
+    switch (stage) {
+        case AJPBackupStageStarted:
+            return @"STARTED";
+        case AJPBackupStageCopyToBackupInProgress:
+            return @"COPY_TO_BACKUP_IN_PROGRESS";
+        case AJPBackupStageDone:
+            return @"DONE";
+        case AJPBackupStageFailed:
+            return @"FAILED";
+        default:
+            return @"";
+    }
+}
+
+- (AJPBackupStage)stringToBackupStage:(NSString *)stageString {
+    if ([stageString isEqualToString:@"STARTED"]) {
+        return AJPBackupStageStarted;
+    } else if ([stageString isEqualToString:@"COPY_TO_BACKUP_IN_PROGRESS"]) {
+        return AJPBackupStageCopyToBackupInProgress;
+    } else if ([stageString isEqualToString:@"DONE"]) {
+        return AJPBackupStageDone;
+    } else if ([stageString isEqualToString:@"FAILED"]) {
+        return AJPBackupStageFailed;
+    }
+    return AJPBackupStageFailed; // Default to failed for unknown states
 }
 
 @end
