@@ -349,31 +349,33 @@ export default function ReleaseDetailPage() {
                         </DialogContent>
                       </Dialog>
 
-                      <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button disabled={isConcluding}>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            {isConcluding ? "Concluding..." : "Conclude"}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Conclude Release</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to conclude this release? This will roll out to 100% and finalize
-                              the deployment.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter className="justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
+                      {release.experiment.status !== "CREATED" && (
+                        <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button disabled={isConcluding}>
+                              <CheckCircle className="h-4 w-4 mr-2" />
                               {isConcluding ? "Concluding..." : "Conclude"}
                             </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Conclude Release</DialogTitle>
+                              <DialogDescription>
+                                Are you sure you want to conclude this release? This will roll out to 100% and finalize
+                                the deployment.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter className="justify-end gap-2">
+                              <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
+                                {isConcluding ? "Concluding..." : "Conclude"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                     </>
                   )}
 
