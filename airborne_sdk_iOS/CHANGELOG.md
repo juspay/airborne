@@ -2,6 +2,42 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.1.1 - 2025-11-05
+#### Bug Fixes
+- **(iOS)** include checksum comparison when determining resources to download - (92aeae2) - yash.rajput.001
+
+- - -
+
+## v0.13.5 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.5 [skip ci] - (3f20b3d) - Airborne Bot
+
+- - -
+
+## v0.13.4 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.4 [skip ci] - (a0cb64d) - Airborne Bot
+
+- - -
+
+## v0.13.3 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.3 [skip ci] - (8877854) - Airborne Bot
+
+- - -
+
+## v0.13.2 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.2 [skip ci] - (934d450) - Airborne Bot
+
+- - -
+
+## v0.13.1 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.1 [skip ci] - (5cd3d70) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.1.0 - 2025-10-28
 #### Features
 - added support for local assets ios (dev server) - (582db37) - yash.rajput.001
