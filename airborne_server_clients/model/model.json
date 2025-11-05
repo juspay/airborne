@@ -3536,7 +3536,7 @@
                 "target": "io.airborne.server#UserCredentials"
             },
             "output": {
-                "target": "io.airborne.server#User"
+                "target": "io.airborne.server#UserToken"
             },
             "errors": [
                 {
