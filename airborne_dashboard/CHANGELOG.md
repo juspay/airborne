@@ -2,6 +2,26 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.9.0 - 2025-11-05
+#### Bug Fixes
+- add CSP - (2dcfb5d) - yuvrajjsingh0
+#### Features
+- add super admin role support and ownership transfer in organisations - (401252d) - Yash Rajput
+
+- - -
+
+## v0.13.6 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.6 [skip ci] - (0038bbd) - Airborne Bot
+
+- - -
+
+## v0.13.5 - 2025-11-05
+#### Miscellaneous Chores
+- **(version)** v0.13.5 [skip ci] - (3f20b3d) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.8.4 - 2025-10-30
 #### Bug Fixes
 - add debouncing to all search inputs - (60a6b56) - Yash Rajput

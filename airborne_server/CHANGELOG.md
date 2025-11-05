@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.9.0 - 2025-11-05
+#### Features
+- add super admin role support and ownership transfer in organisations - (401252d) - Yash Rajput
+
+- - -
+
 ## airborne_server-v0.8.1 - 2025-11-04
 #### Bug Fixes
 - correct build version ordering using semver SQL functions - (a8cde24) - Yash Rajput

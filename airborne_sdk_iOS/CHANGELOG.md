@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.1.2 - 2025-11-05
+#### Bug Fixes
+- Fixing nil value crash in release config - (fbddd47) - Balaganesh S
+
+- - -
+
 ## airborne_sdk_ios-v0.1.1 - 2025-11-05
 #### Bug Fixes
 - **(iOS)** include checksum comparison when determining resources to download - (92aeae2) - yash.rajput.001
