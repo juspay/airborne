@@ -8,7 +8,7 @@ pub struct UserCredentials {
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct Token {
+pub struct PersonalAccessToken {
     pub client_id: uuid::Uuid,
     pub client_secret: String,
 }

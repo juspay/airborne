@@ -60,3 +60,8 @@ pub struct LoginFailure {
     pub error: String,
     pub error_description: String,
 }
+
+#[derive(Deserialize)]
+pub struct OAuthQuery {
+    pub offline: Option<bool>,
+}

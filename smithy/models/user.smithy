@@ -58,7 +58,7 @@ operation GetUser {
 @auth([])
 operation PostLogin {
     input: UserCredentials
-    output: User
+    output: UserToken
     errors: [
         Unauthorized
     ]

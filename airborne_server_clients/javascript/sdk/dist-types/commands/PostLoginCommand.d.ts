@@ -1,5 +1,5 @@
 import { AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes } from "../AirborneClient";
-import { User, UserCredentials } from "../models/models_0";
+import { UserCredentials, UserToken } from "../models/models_0";
 import { Command as $Command } from "@smithy/smithy-client";
 import { MetadataBearer as __MetadataBearer } from "@smithy/types";
 /**
@@ -19,7 +19,7 @@ export interface PostLoginCommandInput extends UserCredentials {
  *
  * The output of {@link PostLoginCommand}.
  */
-export interface PostLoginCommandOutput extends User, __MetadataBearer {
+export interface PostLoginCommandOutput extends UserToken, __MetadataBearer {
 }
 declare const PostLoginCommand_base: {
     new (input: PostLoginCommandInput): import("@smithy/smithy-client").CommandImpl<PostLoginCommandInput, PostLoginCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
@@ -40,32 +40,12 @@ declare const PostLoginCommand_base: {
  * };
  * const command = new PostLoginCommand(input);
  * const response = await client.send(command);
- * // { // User
- * //   user_id: "STRING_VALUE", // required
- * //   organisations: [ // Organisations // required
- * //     { // Organisation
- * //       name: "STRING_VALUE", // required
- * //       applications: [ // Applications // required
- * //         { // Application
- * //           application: "STRING_VALUE", // required
- * //           organisation: "STRING_VALUE", // required
- * //           access: [ // StringList // required
- * //             "STRING_VALUE",
- * //           ],
- * //         },
- * //       ],
- * //       access: [ // required
- * //         "STRING_VALUE",
- * //       ],
- * //     },
- * //   ],
- * //   user_token: { // UserToken
- * //     access_token: "STRING_VALUE", // required
- * //     token_type: "STRING_VALUE", // required
- * //     expires_in: Number("long"), // required
- * //     refresh_token: "STRING_VALUE", // required
- * //     refresh_expires_in: Number("long"), // required
- * //   },
+ * // { // UserToken
+ * //   access_token: "STRING_VALUE", // required
+ * //   token_type: "STRING_VALUE", // required
+ * //   expires_in: Number("long"), // required
+ * //   refresh_token: "STRING_VALUE", // required
+ * //   refresh_expires_in: Number("long"), // required
  * // };
  *
  * ```
@@ -101,7 +81,7 @@ export declare class PostLoginCommand extends PostLoginCommand_base {
     protected static __types: {
         api: {
             input: UserCredentials;
-            output: User;
+            output: UserToken;
         };
         sdk: {
             input: PostLoginCommandInput;

@@ -715,11 +715,7 @@ Troubleshooting:
 
       const result = await PostLoginAction(null, loginOptions);
       console.log("✅ Login successful");
-      saveToken(
-        result.user_token.access_token,
-        result.user_token.refresh_token,
-        directoryPath
-      );
+      saveToken(result.access_token, result.refresh_token, directoryPath);
       process.exit(0);
     } catch (err) {
       console.error("❌ Login error:", err.message);
