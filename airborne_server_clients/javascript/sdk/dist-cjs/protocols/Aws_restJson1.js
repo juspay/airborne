@@ -624,9 +624,11 @@ const de_PostLoginCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
-        'organisations': smithy_client_1._json,
-        'user_id': smithy_client_1.expectString,
-        'user_token': smithy_client_1._json,
+        'access_token': smithy_client_1.expectString,
+        'expires_in': smithy_client_1.expectLong,
+        'refresh_expires_in': smithy_client_1.expectLong,
+        'refresh_token': smithy_client_1.expectString,
+        'token_type': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     return contents;

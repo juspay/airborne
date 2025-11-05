@@ -2,7 +2,7 @@ import { AirborneServiceException as __BaseException } from "../models/AirborneS
 import { BadRequestError, ForbiddenError, InternalServerError, NotFoundError, Unauthorized, } from "../models/models_0";
 import { loadRestJsonErrorCode, parseJsonBody as parseBody, parseJsonErrorBody as parseErrorBody, } from "@aws-sdk/core";
 import { requestBuilder as rb } from "@smithy/core";
-import { decorateServiceException as __decorateServiceException, expectBoolean as __expectBoolean, expectInt32 as __expectInt32, expectNonNull as __expectNonNull, expectObject as __expectObject, expectString as __expectString, _json, collectBody, isSerializableHeaderValue, map, take, withBaseException, } from "@smithy/smithy-client";
+import { decorateServiceException as __decorateServiceException, expectBoolean as __expectBoolean, expectInt32 as __expectInt32, expectLong as __expectLong, expectNonNull as __expectNonNull, expectObject as __expectObject, expectString as __expectString, _json, collectBody, isSerializableHeaderValue, map, take, withBaseException, } from "@smithy/smithy-client";
 export const se_CreateApplicationCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -587,9 +587,11 @@ export const de_PostLoginCommand = async (output, context) => {
     });
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
-        'organisations': _json,
-        'user_id': __expectString,
-        'user_token': _json,
+        'access_token': __expectString,
+        'expires_in': __expectLong,
+        'refresh_expires_in': __expectLong,
+        'refresh_token': __expectString,
+        'token_type': __expectString,
     });
     Object.assign(contents, doc);
     return contents;

@@ -22,7 +22,7 @@ use crate::{
 };
 use actix_web::{
     get, post,
-    web::{self, Json},
+    web::{self, Json, Query},
     HttpRequest, Scope,
 };
 use keycloak::{
@@ -332,6 +332,7 @@ fn parse_groups(user_id: String, username: String, groups: Vec<String>) -> User 
 #[get("oauth/url")]
 async fn get_oauth_url(
     _req: HttpRequest,
+    query: Query<OAuthQuery>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<serde_json::Value>> {
     // Use external URL directly from config
@@ -347,13 +348,21 @@ async fn get_oauth_url(
     let base_url = state.env.public_url.clone();
     let redirect_uri = format!("{}/oauth/callback", base_url);
 
+    let offline = query.offline.unwrap_or(false);
+    let scope = if offline {
+        "openid offline_access"
+    } else {
+        "openid"
+    };
+
     let oauth_state = "oauth_login_state".to_string();
 
     let auth_url = format!(
-        "{}/realms/{}/protocol/openid-connect/auth?client_id={}&response_type=code&scope=openid&redirect_uri={}&kc_idp_hint=google&state={}",
+        "{}/realms/{}/protocol/openid-connect/auth?client_id={}&response_type=code&scope={}&redirect_uri={}&kc_idp_hint=google&state={}",
         keycloak_url,
         realm,
         client_id,
+        urlencoding::encode(scope),
         urlencoding::encode(&redirect_uri),
         oauth_state
     );
@@ -368,7 +377,7 @@ async fn get_oauth_url(
     })))
 }
 
-async fn exchange_code_for_token(
+pub async fn exchange_code_for_token(
     code: &str,
     _req: &HttpRequest,
     state: &web::Data<AppState>,

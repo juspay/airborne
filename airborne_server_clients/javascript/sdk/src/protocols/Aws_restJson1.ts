@@ -109,6 +109,7 @@ import {
   decorateServiceException as __decorateServiceException,
   expectBoolean as __expectBoolean,
   expectInt32 as __expectInt32,
+  expectLong as __expectLong,
   expectNonNull as __expectNonNull,
   expectObject as __expectObject,
   expectString as __expectString,
@@ -960,9 +961,11 @@ export const de_PostLoginCommand = async(
   });
   const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
   const doc = take(data, {
-    'organisations': _json,
-    'user_id': __expectString,
-    'user_token': _json,
+    'access_token': __expectString,
+    'expires_in': __expectLong,
+    'refresh_expires_in': __expectLong,
+    'refresh_token': __expectString,
+    'token_type': __expectString,
   });
   Object.assign(contents, doc);
   return contents;
