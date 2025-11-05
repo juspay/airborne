@@ -4,8 +4,8 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    builds, cleanup_outbox, configs, files, packages, packages_v2, release_views, releases,
-    user_credentials, workspace_names,
+    application_settings, builds, cleanup_outbox, configs, files, packages, packages_v2,
+    release_views, releases, user_credentials, workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -191,4 +191,32 @@ pub struct UserCredentialsEntry {
     pub organisation: String,
     pub application: String,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable, Serialize)]
+#[diesel(table_name = application_settings)]
+pub struct ApplicationSettingsEntry {
+    pub id: uuid::Uuid,
+    pub version: i32,
+    pub org_id: String,
+    pub app_id: String,
+    pub maven_namespace: String,
+    pub maven_artifact_id: String,
+    pub maven_group_id: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl ApplicationSettingsEntry {
+    pub fn default(org_id: &str, app_id: &str) -> Self {
+        ApplicationSettingsEntry {
+            id: uuid::Uuid::new_v4(),
+            version: 0,
+            org_id: org_id.to_string(),
+            app_id: app_id.to_string(),
+            maven_namespace: "hyper-sdk".to_string(),
+            maven_artifact_id: "airborne-assets".to_string(),
+            maven_group_id: format!("{}.{}", org_id, app_id),
+            created_at: chrono::Utc::now(),
+        }
+    }
 }
