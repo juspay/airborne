@@ -52,4 +52,5 @@ tracing-actix-web = "=0.7.19"
 url = "2.5.7"
 urlencoding = "2.1.2"
 uuid = { workspace = true }
+xxhash-rust = { version = "0.8.15", features = ["xxh64"] }
 zip = "4.6.1"

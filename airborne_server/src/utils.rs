@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod advisory_lock;
 pub mod db;
 pub mod document;
 pub mod encryption;
 pub mod keycloak;
 pub mod kms;
+pub mod migrations;
 pub mod s3;
 pub mod semver;
 pub mod transaction_manager;
