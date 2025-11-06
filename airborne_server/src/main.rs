@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #![deny(unused_crate_dependencies)]
 mod build;
 mod dashboard;
@@ -53,7 +54,11 @@ use crate::{
         auth::Auth,
         request::{req_id_header_mw, WithRequestId},
     },
+    utils::migrations::{
+        get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+    },
 };
+
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 pub fn calculate_bucket_index(identifier: &str, group_id: &i64) -> usize {
@@ -116,10 +121,15 @@ async fn main() -> std::io::Result<()> {
     let backlog = std::env::var("BACKLOG")
         .map_or(1024, |v| v.parse().expect("BACKLOG must be a valid number"));
 
-    let run_pending_migrations = std::env::var("RUN_DB_MIGRATIONS")
-        .ok()
-        .and_then(|v| v.parse::<bool>().ok())
-        .unwrap_or_default();
+    let superposition_migration_strategy = SuperpositionMigrationStrategy::from(
+        std::env::var("SUPERPOSITION_MIGRATION_STRATEGY").unwrap_or_else(|_| "PATCH".into()),
+    );
+
+    let migrations_to_run_on_boot: Vec<String> = std::env::var("MIGRATIONS_TO_RUN_ON_BOOT")
+        .unwrap_or_else(|_| "".into())
+        .split(',')
+        .map(|s| s.trim().into())
+        .collect();
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -133,7 +143,7 @@ async fn main() -> std::io::Result<()> {
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
-    if run_pending_migrations {
+    if migrations_to_run_on_boot.contains(&"db".to_string()) {
         info!("Running pending database migrations");
         let mut conn = db::establish_connection(&aws_kms_client).await;
         conn.run_pending_migrations(MIGRATIONS)
@@ -186,6 +196,9 @@ async fn main() -> std::io::Result<()> {
         organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
         cloudfront_distribution_id: cf_distribution_id.clone(),
+        default_configs: get_default_configs_from_file()
+            .await
+            .expect("Failed to load superposition default configs from file"),
     };
 
     // This is required for localStack
@@ -244,6 +257,19 @@ async fn main() -> std::io::Result<()> {
     let _cleanup_handle = start_cleanup_job(app_state_data.clone());
     info!("Started transaction cleanup background job");
     info!("Using server prefix {}", server_path_prefix);
+
+    if migrations_to_run_on_boot.contains(&"superposition".to_string()) {
+        let superposition_migration =
+            migrate_superposition(&app_state_data, superposition_migration_strategy).await;
+        if superposition_migration.is_err() {
+            panic!(
+                "Superposition migration failed: {:?}",
+                superposition_migration.err()
+            );
+        } else {
+            println!("Superposition migration completed successfully");
+        }
+    }
 
     HttpServer::new(move || {
         App::new()
@@ -304,8 +330,4 @@ async fn main() -> std::io::Result<()> {
     .bind(("0.0.0.0", port))? // Listen on all interfaces
     .run()
     .await
-
-    // for i in 0 .. 100 {
-    //     calculate_bucket_index(identifier, group_id)
-    // }
 }

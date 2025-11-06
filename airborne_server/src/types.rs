@@ -28,7 +28,7 @@ use thiserror::Error;
 
 use crate::{
     organisation::{application::types::OrgAppError, types::OrgError},
-    utils::db,
+    utils::{db, migrations::SuperpositionDefaultConfig},
 };
 
 #[derive(Clone)]
@@ -58,6 +58,7 @@ pub struct Environment {
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
+    pub default_configs: Vec<SuperpositionDefaultConfig>,
 }
 pub trait AppError: std::error::Error + Send + Sync + 'static {
     fn code(&self) -> &'static str;
