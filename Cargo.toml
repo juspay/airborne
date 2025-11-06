@@ -5,7 +5,7 @@ package.homepage = "https://juspay.io/open-source/airborne"
 package.repository = "https://github.com/juspay/airborne"
 package.readme = "README.md"
 package.authors = ["airborne@juspay.in"]
-package.version = "0.14.0"
+package.version = "0.14.1"
 
 members = ["airborne_server", "airborne_analytics_server"]
 

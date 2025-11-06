@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.9.1 - 2025-11-06
+#### Bug Fixes
+- add pagination to file priorities in release creation and updation - (92aecac) - Yash Rajput
+
+- - -
+
 ## airborne_dashboard-v0.9.0 - 2025-11-05
 #### Bug Fixes
 - add CSP - (2dcfb5d) - yuvrajjsingh0
