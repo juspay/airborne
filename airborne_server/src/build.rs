@@ -12,7 +12,9 @@ use zip::write::FileOptions;
 use zip::ZipWriter;
 
 use crate::file::utils::download_file_content;
+use crate::organisation::application::get_settings;
 use crate::release::utils::get_files_by_file_keys_async;
+use crate::utils::db::models::ApplicationSettingsEntry;
 use crate::utils::db::schema::hyperotaserver::builds::{
     application as app_column, build_version, dsl::builds, organisation as org_column,
     release_id as release_id_column,
@@ -67,21 +69,25 @@ fn get_maven_metadata_path(prefix: &String, org: &String, app: &String) -> Strin
     )
 }
 
-fn generate_pom_content(org: &String, app: &String, version: &SemVer) -> String {
+fn generate_pom_content(settings: &ApplicationSettingsEntry, version: &SemVer) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>{0}.{1}</groupId>
-    <artifactId>airborne-assets</artifactId>
+    <groupId>{0}</groupId>
+    <artifactId>{1}</artifactId>
     <version>{2}</version>
     <packaging>aar</packaging>
     <name>Airborne Assets</name>
-    <description>Airborne assets package for {0}/{1}</description>
+    <description>Airborne assets package for {3}/{4}</description>
 </project>"#,
-        org, app, version
+        settings.maven_group_id,
+        settings.maven_artifact_id,
+        version,
+        settings.org_id,
+        settings.app_id
     )
 }
 
@@ -112,7 +118,10 @@ fn parse_existing_maven_metadata(metadata_content: &str) -> Result<Vec<SemVer>, 
     Ok(versions)
 }
 
-fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<SemVer>) -> String {
+fn generate_maven_metadata_content(
+    settings: &ApplicationSettingsEntry,
+    versions: Vec<SemVer>,
+) -> String {
     let default_version = SemVer::default();
     let latest_version = versions.last().unwrap_or(&default_version);
     let versions_xml = versions
@@ -133,8 +142,8 @@ fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<Sem
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <metadata>
-    <groupId>{}.{}</groupId>
-    <artifactId>airborne-assets</artifactId>
+    <groupId>{}</groupId>
+    <artifactId>{}</artifactId>
     <versioning>
         <latest>{}</latest>
         <release>{}</release>
@@ -144,7 +153,12 @@ fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<Sem
         <lastUpdated>{}</lastUpdated>
     </versioning>
 </metadata>"#,
-        org, app, latest_version, latest_version, versions_xml, timestamp
+        settings.maven_group_id,
+        settings.maven_artifact_id,
+        latest_version,
+        latest_version,
+        versions_xml,
+        timestamp
     )
 }
 
@@ -202,6 +216,8 @@ async fn create_and_upload_build(
     config_document: Option<Document>,
     state: web::Data<AppState>,
 ) -> Result<(), ABError> {
+    let application_settings = get_settings(&state.db_pool, org.clone(), app.clone()).await?;
+
     // Extract files from config
     let package_index =
         crate::release::utils::extract_file_from_configs(&config_document, "package.index")
@@ -437,7 +453,12 @@ async fn create_and_upload_build(
             ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
         })?;
 
-        let aar_path = get_aar_path(&String::from("hyper-sdk"), &org, &app, new_build_version);
+        let aar_path = get_aar_path(
+            &application_settings.maven_namespace,
+            &org,
+            &app,
+            new_build_version,
+        );
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -450,8 +471,13 @@ async fn create_and_upload_build(
         })?;
 
         // Generate and upload POM file
-        let pom_content = generate_pom_content(&org, &app, new_build_version);
-        let pom_path = get_pom_path(&String::from("hyper-sdk"), &org, &app, new_build_version);
+        let pom_content = generate_pom_content(&application_settings, new_build_version);
+        let pom_path = get_pom_path(
+            &application_settings.maven_namespace,
+            &org,
+            &app,
+            new_build_version,
+        );
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -462,7 +488,8 @@ async fn create_and_upload_build(
         .map_err(|e| ABError::InternalServerError(format!("Failed to upload POM to S3: {}", e)))?;
 
         // Get existing Maven metadata from S3 and merge with new version
-        let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), &org, &app);
+        let maven_metadata_path =
+            get_maven_metadata_path(&application_settings.maven_namespace, &org, &app);
         let existing_versions = match state
             .s3_client
             .get_object()
@@ -510,8 +537,10 @@ async fn create_and_upload_build(
         }
 
         // Generate and upload Maven metadata
-        let maven_metadata_content = generate_maven_metadata_content(&org, &app, versions);
-        let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), &org, &app);
+        let maven_metadata_content =
+            generate_maven_metadata_content(&application_settings, versions);
+        let maven_metadata_path =
+            get_maven_metadata_path(&application_settings.maven_namespace, &org, &app);
         push_file_byte_arr(
             &state.s3_client,
             state.env.bucket_name.clone(),
@@ -858,8 +887,10 @@ async fn serve_aar(
     let app_id = _args.application.clone();
     let build_response = generate(_args, state.clone()).await?;
 
+    let application_settings = get_settings(&state.db_pool, org_id.clone(), app_id.clone()).await?;
+
     let aar_path = get_aar_path(
-        &String::from("hyper-sdk"),
+        &application_settings.maven_namespace,
         &org_id,
         &app_id,
         &build_response.version,

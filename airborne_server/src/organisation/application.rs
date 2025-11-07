@@ -28,18 +28,23 @@ use superposition_sdk::types::WorkspaceStatus;
 use superposition_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, ADMIN};
+use crate::organisation::application::settings::types::UpdateApplicationSettingsRequest;
+use crate::organisation::application::settings::update_settings;
 use crate::types::{ABError, AppState};
 use crate::utils::document::{schema_doc_to_hashmap, value_to_document};
 use diesel::RunQueryDsl;
 
-use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
+use crate::utils::db::models::{ApplicationSettingsEntry, NewWorkspaceName, WorkspaceName};
 use crate::utils::db::schema::hyperotaserver::workspace_names;
 use crate::utils::keycloak::get_token;
 use crate::utils::transaction_manager::TransactionManager;
 
+pub use settings::get_settings;
+
 mod config;
 mod dimension;
 mod properties;
+mod settings;
 mod user;
 
 use diesel::ExpressionMethods;
@@ -52,6 +57,7 @@ pub fn add_routes() -> Scope {
         .service(Scope::new("/dimension").service(dimension::add_routes()))
         .service(Scope::new("/user").service(user::add_routes()))
         .service(Scope::new("/properties").service(properties::add_routes()))
+        .service(Scope::new("/settings").service(settings::add_routes()))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -307,6 +313,21 @@ async fn add_application(
                 }
             }
         }
+
+        // Create Settings row for application
+        let new_settings = ApplicationSettingsEntry::default(&organisation, &application);
+
+        update_settings(
+            &state.db_pool,
+            organisation.clone(),
+            application.clone(),
+            UpdateApplicationSettingsRequest {
+                maven_namespace: Some(new_settings.maven_namespace.clone()),
+                maven_artifact_id: Some(new_settings.maven_artifact_id.clone()),
+                maven_group_id: Some(new_settings.maven_group_id.clone()),
+            },
+        )
+        .await?;
 
         // Store workspace name in our database with a placeholder, then update to "workspace{id}"
         let new_workspace_name = NewWorkspaceName {
