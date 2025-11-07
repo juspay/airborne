@@ -29,7 +29,8 @@ use superposition_sdk::Client;
 
 use crate::middleware::auth::{validate_user, AuthResponse, ADMIN};
 use crate::types::{ABError, AppState};
-use crate::utils::document::{schema_doc_to_hashmap, value_to_document};
+use crate::utils::document::schema_doc_to_hashmap;
+use crate::utils::migrations::{migrate_superposition_workspace, SuperpositionMigrationStrategy};
 use diesel::RunQueryDsl;
 
 use crate::utils::db::models::{NewWorkspaceName, WorkspaceName};
@@ -66,7 +67,7 @@ struct ApplicationCreateRequest {
     application: String,
 }
 
-fn default_config<T: Clone>(
+pub fn default_config<T: Clone>(
     superposition_client: Client,
     workspace_name: String,
     superposition_org: String,
@@ -321,7 +322,7 @@ async fn add_application(
             superposition_org_id_from_env
         );
         // Insert and get the inserted row (to get the id)
-        let inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
+        let mut inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
             .values(&new_workspace_name)
             .get_result(&mut conn)
             .map_err(|e| {
@@ -330,6 +331,7 @@ async fn add_application(
 
         let generated_id = inserted_workspace.id;
         let generated_workspace_name = format!("workspace{}", generated_id);
+        inserted_workspace.workspace_name = generated_workspace_name.clone();
 
         // Update the workspace_name to "workspace{id}"
         diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
@@ -375,37 +377,15 @@ async fn add_application(
             }
         };
 
-        // Step 5: Create default configurations
-        let create_default_config_string = default_config::<String>(
-            state.superposition_client.clone(),
-            generated_workspace_name.clone(),
-            superposition_org_id_from_env.clone(), // Use ID from env
-        );
-        let create_default_config_int = default_config::<i32>(
-            state.superposition_client.clone(),
-            generated_workspace_name.clone(),
-            superposition_org_id_from_env.clone(), // Use ID from env
-        );
-        let create_default_config_doc = default_config::<Document>(
-            state.superposition_client.clone(),
-            generated_workspace_name.clone(),
-            superposition_org_id_from_env.clone(), // Use ID from env
-        );
-        let create_default_config_array = default_config::<Vec<Document>>(
-            state.superposition_client.clone(),
-            generated_workspace_name.clone(),
-            superposition_org_id_from_env.clone(), // Use ID from env
-        );
-
         // Helper function to create default config with error handling
-        async fn create_config_with_tx<T, E>(
-            create_fn: impl futures::Future<Output = Result<T, E>>,
+        async fn create_config_with_tx<E>(
+            create_fn: impl futures::Future<Output = Result<(), E>>,
             key: &str,
             transaction: &TransactionManager,
             admin: &KeycloakAdmin,
             realm: &str,
             state: &web::Data<AppState>,
-        ) -> Result<T, actix_web::Error>
+        ) -> Result<(), ABError>
         where
             E: std::fmt::Display,
         {
@@ -423,7 +403,7 @@ async fn add_application(
                         info!("Rollback failed: {}", rollback_err);
                     }
 
-                    Err(error::ErrorInternalServerError(format!(
+                    Err(ABError::InternalServerError(format!(
                         "Failed to create configuration for {}: {}",
                         key, e
                     )))
@@ -431,175 +411,25 @@ async fn add_application(
             }
         }
 
-        // Create all configurations with transaction-aware error handling
         create_config_with_tx(
-            create_default_config_string(
-                "config.version".to_string(),
-                "0.0.0".to_string(),
-                "Value indicating the version of the release config -> config".to_string(),
-            ),
-            "config.version",
+            async {
+                migrate_superposition_workspace(
+                    &inserted_workspace,
+                    &state,
+                    &SuperpositionMigrationStrategy::Patch,
+                )
+                .await
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Workspace migration error: {}", e))
+                })
+            },
+            "migrate_superposition_workspace",
             &transaction,
             &admin,
             &realm,
             &state,
         )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_int(
-                "config.release_config_timeout".to_string(),
-                1000,
-                "Value indicating the version of the release config".to_string(),
-            ),
-            "config.release_config_timeout",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_int(
-                "config.boot_timeout".to_string(),
-                1000,
-                "Indicating the timeout for downloading the package block".to_string(),
-            ),
-            "config.boot_timeout",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_doc(
-                "config.properties".to_string(),
-                value_to_document(&serde_json::json!({})),
-                "Value indicating the properties of the config".to_string(),
-            ),
-            "config.properties",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        info!(
-            "Creating default configuration (string): key=package.name, value={}",
-            generated_workspace_name
-        );
-        create_config_with_tx(
-            create_default_config_string(
-                "package.name".to_string(),
-                generated_workspace_name.clone(),
-                "Value indicating the version of the release config".to_string(),
-            ),
-            "package.name",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_int(
-                "package.version".to_string(),
-                0,
-                "Value indicating the version of the package".to_string(),
-            ),
-            "package.version",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_doc(
-                "package.properties".to_string(),
-                value_to_document(&serde_json::json!({})),
-                "Value indicating the properties of the package".to_string(),
-            ),
-            "package.properties",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_string(
-                "package.index".to_string(),
-                "".to_string(),
-                "Value indicating the index of the package".to_string(),
-            ),
-            "package.index",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_array(
-                "package.important".to_string(),
-                vec![],
-                "Value indicating the important block of the package".to_string(),
-            ),
-            "package.important",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_array(
-                "package.lazy".to_string(),
-                vec![],
-                "Value indicating the lazy block of the package".to_string(),
-            ),
-            "package.lazy",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-        create_config_with_tx(
-            create_default_config_array(
-                "resources".to_string(),
-                vec![],
-                "Value indicating the resources block of the release config".to_string(),
-            ),
-            "resources",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
+        .await?;
 
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();

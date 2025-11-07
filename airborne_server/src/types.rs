@@ -20,7 +20,7 @@ use serde::Serialize;
 use superposition_sdk::Client;
 use thiserror::Error;
 
-use crate::utils::db;
+use crate::utils::{db, migrations::SuperpositionDefaultConfig};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,6 +49,7 @@ pub struct Environment {
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
+    pub default_configs: Vec<SuperpositionDefaultConfig>,
 }
 pub trait AppError: std::error::Error + Send + Sync + 'static {
     fn code(&self) -> &'static str;
