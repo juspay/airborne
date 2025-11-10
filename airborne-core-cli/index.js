@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, ListVersionsAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -873,13 +873,14 @@ program
   }
   return parsed;
 })
- .option("--per_page <per_page>", "per_page parameter", (value) => {
+ .option("--count <count>", "count parameter", (value) => {
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
-    throw new Error("--per_page must be a valid integer");
+    throw new Error("--count must be a valid integer");
   }
   return parsed;
 })
+ .option("--all <all>", "all parameter")
  .option("--search <search>", "search parameter")
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
@@ -898,12 +899,13 @@ Usage 2 - JSON file:
   airborne-core-cli ListFiles @file.json
 
 Usage 3 - Mixed Usage:
-  $ airborne-core-cli ListFiles @params.json --page <value> --per_page <value> --token <value>
+  $ airborne-core-cli ListFiles @params.json --page <value> --count <value> --token <value>
 
 Parameters:
     --page <integer> (optional) : Page number for pagination
-    --per_page <integer> (optional) : Number of files per page
-    --search <string> (optional) : Search query to filter files
+    --count <integer> (optional) : Number of versions per page
+    --all <boolean> (optional) : Fetch all files without pagination
+    --search <string> (optional) : Search query to filter file versions
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
@@ -924,12 +926,13 @@ Examples:
    $ airborne-core-cli ListFiles @params.json
 
 3. Mixed approach (JSON file + CLI overrides):
-   $ airborne-core-cli ListFiles @params.json --page <value> --per_page <value> --token <value>
+   $ airborne-core-cli ListFiles @params.json --page <value> --count <value> --token <value>
 
 JSON file format (params.json):
 {
   "page": 123,
-  "per_page": 123,
+  "count": 123,
+  "all": "example_all",
   "search": "example_search",
   "organisation": "example_organisation",
   "application": "example_application",
@@ -1006,20 +1009,22 @@ JSON file format (params.json):
 program
   .command("ListPackages")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
- .option("--offset <offset>", "offset parameter", (value) => {
+ .option("--page <page>", "page parameter", (value) => {
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
-    throw new Error("--offset must be a valid integer");
+    throw new Error("--page must be a valid integer");
   }
   return parsed;
 })
- .option("--limit <limit>", "limit parameter", (value) => {
+ .option("--count <count>", "count parameter", (value) => {
   const parsed = parseInt(value, 10);
   if (isNaN(parsed)) {
-    throw new Error("--limit must be a valid integer");
+    throw new Error("--count must be a valid integer");
   }
   return parsed;
 })
+ .option("--search <search>", "search parameter")
+ .option("--all <all>", "all parameter")
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
@@ -1031,17 +1036,19 @@ Usage 1 - Individual options:
      --organisation <organisation> \\
      --application <application> \\
      --token <string> \\
-     [--offset <offset>]
+     [--page <page>]
 
 Usage 2 - JSON file:
   airborne-core-cli ListPackages @file.json
 
 Usage 3 - Mixed Usage:
-  $ airborne-core-cli ListPackages @params.json --offset <value> --limit <value> --token <value>
+  $ airborne-core-cli ListPackages @params.json --page <value> --count <value> --token <value>
 
 Parameters:
-    --offset <integer> (optional) : Offset for pagination
-    --limit <integer> (optional) : Limit for pagination
+    --page <integer> (optional) : Offset for pagination (default: 1)
+    --count <integer> (optional) : Limit for pagination (default: 50)
+    --search <string> (optional) : Search term for filtering packages using index file path
+    --all <boolean> (optional) : If true, fetch all packages without pagination
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
@@ -1056,18 +1063,20 @@ Examples:
      --organisation <organisation> \\
      --application <application> \\
      --token <string> \\
-     [--offset <offset>]
+     [--page <page>]
 
 2. Using JSON file:
    $ airborne-core-cli ListPackages @params.json
 
 3. Mixed approach (JSON file + CLI overrides):
-   $ airborne-core-cli ListPackages @params.json --offset <value> --limit <value> --token <value>
+   $ airborne-core-cli ListPackages @params.json --page <value> --count <value> --token <value>
 
 JSON file format (params.json):
 {
-  "offset": 123,
-  "limit": 123,
+  "page": 123,
+  "count": 123,
+  "search": "example_search",
+  "all": "example_all",
   "organisation": "example_organisation",
   "application": "example_application",
   "token": "your_bearer_token_here"
@@ -1090,6 +1099,22 @@ program
   .command("ListReleases")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--dimension <dimension>", "dimension parameter")
+ .option("--page <page>", "page parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--page must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--count <count>", "count parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--count must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--all <all>", "all parameter")
+ .option("--status <status>", "status parameter")
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
@@ -1107,10 +1132,14 @@ Usage 2 - JSON file:
   airborne-core-cli ListReleases @file.json
 
 Usage 3 - Mixed Usage:
-  $ airborne-core-cli ListReleases @params.json --dimension <value> --organisation <value> --token <value>
+  $ airborne-core-cli ListReleases @params.json --dimension <value> --page <value> --token <value>
 
 Parameters:
     --dimension <string> (optional) : dimension to filter releases in format key1=value1;key2=value2
+    --page <integer> (optional) : Page number for pagination (default: 1)
+    --count <integer> (optional) : Count of releases per page for pagination (default: 50)
+    --all <boolean> (optional) : If true, fetch all releases without pagination
+    --status <string> (optional) : Status to filter releases
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
@@ -1131,11 +1160,15 @@ Examples:
    $ airborne-core-cli ListReleases @params.json
 
 3. Mixed approach (JSON file + CLI overrides):
-   $ airborne-core-cli ListReleases @params.json --dimension <value> --organisation <value> --token <value>
+   $ airborne-core-cli ListReleases @params.json --dimension <value> --page <value> --token <value>
 
 JSON file format (params.json):
 {
   "dimension": "example_dimension",
+  "page": 123,
+  "count": 123,
+  "all": "example_all",
+  "status": "example_status",
   "organisation": "example_organisation",
   "application": "example_application",
   "token": "your_bearer_token_here"
@@ -1144,6 +1177,100 @@ JSON file format (params.json):
     try {
       
       const output = await ListReleasesAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("ListVersions")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--filepath <filepath>", "filepath parameter")
+ .option("--page <page>", "page parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--page must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--count <count>", "count parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--count must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--all <all>", "all parameter")
+ .option("--search <search>", "search parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List versions request operation:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListVersions \\
+     --filepath <filepath> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ListVersions @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListVersions @params.json --filepath <value> --page <value> --token <value>
+
+Parameters:
+    --filepath <string> (required)
+    --page <integer> (optional) : Page number for pagination
+    --count <integer> (optional) : Number of versions per page
+    --all <boolean> (optional) : Fetch all file versions without pagination
+    --search <string> (optional) : Search query to filter file versions
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListVersions \\
+     --filepath <filepath> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+2. Using JSON file:
+   $ airborne-core-cli ListVersions @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListVersions @params.json --filepath <value> --page <value> --token <value>
+
+JSON file format (params.json):
+{
+  "filepath": "example_filepath",
+  "page": 123,
+  "count": 123,
+  "all": "example_all",
+  "search": "example_search",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListVersionsAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {

@@ -5,12 +5,12 @@ import {
   ServiceOutputTypes,
 } from "../AirborneClient";
 import {
-  ListPackagesRequest,
-  ListPackagesResponse,
+  ListVersionResponse,
+  ListVersionsRequest,
 } from "../models/models_0";
 import {
-  de_ListPackagesCommand,
-  se_ListPackagesCommand,
+  de_ListVersionsCommand,
+  se_ListVersionsCommand,
 } from "../protocols/Aws_restJson1";
 import { getSerdePlugin } from "@smithy/middleware-serde";
 import { Command as $Command } from "@smithy/smithy-client";
@@ -24,43 +24,42 @@ export { $Command };
 /**
  * @public
  *
- * The input for {@link ListPackagesCommand}.
+ * The input for {@link ListVersionsCommand}.
  */
-export interface ListPackagesCommandInput extends ListPackagesRequest {}
+export interface ListVersionsCommandInput extends ListVersionsRequest {}
 /**
  * @public
  *
- * The output of {@link ListPackagesCommand}.
+ * The output of {@link ListVersionsCommand}.
  */
-export interface ListPackagesCommandOutput extends ListPackagesResponse, __MetadataBearer {}
+export interface ListVersionsCommandOutput extends ListVersionResponse, __MetadataBearer {}
 
 /**
- * List packages request operation
+ * List versions request operation
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
- * import { AirborneClient, ListPackagesCommand } from "airborne-server-sdk"; // ES Modules import
- * // const { AirborneClient, ListPackagesCommand } = require("airborne-server-sdk"); // CommonJS import
+ * import { AirborneClient, ListVersionsCommand } from "airborne-server-sdk"; // ES Modules import
+ * // const { AirborneClient, ListVersionsCommand } = require("airborne-server-sdk"); // CommonJS import
  * const client = new AirborneClient(config);
- * const input = { // ListPackagesRequest
+ * const input = { // ListVersionsRequest
+ *   filepath: "STRING_VALUE", // required
  *   page: Number("int"),
  *   count: Number("int"),
- *   search: "STRING_VALUE",
  *   all: true || false,
+ *   search: "STRING_VALUE",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
- * const command = new ListPackagesCommand(input);
+ * const command = new ListVersionsCommand(input);
  * const response = await client.send(command);
- * // { // ListPackagesResponse
- * //   data: [ // PackageList // required
- * //     { // Package
- * //       tag: "STRING_VALUE",
+ * // { // ListVersionResponse
+ * //   data: [ // FileVersionItemList // required
+ * //     { // FileVersionItem
  * //       version: Number("int"), // required
- * //       index: "STRING_VALUE", // required
- * //       files: [ // StringList // required
- * //         "STRING_VALUE",
- * //       ],
+ * //       tag: "STRING_VALUE",
+ * //       created_at: "STRING_VALUE", // required
+ * //       id: "STRING_VALUE", // required
  * //     },
  * //   ],
  * //   total_pages: Number("int"), // required
@@ -69,10 +68,10 @@ export interface ListPackagesCommandOutput extends ListPackagesResponse, __Metad
  *
  * ```
  *
- * @param ListPackagesCommandInput - {@link ListPackagesCommandInput}
- * @returns {@link ListPackagesCommandOutput}
- * @see {@link ListPackagesCommandInput} for command's `input` shape.
- * @see {@link ListPackagesCommandOutput} for command's `response` shape.
+ * @param ListVersionsCommandInput - {@link ListVersionsCommandInput}
+ * @returns {@link ListVersionsCommandOutput}
+ * @see {@link ListVersionsCommandInput} for command's `input` shape.
+ * @see {@link ListVersionsCommandOutput} for command's `response` shape.
  * @see {@link AirborneClientResolvedConfig | config} for AirborneClient's `config` shape.
  *
  * @throws {@link Unauthorized} (client fault)
@@ -95,30 +94,30 @@ export interface ListPackagesCommandOutput extends ListPackagesResponse, __Metad
  *
  * @public
  */
-export class ListPackagesCommand extends $Command.classBuilder<ListPackagesCommandInput, ListPackagesCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>()
+export class ListVersionsCommand extends $Command.classBuilder<ListVersionsCommandInput, ListVersionsCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>()
       .m(function (this: any, Command: any, cs: any, config: AirborneClientResolvedConfig, o: any) {
           return [
 
   getSerdePlugin(config, this.serialize, this.deserialize),
       ];
   })
-  .s("Airborne", "ListPackages", {
+  .s("Airborne", "ListVersions", {
 
   })
-  .n("AirborneClient", "ListPackagesCommand")
+  .n("AirborneClient", "ListVersionsCommand")
   .f(void 0, void 0)
-  .ser(se_ListPackagesCommand)
-  .de(de_ListPackagesCommand)
+  .ser(se_ListVersionsCommand)
+  .de(de_ListVersionsCommand)
 .build() {
 /** @internal type navigation helper, not in runtime. */
 declare protected static __types: {
   api: {
-      input: ListPackagesRequest;
-      output: ListPackagesResponse;
+      input: ListVersionsRequest;
+      output: ListVersionResponse;
   };
   sdk: {
-      input: ListPackagesCommandInput;
-      output: ListPackagesCommandOutput;
+      input: ListVersionsCommandInput;
+      output: ListVersionsCommandOutput;
   };
 };
 }

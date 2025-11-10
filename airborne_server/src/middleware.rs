@@ -15,8 +15,18 @@
 pub mod auth;
 pub mod request;
 use crate::types::ABError;
-use actix_web::{error::JsonPayloadError, Error, HttpRequest};
+use actix_web::{
+    error::JsonPayloadError, error::PathError, error::QueryPayloadError, Error, HttpRequest,
+};
 
 pub fn json_error_handler(err: JsonPayloadError, _req: &HttpRequest) -> Error {
+    Error::from(ABError::BadRequest(err.to_string()))
+}
+
+pub fn path_error_handler(err: PathError, _req: &HttpRequest) -> Error {
+    Error::from(ABError::BadRequest(err.to_string()))
+}
+
+pub fn query_error_handler(err: QueryPayloadError, _req: &HttpRequest) -> Error {
     Error::from(ABError::BadRequest(err.to_string()))
 }

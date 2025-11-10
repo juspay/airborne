@@ -44,7 +44,8 @@ export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBea
  * const client = new AirborneClient(config);
  * const input = { // ListFilesRequest
  *   page: Number("int"),
- *   per_page: Number("int"),
+ *   count: Number("int"),
+ *   all: true || false,
  *   search: "STRING_VALUE",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
@@ -52,25 +53,16 @@ export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBea
  * const command = new ListFilesCommand(input);
  * const response = await client.send(command);
  * // { // ListFilesResponse
- * //   organisation: "STRING_VALUE", // required
- * //   application: "STRING_VALUE", // required
- * //   files: [ // FileResponseList // required
- * //     { // CreateFileResponse
- * //       id: "STRING_VALUE", // required
+ * //   data: [ // FileResponseList // required
+ * //     { // FileResponseListItem
  * //       file_path: "STRING_VALUE", // required
- * //       url: "STRING_VALUE", // required
+ * //       id: "STRING_VALUE", // required
  * //       version: Number("int"), // required
- * //       tag: "STRING_VALUE",
- * //       size: Number("int"), // required
- * //       checksum: "STRING_VALUE", // required
- * //       metadata: "DOCUMENT_VALUE", // required
- * //       status: "STRING_VALUE", // required
- * //       created_at: "STRING_VALUE", // required
+ * //       total_versions: Number("int"), // required
  * //     },
  * //   ],
- * //   total: Number("int"), // required
- * //   page: Number("int"), // required
- * //   per_page: Number("int"), // required
+ * //   total_pages: Number("int"), // required
+ * //   total_items: Number("int"), // required
  * // };
  *
  * ```

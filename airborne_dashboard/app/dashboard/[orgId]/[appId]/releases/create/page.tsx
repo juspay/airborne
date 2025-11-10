@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ import {
   Settings,
   Cog,
   Copy,
+  Package,
+  Plus,
 } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
@@ -57,18 +59,18 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { FileTable } from "@/components/files/files-tables";
 
 hljs.registerLanguage("json", json);
 
 type Pkg = { index: string; tag: string; version: number; files: string[] };
 type FileItem = { id: string; file_path: string; version?: number; tag?: string; size?: number };
-type ResourceFile = { id: string; file_path: string; size?: number; created_at?: string; tag: string };
+type ResourceFile = { file_path: string; latest_version: number; total_versions: number; id: string };
 
-type ApiResponse = {
-  files: ResourceFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
+type ApiResponse<T> = {
+  data: T[];
+  total_items: number;
+  total_pages: number;
 };
 
 type TargetingRule = {
@@ -131,6 +133,8 @@ export default function CreateReleasePage() {
 
   const [pkgSearch, setPkgSearch] = useState("");
   const debouncedPackageSearch = useDebouncedValue(pkgSearch, 500);
+  const [pkgPage, setPkgPage] = useState(1);
+  const pkgCount = 10;
   const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(null);
 
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -142,9 +146,11 @@ export default function CreateReleasePage() {
   >([]);
   const [cohorts, setCohorts] = useState<Record<string, string[]>>({});
   const [packages, setPackages] = useState<Pkg[]>([]);
+  const [totalPackagesPage, setTotalPackagesPage] = useState(0);
+  const [pkgLoading, setPkgLoading] = useState(true);
 
   // Resource-related state
-  const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
+  const [selectedResources, setSelectedResources] = useState<Map<string, string>>(new Map());
   const [resourceSearch, setResourceSearch] = useState("");
   const debouncedResourcesSearch = useDebouncedValue(resourceSearch, 500);
   const [resourceCurrentPage, setResourceCurrentPage] = useState(1);
@@ -162,7 +168,7 @@ export default function CreateReleasePage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const perPage = 50;
+  const perPage = 10;
 
   // Check if we're in clone mode and get the release ID
   const isClone = searchParams.get("clone") === "true";
@@ -204,8 +210,10 @@ export default function CreateReleasePage() {
         }
 
         // Initialize selected resources (using file paths)
-        const resourceFilePaths = release.resources.map((resource: any) => resource.file_path);
-        setSelectedResources(new Set(resourceFilePaths));
+        const resourceFilePaths = release.resources.map((resource: any) => {
+          return [resource.file_path, resource.id];
+        });
+        setSelectedResources(new Map(resourceFilePaths));
 
         // Initialize package properties
         if (release.package.properties) {
@@ -357,10 +365,16 @@ export default function CreateReleasePage() {
   // Load packages list
   useEffect(() => {
     if (!token || !org || !app) return;
-    apiFetch<any>("/packages/list", { query: { offset: 0, limit: 100 } }, { token, org, app })
+    setPkgLoading(true);
+    apiFetch<any>(
+      "/packages/list",
+      { query: { page: pkgPage, count: pkgCount, search: pkgSearch ? pkgSearch : undefined } },
+      { token, org, app }
+    )
       .then((res) => {
-        const loadedPackages = res.packages || [];
+        const loadedPackages = res.data || [];
         setPackages(loadedPackages);
+        setTotalPackagesPage(res.total_pages);
 
         // Handle package selection from clone data
         if (isClone) {
@@ -417,8 +431,9 @@ export default function CreateReleasePage() {
           }
         }
       })
-      .catch(() => setPackages([]));
-  }, [token, org, app, searchParams]);
+      .catch(() => setPackages([]))
+      .finally(() => setPkgLoading(false));
+  }, [token, org, app, searchParams, pkgCount, pkgPage, debouncedPackageSearch]);
 
   useEffect(() => {
     if (selectedPackage) {
@@ -487,22 +502,24 @@ export default function CreateReleasePage() {
   } = useSWR(
     token && org && app && currentStep === 6 ? ["/file/list", debouncedResourcesSearch, resourceCurrentPage] : null,
     async () =>
-      apiFetch<ApiResponse>(
+      apiFetch<ApiResponse<ResourceFile>>(
         "/file/list",
-        { method: "GET", query: { search: resourceSearch || undefined, page: resourceCurrentPage, per_page: perPage } },
+        {
+          method: "GET",
+          query: {
+            search: resourceSearch || undefined,
+            page: resourceCurrentPage,
+            count: perPage,
+          },
+        },
         { token, org, app }
       )
   );
 
   const { data } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
-    apiFetch<any>("/releases/list", {}, { token, org, app })
+    apiFetch<any>("/releases/list", { query: { page: 1, count: 1 } }, { token, org, app })
   );
-  const releases: ApiRelease[] = data?.releases || [];
-
-  const filteredPackages = useMemo(
-    () => packages.filter((p) => (p.index || "").toLowerCase().includes(pkgSearch.toLowerCase())),
-    [packages, debouncedPackageSearch]
-  );
+  const releases: ApiRelease[] = data?.data || [];
 
   // Calculate filtered and paginated files for step 5
   const filteredFiles = useMemo(
@@ -517,53 +534,49 @@ export default function CreateReleasePage() {
   );
 
   // Get resource data from API response
-  const allResources = resourceData?.files || [];
-  const resourceTotal = resourceData?.total || 0;
-  const resourceTotalPages = Math.ceil(resourceTotal / perPage);
+  const allResources = resourceData?.data || [];
+  const resourceTotal = resourceData?.total_items || 0;
+  const resourceTotalPages = resourceData?.total_pages || 0;
 
-  // Convert cloned resource file paths to resource IDs when resources are loaded
-  useEffect(() => {
-    if (isClone && allResources.length > 0) {
-      // Check if we have file paths in selectedResources that need to be converted to IDs
-      const currentSelection = Array.from(selectedResources);
-      if (currentSelection.length > 0) {
-        // Check if any of the current selections are file paths (not found in resource IDs)
-        const resourceIds = new Set(allResources.map((r) => r.id));
-        const hasFilePaths = currentSelection.some((id) => !resourceIds.has(id));
+  // // Convert cloned resource file paths to resource IDs when resources are loaded
+  // useEffect(() => {
+  //   if (isClone && allResources.length > 0) {
+  //     // Check if we have file paths in selectedResources that need to be converted to IDs
+  //     const currentSelection = Array.from(selectedResources);
+  //     if (currentSelection.length > 0) {
+  //       // Check if any of the current selections are file paths (not found in resource IDs)
+  //       const resourceIds = new Set(allResources.map((r) => r.id));
+  //       const hasFilePaths = currentSelection.some((id) => !resourceIds.has(id));
 
-        if (hasFilePaths) {
-          // Convert file paths to resource IDs
-          const newResourceIds = new Set<string>();
+  //       if (hasFilePaths) {
+  //         // Convert file paths to resource IDs
+  //         const newResourceIds = new Set<string>();
 
-          currentSelection.forEach((filePath: string) => {
-            const matchingResource = allResources.find((resource) => resource.file_path === filePath);
-            if (matchingResource) {
-              newResourceIds.add(matchingResource.id);
-            }
-          });
+  //         currentSelection.forEach((filePath: string) => {
+  //           const matchingResource = allResources.find((resource) => resource.file_path === filePath);
+  //           if (matchingResource) {
+  //             newResourceIds.add(matchingResource.id);
+  //           }
+  //         });
 
-          if (newResourceIds.size > 0) {
-            setSelectedResources(newResourceIds);
-          }
-        }
-      }
-    }
-  }, [isClone, allResources, selectedResources]);
+  //         if (newResourceIds.size > 0) {
+  //           setSelectedResources(newResourceIds);
+  //         }
+  //       }
+  //     }
+  //   }
+  // }, [isClone, allResources, selectedResources]);
 
   // Filter resources excluding package files and index file by file path only
-  const packageFilePaths = new Set([
-    // Add file paths from current package files
-    ...files.map((f) => f.file_path),
-    // Add index file path if selected package has an index
-    ...(selectedPackage?.index ? [parseFileRef(selectedPackage.index).filePath] : []),
-    // Add file paths from all package files
-    ...(selectedPackage?.files || []).map((fileRef) => parseFileRef(fileRef).filePath),
+  const packageFilePaths = new Map<string, string>([
+    // Add index file if it exists
+    ...(selectedPackage?.index ? [[parseFileRef(selectedPackage.index).filePath, selectedPackage.index] as const] : []),
+    // Add all other files
+    ...(selectedPackage?.files || []).map((fileId) => {
+      const { filePath } = parseFileRef(fileId);
+      return [filePath, fileId] as const;
+    }),
   ]);
-
-  const availableResources = useMemo(
-    () => allResources.filter((r) => !packageFilePaths.has(r.file_path)),
-    [allResources, packageFilePaths]
-  );
 
   const importantFiles = Object.entries(filePriority)
     .filter(([, v]) => v === "important")
@@ -656,7 +669,7 @@ export default function CreateReleasePage() {
       },
       package: { properties, important: importantFiles, lazy: lazyFiles },
       dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
-      resources: Array.from(selectedResources),
+      resources: Array.from(selectedResources.values()),
     };
 
     if (selectedPackage) {
@@ -669,6 +682,59 @@ export default function CreateReleasePage() {
   const handleFilesSearchChange = (value: string) => {
     setFilesSearch(value);
     setFilesCurrentPage(1); // Reset to first page when searching
+  };
+
+  const selectAllResources = async () => {
+    const { data: allFiles } = await apiFetch<ApiResponse<ResourceFile>>(
+      "/file/list",
+      {
+        method: "GET",
+        query: {
+          search: resourceSearch || undefined,
+          all: true,
+        },
+      },
+      { token, org, app }
+    );
+
+    setSelectedResources((prev) => {
+      const newMap = new Map(prev);
+      allFiles.map((f) => {
+        if (!selectedResources.has(f.file_path) && !packageFilePaths.has(f.file_path)) {
+          newMap.set(f.file_path, f.id);
+        }
+      });
+      return newMap;
+    });
+  };
+  const deselectAllResources = () => {
+    setSelectedResources(new Map());
+  };
+
+  const onSelectResources = (file_path: string, file_id: string) => {
+    setSelectedResources((prev) => {
+      const newMap = new Map(prev);
+      if (newMap.has(file_path) && newMap.get(file_path) === file_id) {
+        newMap.delete(file_path);
+      } else {
+        newMap.set(file_path, file_id);
+      }
+      return newMap;
+    });
+  };
+
+  const isFileIdSelected = (file_path: string, file_id: string): boolean => {
+    return selectedResources.get(file_path) === file_id;
+  };
+  const isFilePathSelected = (file_path: string): boolean => {
+    return selectedResources.has(file_path);
+  };
+
+  const isDisabled = (file_path: string): { disabled: boolean; text: string } => {
+    return {
+      disabled: packageFilePaths.has(file_path),
+      text: "Selected in Package",
+    };
   };
 
   const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
@@ -1297,47 +1363,110 @@ export default function CreateReleasePage() {
                     <Input
                       placeholder="Search packages..."
                       value={pkgSearch}
-                      onChange={(e) => setPkgSearch(e.target.value)}
+                      onChange={(e) => {
+                        setPkgSearch(e.target.value);
+                        setPkgPage(1);
+                      }}
                       className="pl-10"
                     />
                   </div>
                 </div>
+                {pkgLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      <span className="text-muted-foreground">Loading packages...</span>
+                    </div>
+                  </div>
+                ) : packages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No packages found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      {pkgSearch.trim() !== ""
+                        ? `No packages found matching "${pkgSearch}".`
+                        : "You haven't created any packages yet."}
+                    </p>
+                    {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && pkgSearch.trim() === "" && (
+                      <Button asChild className="gap-2">
+                        <Link
+                          href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Create your first package
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead>Version</TableHead>
+                        <TableHead>Tag</TableHead>
+                        <TableHead>Index</TableHead>
+                        <TableHead>Files</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {packages.map((p) => {
+                        const key = `${p.tag}:${p.version}`;
+                        const checked = selectedPackage
+                          ? selectedPackage.version === p.version && selectedPackage.tag === p.tag
+                          : false;
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(isChecked) => setSelectedPackage(isChecked ? p : null)}
+                              />
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{p.version}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{p.tag}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{p.index}</TableCell>
+                            <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>Version</TableHead>
-                      <TableHead>Tag</TableHead>
-                      <TableHead>Index</TableHead>
-                      <TableHead>Files</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPackages.map((p) => {
-                      const key = `${p.tag}:${p.version}`;
-                      const checked = selectedPackage
-                        ? selectedPackage.version === p.version && selectedPackage.tag === p.tag
-                        : false;
-                      return (
-                        <TableRow key={key}>
-                          <TableCell>
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={(isChecked) => setSelectedPackage(isChecked ? p : null)}
-                            />
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{p.version}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{p.tag}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">{p.index}</TableCell>
-                          <TableCell className="text-muted-foreground">{p.files.length}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                {totalPackagesPage > 1 && (
+                  <div className="mt-4">
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (pkgPage > 1) setPkgPage(pkgPage - 1);
+                            }}
+                            className={pkgPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                          />
+                        </PaginationItem>
+
+                        {renderPaginationItems(pkgPage, totalPackagesPage, setPkgPage)}
+
+                        <PaginationItem>
+                          <PaginationNext
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (pkgPage < totalPackagesPage) setPkgPage(pkgPage + 1);
+                            }}
+                            className={pkgPage >= totalPackagesPage ? "pointer-events-none opacity-50" : ""}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
 
                 <div className="mt-6 space-y-2 hidden">
                   <Label>Package Properties (JSON)</Label>
@@ -1410,32 +1539,40 @@ export default function CreateReleasePage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {paginatedFiles.map((f) => {
-                          const id = f.id || `${f.file_path}@version:${f.version}`;
-                          return (
-                            <TableRow key={id}>
-                              <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                              <TableCell className="text-muted-foreground">{f.tag}</TableCell>
-                              <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                              <TableCell>
-                                <Select
-                                  value={filePriority[id] || "important"}
-                                  onValueChange={(val: "important" | "lazy") => {
-                                    setFilePriority((prev) => ({ ...prev, [id]: val }));
-                                  }}
-                                >
-                                  <SelectTrigger className="w-36">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="important">Important</SelectItem>
-                                    <SelectItem value="lazy">Lazy</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                        {files.length > 0 ? (
+                          paginatedFiles.map((f) => {
+                            const id = f.id || `${f.file_path}@version:${f.version}`;
+                            return (
+                              <TableRow key={id}>
+                                <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
+                                <TableCell className="text-muted-foreground">{f.tag}</TableCell>
+                                <TableCell className="text-muted-foreground">{f.version}</TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={filePriority[id] || "important"}
+                                    onValueChange={(val: "important" | "lazy") => {
+                                      setFilePriority((prev) => ({ ...prev, [id]: val }));
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-36">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="important">Important</SelectItem>
+                                      <SelectItem value="lazy">Lazy</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        ) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground py-4">
+                              No files available.
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
 
@@ -1486,15 +1623,47 @@ export default function CreateReleasePage() {
                 <CardDescription>Choose additional files to include as resources in this release</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search resources..."
-                      value={resourceSearch}
-                      onChange={(e) => handleResourceSearchChange(e.target.value)}
-                      className="pl-10"
-                    />
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-medium">Bulk Actions</p>
+                    <p className="text-xs text-muted-foreground">
+                      &quot;Select All&quot; selects the latest versions or resources matching the current tag/search,
+                      respecting manual selections. &quot;Deselect All&quot; clears all selections.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllResources}
+                      disabled={
+                        allResources.length === 0 || packageFilePaths.size + selectedResources.size === resourceTotal
+                      }
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={deselectAllResources}
+                      disabled={selectedResources.size === 0}
+                    >
+                      Deselect All
+                    </Button>
+                  </div>
+                </div>
+                <div className="my-4 space-y-3 ">
+                  <div className="flex gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search resources..."
+                        value={resourceSearch}
+                        onChange={(e) => handleResourceSearchChange(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1502,7 +1671,7 @@ export default function CreateReleasePage() {
                   <div className="text-red-600">Failed to load resources</div>
                 ) : resourceLoading ? (
                   <div>Loading resources...</div>
-                ) : availableResources.length === 0 ? (
+                ) : allResources.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="mx-auto h-8 w-8 mb-2" />
                     <p className="text-sm">
@@ -1512,48 +1681,18 @@ export default function CreateReleasePage() {
                 ) : (
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground">
-                      Showing {Math.min(perPage, availableResources.length)} available of {resourceTotal} files (Package
-                      files and index file are excluded)
+                      Showing {Math.min(perPage, allResources.length)} available of {resourceTotal} files (Package files
+                      and index file are excluded)
                       {resourceCurrentPage > 1 && ` (page ${resourceCurrentPage})`}
                     </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[50px]"></TableHead>
-                          <TableHead>File Path</TableHead>
-                          <TableHead>Tag</TableHead>
-                          <TableHead>Created</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {availableResources.map((resource) => {
-                          const isSelected = selectedResources.has(resource.id);
-                          return (
-                            <TableRow key={resource.id}>
-                              <TableCell>
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={(checked) => {
-                                    const newSelected = new Set(selectedResources);
-                                    if (checked) {
-                                      newSelected.add(resource.id);
-                                    } else {
-                                      newSelected.delete(resource.id);
-                                    }
-                                    setSelectedResources(newSelected);
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="font-mono text-sm">{resource.file_path}</TableCell>
-                              <TableCell className="text-muted-foreground">{resource.tag}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {resource.created_at ? new Date(resource.created_at).toLocaleDateString() : "—"}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                    <FileTable
+                      files={allResources}
+                      isLoading={resourceLoading}
+                      onSelect={onSelectResources}
+                      isFileIdSelected={isFileIdSelected}
+                      isFilePathSelected={isFilePathSelected}
+                      disabled={isDisabled}
+                    />
 
                     {/* Resources Pagination */}
                     {resourceTotalPages > 1 && (
@@ -1615,7 +1754,13 @@ export default function CreateReleasePage() {
             </Link>
           </Button>
           {currentStep > 1 && (
-            <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCurrentStep((s) => s - 1);
+                setSelectedResources(new Map());
+              }}
+            >
               Previous
             </Button>
           )}
