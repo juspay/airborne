@@ -600,15 +600,15 @@ smithy-build:
 
 smithy-clean-build: smithy-clean smithy-build
 
-smithy-clients: smithy-build
+smithy-clients: smithy-clean-build
 	rm -rf airborne_server_clients/javascript/sdk
 	mkdir -p airborne_server_clients/javascript/sdk
 	rm -rf airborne_server_clients/model
 	mkdir -p airborne_server_clients/model
 # 	git restore airborne_server_clients/javascript/sdk/README.md
-	git restore airborne_server_clients/javascript/sdk/LICENSE
 	cp -r $(SMITHY_BUILD_SRC)/typescript-client-codegen/*\
 				airborne_server_clients/javascript/sdk
+	git restore airborne_server_clients/javascript/sdk/LICENSE
 	cp -f $(SMITHY_BUILD_SRC)/model/*\
 				airborne_server_clients/model
 
