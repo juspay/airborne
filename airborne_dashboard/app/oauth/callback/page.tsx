@@ -32,7 +32,20 @@ export default function OAuthCallback() {
         console.log("token exchange", oauthAction, res);
         setToken(res.user_token?.access_token || "");
         setUser({ user_id: res.user_id, name: res.username, is_super_admin: res.is_super_admin }); // OAuth users will get name from API response
-        window.location.replace("/dashboard");
+
+        // Check if we have invite-related redirect parameters stored
+        const storedRedirectTo = localStorage.getItem("oauthRedirectTo");
+
+        // Clean up stored parameters
+        localStorage.removeItem("oauthRedirectTo");
+        localStorage.removeItem("oauthInviteToken");
+
+        // Redirect to invitation page if we came from an invitation, otherwise dashboard
+        if (storedRedirectTo) {
+          window.location.replace(storedRedirectTo);
+        } else {
+          window.location.replace("/dashboard");
+        }
       } catch (e: any) {
         console.log("Google Callback Error", e);
         // Error toast will be shown automatically by apiFetch
