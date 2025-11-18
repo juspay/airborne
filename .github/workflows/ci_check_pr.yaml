@@ -76,6 +76,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check node dependencies
+        run: |
+          npm i
+
       - name: Install dependencies
         run: |
           cd airborne_dashboard && npm install prettier
