@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.10.0 - 2025-11-18
+#### Bug Fixes
+- error type in Org->App->User and added custom Result type - (990ba7c) - yuvrajjsingh0
+#### Build system
+- **(deps)** bump prismjs and react-syntax-highlighter - (582035e) - dependabot[bot]
+- **(deps)** bump vite in /airborne_server/docs_react - (fff3ad2) - dependabot[bot]
+#### Features
+- add pagination to list packages and releases - (760909b) - Yash Rajput
+
+- - -
+
 ## airborne_server-v0.9.0 - 2025-11-05
 #### Features
 - add super admin role support and ownership transfer in organisations - (401252d) - Yash Rajput

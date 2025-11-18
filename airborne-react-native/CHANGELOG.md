@@ -2,6 +2,89 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.1.2 - 2025-11-18
+#### Bug Fixes
+- Node dependencies - (401031c) - ayush.jain@juspay.in
+#### Build system
+- **(deps)** bump rexml in /airborne-react-native/ExampleSplitBundle - (748e886) - dependabot[bot]
+- **(deps)** bump @react-native-community/cli and react-native - (23795b2) - dependabot[bot]
+- **(deps-dev)** bump @react-native-community/cli - (fb77fec) - dependabot[bot]
+- **(deps-dev)** bump @react-native-community/cli - (0b4253f) - dependabot[bot]
+
+- - -
+
+## v0.14.1 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.14.1 [skip ci] - (bdcba5f) - Airborne Bot
+
+- - -
+
+## v0.14.0 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.14.0 [skip ci] - (f336a22) - Airborne Bot
+
+- - -
+
+## v0.13.6 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.6 [skip ci] - (0038bbd) - Airborne Bot
+
+- - -
+
+## v0.13.5 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.5 [skip ci] - (3f20b3d) - Airborne Bot
+
+- - -
+
+## v0.13.4 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.4 [skip ci] - (a0cb64d) - Airborne Bot
+
+- - -
+
+## v0.13.3 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.3 [skip ci] - (8877854) - Airborne Bot
+
+- - -
+
+## v0.13.2 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.2 [skip ci] - (934d450) - Airborne Bot
+
+- - -
+
+## v0.13.1 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.1 [skip ci] - (5cd3d70) - Airborne Bot
+
+- - -
+
+## v0.13.0 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.13.0 [skip ci] - (bdbd374) - Airborne Bot
+
+- - -
+
+## v0.12.0 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.12.0 [skip ci] - (c3041a8) - Airborne Bot
+
+- - -
+
+## v0.11.1 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.11.1 [skip ci] - (210c3f8) - Airborne Bot
+
+- - -
+
+## v0.11.0 - 2025-11-18
+#### Miscellaneous Chores
+- **(version)** v0.11.0 [skip ci] - (984bb54) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.1.1 - 2025-10-17
 #### Bug Fixes
 - fix release pipeline - (9e0d102) - george.james

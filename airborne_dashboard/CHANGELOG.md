@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.10.0 - 2025-11-18
+#### Features
+- add pagination to list packages and releases - (760909b) - Yash Rajput
+
+- - -
+
 ## airborne_dashboard-v0.9.1 - 2025-11-06
 #### Bug Fixes
 - add pagination to file priorities in release creation and updation - (92aecac) - Yash Rajput

@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.15.0 - 2025-11-18
+### Package updates
+- smithy bumped to smithy-v0.2.0
+- airborne_core_cli bumped to airborne_core_cli-v0.2.0
+- airborne_server bumped to airborne_server-v0.10.0
+- airborne_server_clients bumped to airborne_server_clients-v0.2.0
+- airborne_react_native bumped to airborne_react_native-v0.1.2
+- airborne_dashboard bumped to airborne_dashboard-v0.10.0
+### Global changes
+#### Bug Fixes
+- Node dependencies - (401031c) - ayush.jain@juspay.in
+#### Build system
+- **(deps-dev)** bump @react-native-community/cli - (0b4253f) - dependabot[bot]
+#### Features
+- add pagination to list packages and releases - (760909b) - Yash Rajput
+
+- - -
+
 ## v0.14.1 - 1970-01-01
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.9.1
