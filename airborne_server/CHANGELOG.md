@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.10.1 - 2025-11-19
+#### Bug Fixes
+- docs react package.json - (5f3e96d) - ayush.jain@juspay.in
+
+- - -
+
 ## airborne_server-v0.10.0 - 2025-11-18
 #### Bug Fixes
 - error type in Org->App->User and added custom Result type - (990ba7c) - yuvrajjsingh0

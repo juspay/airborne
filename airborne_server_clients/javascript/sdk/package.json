@@ -1,7 +1,7 @@
 {
     "name": "airborne-server-sdk",
     "description": "airborne-server-sdk client",
-    "version": "0.15.0",
+    "version": "0.15.1",
     "scripts": {
         "build": "npm run build:types && npm run build:cjs && npm run build:es",
         "build:cjs": "tsc -p tsconfig.cjs.json",
