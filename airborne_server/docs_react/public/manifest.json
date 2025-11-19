@@ -1,22 +1,46 @@
 {
   "CLI": {
-    "files": ["airborne-config.json Format", "content.json", "doc.md"]
+    "files": [
+      "airborne-config.json Format",
+      "content.json",
+      "doc.md"
+    ]
   },
   "Introduction": {
     "Happy Case": {
-      "files": ["Case1.png", "content.json", "doc.md"]
+      "files": [
+        "Case1.png",
+        "content.json",
+        "doc.md"
+      ]
     },
     "Package Timeout Case": {
-      "files": ["Case2.png", "content.json", "doc.md"]
+      "files": [
+        "Case2.png",
+        "content.json",
+        "doc.md"
+      ]
     },
     "Resource Timeout Case": {
-      "files": ["Case3.png", "content.json", "doc.md"]
+      "files": [
+        "Case3.png",
+        "content.json",
+        "doc.md"
+      ]
     },
-    "files": ["code.ts", "content.json", "doc.md"]
+    "files": [
+      "code.ts",
+      "content.json",
+      "doc.md"
+    ]
   },
   "SDKs": {
     "Events": {
-      "files": ["content.json", "doc.md", "events.ts"]
+      "files": [
+        "content.json",
+        "doc.md",
+        "events.ts"
+      ]
     },
     "React Plugin": {
       "Android SDK": {
@@ -28,13 +52,25 @@
           "doc.md",
           "getDimensions.kt",
           "getNamespace.kt",
-          "startApp.kt",
-          "onEvent.kt"
+          "onEvent.kt",
+          "startApp.kt"
         ]
       },
-      "files": ["Getting the SDK", "code.kt", "content.json", "doc.md", "order.json"],
+      "files": [
+        "Getting the SDK",
+        "code.kt",
+        "content.json",
+        "doc.md",
+        "order.json"
+      ],
       "JS SDK": {
-        "files": ["content.json", "doc.md", "getBundlePath.js", "getFileContent.js", "readReleaseConfig.js"]
+        "files": [
+          "content.json",
+          "doc.md",
+          "getBundlePath.js",
+          "getFileContent.js",
+          "readReleaseConfig.js"
+        ]
       },
       "iOS SDK": {
         "files": [
@@ -45,14 +81,22 @@
           "content.json",
           "delegate.h",
           "doc.md",
+          "getBundle",
           "getDimensions",
           "getNamespace",
-          "startApp",
+          "onBootComplete",
           "onEvent"
         ]
       }
     },
-    "files": ["SDK Integration.png", "content.json", "doc.md", "order.json"]
+    "files": [
+      "SDK Integration.png",
+      "content.json",
+      "doc.md",
+      "order.json"
+    ]
   },
-  "files": ["order.json"]
+  "files": [
+    "order.json"
+  ]
 }
