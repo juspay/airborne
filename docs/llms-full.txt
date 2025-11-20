@@ -57,6 +57,35 @@ Airborne is an open-source Over-The-Air (OTA) update platform that enables devel
 
 ### 2.1 Prerequisites
 
+**Recommended: Check for Nix first**
+```bash
+which nix
+```
+
+If Nix is installed, **use it** - it provides all dependencies automatically in an isolated environment.
+
+**Option 1: Using Nix (⭐ Preferred)**
+```bash
+# Enter Nix development environment
+nix develop
+```
+
+This automatically provides:
+- Rust toolchain, cargo-watch
+- diesel-cli (database migrations)
+- Node.js 22+
+- Docker/Podman Compose
+- PostgreSQL client tools
+- jq, yq, curl, AWS CLI
+- All system libraries
+
+**Install Nix (if not present):**
+```bash
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
+
+**Option 2: Manual Installation (Without Nix)**
+
 **Required:**
 - Docker or Podman with compose support
 - Git
@@ -78,22 +107,44 @@ git clone https://github.com/juspay/airborne.git
 cd airborne
 ```
 
-#### Step 2: Start Everything
+#### Step 2: Check for Nix (Recommended)
+```bash
+which nix
+```
+
+**If Nix is available:**
+```bash
+nix develop  # Provides all dependencies automatically
+# Skip to Step 4
+```
+
+**If Nix is not available**, continue with Step 3.
+
+#### Step 3: Initial Setup (Without Nix)
+```bash
+make setup
+```
+
+This command:
+1. Creates .env file from .env.example
+2. Installs all required dependencies
+3. Sets up the development environment
+
+#### Step 3: Start Everything
 ```bash
 make run
 ```
 
 This command:
-1. Creates .env file from .env.example
-2. Starts PostgreSQL (port 5433)
-3. Starts Keycloak (port 8180)
-4. Starts LocalStack/S3 (port 4566)
-5. Starts Superposition (port 8080)
-6. Runs database migrations
-7. Starts Airborne server (port 8081) with hot-reload
-8. Starts dashboard development server
+1. Starts PostgreSQL (port 5433)
+2. Starts Keycloak (port 8180)
+3. Starts LocalStack/S3 (port 4566)
+4. Starts Superposition (port 8080)
+5. Runs database migrations
+6. Starts Airborne server (port 8081) with hot-reload
+7. Starts dashboard development server
 
-#### Step 3: Access Services
+#### Step 4: Access Services
 - Airborne API: http://localhost:8081
 - Keycloak: http://localhost:8180 (admin/admin)
 - Superposition: http://localhost:8080
@@ -847,6 +898,15 @@ airborne-core-cli ServeReleaseV2 \
 #### Step 1: Setup Server
 ```bash
 cd airborne
+
+# Check if you have Nix (recommended)
+which nix
+
+# If Nix is available
+nix develop  # Then run make run
+
+# If Nix is not available
+make setup  # First time only
 make run
 ```
 **Wait for:** All services to start (Airborne API, Keycloak, PostgreSQL, LocalStack)
@@ -1113,6 +1173,28 @@ jobs:
 
 ### 6.1 Server Issues
 
+#### Dependency or Build Issues
+
+**Best Solution: Use Nix**
+```bash
+# Check if Nix is available
+which nix
+
+# If installed, use it
+nix develop
+make run
+```
+
+Nix automatically provides all correct versions of dependencies and system libraries, eliminating most build issues.
+
+**Without Nix:**
+```bash
+# Ensure all dependencies are installed
+make setup
+
+# Check Prerequisites section for your OS
+```
+
 #### Services Not Starting
 ```bash
 # Check Docker/Podman is running
@@ -1338,6 +1420,9 @@ func getBaseBundle() -> Bundle
 
 ### Server
 ```bash
+which nix             # Check if Nix is available (recommended)
+nix develop           # Use Nix for automatic dependency management
+make setup            # Initial setup (first time only, without Nix)
 make run              # Start everything
 make stop             # Stop all services
 make status           # Check status

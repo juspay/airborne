@@ -13,16 +13,39 @@ This guide covers setting up the Airborne Server locally for development using t
 
 ## Prerequisites
 
-### Option 1: Using Nix (Recommended)
+### O**6. Database Migration Errors**
 
-**Nix with Flakes** provides all dependencies automatically:
+```bash
+# Reset database
+make cleanup
+make db
+make db-migration
+```
+
+**7. Build Errors**sing Nix (⭐ Highly Recommended)
+
+**Check if Nix is installed:**
+
+```bash
+which nix
+# If installed, you'll see: /nix/store/...nix or /usr/bin/nix
+```
+
+**Install Nix (if not present):**
+
+```bash
+# macOS/Linux - Install Nix with Flakes support
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
+
+**Using Nix for Development:**
 
 ```bash
 # From the project root
 nix develop
 ```
 
-This provides:
+This automatically provides all dependencies in an isolated environment:
 - Rust toolchain (cargo, rustc)
 - cargo-watch (hot-reloading)
 - diesel-cli (database migrations)
@@ -80,7 +103,41 @@ git clone <repository-url>
 cd airborne
 ```
 
-### 2. Start the Server
+### 2. Choose Your Development Environment
+
+**Check if you have Nix installed (recommended):**
+
+```bash
+which nix
+```
+
+If Nix is available, use it for the best development experience:
+
+```bash
+nix develop
+```
+
+This provides all dependencies automatically in an isolated environment. **Skip to step 4** if using Nix.
+
+**If Nix is not installed**, proceed with the standard setup below.
+
+### 3. Initial Setup (First Time Only - Without Nix)
+
+Before starting the server for the first time, run the setup command to prepare all dependencies:
+
+```bash
+make setup
+```
+
+This prepares your environment:
+- Creates the `.env` file from `.env.example`
+- Starts database services
+- Starts Keycloak with its database
+- Starts LocalStack
+- Starts Superposition
+- Installs Node.js dependencies
+
+### 4. Start the Server
 
 **Development Mode (with hot-reloading):**
 
@@ -88,15 +145,18 @@ cd airborne
 make run
 ```
 
-This single command:
-- Creates the `.env` file from `.env.example` if it doesn't exist
-- Starts all required services (PostgreSQL, Keycloak, LocalStack, Superposition)
-- Initializes all services with required configurations
+This command:
+- Ensures all required services are running (PostgreSQL, Keycloak, LocalStack, Superposition)
+- Initializes services with required configurations
 - Runs database migrations
 - Starts the Airborne server with hot-reloading
 - Starts the dashboard and docs development servers
 
-### 3. Access the Services
+**Note:** 
+- If using Nix: Run `nix develop` once per terminal session, then use `make run`
+- Without Nix: After the initial `make setup`, you can simply use `make run` for subsequent starts
+
+### 5. Access the Services
 
 Once running, you can access:
 
@@ -326,7 +386,31 @@ make cleanup
 make run
 ```
 
-**4. Docker/Podman Issues**
+**4. Dependency Issues / Build Failures**
+
+**Try using Nix first (recommended):**
+```bash
+# Check if Nix is available
+which nix
+
+# If available, use it
+nix develop
+
+# Then try building
+make run
+```
+
+Nix automatically handles all system dependencies and library versions, avoiding common build issues.
+
+**Without Nix:**
+```bash
+# Make sure all dependencies are installed
+make setup
+
+# For specific dependency issues, check Prerequisites section
+```
+
+**5. Docker/Podman Issues**
 
 ```bash
 # Check Docker daemon is running
@@ -338,7 +422,7 @@ podman ps
 # Restart Docker/Podman service
 ```
 
-**5. Database Migration Errors**
+**6. Database Migration Errors**
 
 ```bash
 # Reset database
