@@ -1,6 +1,8 @@
 # Airborne CLI - React Native Tool
 
-The Airborne CLI is a command-line tool specifically designed for React Native developers to manage Over-The-Air (OTA) updates. It provides a user-friendly interface for creating, configuring, and deploying updates to your React Native applications.
+The Airborne CLI (npm package: `airborne-devkit`) is a command-line tool specifically designed for React Native developers to manage Over-The-Air (OTA) updates. It wraps around [Airborne Core CLI](./airborne_core_cli.md) to provide all its commands plus React Native-specific workflows with automatic token management.
+
+**Note**: This CLI **only works with React Native applications**. For non-React Native applications, use [Airborne Core CLI](./airborne_core_cli.md) directly.
 
 ## Table of Contents
 
@@ -17,15 +19,19 @@ The Airborne CLI is a command-line tool specifically designed for React Native d
 
 The Airborne CLI streamlines the OTA update process for React Native applications by:
 
+- ✅ Wrapping all Airborne Core CLI commands with React Native-specific workflows
 - ✅ Initializing Airborne configuration in React Native projects
 - ✅ Creating platform-specific release configurations (Android/iOS)
 - ✅ Managing file uploads to the Airborne server
 - ✅ Creating deployable packages
 - ✅ Providing interactive prompts for easy configuration
+- ✅ **Automatic token management** - stores and reuses authentication tokens
 
 ### Key Features
 
+- **Wrapper Around Core CLI**: Includes all Airborne Core CLI commands plus React Native workflows
 - **React Native Focused**: Tailored for React Native bundle workflows
+- **Automatic Token Management**: Login once, token is stored and reused automatically
 - **Interactive Mode**: Prompts guide you through configuration
 - **Platform Aware**: Separate handling for Android and iOS
 - **File Management**: Upload bundles and assets directly
@@ -33,23 +39,40 @@ The Airborne CLI streamlines the OTA update process for React Native application
 
 ## Installation
 
+### Method 1: Install from npm
+
+**NPM Package**: `airborne-devkit`
+
+```bash
+# Install globally
+npm install -g airborne-devkit
+
+# Or install locally in your project
+npm install --save-dev airborne-devkit
+
+# Run
+airborne-devkit --help
+```
+
+### Method 2: From Repository
+
 The CLI is located in the `airborne_cli/` directory of the Airborne repository.
 
-### Prerequisites
+**Prerequisites**:
 
 - **Node.js**: 20+ required
 - **npm** or **yarn**
 - React Native project
 - Access to an Airborne server
 
-### Install Dependencies
+**Install Dependencies**:
 
 ```bash
 cd airborne_cli
 npm install
 ```
 
-### Run the CLI
+**Run the CLI**:
 
 ```bash
 # From the airborne_cli directory
@@ -59,7 +82,7 @@ node src/index.js --help
 node /path/to/airborne_cli/src/index.js --help
 ```
 
-### Create an Alias (Optional)
+**Create an Alias (Optional)**:
 
 Add to your shell profile (`~/.zshrc`, `~/.bashrc`, etc.):
 
@@ -68,11 +91,13 @@ alias airborne-cli="node /path/to/airborne_cli/src/index.js"
 ```
 
 Then reload:
+
 ```bash
 source ~/.zshrc
 ```
 
 Usage:
+
 ```bash
 airborne-cli --help
 ```
@@ -112,23 +137,43 @@ node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
 
 This creates `airborne-release-config-android.json` and `airborne-release-config-ios.json`.
 
-### 3. Build Your React Native Bundle
+### 3. Set Base URL
+
+Configure your Airborne server endpoint URL:
 
 ```bash
-# Android
-npx react-native bundle --platform android --dev false \
-  --entry-file index.js \
-  --bundle-output android/app/build/generated/assets/react/release/index.android.bundle \
-  --assets-dest android/app/build/generated/res/react/release
-
-# iOS
-npx react-native bundle --platform ios --dev false \
-  --entry-file index.js \
-  --bundle-output ios/main.jsbundle \
-  --assets-dest ios
+node /path/to/airborne_cli/src/index.js configure --base-url https://your-airborne-server.com
 ```
 
-### 4. Authenticate with Airborne Server
+**Common Base URLs**:
+
+- **Production**: `https://airborne.juspay.in`
+- **Local development**: `http://localhost:8081`
+- **Custom server**: Your Airborne server URL
+
+**Example**:
+
+```bash
+# For production
+node /path/to/airborne_cli/src/index.js configure --base-url https://airborne.juspay.in
+
+# For local development
+node /path/to/airborne_cli/src/index.js configure --base-url http://localhost:8081
+```
+
+This configuration is stored in the `.config` file and will be used for all subsequent remote operations.
+
+### 4. Get Client Credentials
+
+Obtain credentials from the Airborne website:
+
+1. Navigate to [https://airborne.juspay.in](https://airborne.juspay.in)
+2. Create an organization (if you don't have one)
+3. Create an application within your organization
+4. Inside the application, find the option to create a token
+5. Generate the token to get your Client ID and Client Secret
+
+### 5. Authenticate with Airborne Server
 
 ```bash
 node /path/to/airborne_cli/src/index.js login \
@@ -136,7 +181,9 @@ node /path/to/airborne_cli/src/index.js login \
   --client_secret YOUR_CLIENT_SECRET
 ```
 
-### 5. Upload Files and Create Package
+**Note**: The token is automatically stored and reused for subsequent commands. You only need to login once.
+
+### 6. Upload Files and Create Package
 
 ```bash
 # Upload files for Android
@@ -159,6 +206,7 @@ node /path/to/airborne_cli/src/index.js create-remote-package -p ios -t "v1.0.0"
 Initialize Airborne configuration for a React Native project.
 
 **Options**:
+
 - `-o, --organisation <org>` - Organisation name
 - `-n, --namespace <namespace>` - Application namespace/ID
 - `-j, --js-entry-file <path>` - JavaScript entry file (default: `index.js`)
@@ -166,11 +214,13 @@ Initialize Airborne configuration for a React Native project.
 - `-i, --ios-index-file <path>` - iOS bundle output path
 
 **Interactive Mode**:
+
 ```bash
 node /path/to/airborne_cli/src/index.js create-local-airborne-config
 ```
 
 You'll be prompted for:
+
 1. Organisation name
 2. Application namespace
 3. JavaScript entry file path
@@ -178,6 +228,7 @@ You'll be prompted for:
 5. iOS bundle output path
 
 **With Options**:
+
 ```bash
 node /path/to/airborne_cli/src/index.js create-local-airborne-config \
   -o "Acme Corp" \
@@ -188,6 +239,7 @@ node /path/to/airborne_cli/src/index.js create-local-airborne-config \
 ```
 
 **Output**: Creates `airborne-config.json`:
+
 ```json
 {
   "organisation": "Acme Corp",
@@ -209,6 +261,7 @@ node /path/to/airborne_cli/src/index.js create-local-airborne-config \
 Create platform-specific release configuration files.
 
 **Options**:
+
 - `-p, --platform <platform>` - Target platform: `android` or `ios` (required)
 - `-b, --boot-timeout <ms>` - Boot timeout in milliseconds (default: 30000)
 - `-r, --release-timeout <ms>` - Release timeout in milliseconds (default: 60000)
@@ -248,6 +301,7 @@ node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
 Update an existing release configuration file.
 
 **Options**:
+
 - `-p, --platform <platform>` - Target platform: `android` or `ios` (required)
 - `-b, --boot-timeout <ms>` - New boot timeout in milliseconds
 - `-r, --release-timeout <ms>` - New release timeout in milliseconds
@@ -275,7 +329,16 @@ node /path/to/airborne_cli/src/index.js update-local-release-config \
 
 Authenticate with the Airborne server using client credentials.
 
+**Getting Credentials**:
+
+1. Navigate to [https://airborne.juspay.in](https://airborne.juspay.in)
+2. Create an organization (if you don't have one)
+3. Create an application within your organization
+4. Inside the application, find the option to create a token
+5. Generate the token to get your Client ID and Client Secret
+
 **Options**:
+
 - `--client_id <clientId>` - Client ID (required)
 - `--client_secret <clientSecret>` - Client secret (required)
 
@@ -294,10 +357,13 @@ node /path/to/airborne_cli/src/index.js login \
 ```
 
 **Output**:
-- Saves authentication token to `.airborne/` directory in your project
-- Token is used for subsequent remote operations
 
-**Security Note**: 
+- Saves authentication token to `.airborne/` directory in your project
+- **Automatic token reuse**: Token is automatically used for all subsequent remote operations
+- No need to provide token on every command (unlike Airborne Core CLI)
+
+**Security Note**:
+
 - Never commit `.airborne/` to version control
 - Add to `.gitignore`:
   ```gitignore
@@ -313,6 +379,7 @@ node /path/to/airborne_cli/src/index.js login \
 Process local files and create file records on the Airborne server.
 
 **Options**:
+
 - `-p, --platform <platform>` - Target platform: `android` or `ios` (required)
 - `-t, --tag <tag>` - Tag for file identification (optional)
 - `-u, --upload` - Upload files directly to Airborne server (optional)
@@ -332,6 +399,7 @@ node /path/to/airborne_cli/src/index.js create-remote-files -p android --upload 
 ```
 
 **With Tag**:
+
 ```bash
 node /path/to/airborne_cli/src/index.js create-remote-files \
   -p ios \
@@ -340,6 +408,7 @@ node /path/to/airborne_cli/src/index.js create-remote-files \
 ```
 
 **What it does**:
+
 1. Reads `airborne-release-config-<platform>.json`
 2. For each file in the config:
    - If `--upload`: Uploads file to Airborne server
@@ -348,6 +417,7 @@ node /path/to/airborne_cli/src/index.js create-remote-files \
 4. Saves updated config back to disk
 
 **Output**:
+
 ```
 Creating file records for Android...
 ✓ Uploaded index.android.bundle -> file_abc123
@@ -365,6 +435,7 @@ Updated airborne-release-config-android.json with file IDs
 Create a deployable package from local release configuration.
 
 **Options**:
+
 - `-p, --platform <platform>` - Target platform: `android` or `ios` (required)
 - `-t, --tag <tag>` - Package tag for identification (optional)
 
@@ -386,16 +457,19 @@ node /path/to/airborne_cli/src/index.js create-remote-package \
 ```
 
 **Prerequisites**:
+
 - Files must already be created via `create-remote-files`
 - `airborne-release-config-<platform>.json` must contain file IDs
 
 **What it does**:
+
 1. Reads `airborne-release-config-<platform>.json`
 2. Extracts file IDs and index file ID
 3. Creates a package on the Airborne server
 4. Returns package ID and details
 
 **Output**:
+
 ```
 Creating package for Android...
 ✓ Package created successfully
@@ -408,30 +482,6 @@ Index: file_abc123
 ---
 
 ## Configuration
-
-### Project Structure
-
-After running the CLI commands, your React Native project will have:
-
-```
-my-react-native-app/
-├── airborne-config.json                    # Main Airborne configuration
-├── airborne-release-config-android.json    # Android release config
-├── airborne-release-config-ios.json        # iOS release config
-├── .airborne/                              # Authentication tokens (DO NOT COMMIT)
-│   └── token.json
-├── android/
-│   └── app/
-│       └── build/
-│           └── generated/
-│               └── assets/
-│                   └── react/
-│                       └── release/
-│                           └── index.android.bundle
-├── ios/
-│   └── main.jsbundle
-└── package.json
-```
 
 ### Configuration Files
 
@@ -454,13 +504,14 @@ Main configuration file for your Airborne setup:
 ```
 
 **Fields**:
+
 - `organisation`: Your company or organization name
 - `namespace`: Unique identifier for your app (use environment-specific names)
 - `js_entry_file`: Entry point for your React Native app
 - `android.index_file_path`: Path to the Android bundle
 - `ios.index_file_path`: Path to the iOS bundle
 
-#### `airborne-release-config-<platform>.json`
+#### `release_config.json`
 
 Platform-specific release configuration:
 
@@ -485,6 +536,7 @@ Platform-specific release configuration:
 ```
 
 **Fields**:
+
 - `boot_timeout_ms`: Maximum time (ms) for app boot
 - `release_timeout_ms`: Maximum time (ms) for release download
 - `index_file_path`: Relative path to the index bundle
@@ -530,27 +582,19 @@ node /path/to/airborne_cli/src/index.js create-local-airborne-config \
 
 # Create release configs
 node /path/to/airborne_cli/src/index.js create-local-release-config -p android
+OR
 node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
 
 # Add .airborne to .gitignore
 echo ".airborne/" >> .gitignore
+# Configure base url
+node /path/to/airborne_cli/src/index.js configure --base-url https://airborne.juspay.in
 ```
 
 #### Step 2: Build and Deploy
 
 ```bash
-# 1. Build React Native bundles
-npx react-native bundle --platform android --dev false \
-  --entry-file index.js \
-  --bundle-output android/app/build/generated/assets/react/release/index.android.bundle \
-  --assets-dest android/app/build/generated/res/react/release
-
-npx react-native bundle --platform ios --dev false \
-  --entry-file index.js \
-  --bundle-output ios/main.jsbundle \
-  --assets-dest ios
-
-# 2. Login to Airborne
+# 1. Login to Airborne
 node /path/to/airborne_cli/src/index.js login \
   --client_id "$AIRBORNE_CLIENT_ID" \
   --client_secret "$AIRBORNE_CLIENT_SECRET"
@@ -570,39 +614,14 @@ node /path/to/airborne_cli/src/index.js create-remote-package -p ios -t "v1.0.0"
 # 1. Make your code changes
 # ... edit your React Native code ...
 
-# 2. Build new bundles
-npx react-native bundle --platform android --dev false \
-  --entry-file index.js \
-  --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
-
-# 3. Login (if needed)
+# 2. Login (if needed)
 node /path/to/airborne_cli/src/index.js login \
   --client_id "$AIRBORNE_CLIENT_ID" \
   --client_secret "$AIRBORNE_CLIENT_SECRET"
 
-# 4. Upload and deploy
+# 3. Upload and deploy
 node /path/to/airborne_cli/src/index.js create-remote-files -p android --upload -t "v1.0.1-hotfix"
 node /path/to/airborne_cli/src/index.js create-remote-package -p android -t "v1.0.1-hotfix"
-```
-
-### Multi-Environment Workflow
-
-```bash
-# Production
-node /path/to/airborne_cli/src/index.js create-local-airborne-config \
-  -n "myapp-production"
-
-# Staging
-node /path/to/airborne_cli/src/index.js create-local-airborne-config \
-  -n "myapp-staging"
-
-# Use different config files
-cp airborne-config.json airborne-config.production.json
-cp airborne-config.json airborne-config.staging.json
-
-# Edit namespace in each file
-# Then symlink the one you want to use
-ln -sf airborne-config.production.json airborne-config.json
 ```
 
 ## CI/CD Integration
@@ -615,29 +634,22 @@ name: Deploy OTA Update
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   deploy-android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install dependencies
         run: npm install
-      
-      - name: Build Android bundle
-        run: |
-          npx react-native bundle --platform android --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/build/generated/assets/react/release/index.android.bundle \
-            --assets-dest android/app/build/generated/res/react/release
-      
+
       - name: Deploy to Airborne
         env:
           CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
@@ -645,30 +657,31 @@ jobs:
         run: |
           cd airborne_cli
           npm install
+          node src/index.js configure --base-url https://airborne.juspay.in
           node src/index.js login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
           node src/index.js create-remote-files -p android --upload -t "${{ github.ref_name }}"
           node src/index.js create-remote-package -p android -t "${{ github.ref_name }}"
-      
+
   deploy-ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install dependencies
         run: npm install
-      
+
       - name: Build iOS bundle
         run: |
           npx react-native bundle --platform ios --dev false \
             --entry-file index.js \
             --bundle-output ios/main.jsbundle \
             --assets-dest ios
-      
+
       - name: Deploy to Airborne
         env:
           CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
@@ -676,6 +689,7 @@ jobs:
         run: |
           cd airborne_cli
           npm install
+          node src/index.js configure --base-url https://airborne.juspay.in
           node src/index.js login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
           node src/index.js create-remote-files -p ios --upload -t "${{ github.ref_name }}"
           node src/index.js create-remote-package -p ios -t "${{ github.ref_name }}"
@@ -694,8 +708,8 @@ build:android:
   script:
     - npm install
     - npx react-native bundle --platform android --dev false
-        --entry-file index.js
-        --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
+      --entry-file index.js
+      --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
   artifacts:
     paths:
       - android/app/build/generated/assets/react/release/
@@ -710,66 +724,13 @@ deploy:android:
     - tags
   script:
     - cd airborne_cli && npm install
+    - node src/index.js configure --base-url https://airborne.juspay.in
     - node src/index.js login --client_id "$AIRBORNE_CLIENT_ID" --client_secret "$AIRBORNE_CLIENT_SECRET"
     - node src/index.js create-remote-files -p android --upload -t "$CI_COMMIT_TAG"
     - node src/index.js create-remote-package -p android -t "$CI_COMMIT_TAG"
   variables:
     AIRBORNE_CLIENT_ID: $AIRBORNE_CLIENT_ID
     AIRBORNE_CLIENT_SECRET: $AIRBORNE_CLIENT_SECRET
-```
-
-### Shell Script for Local Deployment
-
-```bash
-#!/bin/bash
-# deploy-ota.sh
-
-set -e
-
-PLATFORM=${1:-android}
-VERSION=${2:-$(git describe --tags --abbrev=0)}
-
-echo "Building $PLATFORM bundle..."
-
-if [ "$PLATFORM" == "android" ]; then
-  npx react-native bundle --platform android --dev false \
-    --entry-file index.js \
-    --bundle-output android/app/build/generated/assets/react/release/index.android.bundle \
-    --assets-dest android/app/build/generated/res/react/release
-elif [ "$PLATFORM" == "ios" ]; then
-  npx react-native bundle --platform ios --dev false \
-    --entry-file index.js \
-    --bundle-output ios/main.jsbundle \
-    --assets-dest ios
-else
-  echo "Invalid platform: $PLATFORM"
-  exit 1
-fi
-
-echo "Deploying to Airborne..."
-
-cd airborne_cli
-npm install
-
-node src/index.js login \
-  --client_id "$AIRBORNE_CLIENT_ID" \
-  --client_secret "$AIRBORNE_CLIENT_SECRET"
-
-node src/index.js create-remote-files -p "$PLATFORM" --upload -t "$VERSION"
-node src/index.js create-remote-package -p "$PLATFORM" -t "$VERSION"
-
-echo "✓ Deployment complete: $PLATFORM $VERSION"
-```
-
-Usage:
-```bash
-chmod +x deploy-ota.sh
-
-# Deploy Android
-./deploy-ota.sh android v1.2.0
-
-# Deploy iOS
-./deploy-ota.sh ios v1.2.0
 ```
 
 ## Troubleshooting
@@ -781,6 +742,7 @@ chmod +x deploy-ota.sh
 **Error**: `Airborne config already exists at ...`
 
 **Solution**:
+
 - Use `update-local-release-config` to modify existing configs
 - Or delete the existing config and recreate:
   ```bash
@@ -793,6 +755,7 @@ chmod +x deploy-ota.sh
 **Error**: `Authentication failed` or `401 Unauthorized`
 
 **Solution**:
+
 ```bash
 # Verify credentials are correct
 echo $AIRBORNE_CLIENT_ID
@@ -812,6 +775,7 @@ ls -la .airborne/
 **Error**: `File not found: index.android.bundle`
 
 **Solution**:
+
 - Ensure you've built the bundle before uploading
 - Check the path in `airborne-config.json` matches the actual file location
 - Run the build command:
@@ -826,6 +790,7 @@ ls -la .airborne/
 **Error**: `Platform must be 'android' or 'ios'`
 
 **Solution**:
+
 - Ensure platform is lowercase: `-p android` not `-p Android`
 - Use exact strings: `android` or `ios`
 
@@ -834,6 +799,7 @@ ls -la .airborne/
 **Error**: `Cannot find module 'airborne-core-cli'`
 
 **Solution**:
+
 ```bash
 cd airborne_cli
 npm install
@@ -844,6 +810,7 @@ npm install
 **Error**: `ECONNREFUSED` or `Network error`
 
 **Solution**:
+
 - Check server URL is correct
 - Verify server is running and accessible
 - Test with curl:
@@ -875,7 +842,7 @@ node /path/to/airborne_cli/src/index.js create-remote-files --help
 ## Best Practices
 
 1. **Version Control**:
-   - Commit `airborne-config.json` and `airborne-release-config-*.json`
+   - Commit `airborne-config.json` and `release_config.json`
    - Do NOT commit `.airborne/` directory
    - Add to `.gitignore`:
      ```gitignore
@@ -905,6 +872,4 @@ node /path/to/airborne_cli/src/index.js create-remote-files --help
 ## Next Steps
 
 - [Set up Airborne Server](../airborne_server/Setup.md)
-- [Integrate SDKs](../airborne_sdk/README.md)
-- [Use Airborne Core CLI](./airborne_core_cli.md) for advanced operations
 - [Read API Documentation](../airborne_server/API.md)

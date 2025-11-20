@@ -5,44 +5,62 @@ Welcome to the Airborne CLI tools documentation. Airborne provides two CLI tools
 ## CLI Tools Overview
 
 ### [Airborne CLI](./airborne_cli.md)
-**React Native focused CLI** for managing OTA updates in React Native applications.
+
+**React Native specific CLI** (npm package: `airborne-devkit`) - a wrapper around Airborne Core CLI that orchestrates commands specifically for React Native applications. **Note: This CLI only works with React Native applications.**
 
 **Key Features**:
+
+- Wraps all Airborne Core CLI commands with React Native-specific workflows
 - Initialize Airborne configuration for React Native projects
 - Create release configurations for Android and iOS
 - Upload files and create packages
 - Manage local and remote configurations
 - Interactive prompts for easy setup
+- **Token management**: Automatically stores and reuses authentication tokens (no need to provide token on every command)
 
 **Best For**: React Native developers deploying OTA updates
 
+**NPM Package**: `airborne-devkit`
+
 ### [Airborne Core CLI](./airborne_core_cli.md)
-**Low-level CLI** for direct interaction with the Airborne server API.
+
+**Low-level CLI** (npm package: `airborne-core-cli`) for direct interaction with the Airborne server API.
 
 **Key Features**:
+
 - Comprehensive server API access
 - Organization and application management
 - File and package operations
 - Release management
 - Dimension-based configuration
 - Serve releases locally for testing
+- **Token handling**: Login command prints the token output instead of storing it - requires manual token management
 
-**Best For**: Server administrators, CI/CD pipelines, advanced users
+**Best For**: Advanced use cases where you need direct API control, or as a base that Airborne CLI wraps around
+
+**NPM Package**: `airborne-core-cli`
+
+**Note**: Since Airborne CLI wraps all Airborne Core CLI commands and adds automatic token management, most users (including server administrators and DevOps teams) should prefer using Airborne CLI for non-React Native applications as well.
 
 ## Quick Comparison
 
-| Feature | Airborne CLI | Airborne Core CLI |
-|---------|--------------|-------------------|
-| **Target Users** | React Native developers | Server admins, DevOps |
-| **Complexity** | User-friendly, interactive | Powerful, scriptable |
-| **Focus** | React Native workflows | Server API operations |
-| **Authentication** | Client credentials | Client credentials |
-| **Configuration** | React Native projects | Any application |
-| **File Handling** | Bundle-focused | Generic file management |
-| **Release Management** | Simplified | Full control |
-| **Organization Management** | No | Yes |
-| **Dimension Management** | No | Yes |
-| **Local Testing** | No | Yes (serve releases) |
+| Feature                     | Airborne CLI (`airborne-devkit`)        | Airborne Core CLI (`airborne-core-cli`)            |
+| --------------------------- | --------------------------------------- | -------------------------------------------------- |
+| **NPM Package**             | `airborne-devkit`                       | `airborne-core-cli`                                |
+| **Relationship**            | Wrapper around Airborne Core CLI        | Standalone low-level CLI                           |
+| **Commands**                | All Core CLI commands + RN workflows    | Base commands only                                 |
+| **Target Users**            | Most users (RN & non-RN)                | Advanced users needing direct API control          |
+| **Application Support**     | React Native only                       | Any application                                    |
+| **Complexity**              | User-friendly, interactive              | Powerful, scriptable                               |
+| **Focus**                   | React Native workflows                  | Server API operations                              |
+| **Token Management**        | Automatic (stores & reuses)             | Manual (login prints token, not stored)            |
+| **Configuration**           | React Native projects                   | Any application                                    |
+| **File Handling**           | Bundle-focused                          | Generic file management                            |
+| **Release Management**      | Simplified                              | Full control                                       |
+| **Organization Management** | Yes (via wrapped commands)              | Yes                                                |
+| **Dimension Management**    | Yes (via wrapped commands)              | Yes                                                |
+| **Local Testing**           | Yes (via wrapped commands)              | Yes (serve releases)                               |
+| **Recommended For**         | ✅ Most use cases                       | Advanced scenarios requiring manual token handling |
 
 ## Getting Started
 
@@ -92,7 +110,17 @@ airborne-core-cli create-package --config ./package-config.json
 
 ### Airborne CLI (React Native)
 
-Located in the repository at `airborne_cli/`:
+**NPM Package**: `airborne-devkit`
+
+```bash
+# Install from npm
+npm install -g airborne-devkit
+
+# Or install locally in your project
+npm install --save-dev airborne-devkit
+```
+
+**From Repository** (located at `airborne_cli/`):
 
 ```bash
 cd airborne_cli
@@ -104,7 +132,17 @@ node src/index.js --help
 
 ### Airborne Core CLI
 
-Located in the repository at `airborne-core-cli/`:
+**NPM Package**: `airborne-core-cli`
+
+```bash
+# Install from npm
+npm install -g airborne-core-cli
+
+# Or install locally in your project
+npm install --save-dev airborne-core-cli
+```
+
+**From Repository** (located at `airborne-core-cli/`):
 
 ```bash
 cd airborne-core-cli
@@ -115,23 +153,6 @@ npm link
 
 # Run commands
 airborne-core-cli --help
-```
-
-Or use the standalone binary (no Node.js required):
-
-```bash
-# Download from releases
-# Linux
-wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-linux-x64
-
-# macOS
-wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-macos-x64
-
-# Make executable
-chmod +x airborne-core-cli-*
-
-# Run
-./airborne-core-cli-linux-x64 --help
 ```
 
 ## Common Workflows
@@ -193,21 +214,22 @@ airborne-core-cli serve-release-v2 --namespace myapp --platform android \
 
 ## Authentication
 
-Both CLIs use the same authentication mechanism:
+Both CLIs use client credentials for authentication, but handle tokens differently:
 
-### Client Credentials
+### Getting Client Credentials
 
-Obtain from your Airborne server administrator or Keycloak:
+Obtain client credentials from the Airborne website:
 
-1. Navigate to Keycloak admin console
-2. Select your realm
-3. Go to Clients
-4. Create or select a client
-5. Get Client ID and Client Secret
+1. Navigate to [https://airborne.juspay.in](https://airborne.juspay.in)
+2. Create an organization (if you don't have one)
+3. Create an application within your organization
+4. Inside the application, you will find an option to create a token
+5. Generate the token to get your Client ID and Client Secret
 
 ### Login Command
 
-**Airborne CLI**:
+**Airborne CLI** (`airborne-devkit`):
+
 ```bash
 node airborne_cli/src/index.js login \
   --client_id your_client_id \
@@ -215,20 +237,28 @@ node airborne_cli/src/index.js login \
 ```
 
 **Airborne Core CLI**:
+
 ```bash
 airborne-core-cli login \
   --client-id your_client_id \
   --client-secret your_client_secret
 ```
 
-### Token Storage
+### Token Management - Key Difference
 
-Both CLIs store authentication tokens locally:
+**Airborne CLI (`airborne-devkit`)**:
+- **Automatic token management**: Stores authentication tokens locally and reuses them
+- You only need to login once, subsequent commands automatically use the stored token
+- Token stored in `.airborne/` directory in your project
+- No need to provide token on every command
 
-- **Airborne CLI**: `.airborne/` directory in your project
-- **Airborne Core CLI**: `.config` file in CLI installation directory
+**Airborne Core CLI**:
+- **Manual token handling**: Login command prints the token to console instead of storing it
+- Does NOT store tokens automatically
+- You must manually copy and provide the token on every command
+- Suitable only for advanced scenarios where manual token control is required
 
-**Security Note**: Never commit these files to version control. Add to `.gitignore`:
+**Security Note**: Never commit token files to version control. Add to `.gitignore`:
 
 ```gitignore
 .airborne/
@@ -260,29 +290,29 @@ name: Deploy OTA Update
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
-      
+          node-version: "20"
+
       - name: Install dependencies
         run: npm install
-      
+
       - name: Build React Native bundle
         run: |
           npx react-native bundle --platform android --dev false \
             --entry-file index.js \
             --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
-      
+
       - name: Deploy to Airborne
         env:
           CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
@@ -306,8 +336,8 @@ deploy-ota:
   script:
     - npm install
     - npx react-native bundle --platform android --dev false
-        --entry-file index.js
-        --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
+      --entry-file index.js
+      --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
     - cd airborne_cli && npm install
     - node src/index.js login --client_id "$AIRBORNE_CLIENT_ID" --client_secret "$AIRBORNE_CLIENT_SECRET"
     - node src/index.js create-remote-files -p android --upload -t "$CI_COMMIT_TAG"
@@ -326,6 +356,7 @@ deploy-ota:
 **Error**: `401 Unauthorized` or `Invalid credentials`
 
 **Solution**:
+
 - Verify client ID and secret are correct
 - Check if client has proper permissions in Keycloak
 - Ensure server URL is correct
@@ -336,6 +367,7 @@ deploy-ota:
 **Error**: `Failed to upload file` or `Network error`
 
 **Solution**:
+
 - Check network connectivity
 - Verify server is accessible
 - Ensure file paths are correct
@@ -346,6 +378,7 @@ deploy-ota:
 **Error**: `command not found: airborne-core-cli`
 
 **Solution**:
+
 ```bash
 # Install globally
 cd airborne-core-cli
@@ -360,6 +393,7 @@ node /path/to/airborne-core-cli/bin.js --help
 **Error**: `No config file found`
 
 **Solution**:
+
 ```bash
 # For Airborne Core CLI
 airborne-core-cli configure --base-url https://your-server.com
@@ -367,21 +401,6 @@ airborne-core-cli configure --base-url https://your-server.com
 # For Airborne CLI
 cd your-project
 node path/to/airborne_cli/src/index.js create-local-airborne-config
-```
-
-### Debug Mode
-
-Enable verbose logging:
-
-**Airborne CLI**:
-```bash
-export DEBUG=airborne:*
-node airborne_cli/src/index.js <command>
-```
-
-**Airborne Core CLI**:
-```bash
-airborne-core-cli --verbose <command>
 ```
 
 ## Next Steps

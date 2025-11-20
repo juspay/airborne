@@ -48,16 +48,21 @@ Command-line tools for managing OTA updates and server operations.
 
 Comparison and overview of both CLI tools.
 
+**Key Differences**:
+- **Airborne CLI** (`airborne-devkit`): Wraps Airborne Core CLI with automatic token management and React Native workflows
+- **Airborne Core CLI** (`airborne-core-cli`): Low-level tool built from backend SDK with manual token handling
+
 #### Tool-Specific Guides
 
-| Tool | Documentation | Best For |
-|------|--------------|----------|
-| **Airborne CLI** | [User Guide](./airborne_cli/airborne_cli.md) | React Native developers deploying updates |
-| **Airborne Core CLI** | [User Guide](./airborne_cli/airborne_core_cli.md) | Server administrators and DevOps |
+| Tool | NPM Package | Documentation | Best For |
+|------|-------------|--------------|----------|
+| **Airborne CLI** | `airborne-devkit` | [User Guide](./airborne_cli/airborne_cli.md) | Most users - React Native developers and general use |
+| **Airborne Core CLI** | `airborne-core-cli` | [User Guide](./airborne_cli/airborne_core_cli.md) | Advanced scenarios requiring manual token control |
 
 **What you'll learn:**
-- Installation and setup
-- Authentication and configuration
+- Installation from npm or repository
+- Getting credentials from [airborne.juspay.in](https://airborne.juspay.in)
+- Authentication and token management
 - Command reference
 - CI/CD integration
 - Automation scripts
@@ -305,8 +310,9 @@ Airborne is licensed under the [Apache License 2.0](../LICENSE).
 - **GitHub Repository**: [juspay/airborne](https://github.com/juspay/airborne)
 - **Maven Repository** (Android): [maven.juspay.in](https://maven.juspay.in/hyper-sdk/)
 - **npm Packages**:
-  - [airborne-react-native](https://www.npmjs.com/package/airborne-react-native)
-  - [airborne-core-cli](https://www.npmjs.com/package/airborne-core-cli)
+  - SDK: [airborne-react-native](https://www.npmjs.com/package/airborne-react-native)
+  - CLI: [airborne-devkit](https://www.npmjs.com/package/airborne-devkit) (Airborne CLI - React Native wrapper)
+  - CLI: [airborne-core-cli](https://www.npmjs.com/package/airborne-core-cli) (Airborne Core CLI - low-level tool)
 
 ### Related Documentation
 

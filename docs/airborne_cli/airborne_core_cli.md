@@ -1,6 +1,8 @@
 # Airborne Core CLI - Server Administration Tool
 
-The Airborne Core CLI is a powerful command-line tool for direct interaction with the Airborne server API. It provides comprehensive access to all server operations, making it ideal for server administrators, DevOps engineers, and advanced users.
+The Airborne Core CLI (npm package: `airborne-core-cli`) is a low-level command-line tool for direct interaction with the Airborne server API. Built from the backend SDK, it provides comprehensive access to all server operations.
+
+**Note**: Most users should use [Airborne CLI](./airborne_cli.md) (`airborne-devkit`) instead, which wraps all Core CLI commands and adds automatic token management. Airborne Core CLI is recommended only for advanced scenarios requiring manual token control.
 
 ## Table of Contents
 
@@ -28,12 +30,26 @@ The Airborne Core CLI provides low-level access to:
 - **Comprehensive API Access**: Full coverage of Airborne server API
 - **Scriptable**: Perfect for CI/CD pipelines and automation
 - **Flexible Input**: Supports CLI options, JSON files, or mixed approach
-- **Binary Distribution**: Standalone binaries available (no Node.js required)
 - **Local Testing**: Serve releases locally for development
 
 ## Installation
 
-### Method 1: From Source (Requires Node.js 18+)
+### Method 1: Install from npm
+
+**NPM Package**: `airborne-core-cli`
+
+```bash
+# Install globally
+npm install -g airborne-core-cli
+
+# Or install locally in your project
+npm install --save-dev airborne-core-cli
+
+# Run
+airborne-core-cli --help
+```
+
+### Method 2: From Source (Requires Node.js 18+)
 
 ```bash
 cd airborne-core-cli
@@ -46,28 +62,6 @@ npm link
 airborne-core-cli --help
 ```
 
-### Method 2: Standalone Binary
-
-Download pre-built binaries (no Node.js required):
-
-```bash
-# Linux
-wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-linux-x64
-chmod +x airborne-core-cli-linux-x64
-sudo mv airborne-core-cli-linux-x64 /usr/local/bin/airborne-core-cli
-
-# macOS
-wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-macos-x64
-chmod +x airborne-core-cli-macos-x64
-sudo mv airborne-core-cli-macos-x64 /usr/local/bin/airborne-core-cli
-
-# Windows
-# Download airborne-core-cli-win-x64.exe from releases
-
-# Verify installation
-airborne-core-cli --help
-```
-
 ## Quick Start
 
 ### 1. Configure Server Endpoint
@@ -76,7 +70,17 @@ airborne-core-cli --help
 airborne-core-cli configure --base-url https://your-airborne-server.com
 ```
 
-### 2. Login
+### 2. Get Client Credentials
+
+Obtain credentials from the Airborne website:
+
+1. Navigate to [https://airborne.juspay.in](https://airborne.juspay.in)
+2. Create an organization (if you don't have one)
+3. Create an application within your organization
+4. Inside the application, find the option to create a token
+5. Generate the token to get your Client ID and Client Secret
+
+### 3. Login
 
 ```bash
 airborne-core-cli login \
@@ -84,21 +88,23 @@ airborne-core-cli login \
   --client-secret your_client_secret
 ```
 
-### 3. Create Organization
+**Note**: This command prints the token to console. You must manually copy and provide it on every subsequent command.
+
+### 4. Create Organization
 
 ```bash
 airborne-core-cli CreateOrganisation \
   --name "MyCompany" \
-  --token "$(cat ~/.airborne-token)"
+  --token "your_token_from_login"
 ```
 
-### 4. Create Application
+### 5. Create Application
 
 ```bash
 airborne-core-cli CreateApplication \
   --organisation "MyCompany" \
   --application "MyApp" \
-  --token "$(cat ~/.airborne-token)"
+  --token "your_token_from_login"
 ```
 
 ## Commands
@@ -119,7 +125,16 @@ airborne-core-cli configure --base-url https://airborne.example.com
 
 Authenticate with the Airborne server.
 
+**Getting Credentials**:
+
+1. Navigate to [https://airborne.juspay.in](https://airborne.juspay.in)
+2. Create an organization (if you don't have one)
+3. Create an application within your organization
+4. Inside the application, find the option to create a token
+5. Generate the token to get your Client ID and Client Secret
+
 **Options**:
+
 - `--client-id` - Client ID (required)
 - `--client-secret` - Client secret (required)
 
@@ -129,7 +144,7 @@ airborne-core-cli login \
   --client-secret your_client_secret
 ```
 
-**Output**: Stores token in `.config` file
+**Output**: Prints the authentication token to console. Unlike Airborne CLI, this does NOT store the token automatically. You must manually copy and provide the token on every subsequent command.
 
 ---
 
@@ -140,12 +155,14 @@ airborne-core-cli login \
 Create a new organization.
 
 **Parameters**:
+
 - `--name` - Organization name (required)
 - `--token` - Bearer token (required)
 
 **Usage**:
 
 1. **CLI Options**:
+
 ```bash
 airborne-core-cli CreateOrganisation \
   --name "Acme Corp" \
@@ -153,6 +170,7 @@ airborne-core-cli CreateOrganisation \
 ```
 
 2. **JSON File**:
+
 ```bash
 # params.json
 {
@@ -164,6 +182,7 @@ airborne-core-cli CreateOrganisation @params.json
 ```
 
 3. **Mixed**:
+
 ```bash
 airborne-core-cli CreateOrganisation @params.json --name "Different Name"
 ```
@@ -195,6 +214,7 @@ airborne-core-cli RequestOrganisation \
 Create a new application within an organization.
 
 **Parameters**:
+
 - `--application` - Application name (required)
 - `--organisation` - Organization name (required)
 - `--token` - Bearer token (required)
@@ -215,6 +235,7 @@ airborne-core-cli CreateApplication \
 Create a dimension for user segmentation.
 
 **Parameters**:
+
 - `--dimension` - Dimension name (required)
 - `--description` - Description (required)
 - `--dimension_type` - Type: `standard` or `cohort` (required)
@@ -291,6 +312,7 @@ airborne-core-cli DeleteDimension \
 Create a file record on the server.
 
 **Parameters**:
+
 - `--file_path` - Path where file will be stored on SDK (required)
 - `--url` - Download URL for the file (required)
 - `--tag` - Tag for identification (optional)
@@ -340,6 +362,7 @@ airborne-core-cli CreateFile @file-params.json
 Upload a file directly to the Airborne server.
 
 **Parameters**:
+
 - `--file` - Path to local file (required)
 - `--tag` - Tag for identification (optional)
 - `--organisation` - Organization name (required)
@@ -375,6 +398,7 @@ airborne-core-cli ListFiles \
 Create a package from file IDs.
 
 **Parameters**:
+
 - `--index` - Index file ID (required)
 - `--files` - Space-separated file IDs (required)
 - `--tag` - Package tag (optional)
@@ -412,6 +436,7 @@ airborne-core-cli ListPackages \
 Create a release from a package.
 
 **Parameters**:
+
 - `--package` - Package ID (required)
 - `--app_version` - Application version (required)
 - `--lazy_packages` - Lazy package IDs (optional)
@@ -511,17 +536,6 @@ The CLI stores server configuration in `.config` file:
 }
 ```
 
-### Authentication Token
-
-After login, the token is stored in `.config`:
-
-```json
-{
-  "baseUrl": "https://airborne.example.com",
-  "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
 ### Using JSON Files
 
 All commands support JSON file input using `@file.json` syntax:
@@ -559,13 +573,12 @@ airborne-core-cli login \
 # 3. Create organization
 airborne-core-cli CreateOrganisation \
   --name "MyCompany" \
-  --token "$(cat .config | jq -r .token)"
-
+  --token "eyJhbGciOiJIUzI1N...."
 # 4. Create application
 airborne-core-cli CreateApplication \
   --organisation "MyCompany" \
   --application "MyApp" \
-  --token "$(cat .config | jq -r .token)"
+  --token "eyJhbGciOiJIUzI1N...."
 
 # 5. Create dimensions
 airborne-core-cli CreateDimension \
@@ -574,7 +587,7 @@ airborne-core-cli CreateDimension \
   --dimension_type "standard" \
   --organisation "MyCompany" \
   --application "MyApp" \
-  --token "$(cat .config | jq -r .token)"
+  --token "eyJhbGciOiJIUzI1N...."
 ```
 
 ### Deployment Workflow
@@ -589,13 +602,13 @@ FILE1=$(airborne-core-cli UploadFile \
   --file ./build/index.android.bundle \
   --organisation "$ORG" \
   --application "$APP" \
-  --token "$TOKEN" | jq -r .file_id)
+  --token "eyJhbGciOiJIUzI1N....")
 
 FILE2=$(airborne-core-cli UploadFile \
   --file ./build/assets/logo.png \
   --organisation "$ORG" \
   --application "$APP" \
-  --token "$TOKEN" | jq -r .file_id)
+  --token "eyJhbGciOiJIUzI1N....")
 
 # 2. Create package
 PKG=$(airborne-core-cli CreatePackage \
@@ -604,7 +617,7 @@ PKG=$(airborne-core-cli CreatePackage \
   --tag "v1.0.0" \
   --organisation "$ORG" \
   --application "$APP" \
-  --token "$TOKEN" | jq -r .package_id)
+  --token "eyJhbGciOiJIUzI1N....")
 
 # 3. Create release
 airborne-core-cli CreateRelease \
@@ -614,7 +627,7 @@ airborne-core-cli CreateRelease \
   --release_timeout_ms 60000 \
   --organisation "$ORG" \
   --application "$APP" \
-  --token "$TOKEN"
+  --token "eyJhbGciOiJIUzI1N...."
 
 echo "✓ Deployment complete"
 ```
@@ -660,20 +673,20 @@ name: Deploy with Core CLI
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Download Airborne Core CLI
         run: |
           wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-linux-x64
           chmod +x airborne-core-cli-linux-x64
           sudo mv airborne-core-cli-linux-x64 /usr/local/bin/airborne-core-cli
-      
+
       - name: Configure and Login
         env:
           CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
@@ -681,11 +694,11 @@ jobs:
         run: |
           airborne-core-cli configure --base-url https://airborne.example.com
           airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
-      
+
       - name: Deploy
         run: |
-          TOKEN=$(cat .config | jq -r .token)
-          
+          TOKEN="eyJhbGciOiJIUzI1N...."
+
           # Upload and create package (your deployment script here)
           ./scripts/deploy.sh "$TOKEN" "${{ github.ref_name }}"
 ```
@@ -695,20 +708,23 @@ jobs:
 ### Common Issues
 
 1. **Command Not Found**
+
    ```bash
    # Ensure binary is in PATH
    which airborne-core-cli
-   
+
    # Or use full path
    /usr/local/bin/airborne-core-cli --help
    ```
 
 2. **Config Not Found**
+
    ```bash
    airborne-core-cli configure --base-url https://your-server.com
    ```
 
 3. **Authentication Failed**
+
    ```bash
    # Re-login
    airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
