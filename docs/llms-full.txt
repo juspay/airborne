@@ -1,0 +1,1400 @@
+# Airborne Complete Documentation - LLM Full Context
+
+This document provides a comprehensive, step-by-step guide to all Airborne components with hierarchical organization and links to specific documentation sections.
+
+## Table of Contents
+1. [Introduction & Overview](#1-introduction--overview)
+2. [Server Setup](#2-server-setup)
+3. [SDK Integration](#3-sdk-integration)
+4. [CLI Tools](#4-cli-tools)
+5. [Complete Workflows](#5-complete-workflows)
+6. [Troubleshooting](#6-troubleshooting)
+7. [API Reference](#7-api-reference)
+
+---
+
+## 1. Introduction & Overview
+
+### 1.1 What is Airborne?
+Airborne is an open-source Over-The-Air (OTA) update platform that enables developers to deploy updates to mobile applications (Android, iOS, React Native) without requiring app store submissions.
+
+**Key Components:**
+- Airborne Server: REST API backend (Rust)
+- Mobile SDKs: Android (Kotlin), iOS (Swift), React Native (TypeScript)
+- CLI Tools: Developer CLI, Core Server CLI
+- Infrastructure: PostgreSQL, Keycloak, S3/LocalStack
+
+**Documentation:** [docs/README.md](./README.md)
+
+### 1.2 Core Concepts
+
+**Namespace:** Unique identifier for your application (e.g., "com.company.app.production")
+
+**Dimensions:** Key-value pairs for user segmentation
+- Examples: {"city": "bangalore", "userType": "premium", "appVersion": "1.0.0"}
+- Used for A/B testing, feature flags, gradual rollouts
+
+**Package:** Collection of files bundled together
+- Index file (main bundle)
+- Assets (images, configs, etc.)
+- Lazy packages (non-critical content)
+
+**Release:** Deployment of a package to users
+- Contains package reference
+- Timeouts (boot_timeout_ms, release_timeout_ms)
+- Version information
+
+**File:** Individual asset in a package
+- file_path: Path on device
+- url: Download location
+- metadata: Additional information
+
+**Documentation:** [docs/README.md#architecture-overview](./README.md#architecture-overview)
+
+---
+
+## 2. Server Setup
+
+### 2.1 Prerequisites
+
+**Required:**
+- Docker or Podman with compose support
+- Git
+- Make (GNU Make)
+- Node.js 22+
+- PostgreSQL Client Tools (psql, pg_isready)
+- curl, jq, yq
+
+**Recommended:**
+- Nix with Flakes (provides all dependencies automatically)
+
+**Documentation:** [docs/airborne_server/Setup.md#prerequisites](./airborne_server/Setup.md#prerequisites)
+
+### 2.2 Quick Start (Local Development)
+
+#### Step 1: Clone Repository
+```bash
+git clone https://github.com/juspay/airborne.git
+cd airborne
+```
+
+#### Step 2: Start Everything
+```bash
+make run
+```
+
+This command:
+1. Creates .env file from .env.example
+2. Starts PostgreSQL (port 5433)
+3. Starts Keycloak (port 8180)
+4. Starts LocalStack/S3 (port 4566)
+5. Starts Superposition (port 8080)
+6. Runs database migrations
+7. Starts Airborne server (port 8081) with hot-reload
+8. Starts dashboard development server
+
+#### Step 3: Access Services
+- Airborne API: http://localhost:8081
+- Keycloak: http://localhost:8180 (admin/admin)
+- Superposition: http://localhost:8080
+- PostgreSQL: localhost:5433
+
+**Documentation:** [docs/airborne_server/Setup.md#quick-start](./airborne_server/Setup.md#quick-start)
+
+### 2.3 Service Configuration
+
+#### PostgreSQL Database
+**Port:** 5433
+**Database:** airborneserver
+**User:** postgres
+
+**Manual Access:**
+```bash
+psql -h localhost -p 5433 -U postgres -d airborneserver
+```
+
+**Migrations:**
+```bash
+make db-migration
+```
+
+**Documentation:** [docs/airborne_server/Setup.md#postgresql-database](./airborne_server/Setup.md#postgresql-database)
+
+#### Keycloak (Authentication)
+**Port:** 8180
+**Admin:** admin/admin
+**Realm:** Configured in .env
+
+**Initialization:**
+```bash
+make keycloak-init
+```
+
+**Features:**
+- User management
+- Organization/application groups
+- Role-based permissions (owner, admin, write, read)
+- JWT token issuance
+
+**Documentation:** [docs/airborne_server/Setup.md#keycloak-authentication--authorization](./airborne_server/Setup.md#keycloak-authentication--authorization)
+
+#### LocalStack (AWS S3 Mock)
+**Port:** 4566
+**Services:** S3 bucket for package storage
+
+**Initialization:**
+```bash
+make localstack-init
+```
+
+**Documentation:** [docs/airborne_server/Setup.md#localstack-aws-services-mock](./airborne_server/Setup.md#localstack-aws-services-mock)
+
+#### Superposition (Configuration)
+**Port:** 8080
+**Purpose:** Dynamic configuration management
+
+**Initialization:**
+```bash
+make superposition-init
+```
+
+**Documentation:** [docs/airborne_server/Setup.md#superposition-configuration-management](./airborne_server/Setup.md#superposition-configuration-management)
+
+### 2.4 Development Workflow
+
+#### Daily Development:
+```bash
+make run          # Start everything with hot-reload
+make fmt          # Format code
+make lint         # Run linter
+make check        # Format check + lint (CI mode)
+make commit       # Commit changes
+```
+
+#### Service Management:
+```bash
+make status       # Check service status
+make stop         # Stop all services
+make cleanup      # Remove containers and volumes
+make kill         # Kill server process
+```
+
+**Documentation:** [docs/airborne_server/Setup.md#development-workflow](./airborne_server/Setup.md#development-workflow)
+
+### 2.5 Environment Configuration
+
+**Key Variables (.env):**
+```bash
+KEYCLOAK_URL=http://localhost:8180
+KEYCLOAK_CLIENT_ID=airborne-server
+KEYCLOAK_SECRET=your_secret
+SUPERPOSITION_URL=http://localhost:8080
+AWS_BUCKET=airborne-packages
+DB_URL=postgresql://postgres@localhost:5433/airborneserver
+```
+
+**Documentation:** [docs/airborne_server/Setup.md#environment-configuration](./airborne_server/Setup.md#environment-configuration)
+
+---
+
+## 3. SDK Integration
+
+### 3.1 React Native SDK
+
+#### 3.1.1 Installation
+
+```bash
+npm install airborne-react-native
+# or
+yarn add airborne-react-native
+
+# iOS only
+cd ios && pod install && cd ..
+```
+
+**Documentation:** [docs/airborne_sdk/React_Native.md#installation](./airborne_sdk/React_Native.md#installation)
+
+#### 3.1.2 Android Setup
+
+**Step 1:** Add Maven repository (android/build.gradle):
+```gradle
+allprojects {
+    repositories {
+        maven { url "https://maven.juspay.in/hyper-sdk/" }
+    }
+}
+```
+
+**Step 2:** Update MainApplication.kt:
+```kotlin
+import `in`.juspay.airborneplugin.Airborne
+import `in`.juspay.airborneplugin.AirborneInterface
+import `in`.juspay.airborneplugin.AirborneReactNativeHost
+
+class MainApplication : Application(), ReactApplication {
+    private lateinit var airborne: Airborne
+    
+    override val reactNativeHost: ReactNativeHost =
+        object : AirborneReactNativeHost(this@MainApplication) {
+            override fun getJSBundleFile(): String? {
+                return airborne.getBundlePath()
+            }
+            // ... other overrides
+        }
+    
+    override fun onCreate() {
+        super.onCreate()
+        
+        airborne = Airborne(
+            this.applicationContext,
+            "https://your-server.com/release/namespace/android",
+            object : AirborneInterface() {
+                override fun getNamespace(): String = "your-namespace"
+                override fun getDimensions(): HashMap<String, String> = hashMapOf(
+                    "city" to "bangalore"
+                )
+                override fun startApp(indexPath: String) {
+                    // App is ready
+                }
+                // ... other callbacks
+            }
+        )
+    }
+}
+```
+
+**Step 3:** Update MainActivity.kt:
+```kotlin
+import `in`.juspay.airborneplugin.AirborneReactActivityDelegate
+
+class MainActivity : ReactActivity() {
+    override fun createReactActivityDelegate(): ReactActivityDelegate =
+        AirborneReactActivityDelegate(this, mainComponentName, fabricEnabled)
+}
+```
+
+**Documentation:** [docs/airborne_sdk/React_Native.md#android-setup](./airborne_sdk/React_Native.md#android-setup)
+
+#### 3.1.3 iOS Setup
+
+**Step 1:** Install pods:
+```bash
+cd ios && pod install && cd ..
+```
+
+**Step 2:** Update AppDelegate.swift:
+```swift
+import Airborne
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    private var airborne: AirborneServices?
+    
+    func application(_ application: UIApplication, 
+                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        airborne = AirborneServices(
+            releaseConfigURL: "https://your-server.com/release/namespace/ios",
+            delegate: self
+        )
+        return true
+    }
+}
+
+extension AppDelegate: AirborneDelegate {
+    func namespace() -> String { return "your-namespace" }
+    
+    func dimensions() -> [String: String] {
+        return ["city": "bangalore"]
+    }
+    
+    func startApp(indexBundleURL: URL?) {
+        // App is ready
+    }
+    
+    // ... other callbacks
+}
+
+// For React Native apps
+extension AppDelegate: RCTBridgeDelegate {
+    func sourceURL(for bridge: RCTBridge) -> URL? {
+        #if DEBUG
+        return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+        #else
+        return airborne?.getIndexBundlePath()
+        #endif
+    }
+}
+```
+
+**Documentation:** [docs/airborne_sdk/React_Native.md#ios-setup](./airborne_sdk/React_Native.md#ios-setup)
+
+#### 3.1.4 JavaScript/TypeScript API
+
+```typescript
+import { readReleaseConfig, getFileContent, getBundlePath } from 'airborne-react-native';
+
+// Read configuration
+const configString = await readReleaseConfig('your-namespace');
+const config = JSON.parse(configString);
+
+// Get file content
+const content = await getFileContent('your-namespace', 'config/features.json');
+
+// Get bundle path
+const bundlePath = await getBundlePath('your-namespace');
+```
+
+**Documentation:** [docs/airborne_sdk/React_Native.md#javascripttypescript-api](./airborne_sdk/React_Native.md#javascripttypescript-api)
+
+### 3.2 Android SDK (Native)
+
+#### 3.2.1 Installation
+
+**Step 1:** Add Maven repository (build.gradle):
+```gradle
+allprojects {
+    repositories {
+        maven { url "https://maven.juspay.in/hyper-sdk/" }
+    }
+}
+```
+
+**Step 2:** Add dependency (app/build.gradle):
+```gradle
+dependencies {
+    implementation 'io.juspay:airborne:0.15.1'
+}
+```
+
+**Requirements:**
+```gradle
+android {
+    compileSdk 35
+    defaultConfig {
+        minSdk 21
+        targetSdk 35
+    }
+}
+```
+
+**Documentation:** [docs/airborne_sdk/Android.md#installation](./airborne_sdk/Android.md#installation)
+
+#### 3.2.2 Implementation
+
+**Step 1:** Create Application class:
+```kotlin
+import `in`.juspay.airborne.HyperOTAServices
+import `in`.juspay.airborne.TrackerCallback
+import `in`.juspay.airborne.LazyDownloadCallback
+
+class MyApplication : Application() {
+    private lateinit var hyperOTA: HyperOTAServices
+    
+    override fun onCreate() {
+        super.onCreate()
+        
+        hyperOTA = HyperOTAServices(
+            context = applicationContext,
+            workSpacePath = filesDir.absolutePath + "/airborne",
+            appVersion = BuildConfig.VERSION_NAME,
+            releaseConfigTemplateUrl = "https://server.com/release/namespace/android",
+            trackerCallback = AirborneTracker(),
+            onBootComplete = { indexPath ->
+                // App is ready
+            }
+        )
+        
+        val appManager = hyperOTA.createApplicationManager(
+            dimensions = mapOf("city" to "bangalore")
+        )
+        
+        appManager.start(AirborneLazyCallback())
+    }
+}
+```
+
+**Step 2:** Implement callbacks:
+```kotlin
+class AirborneTracker : TrackerCallback {
+    override fun logEvent(level: String, label: String, key: String, 
+                         value: JSONObject, category: String, subCategory: String) {
+        // Track events
+    }
+}
+
+class AirborneLazyCallback : LazyDownloadCallback {
+    override fun fileInstalled(filePath: String, success: Boolean) {
+        // File installed
+    }
+    
+    override fun lazySplitsInstalled(success: Boolean) {
+        // All lazy content installed
+    }
+}
+```
+
+**Documentation:** [docs/airborne_sdk/Android.md#integration-steps](./airborne_sdk/Android.md#integration-steps)
+
+#### 3.2.3 API Usage
+
+```kotlin
+val appManager = hyperOTA.createApplicationManager(dimensions)
+
+// Read configuration
+val configJson = appManager.readConfig("namespace")
+
+// Read file
+val content = appManager.getFileContent("namespace", "config/features.json")
+
+// Get bundle path
+val bundlePath = appManager.getBundlePath("namespace")
+```
+
+**Documentation:** [docs/airborne_sdk/Android.md#api-reference](./airborne_sdk/Android.md#api-reference)
+
+### 3.3 iOS SDK (Native)
+
+#### 3.3.1 Installation
+
+**CocoaPods (Podfile):**
+```ruby
+pod 'Airborne', :git => 'https://github.com/juspay/airborne.git', :tag => 'v0.15.1'
+```
+
+**Swift Package Manager:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/juspay/airborne.git", from: "0.15.1")
+]
+```
+
+**Requirements:**
+- iOS 12.0+
+- Xcode 14.0+
+- Swift 5.5+
+
+**Documentation:** [docs/airborne_sdk/iOS.md#installation](./airborne_sdk/iOS.md#installation)
+
+#### 3.3.2 Implementation
+
+**Step 1:** Import and initialize:
+```swift
+import Airborne
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    private var airborne: AirborneServices?
+    
+    func application(_ application: UIApplication, 
+                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        airborne = AirborneServices(
+            releaseConfigURL: "https://server.com/release/namespace/ios",
+            delegate: self
+        )
+        return true
+    }
+}
+```
+
+**Step 2:** Implement delegate:
+```swift
+extension AppDelegate: AirborneDelegate {
+    func namespace() -> String {
+        return "your-namespace"
+    }
+    
+    func dimensions() -> [String: String] {
+        return [
+            "city": "bangalore",
+            "userType": "premium"
+        ]
+    }
+    
+    func startApp(indexBundleURL: URL?) {
+        DispatchQueue.main.async {
+            // Load main UI
+        }
+    }
+    
+    func onEvent(level: String, label: String, key: String, 
+                value: [String: Any], category: String, subcategory: String) {
+        // Track events
+    }
+    
+    func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String) {
+        // Lazy package downloaded
+    }
+    
+    func onAllLazyPackageDownloadsComplete() {
+        // All lazy content ready
+    }
+}
+```
+
+**Documentation:** [docs/airborne_sdk/iOS.md#integration-steps](./airborne_sdk/iOS.md#integration-steps)
+
+#### 3.3.3 API Usage
+
+```swift
+// Get bundle path
+if let bundleURL = airborne?.getIndexBundlePath() {
+    // Use bundle
+}
+
+// Read configuration
+if let configJSON = airborne?.getReleaseConfig() {
+    let config = try? JSONSerialization.jsonObject(with: configJSON.data(using: .utf8)!)
+}
+
+// Read file content
+if let content = airborne?.getFileContent(filePath: "config/features.json") {
+    // Parse content
+}
+```
+
+**Documentation:** [docs/airborne_sdk/iOS.md#api-reference](./airborne_sdk/iOS.md#api-reference)
+
+---
+
+## 4. CLI Tools
+
+### 4.1 Airborne CLI (React Native)
+
+#### 4.1.1 Installation
+
+```bash
+cd airborne_cli
+npm install
+
+# Create alias (optional)
+alias airborne-cli="node /path/to/airborne_cli/src/index.js"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_cli.md#installation](./airborne_cli/airborne_cli.md#installation)
+
+#### 4.1.2 Initialize Configuration
+
+```bash
+cd my-react-native-app
+
+# Interactive mode
+node /path/to/airborne_cli/src/index.js create-local-airborne-config
+
+# With options
+node /path/to/airborne_cli/src/index.js create-local-airborne-config \
+  -o "MyCompany" \
+  -n "myapp" \
+  -j "index.js"
+```
+
+**Creates:** `airborne-config.json`
+
+**Documentation:** [docs/airborne_cli/airborne_cli.md#create-local-airborne-config-directorypath](./airborne_cli/airborne_cli.md#create-local-airborne-config-directorypath)
+
+#### 4.1.3 Create Release Configuration
+
+```bash
+# For Android
+node /path/to/airborne_cli/src/index.js create-local-release-config -p android
+
+# For iOS
+node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
+
+# With custom timeouts
+node /path/to/airborne_cli/src/index.js create-local-release-config \
+  -p android \
+  -b 40000 \
+  -r 80000
+```
+
+**Creates:** `airborne-release-config-<platform>.json`
+
+**Documentation:** [docs/airborne_cli/airborne_cli.md#create-local-release-config-directorypath](./airborne_cli/airborne_cli.md#create-local-release-config-directorypath)
+
+#### 4.1.4 Authentication
+
+```bash
+node /path/to/airborne_cli/src/index.js login \
+  --client_id YOUR_CLIENT_ID \
+  --client_secret YOUR_CLIENT_SECRET
+
+# With environment variables
+node /path/to/airborne_cli/src/index.js login \
+  --client_id "$AIRBORNE_CLIENT_ID" \
+  --client_secret "$AIRBORNE_CLIENT_SECRET"
+```
+
+**Creates:** `.airborne/` directory with token
+
+**Documentation:** [docs/airborne_cli/airborne_cli.md#login-directorypath](./airborne_cli/airborne_cli.md#login-directorypath)
+
+#### 4.1.5 Upload Files and Create Package
+
+```bash
+# Upload files
+node /path/to/airborne_cli/src/index.js create-remote-files \
+  -p android \
+  --upload \
+  -t "v1.0.0"
+
+# Create package
+node /path/to/airborne_cli/src/index.js create-remote-package \
+  -p android \
+  -t "v1.0.0"
+```
+
+**Documentation:** 
+- [create-remote-files](./airborne_cli/airborne_cli.md#create-remote-files-directorypath)
+- [create-remote-package](./airborne_cli/airborne_cli.md#create-remote-package-directorypath)
+
+### 4.2 Airborne Core CLI (Server Admin)
+
+#### 4.2.1 Installation
+
+**From source:**
+```bash
+cd airborne-core-cli
+npm install
+npm link  # Optional: install globally
+```
+
+**Standalone binary:**
+```bash
+# Download for your platform
+wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-linux-x64
+chmod +x airborne-core-cli-linux-x64
+sudo mv airborne-core-cli-linux-x64 /usr/local/bin/airborne-core-cli
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#installation](./airborne_cli/airborne_core_cli.md#installation)
+
+#### 4.2.2 Configuration and Authentication
+
+```bash
+# Configure server
+airborne-core-cli configure --base-url https://airborne.example.com
+
+# Login
+airborne-core-cli login \
+  --client-id YOUR_CLIENT_ID \
+  --client-secret YOUR_CLIENT_SECRET
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#configuration](./airborne_cli/airborne_core_cli.md#configuration)
+
+#### 4.2.3 Organization Management
+
+```bash
+# Create organization
+airborne-core-cli CreateOrganisation \
+  --name "MyCompany" \
+  --token "$(cat .config | jq -r .token)"
+
+# List organizations
+airborne-core-cli ListOrganisations --token "your_token"
+
+# Request access
+airborne-core-cli RequestOrganisation \
+  --organisation "MyCompany" \
+  --token "your_token"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#organization-management](./airborne_cli/airborne_core_cli.md#organization-management)
+
+#### 4.2.4 Application Management
+
+```bash
+# Create application
+airborne-core-cli CreateApplication \
+  --application "MyApp" \
+  --organisation "MyCompany" \
+  --token "your_token"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#application-management](./airborne_cli/airborne_core_cli.md#application-management)
+
+#### 4.2.5 Dimension Management
+
+```bash
+# Create standard dimension
+airborne-core-cli CreateDimension \
+  --dimension "userType" \
+  --description "User subscription type" \
+  --dimension_type "standard" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# Create cohort dimension (depends on another)
+airborne-core-cli CreateDimension \
+  --dimension "premiumFeatures" \
+  --description "Premium features" \
+  --dimension_type "cohort" \
+  --depends_on "userType" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# List dimensions
+airborne-core-cli ListDimensions \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#dimension-management](./airborne_cli/airborne_core_cli.md#dimension-management)
+
+#### 4.2.6 File Operations
+
+```bash
+# Create file record
+airborne-core-cli CreateFile \
+  --file_path "index.android.bundle" \
+  --url "https://cdn.example.com/index.android.bundle" \
+  --tag "v1.0.0" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# Upload file
+airborne-core-cli UploadFile \
+  --file ./build/index.android.bundle \
+  --tag "v1.0.0" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# List files
+airborne-core-cli ListFiles \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#file-management](./airborne_cli/airborne_core_cli.md#file-management)
+
+#### 4.2.7 Package Operations
+
+```bash
+# Create package
+airborne-core-cli CreatePackage \
+  --index "file_abc123" \
+  --files "file_abc123 file_def456" \
+  --tag "v1.0.0" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# List packages
+airborne-core-cli ListPackages \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#package-management](./airborne_cli/airborne_core_cli.md#package-management)
+
+#### 4.2.8 Release Operations
+
+```bash
+# Create release
+airborne-core-cli CreateRelease \
+  --package "pkg_xyz123" \
+  --app_version "1.0.0" \
+  --boot_timeout_ms 30000 \
+  --release_timeout_ms 60000 \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# List releases
+airborne-core-cli ListReleases \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+
+# Get release details
+airborne-core-cli GetRelease \
+  --release_id "rel_abc123" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#release-management](./airborne_cli/airborne_core_cli.md#release-management)
+
+#### 4.2.9 Local Testing
+
+```bash
+# Serve release locally
+airborne-core-cli ServeReleaseV2 \
+  --namespace "myapp" \
+  --platform "android" \
+  --port 3000 \
+  --config ./release-config.json
+
+# Access at: http://localhost:3000/release/myapp/android
+```
+
+**Documentation:** [docs/airborne_cli/airborne_core_cli.md#local-testing](./airborne_cli/airborne_core_cli.md#local-testing)
+
+---
+
+## 5. Complete Workflows
+
+### 5.1 React Native: First Deployment
+
+#### Step 1: Setup Server
+```bash
+cd airborne
+make run
+```
+**Wait for:** All services to start (Airborne API, Keycloak, PostgreSQL, LocalStack)
+
+#### Step 2: Initialize React Native Project
+```bash
+cd my-react-native-app
+
+# Initialize Airborne config
+node /path/to/airborne_cli/src/index.js create-local-airborne-config \
+  -o "MyCompany" \
+  -n "myapp-production"
+
+# Create release configs
+node /path/to/airborne_cli/src/index.js create-local-release-config -p android
+node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
+
+# Add to .gitignore
+echo ".airborne/" >> .gitignore
+```
+
+#### Step 3: Integrate SDK
+
+**Android (MainApplication.kt):**
+```kotlin
+import `in`.juspay.airborneplugin.Airborne
+import `in`.juspay.airborneplugin.AirborneReactNativeHost
+
+class MainApplication : Application(), ReactApplication {
+    private lateinit var airborne: Airborne
+    
+    override val reactNativeHost: ReactNativeHost =
+        object : AirborneReactNativeHost(this@MainApplication) {
+            override fun getJSBundleFile(): String? = airborne.getBundlePath()
+            // ... rest of implementation
+        }
+    
+    override fun onCreate() {
+        super.onCreate()
+        airborne = Airborne(
+            this.applicationContext,
+            "http://10.0.2.2:8081/release/myapp-production/android", // Android emulator
+            object : AirborneInterface() {
+                override fun getNamespace(): String = "myapp-production"
+                override fun startApp(indexPath: String) { /* ready */ }
+            }
+        )
+    }
+}
+```
+
+**iOS (AppDelegate.swift):**
+```swift
+import Airborne
+
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    private var airborne: AirborneServices?
+    
+    func application(_ application: UIApplication, 
+                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        airborne = AirborneServices(
+            releaseConfigURL: "http://localhost:8081/release/myapp-production/ios",
+            delegate: self
+        )
+        return true
+    }
+}
+
+extension AppDelegate: AirborneDelegate {
+    func namespace() -> String { return "myapp-production" }
+    func startApp(indexBundleURL: URL?) { /* ready */ }
+}
+```
+
+#### Step 4: Build Bundles
+```bash
+# Android
+npx react-native bundle --platform android --dev false \
+  --entry-file index.js \
+  --bundle-output android/app/build/generated/assets/react/release/index.android.bundle \
+  --assets-dest android/app/build/generated/res/react/release
+
+# iOS
+npx react-native bundle --platform ios --dev false \
+  --entry-file index.js \
+  --bundle-output ios/main.jsbundle \
+  --assets-dest ios
+```
+
+#### Step 5: Deploy
+```bash
+# Get credentials from Keycloak
+# Go to http://localhost:8180 -> admin/admin -> Clients -> Create client
+
+# Login
+node /path/to/airborne_cli/src/index.js login \
+  --client_id "your-client-id" \
+  --client_secret "your-client-secret"
+
+# Upload files and create packages
+node /path/to/airborne_cli/src/index.js create-remote-files -p android --upload -t "v1.0.0"
+node /path/to/airborne_cli/src/index.js create-remote-package -p android -t "v1.0.0"
+
+node /path/to/airborne_cli/src/index.js create-remote-files -p ios --upload -t "v1.0.0"
+node /path/to/airborne_cli/src/index.js create-remote-package -p ios -t "v1.0.0"
+```
+
+#### Step 6: Test
+```bash
+# Run Android
+npm run android
+
+# Run iOS
+npm run ios
+```
+
+**Expected:** App downloads OTA bundle and loads successfully
+
+**Documentation:** [docs/airborne_sdk/React_Native.md#quick-start](./airborne_sdk/React_Native.md#quick-start)
+
+### 5.2 Native Android: Complete Integration
+
+#### Step 1: Setup Project
+```gradle
+// android/build.gradle
+allprojects {
+    repositories {
+        maven { url "https://maven.juspay.in/hyper-sdk/" }
+    }
+}
+
+// app/build.gradle
+dependencies {
+    implementation 'io.juspay:airborne:0.15.1'
+}
+```
+
+#### Step 2: Create Application Class
+```kotlin
+class MyApplication : Application() {
+    private lateinit var hyperOTA: HyperOTAServices
+    var isBootComplete = false
+    
+    override fun onCreate() {
+        super.onCreate()
+        
+        hyperOTA = HyperOTAServices(
+            context = applicationContext,
+            workSpacePath = filesDir.absolutePath + "/airborne",
+            appVersion = BuildConfig.VERSION_NAME,
+            releaseConfigTemplateUrl = "http://10.0.2.2:8081/release/myapp/android",
+            trackerCallback = object : TrackerCallback {
+                override fun logEvent(/*...*/) { /* track */ }
+            },
+            onBootComplete = { path ->
+                isBootComplete = true
+                // Start MainActivity
+            }
+        )
+        
+        val appManager = hyperOTA.createApplicationManager(
+            dimensions = mapOf("city" to "bangalore")
+        )
+        
+        appManager.start(object : LazyDownloadCallback {
+            override fun fileInstalled(filePath: String, success: Boolean) {}
+            override fun lazySplitsInstalled(success: Boolean) {}
+        })
+    }
+}
+```
+
+#### Step 3: Update Manifest
+```xml
+<application
+    android:name=".MyApplication"
+    ...>
+```
+
+#### Step 4: Deploy Using Core CLI
+```bash
+# Configure
+airborne-core-cli configure --base-url http://localhost:8081
+airborne-core-cli login --client-id "..." --client-secret "..."
+
+TOKEN=$(cat .config | jq -r .token)
+
+# Create org and app
+airborne-core-cli CreateOrganisation --name "MyCompany" --token "$TOKEN"
+airborne-core-cli CreateApplication --organisation "MyCompany" --application "MyApp" --token "$TOKEN"
+
+# Upload and deploy
+FILE_ID=$(airborne-core-cli UploadFile \
+  --file ./app/build/outputs/bundle.aab \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "$TOKEN" | jq -r .file_id)
+
+PKG_ID=$(airborne-core-cli CreatePackage \
+  --index "$FILE_ID" \
+  --files "$FILE_ID" \
+  --tag "v1.0.0" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "$TOKEN" | jq -r .package_id)
+
+airborne-core-cli CreateRelease \
+  --package "$PKG_ID" \
+  --app_version "1.0.0" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "$TOKEN"
+```
+
+**Documentation:** [docs/airborne_sdk/Android.md](./airborne_sdk/Android.md)
+
+### 5.3 CI/CD: GitHub Actions
+
+```yaml
+name: Deploy OTA
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  deploy-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      
+      - name: Install deps
+        run: npm install
+      
+      - name: Build bundle
+        run: |
+          npx react-native bundle --platform android --dev false \
+            --entry-file index.js \
+            --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
+      
+      - name: Deploy
+        env:
+          CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.AIRBORNE_CLIENT_SECRET }}
+        run: |
+          cd airborne_cli
+          npm install
+          node src/index.js login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
+          node src/index.js create-remote-files -p android --upload -t "${{ github.ref_name }}"
+          node src/index.js create-remote-package -p android -t "${{ github.ref_name }}"
+```
+
+**Documentation:** [docs/airborne_cli/airborne_cli.md#cicd-integration](./airborne_cli/airborne_cli.md#cicd-integration)
+
+---
+
+## 6. Troubleshooting
+
+### 6.1 Server Issues
+
+#### Services Not Starting
+```bash
+# Check Docker/Podman is running
+docker ps
+
+# Check container status
+make status
+
+# View logs
+docker logs airborne_db
+docker logs airborne_keycloak
+
+# Cleanup and restart
+make cleanup
+make run
+```
+
+**Documentation:** [docs/airborne_server/Setup.md#troubleshooting](./airborne_server/Setup.md#troubleshooting)
+
+#### Port Conflicts
+```bash
+# Find process using port
+lsof -i :8081
+
+# Kill process
+kill -9 <PID>
+
+# Or use make command
+make kill
+```
+
+#### Database Connection Failed
+```bash
+# Check database is running
+pg_isready -h localhost -p 5433
+
+# Restart database
+make stop
+make db
+
+# Reset database
+make cleanup
+make db
+make db-migration
+```
+
+### 6.2 SDK Integration Issues
+
+#### React Native: Module Not Found
+```bash
+# Clear caches
+rm -rf node_modules
+npm install
+cd ios && pod install && cd ..
+
+# Clear metro cache
+npm start -- --reset-cache
+
+# Rebuild
+cd android && ./gradlew clean && cd ..
+npm run android
+```
+
+**Documentation:** [docs/airborne_sdk/React_Native.md#troubleshooting](./airborne_sdk/React_Native.md#troubleshooting)
+
+#### Android: Class Not Found
+```bash
+# Clean and rebuild
+cd android
+./gradlew clean
+./gradlew assembleDebug
+
+# Check ProGuard rules
+# Add to proguard-rules.pro:
+-keep class in.juspay.airborne.** { *; }
+```
+
+**Documentation:** [docs/airborne_sdk/Android.md#troubleshooting](./airborne_sdk/Android.md#troubleshooting)
+
+#### iOS: SDK Not Found
+```bash
+# Clean pods
+cd ios
+pod deintegrate
+pod install
+cd ..
+
+# Clean build
+rm -rf ~/Library/Developer/Xcode/DerivedData/*
+xcodebuild clean
+
+# Rebuild
+npm run ios
+```
+
+**Documentation:** [docs/airborne_sdk/iOS.md#troubleshooting](./airborne_sdk/iOS.md#troubleshooting)
+
+#### Boot Never Completes
+- Check network connectivity (use WiFi if on emulator/simulator)
+- Verify server URL is accessible
+- Check server logs for errors
+- Test with bundled assets first (useBundledAssets = true)
+- Enable debug logging
+
+### 6.3 CLI Issues
+
+#### Authentication Failed
+```bash
+# Verify credentials
+echo $AIRBORNE_CLIENT_ID
+echo $AIRBORNE_CLIENT_SECRET
+
+# Re-login
+node /path/to/airborne_cli/src/index.js login \
+  --client_id "$AIRBORNE_CLIENT_ID" \
+  --client_secret "$AIRBORNE_CLIENT_SECRET"
+
+# Check token was created
+ls -la .airborne/
+```
+
+#### File Upload Failed
+- Check file paths are correct
+- Verify file exists and is readable
+- Check network connectivity
+- Verify server is accessible
+- Check server logs for errors
+
+#### Config Not Found
+```bash
+# For Airborne CLI
+node /path/to/airborne_cli/src/index.js create-local-airborne-config
+
+# For Core CLI
+airborne-core-cli configure --base-url https://your-server.com
+```
+
+**Documentation:** 
+- [docs/airborne_cli/airborne_cli.md#troubleshooting](./airborne_cli/airborne_cli.md#troubleshooting)
+- [docs/airborne_cli/airborne_core_cli.md#troubleshooting](./airborne_cli/airborne_core_cli.md#troubleshooting)
+
+---
+
+## 7. API Reference
+
+### 7.1 Server REST API
+
+**Base URL:** `http://localhost:8081` (development)
+
+#### Authentication
+All API requests require Bearer token in Authorization header:
+```
+Authorization: Bearer <token>
+```
+
+Get token via Keycloak or CLI login.
+
+#### Endpoints
+
+**Organizations:**
+- POST `/org` - Create organization
+- GET `/orgs` - List organizations
+- POST `/org/request` - Request access
+
+**Applications:**
+- POST `/org/{org}/app` - Create application
+- GET `/org/{org}/apps` - List applications
+
+**Files:**
+- POST `/org/{org}/app/{app}/file` - Create file
+- POST `/org/{org}/app/{app}/file/upload` - Upload file
+- GET `/org/{org}/app/{app}/files` - List files
+
+**Packages:**
+- POST `/org/{org}/app/{app}/package` - Create package
+- GET `/org/{org}/app/{app}/packages` - List packages
+
+**Releases:**
+- POST `/org/{org}/app/{app}/release` - Create release
+- GET `/org/{org}/app/{app}/releases` - List releases
+- GET `/org/{org}/app/{app}/release/{id}` - Get release
+
+**Public Endpoints:**
+- GET `/release/{namespace}/{platform}` - Get release configuration (no auth)
+
+**Documentation:** [API_DOCUMENTATION.md](../API_DOCUMENTATION.md)
+
+### 7.2 SDK APIs
+
+#### React Native
+```typescript
+// Read configuration
+readReleaseConfig(namespace: string): Promise<string>
+
+// Get file content
+getFileContent(namespace: string, filePath: string): Promise<string>
+
+// Get bundle path
+getBundlePath(namespace: string): Promise<string>
+```
+
+#### Android (Kotlin)
+```kotlin
+// ApplicationManager APIs
+fun readConfig(namespace: String): String?
+fun getFileContent(namespace: String, path: String): String?
+fun getBundlePath(namespace: String): String?
+fun start(callback: LazyDownloadCallback)
+```
+
+#### iOS (Swift)
+```swift
+// AirborneServices APIs
+func getIndexBundlePath() -> URL
+func getReleaseConfig() -> String?
+func getFileContent(filePath: String) -> String?
+func getBaseBundle() -> Bundle
+```
+
+---
+
+## Quick Reference: Common Commands
+
+### Server
+```bash
+make run              # Start everything
+make stop             # Stop all services
+make status           # Check status
+make cleanup          # Clean up everything
+make db-migration     # Run migrations
+make fmt              # Format code
+make lint             # Run linter
+```
+
+### Airborne CLI
+```bash
+# Setup
+create-local-airborne-config
+create-local-release-config -p <platform>
+login --client_id <id> --client_secret <secret>
+
+# Deploy
+create-remote-files -p <platform> --upload -t <tag>
+create-remote-package -p <platform> -t <tag>
+```
+
+### Core CLI
+```bash
+# Setup
+configure --base-url <url>
+login --client-id <id> --client-secret <secret>
+
+# Management
+CreateOrganisation --name <name> --token <token>
+CreateApplication --organisation <org> --application <app> --token <token>
+CreateDimension --dimension <name> --dimension_type standard --organisation <org> --application <app> --token <token>
+
+# Deploy
+UploadFile --file <path> --organisation <org> --application <app> --token <token>
+CreatePackage --index <file_id> --files <file_ids> --organisation <org> --application <app> --token <token>
+CreateRelease --package <pkg_id> --app_version <version> --organisation <org> --application <app> --token <token>
+```
+
+---
+
+## Document Index
+
+1. **Main Documentation:** [docs/README.md](./README.md)
+2. **Server Setup:** [docs/airborne_server/Setup.md](./airborne_server/Setup.md)
+3. **SDK Documentation:**
+   - [Overview](./airborne_sdk/README.md)
+   - [React Native](./airborne_sdk/React_Native.md)
+   - [Android](./airborne_sdk/Android.md)
+   - [iOS](./airborne_sdk/iOS.md)
+4. **CLI Documentation:**
+   - [Overview](./airborne_cli/README.md)
+   - [Airborne CLI](./airborne_cli/airborne_cli.md)
+   - [Core CLI](./airborne_cli/airborne_core_cli.md)
+5. **API Reference:** [API_DOCUMENTATION.md](../API_DOCUMENTATION.md)
+
+---
+
+**End of LLM Full Documentation**
+
+This document provides comprehensive coverage of all Airborne components with step-by-step instructions and links to detailed documentation. For the latest updates, visit: https://github.com/juspay/airborne
