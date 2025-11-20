@@ -611,14 +611,19 @@ if let content = airborne?.getFileContent(filePath: "config/features.json") {
 
 ### 4.1 Airborne CLI (React Native)
 
+**NPM Package:** `airborne-devkit`
+
 #### 4.1.1 Installation
 
 ```bash
-cd airborne_cli
-npm install
+# Install globally
+npm install -g airborne-devkit
 
-# Create alias (optional)
-alias airborne-cli="node /path/to/airborne_cli/src/index.js"
+# Or install locally in your project
+npm install --save-dev airborne-devkit
+
+# Or use npx (no installation needed)
+npx airborne-devkit --help
 ```
 
 **Documentation:** [docs/airborne_cli/airborne_cli.md#installation](./airborne_cli/airborne_cli.md#installation)
@@ -629,10 +634,10 @@ alias airborne-cli="node /path/to/airborne_cli/src/index.js"
 cd my-react-native-app
 
 # Interactive mode
-node /path/to/airborne_cli/src/index.js create-local-airborne-config
+npx airborne-devkit create-local-airborne-config
 
 # With options
-node /path/to/airborne_cli/src/index.js create-local-airborne-config \
+npx airborne-devkit create-local-airborne-config \
   -o "MyCompany" \
   -n "myapp" \
   -j "index.js"
@@ -646,13 +651,13 @@ node /path/to/airborne_cli/src/index.js create-local-airborne-config \
 
 ```bash
 # For Android
-node /path/to/airborne_cli/src/index.js create-local-release-config -p android
+npx airborne-devkit create-local-release-config -p android
 
 # For iOS
-node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
+npx airborne-devkit create-local-release-config -p ios
 
 # With custom timeouts
-node /path/to/airborne_cli/src/index.js create-local-release-config \
+npx airborne-devkit create-local-release-config \
   -p android \
   -b 40000 \
   -r 80000
@@ -662,39 +667,65 @@ node /path/to/airborne_cli/src/index.js create-local-release-config \
 
 **Documentation:** [docs/airborne_cli/airborne_cli.md#create-local-release-config-directorypath](./airborne_cli/airborne_cli.md#create-local-release-config-directorypath)
 
-#### 4.1.4 Authentication
+#### 4.1.4 Configure Base URL
 
 ```bash
-node /path/to/airborne_cli/src/index.js login \
+# Configure server endpoint
+npx airborne-devkit configure --base-url https://airborne.juspay.in
+
+# For local development
+npx airborne-devkit configure --base-url http://localhost:8081
+```
+
+**Common Base URLs:**
+- **Production**: `https://airborne.juspay.in`
+- **Local development**: `http://localhost:8081`
+
+**Documentation:** [docs/airborne_cli/airborne_cli.md#set-base-url](./airborne_cli/airborne_cli.md#set-base-url)
+
+#### 4.1.5 Authentication
+
+```bash
+npx airborne-devkit login \
   --client_id YOUR_CLIENT_ID \
   --client_secret YOUR_CLIENT_SECRET
 
 # With environment variables
-node /path/to/airborne_cli/src/index.js login \
+npx airborne-devkit login \
   --client_id "$AIRBORNE_CLIENT_ID" \
   --client_secret "$AIRBORNE_CLIENT_SECRET"
 ```
 
 **Creates:** `.airborne/` directory with token
+**Note:** Token is automatically stored and reused for subsequent commands
 
 **Documentation:** [docs/airborne_cli/airborne_cli.md#login-directorypath](./airborne_cli/airborne_cli.md#login-directorypath)
 
-#### 4.1.5 Upload Files and Create Package
+#### 4.1.6 Upload Files and Create Package
 
 ```bash
-# Upload files
-node /path/to/airborne_cli/src/index.js create-remote-files \
+# For Android
+npx airborne-devkit create-remote-files \
   -p android \
   --upload \
   -t "v1.0.0"
 
-# Create package
-node /path/to/airborne_cli/src/index.js create-remote-package \
+npx airborne-devkit create-remote-package \
   -p android \
+  -t "v1.0.0"
+
+# OR for iOS
+npx airborne-devkit create-remote-files \
+  -p ios \
+  --upload \
+  -t "v1.0.0"
+
+npx airborne-devkit create-remote-package \
+  -p ios \
   -t "v1.0.0"
 ```
 
-**Documentation:** 
+**Documentation:**
 - [create-remote-files](./airborne_cli/airborne_cli.md#create-remote-files-directorypath)
 - [create-remote-package](./airborne_cli/airborne_cli.md#create-remote-package-directorypath)
 
@@ -702,19 +733,17 @@ node /path/to/airborne_cli/src/index.js create-remote-package \
 
 #### 4.2.1 Installation
 
-**From source:**
-```bash
-cd airborne-core-cli
-npm install
-npm link  # Optional: install globally
-```
+**NPM Package**: `airborne-core-cli`
 
-**Standalone binary:**
 ```bash
-# Download for your platform
-wget https://github.com/juspay/airborne/releases/download/v0.15.1/airborne-core-cli-linux-x64
-chmod +x airborne-core-cli-linux-x64
-sudo mv airborne-core-cli-linux-x64 /usr/local/bin/airborne-core-cli
+# Install globally
+npm install -g airborne-core-cli
+
+# Or install locally in your project
+npm install --save-dev airborne-core-cli
+
+# Run with npx (no installation needed)
+npx airborne-core-cli --help
 ```
 
 **Documentation:** [docs/airborne_cli/airborne_core_cli.md#installation](./airborne_cli/airborne_core_cli.md#installation)
@@ -723,10 +752,10 @@ sudo mv airborne-core-cli-linux-x64 /usr/local/bin/airborne-core-cli
 
 ```bash
 # Configure server
-airborne-core-cli configure --base-url https://airborne.example.com
+npx airborne-core-cli configure --base-url https://airborne.example.com
 
 # Login
-airborne-core-cli login \
+npx airborne-core-cli login \
   --client-id YOUR_CLIENT_ID \
   --client-secret YOUR_CLIENT_SECRET
 ```
@@ -737,15 +766,15 @@ airborne-core-cli login \
 
 ```bash
 # Create organization
-airborne-core-cli CreateOrganisation \
+npx airborne-core-cli CreateOrganisation \
   --name "MyCompany" \
-  --token "$(cat .config | jq -r .token)"
+  --token "your_token"
 
 # List organizations
-airborne-core-cli ListOrganisations --token "your_token"
+npx airborne-core-cli ListOrganisations --token "your_token"
 
 # Request access
-airborne-core-cli RequestOrganisation \
+npx airborne-core-cli RequestOrganisation \
   --organisation "MyCompany" \
   --token "your_token"
 ```
@@ -756,7 +785,7 @@ airborne-core-cli RequestOrganisation \
 
 ```bash
 # Create application
-airborne-core-cli CreateApplication \
+npx airborne-core-cli CreateApplication \
   --application "MyApp" \
   --organisation "MyCompany" \
   --token "your_token"
@@ -768,7 +797,7 @@ airborne-core-cli CreateApplication \
 
 ```bash
 # Create standard dimension
-airborne-core-cli CreateDimension \
+npx airborne-core-cli CreateDimension \
   --dimension "userType" \
   --description "User subscription type" \
   --dimension_type "standard" \
@@ -777,7 +806,7 @@ airborne-core-cli CreateDimension \
   --token "your_token"
 
 # Create cohort dimension (depends on another)
-airborne-core-cli CreateDimension \
+npx airborne-core-cli CreateDimension \
   --dimension "premiumFeatures" \
   --description "Premium features" \
   --dimension_type "cohort" \
@@ -787,7 +816,7 @@ airborne-core-cli CreateDimension \
   --token "your_token"
 
 # List dimensions
-airborne-core-cli ListDimensions \
+npx airborne-core-cli ListDimensions \
   --organisation "MyCompany" \
   --application "MyApp" \
   --token "your_token"
@@ -799,7 +828,7 @@ airborne-core-cli ListDimensions \
 
 ```bash
 # Create file record
-airborne-core-cli CreateFile \
+npx airborne-core-cli CreateFile \
   --file_path "index.android.bundle" \
   --url "https://cdn.example.com/index.android.bundle" \
   --tag "v1.0.0" \
@@ -808,7 +837,7 @@ airborne-core-cli CreateFile \
   --token "your_token"
 
 # Upload file
-airborne-core-cli UploadFile \
+npx airborne-core-cli UploadFile \
   --file ./build/index.android.bundle \
   --tag "v1.0.0" \
   --organisation "MyCompany" \
@@ -816,7 +845,7 @@ airborne-core-cli UploadFile \
   --token "your_token"
 
 # List files
-airborne-core-cli ListFiles \
+npx airborne-core-cli ListFiles \
   --organisation "MyCompany" \
   --application "MyApp" \
   --token "your_token"
@@ -828,7 +857,7 @@ airborne-core-cli ListFiles \
 
 ```bash
 # Create package
-airborne-core-cli CreatePackage \
+npx airborne-core-cli CreatePackage \
   --index "file_abc123" \
   --files "file_abc123 file_def456" \
   --tag "v1.0.0" \
@@ -837,7 +866,7 @@ airborne-core-cli CreatePackage \
   --token "your_token"
 
 # List packages
-airborne-core-cli ListPackages \
+npx airborne-core-cli ListPackages \
   --organisation "MyCompany" \
   --application "MyApp" \
   --token "your_token"
@@ -849,7 +878,7 @@ airborne-core-cli ListPackages \
 
 ```bash
 # Create release
-airborne-core-cli CreateRelease \
+npx airborne-core-cli CreateRelease \
   --package "pkg_xyz123" \
   --app_version "1.0.0" \
   --boot_timeout_ms 30000 \
@@ -859,13 +888,13 @@ airborne-core-cli CreateRelease \
   --token "your_token"
 
 # List releases
-airborne-core-cli ListReleases \
+npx airborne-core-cli ListReleases \
   --organisation "MyCompany" \
   --application "MyApp" \
   --token "your_token"
 
 # Get release details
-airborne-core-cli GetRelease \
+npx airborne-core-cli GetRelease \
   --release_id "rel_abc123" \
   --organisation "MyCompany" \
   --application "MyApp" \
@@ -878,7 +907,7 @@ airborne-core-cli GetRelease \
 
 ```bash
 # Serve release locally
-airborne-core-cli ServeReleaseV2 \
+npx airborne-core-cli ServeReleaseV2 \
   --namespace "myapp" \
   --platform "android" \
   --port 3000 \
@@ -916,13 +945,13 @@ make run
 cd my-react-native-app
 
 # Initialize Airborne config
-node /path/to/airborne_cli/src/index.js create-local-airborne-config \
+npx airborne-devkit create-local-airborne-config \
   -o "MyCompany" \
   -n "myapp-production"
 
 # Create release configs
-node /path/to/airborne_cli/src/index.js create-local-release-config -p android
-node /path/to/airborne_cli/src/index.js create-local-release-config -p ios
+npx airborne-devkit create-local-release-config -p android
+npx airborne-devkit create-local-release-config -p ios
 
 # Add to .gitignore
 echo ".airborne/" >> .gitignore
@@ -982,37 +1011,22 @@ extension AppDelegate: AirborneDelegate {
 }
 ```
 
-#### Step 4: Build Bundles
-```bash
-# Android
-npx react-native bundle --platform android --dev false \
-  --entry-file index.js \
-  --bundle-output android/app/build/generated/assets/react/release/index.android.bundle \
-  --assets-dest android/app/build/generated/res/react/release
-
-# iOS
-npx react-native bundle --platform ios --dev false \
-  --entry-file index.js \
-  --bundle-output ios/main.jsbundle \
-  --assets-dest ios
-```
-
-#### Step 5: Deploy
+#### Step 4: Deploy
 ```bash
 # Get credentials from Keycloak
 # Go to http://localhost:8180 -> admin/admin -> Clients -> Create client
 
 # Login
-node /path/to/airborne_cli/src/index.js login \
+npx airborne-devkit login \
   --client_id "your-client-id" \
   --client_secret "your-client-secret"
 
 # Upload files and create packages
-node /path/to/airborne_cli/src/index.js create-remote-files -p android --upload -t "v1.0.0"
-node /path/to/airborne_cli/src/index.js create-remote-package -p android -t "v1.0.0"
+npx airborne-devkit create-remote-files -p android --upload -t "v1.0.0"
+npx airborne-devkit create-remote-package -p android -t "v1.0.0"
 
-node /path/to/airborne_cli/src/index.js create-remote-files -p ios --upload -t "v1.0.0"
-node /path/to/airborne_cli/src/index.js create-remote-package -p ios -t "v1.0.0"
+npx airborne-devkit create-remote-files -p ios --upload -t "v1.0.0"
+npx airborne-devkit create-remote-package -p ios -t "v1.0.0"
 ```
 
 #### Step 6: Test
@@ -1090,31 +1104,30 @@ class MyApplication : Application() {
 #### Step 4: Deploy Using Core CLI
 ```bash
 # Configure
-airborne-core-cli configure --base-url http://localhost:8081
-airborne-core-cli login --client-id "..." --client-secret "..."
-
-TOKEN=$(cat .config | jq -r .token)
+npx airborne-core-cli configure --base-url http://localhost:8081
+npx airborne-core-cli login --client-id "..." --client-secret "..."
+export TOKEN="eyJhbGciOiJIUzI1N...."
 
 # Create org and app
-airborne-core-cli CreateOrganisation --name "MyCompany" --token "$TOKEN"
-airborne-core-cli CreateApplication --organisation "MyCompany" --application "MyApp" --token "$TOKEN"
+npx airborne-core-cli CreateOrganisation --name "MyCompany" --token "$TOKEN"
+npx airborne-core-cli CreateApplication --organisation "MyCompany" --application "MyApp" --token "$TOKEN"
 
 # Upload and deploy
-FILE_ID=$(airborne-core-cli UploadFile \
+FILE_ID=$(npx airborne-core-cli UploadFile \
   --file ./app/build/outputs/bundle.aab \
   --organisation "MyCompany" \
   --application "MyApp" \
-  --token "$TOKEN" | jq -r .file_id)
+  --token "$TOKEN")
 
-PKG_ID=$(airborne-core-cli CreatePackage \
+PKG_ID=$(npx airborne-core-cli CreatePackage \
   --index "$FILE_ID" \
   --files "$FILE_ID" \
   --tag "v1.0.0" \
   --organisation "MyCompany" \
   --application "MyApp" \
-  --token "$TOKEN" | jq -r .package_id)
+  --token "$TOKEN")
 
-airborne-core-cli CreateRelease \
+npx airborne-core-cli CreateRelease \
   --package "$PKG_ID" \
   --app_version "1.0.0" \
   --organisation "MyCompany" \
@@ -1147,22 +1160,14 @@ jobs:
       - name: Install deps
         run: npm install
       
-      - name: Build bundle
-        run: |
-          npx react-native bundle --platform android --dev false \
-            --entry-file index.js \
-            --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
-      
       - name: Deploy
         env:
           CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.AIRBORNE_CLIENT_SECRET }}
         run: |
-          cd airborne_cli
-          npm install
-          node src/index.js login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
-          node src/index.js create-remote-files -p android --upload -t "${{ github.ref_name }}"
-          node src/index.js create-remote-package -p android -t "${{ github.ref_name }}"
+          npx airborne-devkit login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
+          npx airborne-devkit create-remote-files -p android --upload -t "${{ github.ref_name }}"
+          npx airborne-devkit create-remote-package -p android -t "${{ github.ref_name }}"
 ```
 
 **Documentation:** [docs/airborne_cli/airborne_cli.md#cicd-integration](./airborne_cli/airborne_cli.md#cicd-integration)
@@ -1308,7 +1313,7 @@ echo $AIRBORNE_CLIENT_ID
 echo $AIRBORNE_CLIENT_SECRET
 
 # Re-login
-node /path/to/airborne_cli/src/index.js login \
+npx airborne-devkit login \
   --client_id "$AIRBORNE_CLIENT_ID" \
   --client_secret "$AIRBORNE_CLIENT_SECRET"
 
@@ -1326,10 +1331,10 @@ ls -la .airborne/
 #### Config Not Found
 ```bash
 # For Airborne CLI
-node /path/to/airborne_cli/src/index.js create-local-airborne-config
+npx airborne-devkit create-local-airborne-config
 
 # For Core CLI
-airborne-core-cli configure --base-url https://your-server.com
+npx airborne-core-cli configure --base-url https://your-server.com
 ```
 
 **Documentation:** 
@@ -1435,30 +1440,30 @@ make lint             # Run linter
 ### Airborne CLI
 ```bash
 # Setup
-create-local-airborne-config
-create-local-release-config -p <platform>
-login --client_id <id> --client_secret <secret>
+npx airborne-devkit create-local-airborne-config
+npx airborne-devkit create-local-release-config -p <platform>
+npx airborne-devkit login --client_id <id> --client_secret <secret>
 
 # Deploy
-create-remote-files -p <platform> --upload -t <tag>
-create-remote-package -p <platform> -t <tag>
+npx airborne-devkit create-remote-files -p <platform> --upload -t <tag>
+npx airborne-devkit create-remote-package -p <platform> -t <tag>
 ```
 
 ### Core CLI
 ```bash
 # Setup
-configure --base-url <url>
-login --client-id <id> --client-secret <secret>
+npx airborne-core-cli configure --base-url <url>
+npx airborne-core-cli login --client-id <id> --client-secret <secret>
 
 # Management
-CreateOrganisation --name <name> --token <token>
-CreateApplication --organisation <org> --application <app> --token <token>
-CreateDimension --dimension <name> --dimension_type standard --organisation <org> --application <app> --token <token>
+npx airborne-core-cli CreateOrganisation --name <name> --token <token>
+npx airborne-core-cli CreateApplication --organisation <org> --application <app> --token <token>
+npx airborne-core-cli CreateDimension --dimension <name> --dimension_type standard --organisation <org> --application <app> --token <token>
 
 # Deploy
-UploadFile --file <path> --organisation <org> --application <app> --token <token>
-CreatePackage --index <file_id> --files <file_ids> --organisation <org> --application <app> --token <token>
-CreateRelease --package <pkg_id> --app_version <version> --organisation <org> --application <app> --token <token>
+npx airborne-core-cli UploadFile --file <path> --organisation <org> --application <app> --token <token>
+npx airborne-core-cli CreatePackage --index <file_id> --files <file_ids> --organisation <org> --application <app> --token <token>
+npx airborne-core-cli CreateRelease --package <pkg_id> --app_version <version> --organisation <org> --application <app> --token <token>
 ```
 
 ---

@@ -44,23 +44,23 @@ Welcome to the Airborne CLI tools documentation. Airborne provides two CLI tools
 
 ## Quick Comparison
 
-| Feature                     | Airborne CLI (`airborne-devkit`)        | Airborne Core CLI (`airborne-core-cli`)            |
-| --------------------------- | --------------------------------------- | -------------------------------------------------- |
-| **NPM Package**             | `airborne-devkit`                       | `airborne-core-cli`                                |
-| **Relationship**            | Wrapper around Airborne Core CLI        | Standalone low-level CLI                           |
-| **Commands**                | All Core CLI commands + RN workflows    | Base commands only                                 |
-| **Target Users**            | Most users (RN & non-RN)                | Advanced users needing direct API control          |
-| **Application Support**     | React Native only                       | Any application                                    |
-| **Complexity**              | User-friendly, interactive              | Powerful, scriptable                               |
-| **Focus**                   | React Native workflows                  | Server API operations                              |
-| **Token Management**        | Automatic (stores & reuses)             | Manual (login prints token, not stored)            |
-| **Configuration**           | React Native projects                   | Any application                                    |
-| **File Handling**           | Bundle-focused                          | Generic file management                            |
-| **Release Management**      | Simplified                              | Full control                                       |
-| **Organization Management** | Yes (via wrapped commands)              | Yes                                                |
-| **Dimension Management**    | Yes (via wrapped commands)              | Yes                                                |
-| **Local Testing**           | Yes (via wrapped commands)              | Yes (serve releases)                               |
-| **Recommended For**         | ✅ Most use cases                       | Advanced scenarios requiring manual token handling |
+| Feature                     | Airborne CLI (`airborne-devkit`)     | Airborne Core CLI (`airborne-core-cli`)            |
+| --------------------------- | ------------------------------------ | -------------------------------------------------- |
+| **NPM Package**             | `airborne-devkit`                    | `airborne-core-cli`                                |
+| **Relationship**            | Wrapper around Airborne Core CLI     | Standalone low-level CLI                           |
+| **Commands**                | All Core CLI commands + RN workflows | Base commands only                                 |
+| **Target Users**            | Most users (RN & non-RN)             | Advanced users needing direct API control          |
+| **Application Support**     | React Native only                    | Any application                                    |
+| **Complexity**              | User-friendly, interactive           | Powerful, scriptable                               |
+| **Focus**                   | React Native workflows               | Server API operations                              |
+| **Token Management**        | Automatic (stores & reuses)          | Manual (login prints token, not stored)            |
+| **Configuration**           | React Native projects                | Any application                                    |
+| **File Handling**           | Bundle-focused                       | Generic file management                            |
+| **Release Management**      | Simplified                           | Full control                                       |
+| **Organization Management** | Yes (via wrapped commands)           | Yes                                                |
+| **Dimension Management**    | Yes (via wrapped commands)           | Yes                                                |
+| **Local Testing**           | Yes (via wrapped commands)           | Yes (serve releases)                               |
+| **Recommended For**         | ✅ Most use cases                    | Advanced scenarios requiring manual token handling |
 
 ## Getting Started
 
@@ -69,19 +69,34 @@ Welcome to the Airborne CLI tools documentation. Airborne provides two CLI tools
 Start with **[Airborne CLI](./airborne_cli.md)**:
 
 ```bash
+# Install from npm
+npm install -g airborne-devkit
+# or use npx (no installation needed)
+
 # Navigate to your React Native project
 cd my-react-native-app
 
 # Initialize configuration
-node path/to/airborne_cli/src/index.js create-local-airborne-config
+npx airborne-devkit create-local-airborne-config
 
-# Create release config
-node path/to/airborne_cli/src/index.js create-local-release-config -p android
+# Create release config (choose platform)
+npx airborne-devkit create-local-release-config -p android
+# OR
+npx airborne-devkit create-local-release-config -p ios
 
-# Deploy
-node path/to/airborne_cli/src/index.js login --client_id YOUR_ID --client_secret YOUR_SECRET
-node path/to/airborne_cli/src/index.js create-remote-files -p android --upload
-node path/to/airborne_cli/src/index.js create-remote-package -p android
+# Configure base URL
+npx airborne-devkit configure --base-url https://airborne.juspay.in
+
+# Deploy (choose platform)
+npx airborne-devkit login --client_id YOUR_ID --client_secret YOUR_SECRET
+
+# For Android
+npx airborne-devkit create-remote-files -p android --upload
+npx airborne-devkit create-remote-package -p android
+
+# OR for iOS
+npx airborne-devkit create-remote-files -p ios --upload
+npx airborne-devkit create-remote-package -p ios
 ```
 
 ### For Server Administrators
@@ -89,21 +104,25 @@ node path/to/airborne_cli/src/index.js create-remote-package -p android
 Start with **[Airborne Core CLI](./airborne_core_cli.md)**:
 
 ```bash
+# Install from npm
+npm install -g airborne-core-cli
+# or use npx (no installation needed)
+
 # Configure server endpoint
-airborne-core-cli configure --base-url https://your-server.com
+npx airborne-core-cli configure --base-url https://your-server.com
 
 # Login
-airborne-core-cli login --client-id YOUR_ID --client-secret YOUR_SECRET
+npx airborne-core-cli login --client-id YOUR_ID --client-secret YOUR_SECRET
 
 # Create organization
-airborne-core-cli create-org --name "MyOrg" --description "My Organization"
+npx airborne-core-cli CreateOrganisation --name "MyOrg" --token "your_token"
 
 # Create application
-airborne-core-cli create-app --org-id org_123 --name "MyApp"
+npx airborne-core-cli CreateApplication --organisation "MyOrg" --application "MyApp" --token "your_token"
 
 # Upload and create package
-airborne-core-cli upload-file --file ./bundle.js --tag v1.0.0
-airborne-core-cli create-package --config ./package-config.json
+npx airborne-core-cli UploadFile --file ./bundle.js --tag v1.0.0 --organisation "MyOrg" --application "MyApp" --token "your_token"
+npx airborne-core-cli CreatePackage --index "file_id" --files "file_id" --tag v1.0.0 --organisation "MyOrg" --application "MyApp" --token "your_token"
 ```
 
 ## Installation
@@ -113,21 +132,14 @@ airborne-core-cli create-package --config ./package-config.json
 **NPM Package**: `airborne-devkit`
 
 ```bash
-# Install from npm
+# Install globally
 npm install -g airborne-devkit
 
 # Or install locally in your project
 npm install --save-dev airborne-devkit
-```
 
-**From Repository** (located at `airborne_cli/`):
-
-```bash
-cd airborne_cli
-npm install
-
-# Run commands
-node src/index.js --help
+# Run with npx (no installation needed)
+npx airborne-devkit --help
 ```
 
 ### Airborne Core CLI
@@ -135,24 +147,14 @@ node src/index.js --help
 **NPM Package**: `airborne-core-cli`
 
 ```bash
-# Install from npm
+# Install globally
 npm install -g airborne-core-cli
 
 # Or install locally in your project
 npm install --save-dev airborne-core-cli
-```
 
-**From Repository** (located at `airborne-core-cli/`):
-
-```bash
-cd airborne-core-cli
-npm install
-
-# Install globally (optional)
-npm link
-
-# Run commands
-airborne-core-cli --help
+# Run with npx (no installation needed)
+npx airborne-core-cli --help
 ```
 
 ## Common Workflows
@@ -166,36 +168,47 @@ npx react-native bundle --platform android --dev false \
   --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
 
 # 2. Create/update release config
-node airborne_cli/src/index.js create-local-release-config -p android
+npx airborne-devkit create-local-release-config -p android
 
-# 3. Authenticate
-node airborne_cli/src/index.js login --client_id $CLIENT_ID --client_secret $CLIENT_SECRET
+# 3. Configure base URL (one-time setup)
+npx airborne-devkit configure --base-url https://airborne.juspay.in
 
-# 4. Upload files
-node airborne_cli/src/index.js create-remote-files -p android --upload -t "v1.2.0"
+# 4. Authenticate
+npx airborne-devkit login --client_id $CLIENT_ID --client_secret $CLIENT_SECRET
 
-# 5. Create package
-node airborne_cli/src/index.js create-remote-package -p android -t "v1.2.0"
+# 5. Upload files
+npx airborne-devkit create-remote-files -p android --upload -t "v1.2.0"
+
+# 6. Create package
+npx airborne-devkit create-remote-package -p android -t "v1.2.0"
 ```
 
 ### Setting Up a New Organization
 
 ```bash
 # 1. Configure endpoint
-airborne-core-cli configure --base-url https://airborne.example.com
+npx airborne-core-cli configure --base-url https://airborne.example.com
 
 # 2. Login
-airborne-core-cli login --client-id $CLIENT_ID --client-secret $CLIENT_SECRET
+npx airborne-core-cli login --client-id $CLIENT_ID --client-secret $CLIENT_SECRET
 
 # 3. Create organization
-airborne-core-cli create-org --name "MyCompany" --description "Company OTA updates"
+npx airborne-core-cli CreateOrganisation --name "MyCompany" --token "your_token"
 
 # 4. Create application
-airborne-core-cli create-app --org-id org_abc123 --name "MyApp"
+npx airborne-core-cli CreateApplication \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
 
 # 5. Create dimensions
-airborne-core-cli create-dimension --key "userType" --value "premium"
-airborne-core-cli create-dimension --key "city" --value "bangalore"
+npx airborne-core-cli CreateDimension \
+  --dimension "userType" \
+  --description "User subscription type" \
+  --dimension_type "standard" \
+  --organisation "MyCompany" \
+  --application "MyApp" \
+  --token "your_token"
 ```
 
 ### Testing Releases Locally
@@ -204,8 +217,11 @@ airborne-core-cli create-dimension --key "city" --value "bangalore"
 # Using Airborne Core CLI to serve releases locally
 
 # 1. Create a local release configuration
-airborne-core-cli serve-release-v2 --namespace myapp --platform android \
-  --port 3000 --config ./local-release-config.json
+npx airborne-core-cli ServeReleaseV2 \
+  --namespace myapp \
+  --platform android \
+  --port 3000 \
+  --config ./local-release-config.json
 
 # 2. Point your app to http://localhost:3000/release/myapp/android
 
@@ -231,7 +247,7 @@ Obtain client credentials from the Airborne website:
 **Airborne CLI** (`airborne-devkit`):
 
 ```bash
-node airborne_cli/src/index.js login \
+npx airborne-devkit login \
   --client_id your_client_id \
   --client_secret your_client_secret
 ```
@@ -239,7 +255,7 @@ node airborne_cli/src/index.js login \
 **Airborne Core CLI**:
 
 ```bash
-airborne-core-cli login \
+npx airborne-core-cli login \
   --client-id your_client_id \
   --client-secret your_client_secret
 ```
@@ -247,12 +263,14 @@ airborne-core-cli login \
 ### Token Management - Key Difference
 
 **Airborne CLI (`airborne-devkit`)**:
+
 - **Automatic token management**: Stores authentication tokens locally and reuses them
 - You only need to login once, subsequent commands automatically use the stored token
 - Token stored in `.airborne/` directory in your project
 - No need to provide token on every command
 
 **Airborne Core CLI**:
+
 - **Manual token handling**: Login command prints the token to console instead of storing it
 - Does NOT store tokens automatically
 - You must manually copy and provide the token on every command
@@ -275,7 +293,7 @@ export AIRBORNE_CLIENT_SECRET="your_client_secret"
 export AIRBORNE_SERVER_URL="https://airborne.example.com"
 
 # Use in commands
-node airborne_cli/src/index.js login \
+npx airborne-devkit login \
   --client_id "$AIRBORNE_CLIENT_ID" \
   --client_secret "$AIRBORNE_CLIENT_SECRET"
 ```
@@ -318,11 +336,10 @@ jobs:
           CLIENT_ID: ${{ secrets.AIRBORNE_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.AIRBORNE_CLIENT_SECRET }}
         run: |
-          cd airborne_cli
-          npm install
-          node src/index.js login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
-          node src/index.js create-remote-files -p android --upload -t "${{ github.ref_name }}"
-          node src/index.js create-remote-package -p android -t "${{ github.ref_name }}"
+          npx airborne-devkit configure --base-url https://airborne.juspay.in
+          npx airborne-devkit login --client_id "$CLIENT_ID" --client_secret "$CLIENT_SECRET"
+          npx airborne-devkit create-remote-files -p android --upload -t "${{ github.ref_name }}"
+          npx airborne-devkit create-remote-package -p android -t "${{ github.ref_name }}"
 ```
 
 ### GitLab CI Example
@@ -342,6 +359,12 @@ deploy-ota:
     - node src/index.js login --client_id "$AIRBORNE_CLIENT_ID" --client_secret "$AIRBORNE_CLIENT_SECRET"
     - node src/index.js create-remote-files -p android --upload -t "$CI_COMMIT_TAG"
     - node src/index.js create-remote-package -p android -t "$CI_COMMIT_TAG"
+      --entry-file index.js
+      --bundle-output android/app/build/generated/assets/react/release/index.android.bundle
+    - npx airborne-devkit configure --base-url https://airborne.juspay.in
+    - npx airborne-devkit login --client_id "$AIRBORNE_CLIENT_ID" --client_secret "$AIRBORNE_CLIENT_SECRET"
+    - npx airborne-devkit create-remote-files -p android --upload -t "$CI_COMMIT_TAG"
+    - npx airborne-devkit create-remote-package -p android -t "$CI_COMMIT_TAG"
   variables:
     AIRBORNE_CLIENT_ID: $AIRBORNE_CLIENT_ID
     AIRBORNE_CLIENT_SECRET: $AIRBORNE_CLIENT_SECRET
@@ -380,12 +403,11 @@ deploy-ota:
 **Solution**:
 
 ```bash
-# Install globally
-cd airborne-core-cli
-npm link
+# Install from npm
+npm install -g airborne-core-cli
 
-# Or use full path
-node /path/to/airborne-core-cli/bin.js --help
+# Or use npx (no installation needed)
+npx airborne-core-cli --help
 ```
 
 #### 4. Configuration Not Found
@@ -396,11 +418,11 @@ node /path/to/airborne-core-cli/bin.js --help
 
 ```bash
 # For Airborne Core CLI
-airborne-core-cli configure --base-url https://your-server.com
+npx airborne-core-cli configure --base-url https://your-server.com
 
 # For Airborne CLI
 cd your-project
-node path/to/airborne_cli/src/index.js create-local-airborne-config
+npx airborne-devkit create-local-airborne-config
 ```
 
 ## Next Steps

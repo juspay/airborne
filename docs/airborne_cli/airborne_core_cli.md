@@ -34,7 +34,7 @@ The Airborne Core CLI provides low-level access to:
 
 ## Installation
 
-### Method 1: Install from npm
+### Install from npm
 
 **NPM Package**: `airborne-core-cli`
 
@@ -46,20 +46,7 @@ npm install -g airborne-core-cli
 npm install --save-dev airborne-core-cli
 
 # Run
-airborne-core-cli --help
-```
-
-### Method 2: From Source (Requires Node.js 18+)
-
-```bash
-cd airborne-core-cli
-npm install
-
-# Install globally (optional)
-npm link
-
-# Run
-airborne-core-cli --help
+npx airborne-core-cli --help
 ```
 
 ## Quick Start
@@ -67,7 +54,7 @@ airborne-core-cli --help
 ### 1. Configure Server Endpoint
 
 ```bash
-airborne-core-cli configure --base-url https://your-airborne-server.com
+npx airborne-core-cli configure --base-url https://your-airborne-server.com
 ```
 
 ### 2. Get Client Credentials
@@ -83,7 +70,7 @@ Obtain credentials from the Airborne website:
 ### 3. Login
 
 ```bash
-airborne-core-cli login \
+npx airborne-core-cli login \
   --client-id your_client_id \
   --client-secret your_client_secret
 ```
@@ -93,7 +80,7 @@ airborne-core-cli login \
 ### 4. Create Organization
 
 ```bash
-airborne-core-cli CreateOrganisation \
+npx airborne-core-cli CreateOrganisation \
   --name "MyCompany" \
   --token "your_token_from_login"
 ```
@@ -101,7 +88,7 @@ airborne-core-cli CreateOrganisation \
 ### 5. Create Application
 
 ```bash
-airborne-core-cli CreateApplication \
+npx airborne-core-cli CreateApplication \
   --organisation "MyCompany" \
   --application "MyApp" \
   --token "your_token_from_login"
@@ -116,7 +103,7 @@ airborne-core-cli CreateApplication \
 Set the Airborne server base URL.
 
 ```bash
-airborne-core-cli configure --base-url https://airborne.example.com
+npx airborne-core-cli configure --base-url https://airborne.example.com
 ```
 
 ### Authentication
@@ -139,7 +126,7 @@ Authenticate with the Airborne server.
 - `--client-secret` - Client secret (required)
 
 ```bash
-airborne-core-cli login \
+npx airborne-core-cli login \
   --client-id your_client_id \
   --client-secret your_client_secret
 ```
@@ -164,7 +151,7 @@ Create a new organization.
 1. **CLI Options**:
 
 ```bash
-airborne-core-cli CreateOrganisation \
+npx airborne-core-cli CreateOrganisation \
   --name "Acme Corp" \
   --token "your_token_here"
 ```
@@ -178,13 +165,13 @@ airborne-core-cli CreateOrganisation \
   "token": "your_token_here"
 }
 
-airborne-core-cli CreateOrganisation @params.json
+npx airborne-core-cli CreateOrganisation @params.json
 ```
 
 3. **Mixed**:
 
 ```bash
-airborne-core-cli CreateOrganisation @params.json --name "Different Name"
+npx airborne-core-cli CreateOrganisation @params.json --name "Different Name"
 ```
 
 #### `ListOrganisations`
@@ -192,7 +179,7 @@ airborne-core-cli CreateOrganisation @params.json --name "Different Name"
 List all organizations.
 
 ```bash
-airborne-core-cli ListOrganisations --token "your_token"
+npx airborne-core-cli ListOrganisations --token "your_token"
 ```
 
 #### `RequestOrganisation`
@@ -200,7 +187,7 @@ airborne-core-cli ListOrganisations --token "your_token"
 Request access to an organization.
 
 ```bash
-airborne-core-cli RequestOrganisation \
+npx airborne-core-cli RequestOrganisation \
   --organisation "Acme Corp" \
   --token "your_token"
 ```
@@ -220,7 +207,7 @@ Create a new application within an organization.
 - `--token` - Bearer token (required)
 
 ```bash
-airborne-core-cli CreateApplication \
+npx airborne-core-cli CreateApplication \
   --application "Mobile App" \
   --organisation "Acme Corp" \
   --token "your_token"
@@ -248,7 +235,7 @@ Create a dimension for user segmentation.
 
 ```bash
 # Standard dimension
-airborne-core-cli CreateDimension \
+npx airborne-core-cli CreateDimension \
   --dimension "userType" \
   --description "User subscription type" \
   --dimension_type "standard" \
@@ -257,7 +244,7 @@ airborne-core-cli CreateDimension \
   --token "your_token"
 
 # Cohort dimension (depends on another dimension)
-airborne-core-cli CreateDimension \
+npx airborne-core-cli CreateDimension \
   --dimension "premiumFeatures" \
   --description "Premium user features" \
   --dimension_type "cohort" \
@@ -272,7 +259,7 @@ airborne-core-cli CreateDimension \
 List all dimensions for an application.
 
 ```bash
-airborne-core-cli ListDimensions \
+npx airborne-core-cli ListDimensions \
   --organisation "Acme Corp" \
   --application "Mobile App" \
   --token "your_token"
@@ -283,7 +270,7 @@ airborne-core-cli ListDimensions \
 Update an existing dimension.
 
 ```bash
-airborne-core-cli UpdateDimension \
+npx airborne-core-cli UpdateDimension \
   --dimension "userType" \
   --description "Updated description" \
   --organisation "Acme Corp" \
@@ -296,7 +283,7 @@ airborne-core-cli UpdateDimension \
 Delete a dimension.
 
 ```bash
-airborne-core-cli DeleteDimension \
+npx airborne-core-cli DeleteDimension \
   --dimension "userType" \
   --organisation "Acme Corp" \
   --application "Mobile App" \
@@ -325,7 +312,7 @@ Create a file record on the server.
 
 ```bash
 # Simple file
-airborne-core-cli CreateFile \
+npx airborne-core-cli CreateFile \
   --file_path "index.android.bundle" \
   --url "https://cdn.example.com/bundles/index.android.bundle" \
   --organisation "Acme Corp" \
@@ -333,7 +320,7 @@ airborne-core-cli CreateFile \
   --token "your_token"
 
 # With tag and metadata
-airborne-core-cli CreateFile \
+npx airborne-core-cli CreateFile \
   --file_path "assets/logo.png" \
   --url "https://cdn.example.com/assets/logo.png" \
   --tag "v1.0.0" \
@@ -354,7 +341,7 @@ cat > file-params.json << EOF
 }
 EOF
 
-airborne-core-cli CreateFile @file-params.json
+npx airborne-core-cli CreateFile @file-params.json
 ```
 
 #### `UploadFile`
@@ -370,7 +357,7 @@ Upload a file directly to the Airborne server.
 - `--token` - Bearer token (required)
 
 ```bash
-airborne-core-cli UploadFile \
+npx airborne-core-cli UploadFile \
   --file ./build/index.android.bundle \
   --tag "v1.0.0" \
   --organisation "Acme Corp" \
@@ -383,7 +370,7 @@ airborne-core-cli UploadFile \
 List all files for an application.
 
 ```bash
-airborne-core-cli ListFiles \
+npx airborne-core-cli ListFiles \
   --organisation "Acme Corp" \
   --application "Mobile App" \
   --token "your_token"
@@ -407,7 +394,7 @@ Create a package from file IDs.
 - `--token` - Bearer token (required)
 
 ```bash
-airborne-core-cli CreatePackage \
+npx airborne-core-cli CreatePackage \
   --index "file_abc123" \
   --files "file_abc123 file_def456 file_ghi789" \
   --tag "v1.0.0" \
@@ -421,7 +408,7 @@ airborne-core-cli CreatePackage \
 List all packages for an application.
 
 ```bash
-airborne-core-cli ListPackages \
+npx airborne-core-cli ListPackages \
   --organisation "Acme Corp" \
   --application "Mobile App" \
   --token "your_token"
@@ -447,7 +434,7 @@ Create a release from a package.
 - `--token` - Bearer token (required)
 
 ```bash
-airborne-core-cli CreateRelease \
+npx airborne-core-cli CreateRelease \
   --package "pkg_xyz123" \
   --app_version "1.0.0" \
   --boot_timeout_ms 30000 \
@@ -462,7 +449,7 @@ airborne-core-cli CreateRelease \
 Get release details.
 
 ```bash
-airborne-core-cli GetRelease \
+npx airborne-core-cli GetRelease \
   --release_id "rel_abc123" \
   --organisation "Acme Corp" \
   --application "Mobile App" \
@@ -474,7 +461,7 @@ airborne-core-cli GetRelease \
 List all releases for an application.
 
 ```bash
-airborne-core-cli ListReleases \
+npx airborne-core-cli ListReleases \
   --organisation "Acme Corp" \
   --application "Mobile App" \
   --token "your_token"
@@ -489,7 +476,7 @@ airborne-core-cli ListReleases \
 Serve a release configuration locally for testing.
 
 ```bash
-airborne-core-cli ServeRelease \
+npx airborne-core-cli ServeRelease \
   --port 3000 \
   --config ./local-release-config.json
 ```
@@ -501,7 +488,7 @@ Access at: `http://localhost:3000`
 Serve release with namespace and platform routing.
 
 ```bash
-airborne-core-cli ServeReleaseV2 \
+npx airborne-core-cli ServeReleaseV2 \
   --namespace "myapp" \
   --platform "android" \
   --port 3000 \
@@ -519,7 +506,7 @@ Access at: `http://localhost:3000/release/myapp/android`
 Get current user information.
 
 ```bash
-airborne-core-cli GetUser --token "your_token"
+npx airborne-core-cli GetUser --token "your_token"
 ```
 
 ---
@@ -551,10 +538,10 @@ cat > params.json << EOF
 EOF
 
 # Use it
-airborne-core-cli CreateApplication @params.json
+npx airborne-core-cli CreateApplication @params.json
 
 # Override specific fields
-airborne-core-cli CreateApplication @params.json --application "DifferentApp"
+npx airborne-core-cli CreateApplication @params.json --application "DifferentApp"
 ```
 
 ## Workflows
@@ -563,25 +550,25 @@ airborne-core-cli CreateApplication @params.json --application "DifferentApp"
 
 ```bash
 # 1. Configure server
-airborne-core-cli configure --base-url https://airborne.example.com
+npx airborne-core-cli configure --base-url https://airborne.example.com
 
 # 2. Login
-airborne-core-cli login \
+npx airborne-core-cli login \
   --client-id "$CLIENT_ID" \
   --client-secret "$CLIENT_SECRET"
 
 # 3. Create organization
-airborne-core-cli CreateOrganisation \
+npx airborne-core-cli CreateOrganisation \
   --name "MyCompany" \
   --token "eyJhbGciOiJIUzI1N...."
 # 4. Create application
-airborne-core-cli CreateApplication \
+npx airborne-core-cli CreateApplication \
   --organisation "MyCompany" \
   --application "MyApp" \
   --token "eyJhbGciOiJIUzI1N...."
 
 # 5. Create dimensions
-airborne-core-cli CreateDimension \
+npx airborne-core-cli CreateDimension \
   --dimension "userType" \
   --description "User subscription type" \
   --dimension_type "standard" \
@@ -593,25 +580,24 @@ airborne-core-cli CreateDimension \
 ### Deployment Workflow
 
 ```bash
-TOKEN=$(cat .config | jq -r .token)
 ORG="MyCompany"
 APP="MyApp"
 
 # 1. Upload files
-FILE1=$(airborne-core-cli UploadFile \
+FILE1=$(npx airborne-core-cli UploadFile \
   --file ./build/index.android.bundle \
   --organisation "$ORG" \
   --application "$APP" \
   --token "eyJhbGciOiJIUzI1N....")
 
-FILE2=$(airborne-core-cli UploadFile \
+FILE2=$(npx airborne-core-cli UploadFile \
   --file ./build/assets/logo.png \
   --organisation "$ORG" \
   --application "$APP" \
   --token "eyJhbGciOiJIUzI1N....")
 
 # 2. Create package
-PKG=$(airborne-core-cli CreatePackage \
+PKG=$(npx airborne-core-cli CreatePackage \
   --index "$FILE1" \
   --files "$FILE1 $FILE2" \
   --tag "v1.0.0" \
@@ -620,7 +606,7 @@ PKG=$(airborne-core-cli CreatePackage \
   --token "eyJhbGciOiJIUzI1N....")
 
 # 3. Create release
-airborne-core-cli CreateRelease \
+npx airborne-core-cli CreateRelease \
   --package "$PKG" \
   --app_version "1.0.0" \
   --boot_timeout_ms 30000 \
@@ -654,7 +640,7 @@ cat > test-release.json << EOF
 EOF
 
 # Serve it locally
-airborne-core-cli ServeReleaseV2 \
+npx airborne-core-cli ServeReleaseV2 \
   --namespace "test-app" \
   --platform "android" \
   --port 3000 \
@@ -695,6 +681,9 @@ jobs:
           airborne-core-cli configure --base-url https://airborne.example.com
           airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
 
+          npx airborne-core-cli configure --base-url https://airborne.example.com
+          npx airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
+
       - name: Deploy
         run: |
           TOKEN="eyJhbGciOiJIUzI1N...."
@@ -715,25 +704,28 @@ jobs:
 
    # Or use full path
    /usr/local/bin/airborne-core-cli --help
+
+   # Or use npx
+   npx airborne-core-cli --help
    ```
 
 2. **Config Not Found**
 
    ```bash
-   airborne-core-cli configure --base-url https://your-server.com
+   npx airborne-core-cli configure --base-url https://your-server.com
    ```
 
 3. **Authentication Failed**
 
    ```bash
    # Re-login
-   airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
+   npx airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
    ```
 
 4. **Token Expired**
    ```bash
    # Login again to refresh token
-   airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
+   npx airborne-core-cli login --client-id "$CLIENT_ID" --client-secret "$CLIENT_SECRET"
    ```
 
 ## Next Steps
