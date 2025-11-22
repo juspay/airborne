@@ -27,26 +27,62 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Create the main window early
         self.window = UIWindow(frame: UIScreen.main.bounds)
         
+//        let delegate = ReactNativeDelegate(customPath: bundlePath)
+//        let factory = RCTReactNativeFactory(delegate: delegate)
+//        delegate.dependencyProvider = RCTAppDependencyProvider()
+//        
+//        reactNativeDelegate = delegate
+//        reactNativeFactory = factory
+//        
+//        factory.startReactNative(
+//            withModuleName: "AirborneExample",
+//            in: window,
+//            launchOptions: self.launchOptions
+//        )
+        
+        
+//        let delegate = ReactNativeDelegate()
+//        let factory = RCTReactNativeFactory(delegate: delegate)
+//        delegate.dependencyProvider = RCTAppDependencyProvider()
+//
+//        reactNativeDelegate = delegate
+//        reactNativeFactory = factory
+//
+//        window = UIWindow(frame: UIScreen.main.bounds)
+//
+//        factory.startReactNative(
+//          withModuleName: "AirborneExample",
+//          in: window,
+//          launchOptions: launchOptions
+//        )
+
         return true
     }
     
     private func initializeHyperOTA() {
-        airborne = Airborne(releaseConfigURL: "https://airborne.sandbox.juspay.in/release/airborne-react-example/ios", delegate: self)
+        airborne = Airborne(releaseConfigURL: "http://127.0.0.1:8080/release_config.json", delegate: self)
         print("HyperOTA: Initialized successfully")
     }
 }
 
 extension AppDelegate: AirborneDelegate {
     
-    func getNamespace() -> String {
+    func namespace() -> String {
         return "airborneexample"
     }
     
-    func getBundle() -> Bundle {
-        return Bundle.main
+    func bundle() -> Bundle {
+        guard
+            let bundleURL = Bundle.main.url(forResource: "airborneex", withExtension: "bundle"),
+            let bundle = Bundle(url: bundleURL)
+        else {
+            fatalError("❌ Could not find airborneex.bundle in main bundle.")
+        }
+
+        return bundle
     }
     
-    func getDimensions() -> [String : String] {
+    func dimensions() -> [String : String] {
         return [:]
     }
     
@@ -54,32 +90,37 @@ extension AppDelegate: AirborneDelegate {
         print("Event: \(key) = \(value)")
     }
     
-    func startApp(_ bundlePath: String) {
+
+    func startApp(indexBundleURL: URL) -> Void {
         DispatchQueue.main.async { [self] in
             
-            let delegate = ReactNativeDelegate(customPath: bundlePath)
+            let bundlePath = indexBundleURL.absoluteString
+            
+            print("In start APP \(bundlePath)")
+            let delegate = ReactNativeDelegate(bundleURL: indexBundleURL)
             let factory = RCTReactNativeFactory(delegate: delegate)
             delegate.dependencyProvider = RCTAppDependencyProvider()
-            
+
             reactNativeDelegate = delegate
             reactNativeFactory = factory
-            
+
             factory.startReactNative(
                 withModuleName: "AirborneExample",
                 in: window,
                 launchOptions: self.launchOptions
             )
-            
+
         }
     }
+
 }
 
 class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
     
-    private let customPath: String
+    private let bundleUrl: URL
     
-    init(customPath: String) {
-        self.customPath = customPath
+    init(bundleURL: URL) {
+        self.bundleUrl = bundleURL
         super.init()
     }
     
@@ -88,10 +129,30 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
     }
     
     override func bundleURL() -> URL? {
-#if DEBUG
-        RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
-#else
-        URL(fileURLWithPath: customPath)
-#endif
+        
+//        if let bundleURL = Bundle.main.url(forResource: "airborneex", withExtension: "bundle") {
+//              return bundleURL.appendingPathComponent("main.jsbundle")
+//          }
+        
+        return self.bundleUrl
     }
 }
+
+//class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
+//  override func sourceURL(for bridge: RCTBridge) -> URL? {
+//    self.bundleURL()
+//  }
+//
+//  override func bundleURL() -> URL? {
+//      
+//      if let bundleURL = Bundle.main.url(forResource: "airborneex", withExtension: "bundle") {
+//          return bundleURL.appendingPathComponent("main.jsbundle")
+//      }
+//      
+//#if DEBUG
+//    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+//#else
+//    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+//#endif
+//  }
+//}
