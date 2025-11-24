@@ -1137,7 +1137,7 @@ async fn serve_release_handler(
         organisation.clone(),
     )
     .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
+    .map_err(|e| ABError::NotFound(format!("Failed to get workspace name: {}", e)))?;
 
     let context: HashMap<String, Value> = req
         .headers()
