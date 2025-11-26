@@ -904,8 +904,12 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     [request setValue:self.config.version forHTTPHeaderField: @"x-config-version"];
     
     // TODO: hyper sdk version can also be added from the headers from SessionManager
+    NSMutableString *dimensions = [NSMutableString string];
     for (NSString *field in self.releaseConfigHeaders) {
-        [request setValue:self.releaseConfigHeaders[field] forHTTPHeaderField:field];
+        [dimensions appendString:[NSString stringWithFormat:@"%@=%@;", field, self.releaseConfigHeaders[field]]];
+    }
+    if (![dimensions isEqualToString: @""]) {
+        [request setValue:dimensions forHTTPHeaderField:@"x-dimension"];
     }
 
     NSURLSession *session = [NSURLSession sharedSession];
