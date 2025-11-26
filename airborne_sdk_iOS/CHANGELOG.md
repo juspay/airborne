@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.1.3 - 2025-11-26
+#### Bug Fixes
+- fixing headers send to server - (2a59772) - Namit Goel
+
+- - -
+
+## v0.15.1 - 2025-11-26
+#### Miscellaneous Chores
+- **(version)** v0.15.1 [skip ci] - (a49504e) - Airborne Bot
+
+- - -
+
+## v0.15.0 - 2025-11-26
+#### Miscellaneous Chores
+- **(version)** v0.15.0 [skip ci] - (c51c3cb) - Airborne Bot
+
+- - -
+
+## v0.14.1 - 2025-11-26
+#### Miscellaneous Chores
+- **(version)** v0.14.1 [skip ci] - (bdcba5f) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.1.2 - 2025-11-05
 #### Bug Fixes
 - Fixing nil value crash in release config - (fbddd47) - Balaganesh S

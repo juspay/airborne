@@ -26,7 +26,7 @@ const program = new Command();
 program
   .name("airborne-devkit")
   .description("Command-line interface for Airborne operations")
-  .version("0.15.1");
+  .version("0.15.2");
 
 coreCli.commands.forEach((cmd, i) => {
   if (cmd._name !== "PostLogin") {
