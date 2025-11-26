@@ -174,7 +174,7 @@ async fn organisation_add_user(
                 .into());
             }
         } else {
-            return Err(ABError::Unauthorized("No organization access".to_string()));
+            return Err(ABError::Forbidden("No organization access".to_string()));
         }
     }
 

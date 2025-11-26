@@ -78,7 +78,7 @@ async fn create_file(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -174,7 +174,7 @@ async fn bulk_create_files(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -321,7 +321,7 @@ async fn get_file(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -374,7 +374,7 @@ async fn list_files(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -466,7 +466,7 @@ async fn update_file(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -531,7 +531,7 @@ async fn upload_file(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -796,7 +796,7 @@ async fn upload_bulk_files(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)

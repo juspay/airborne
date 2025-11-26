@@ -10,6 +10,12 @@ type FetchOptions = {
   showErrorToast?: boolean; // New option to control error toast display
 };
 
+export enum ErrorName {
+  Forbidden = "forbidden",
+  Unauthorized = "unauthorized",
+  Unknown = "unknown",
+}
+
 export async function apiFetch<T>(
   path: string,
   opts: FetchOptions = {},
@@ -48,7 +54,7 @@ export async function apiFetch<T>(
     });
 
     // Handle different HTTP status codes
-    if ((res.status === 401 || res.status === 403) && !path.includes("login") && !path.includes("oauth")) {
+    if (res.status === 401 && !path.includes("login") && !path.includes("oauth")) {
       // Handle unauthorized access
       console.error("Unauthorized access - redirecting to login");
       localStorage.clear();
@@ -57,8 +63,19 @@ export async function apiFetch<T>(
         window.location.href = "/login";
       }
       const error = new Error("Unauthorized access");
+      error.name = ErrorName.Unauthorized;
       if (showErrorToast) {
         toastError("Authentication Failed", "Please log in again");
+      }
+      throw error;
+    }
+
+    if (res.status === 403) {
+      // Handle forbidden access
+      const error = new Error("You do not have permission to access this resource");
+      error.name = ErrorName.Forbidden;
+      if (showErrorToast) {
+        toastError("Access Denied", "You do not have permission to access this resource");
       }
       throw error;
     }
@@ -76,6 +93,7 @@ export async function apiFetch<T>(
     if (!res.ok) {
       const errorMessage = responseData?.message || responseData?.error || `HTTP ${res.status}: ${res.statusText}`;
       const error = new Error(errorMessage);
+      error.name = ErrorName.Unknown;
 
       if (showErrorToast) {
         toastError("Request Failed", errorMessage);

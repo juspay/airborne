@@ -39,7 +39,7 @@ async fn list_cohorts_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -89,9 +89,9 @@ async fn create_cohort_checkpoint_api(
     let cohort_dimension_id = cohort_dimension.into_inner();
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+        .map_err(|_| ABError::Forbidden("No access to org".to_string()))?;
     let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+        .map_err(|_| ABError::Forbidden("No access to application".to_string()))?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -261,7 +261,7 @@ async fn create_cohort_group_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -360,7 +360,7 @@ async fn get_cohort_priority_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -435,7 +435,7 @@ async fn update_cohort_priority_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
