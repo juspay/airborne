@@ -57,7 +57,7 @@ async fn create_package(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -168,7 +168,7 @@ async fn get_package(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -218,7 +218,7 @@ async fn list_packages(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)

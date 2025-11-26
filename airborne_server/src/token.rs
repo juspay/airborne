@@ -53,7 +53,7 @@ async fn create_token(
     let (org_name, app_name) = match validate_user(auth_response.organisation.clone(), ADMIN) {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), ADMIN)
@@ -126,7 +126,7 @@ async fn delete_token(
         match validate_user(auth_response.organisation.clone(), ADMIN) {
             Ok(org_name) => auth_response
                 .application
-                .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+                .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
                 .map(|access| (org_name, access.name)),
             Err(_) => {
                 validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
@@ -159,7 +159,7 @@ async fn list_tokens(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), ADMIN)

@@ -139,7 +139,7 @@ async fn add_application(
     info!("Validating organisation: {:?}", organisation);
     let organisation = validate_user(organisation, ADMIN).map_err(|e| {
         info!("Error validating organisation: {:?}", e);
-        ABError::Unauthorized(format!(
+        ABError::Forbidden(format!(
             "User does not have ADMIN access to organisation: {}",
             e
         ))
