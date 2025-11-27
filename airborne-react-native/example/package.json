@@ -1,6 +1,6 @@
 {
   "name": "airborne-react-native-example",
-  "version": "0.15.2",
+  "version": "0.15.3",
   "private": true,
   "scripts": {
     "android": "react-native run-android",

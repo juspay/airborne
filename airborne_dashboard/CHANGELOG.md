@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.10.1 - 2025-11-27
+#### Bug Fixes
+- CVE issues in built image - (9a3de2d) - yuvrajjsingh0
+
+- - -
+
+## v0.15.2 - 2025-11-27
+#### Miscellaneous Chores
+- **(version)** v0.15.2 [skip ci] - (0479382) - Airborne Bot
+
+- - -
+
+## v0.15.1 - 2025-11-27
+#### Miscellaneous Chores
+- **(version)** v0.15.1 [skip ci] - (a49504e) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.10.0 - 2025-11-18
 #### Features
 - add pagination to list packages and releases - (760909b) - Yash Rajput

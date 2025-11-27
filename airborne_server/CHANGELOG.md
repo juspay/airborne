@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.10.2 - 2025-11-27
+#### Bug Fixes
+- CVE issues in built image - (9a3de2d) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.10.1 - 2025-11-19
 #### Bug Fixes
 - docs react package.json - (5f3e96d) - ayush.jain@juspay.in
