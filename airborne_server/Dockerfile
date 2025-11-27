@@ -17,7 +17,7 @@ FROM node:22 as frontend-builder
 WORKDIR /app
 COPY airborne_server/docs_react/package*.json ./docs_react/
 WORKDIR /app/docs_react
-RUN npm install
+RUN npm ci
 COPY airborne_server/docs_react/ ./
 
 # Run the build
@@ -38,10 +38,10 @@ RUN cargo build --release
 RUN ls -la /app/target/release/
 
 # Final production image
-FROM debian:bookworm-slim as prod
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates curl libpq5 && \
-    rm -rf /var/lib/apt/lists/*
+FROM ubuntu:24.04 AS prod
+RUN apt-get update && apt-get install -y postgresql-client \
+    && apt-get clean
+
 WORKDIR /app
 COPY --from=builder /app/target/release/airborne_server /app/airborne_server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
