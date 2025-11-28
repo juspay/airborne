@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.10.3 - 2025-11-28
+#### Bug Fixes
+- Updated ubuntu image from 24.04 to 25.10 to fix CVE-2025-8941 - (111ebab) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.10.2 - 2025-11-27
 #### Bug Fixes
 - CVE issues in built image - (9a3de2d) - yuvrajjsingh0
