@@ -38,9 +38,10 @@ RUN cargo build --release
 RUN ls -la /app/target/release/
 
 # Final production image
-FROM ubuntu:24.04 AS prod
-RUN apt-get update && apt-get install -y postgresql-client \
-    && apt-get clean
+FROM ubuntu:25.10 AS prod
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl libpq5 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY --from=builder /app/target/release/airborne_server /app/airborne_server
