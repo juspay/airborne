@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.10.3 - 2025-12-07
+#### Bug Fixes
+- Mismatched react versions - (d0724dd) - George James
+
+- - -
+
 ## airborne_dashboard-v0.10.2 - 2025-12-07
 #### Bug Fixes
 - Remove critical vulnerability via npm audit fix - (8c8f631) - George James
