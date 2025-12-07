@@ -23,11 +23,12 @@
     "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
-    "commander": "14.0.1",
-    "airborne-core-cli": "file:../airborne-core-cli"
+    "@react-native-community/cli": "18.0.1",
+    "airborne-core-cli": "file:../airborne-core-cli",
+    "commander": "14.0.1"
   },
   "devDependencies": {
-    "release-it": "^17.10.0"
+    "release-it": "^19.0.6"
   },
   "release-it": {
     "git": {
