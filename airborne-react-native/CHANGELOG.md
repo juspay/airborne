@@ -2,6 +2,36 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.1.3 - 2025-12-07
+#### Bug Fixes
+- Remove critical vulnerability via npm audit fix - (8c8f631) - George James
+
+- - -
+
+## v0.15.4 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.4 [skip ci] - (4269cd6) - Airborne Bot
+
+- - -
+
+## v0.15.3 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.3 [skip ci] - (bb591e8) - Airborne Bot
+
+- - -
+
+## v0.15.2 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.2 [skip ci] - (0479382) - Airborne Bot
+
+- - -
+
+## v0.15.1 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.1 [skip ci] - (a49504e) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.1.2 - 2025-11-18
 #### Bug Fixes
 - Node dependencies - (401031c) - ayush.jain@juspay.in

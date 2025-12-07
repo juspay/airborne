@@ -2,6 +2,84 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.4 - 2025-12-07
+#### Bug Fixes
+- Remove critical vulnerability via npm audit fix - (8c8f631) - George James
+
+- - -
+
+## v0.15.4 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.4 [skip ci] - (4269cd6) - Airborne Bot
+
+- - -
+
+## v0.15.3 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.3 [skip ci] - (bb591e8) - Airborne Bot
+
+- - -
+
+## v0.15.2 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.2 [skip ci] - (0479382) - Airborne Bot
+
+- - -
+
+## v0.15.1 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.1 [skip ci] - (a49504e) - Airborne Bot
+
+- - -
+
+## v0.15.0 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.15.0 [skip ci] - (c51c3cb) - Airborne Bot
+
+- - -
+
+## v0.14.1 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.14.1 [skip ci] - (bdcba5f) - Airborne Bot
+
+- - -
+
+## v0.14.0 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.14.0 [skip ci] - (f336a22) - Airborne Bot
+
+- - -
+
+## v0.13.6 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.13.6 [skip ci] - (0038bbd) - Airborne Bot
+
+- - -
+
+## v0.13.5 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.13.5 [skip ci] - (3f20b3d) - Airborne Bot
+
+- - -
+
+## v0.13.4 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.13.4 [skip ci] - (a0cb64d) - Airborne Bot
+
+- - -
+
+## v0.13.3 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.13.3 [skip ci] - (8877854) - Airborne Bot
+
+- - -
+
+## v0.13.2 - 2025-12-07
+#### Miscellaneous Chores
+- **(version)** v0.13.2 [skip ci] - (934d450) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.1.3 - 2025-10-28
 #### Bug Fixes
 - ensure directoryPath defaults to current working directory - (7404ed8) - Yash Rajput

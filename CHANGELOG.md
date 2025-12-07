@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.15.5 - 2025-12-07
+### Package updates
+- airborne_dashboard bumped to airborne_dashboard-v0.10.2
+- airborne_react_native bumped to airborne_react_native-v0.1.3
+- airborne_cli bumped to airborne_cli-v0.1.4
+### Global changes
+#### Bug Fixes
+- Remove critical vulnerability via npm audit fix - (8c8f631) - George James
+
+- - -
+
 ## v0.15.4 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.10.3
