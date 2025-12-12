@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.10.4 - 2025-12-12
+#### Bug Fixes
+- CVE-2025-55184 and CVE-2025-55183 - (1cf6c67) - yuvrajjsingh0
+#### Build system
+- **(deps)** bump next from 15.5.7 to 15.5.9 in /airborne_dashboard - (864143f) - dependabot[bot]
+
+- - -
+
 ## airborne_dashboard-v0.10.3 - 2025-12-07
 #### Bug Fixes
 - Mismatched react versions - (d0724dd) - George James
