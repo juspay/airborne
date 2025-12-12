@@ -58,7 +58,7 @@ async fn create_dimension_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -162,7 +162,7 @@ async fn list_dimensions_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -242,7 +242,7 @@ async fn update_dimension_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -305,7 +305,7 @@ async fn delete_dimension_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -346,7 +346,7 @@ async fn create_release_view_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -448,7 +448,7 @@ async fn list_release_views_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), READ)
@@ -509,7 +509,7 @@ async fn get_release_view_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -559,7 +559,7 @@ async fn update_release_view_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)
@@ -669,7 +669,7 @@ async fn delete_release_view_api(
     {
         Ok(org_name) => auth_response
             .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
             validate_user(auth_response.application.clone(), WRITE)

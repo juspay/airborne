@@ -69,14 +69,14 @@ async fn get_app_context(
         Ok(org_name) => auth
             .application
             .clone()
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
             .map(|access| (org_name, access.name)),
         Err(_) => validate_user(auth.organisation.clone(), READ)
             .and_then(|org_name| {
                 validate_user(auth.application.clone(), required_level)
                     .map(|app_name| (org_name, app_name))
             })
-            .map_err(|e| ABError::Unauthorized(e.to_string())),
+            .map_err(|e| ABError::Forbidden(e.to_string())),
     }?;
 
     // For application admin operations, application-level permissions take precedence
