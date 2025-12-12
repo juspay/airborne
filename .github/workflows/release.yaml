@@ -396,7 +396,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.tag-release.outputs.version }}
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
