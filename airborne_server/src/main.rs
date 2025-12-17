@@ -71,7 +71,8 @@ async fn main() -> std::io::Result<()> {
     let keycloak_external_url = std::env::var("KEYCLOAK_EXTERNAL_URL")
         .unwrap_or_else(|_| url.replace("keycloak:8080", "localhost:8180"));
     let client_id = std::env::var("KEYCLOAK_CLIENT_ID").expect("KEYCLOAK_CLIENT_ID must be set");
-    let enc_sec = std::env::var("KEYCLOAK_SECRET").expect("KEYCLOAK_SECRET must be set"); // Move this to AWS KMS
+    let enc_sec = std::env::var("KEYCLOAK_SECRET").expect("KEYCLOAK_SECRET must be set");
+    let enc_superposition_token = std::env::var("SUPERPOSITION_TOKEN");
     let realm = std::env::var("KEYCLOAK_REALM").expect("KEYCLOAK_REALM must be set");
     let publickey = std::env::var("KEYCLOAK_PUBLIC_KEY").expect("KEYCLOAK_PUBLIC_KEY must be set");
     let cac_url = std::env::var("SUPERPOSITION_URL").expect("SUPERPOSITION_URL must be set");
@@ -159,6 +160,11 @@ async fn main() -> std::io::Result<()> {
     info!("Creating db pool");
     let pool = db::establish_pool(&aws_kms_client).await;
     let secret = decrypt_kms(&aws_kms_client, enc_sec).await;
+    let superposition_token = if let Ok(enc_token) = enc_superposition_token {
+        decrypt_kms(&aws_kms_client, enc_token).await
+    } else {
+        "".to_string()
+    };
 
     let env = types::Environment {
         public_url,
@@ -217,7 +223,7 @@ async fn main() -> std::io::Result<()> {
         SrsConfig::builder()
             .endpoint_url(cac_url.clone())
             .behavior_version_latest()
-            .bearer_token("your_bearer_token_here".into())
+            .bearer_token(superposition_token.into())
             .build(),
     );
 
