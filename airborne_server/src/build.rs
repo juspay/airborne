@@ -45,22 +45,24 @@ struct BuildResponse {
 }
 
 fn get_android_root_path(prefix: &String, org: &String, app: &String) -> String {
-    format!("builds/{0}/{1}/{2}/airborne-assets/", prefix, org, app)
+    format!("builds/{0}/{1}/{2}-airborne-assets/", prefix, org, app)
 }
 
 fn get_aar_path(prefix: &String, org: &String, app: &String, new_build_version: &SemVer) -> String {
     format!(
-        "{0}{1}/airborne-assets-{1}.aar",
+        "{0}{1}/{2}-airborne-assets-{1}.aar",
         get_android_root_path(prefix, org, app),
-        new_build_version
+        new_build_version,
+        app
     )
 }
 
 fn get_pom_path(prefix: &String, org: &String, app: &String, new_build_version: &SemVer) -> String {
     format!(
-        "{0}{1}/airborne-assets-{1}.pom",
+        "{0}{1}/{2}-airborne-assets-{1}.pom",
         get_android_root_path(prefix, org, app),
-        new_build_version
+        new_build_version,
+        app
     )
 }
 
@@ -78,8 +80,8 @@ fn generate_pom_content(org: &String, app: &String, version: &SemVer) -> String 
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>{0}.{1}</groupId>
-    <artifactId>airborne-assets</artifactId>
+    <groupId>{0}</groupId>
+    <artifactId>{1}-airborne-assets</artifactId>
     <version>{2}</version>
     <packaging>aar</packaging>
     <name>Airborne Assets</name>
@@ -137,8 +139,8 @@ fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<Sem
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <metadata>
-    <groupId>{}.{}</groupId>
-    <artifactId>airborne-assets</artifactId>
+    <groupId>{}</groupId>
+    <artifactId>{}-airborne-assets</artifactId>
     <versioning>
         <latest>{}</latest>
         <release>{}</release>
@@ -695,8 +697,11 @@ async fn generate(
         Some(build_entry) => {
             // Return existing build version
             info!(
-                "Found existing build entry for org: {} app: {} as version: {}",
-                &arguments.organisation, &arguments.application, &build_entry.build_version
+                "Found existing build entry for org: {} app: {}, dimensions: {} as version: {}",
+                &arguments.organisation,
+                &arguments.application,
+                serde_json::to_string(&arguments.dimensions).unwrap_or_default(),
+                &build_entry.build_version
             );
             Ok(BuildResponse {
                 version: build_entry.build_version,
@@ -908,8 +913,8 @@ async fn serve_aar(
         .header(
             actix_web::http::header::CONTENT_DISPOSITION,
             HeaderValue::from_str(&format!(
-                "attachment; filename=\"airborne-assets-{}.aar\"",
-                build_response.version
+                "attachment; filename=\"{}-airborne-assets-{}.aar\"",
+                app_id, build_response.version
             ))
             .map_err(|e| {
                 ABError::InternalServerError(format!(
