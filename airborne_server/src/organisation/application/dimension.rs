@@ -85,9 +85,23 @@ async fn create_dimension_api(
         .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;
 
     // Find the highest position using nested match statements
-    let highest_position = match &current_dimensions.data {
-        Some(dimensions) => dimensions.iter().map(|d| d.position).max().unwrap_or(0),
-        None => 0,
+    let highest_position = match req.dimension_type {
+        DimensionType::Cohort => match &current_dimensions.data {
+            Some(dimensions) => dimensions
+                .iter()
+                .find(|d| d.dimension == req.depends_on.clone().unwrap_or_default())
+                .map(|d| d.position)
+                .ok_or_else(|| ABError::NotFound("Dependency dimension not found".to_string()))?,
+            None => {
+                return Err(ABError::NotFound(
+                    "Dependency dimension not found".to_string(),
+                ))
+            }
+        },
+        DimensionType::Standard => match &current_dimensions.data {
+            Some(dimensions) => dimensions.iter().map(|d| d.position).max().unwrap_or(0) + 1,
+            None => 1,
+        },
     };
 
     let dim_schema = req.schema.to_json();
@@ -104,7 +118,7 @@ async fn create_dimension_api(
                 .org_id(state.env.superposition_org_id.clone())
                 .workspace_id(workspace_name.clone())
                 .dimension(req.dimension.clone())
-                .position(highest_position + 1)
+                .position(highest_position)
                 .set_schema(Some(schema))
                 .dimension_type(superposition_sdk::types::DimensionType::LocalCohort(
                     depends_on,
@@ -115,6 +129,20 @@ async fn create_dimension_api(
                 .await
                 .map_err(|e| {
                     ABError::InternalServerError(format!("Failed to create dimension: {}", e))
+                })?;
+
+            let _ = state
+                .superposition_client
+                .weight_recompute()
+                .org_id(state.env.superposition_org_id.clone())
+                .workspace_id(workspace_name.clone())
+                .send()
+                .await
+                .map_err(|e| {
+                    ABError::InternalServerError(format!(
+                        "Failed to trigger weight recompute: {}",
+                        e
+                    ))
                 })?;
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
@@ -131,7 +159,7 @@ async fn create_dimension_api(
                 .org_id(state.env.superposition_org_id.clone())
                 .workspace_id(workspace_name.clone())
                 .dimension(req.dimension.clone())
-                .position(highest_position + 1)
+                .position(highest_position)
                 .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&dim_schema))))
                 .description(req.description.clone())
                 .change_reason("Creating new dimension".to_string())
@@ -275,6 +303,17 @@ async fn update_dimension_api(
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+
+    let _ = state
+        .superposition_client
+        .weight_recompute()
+        .org_id(state.env.superposition_org_id.clone())
+        .workspace_id(workspace_name.clone())
+        .send()
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to trigger weight recompute: {}", e))
+        })?;
 
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
