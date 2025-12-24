@@ -75,9 +75,9 @@ async fn create_config_json_v1(
 ) -> airborne_types::Result<Json<Response>> {
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+        .map_err(|_| ABError::Forbidden("No access to org".to_string()))?;
     let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+        .map_err(|_| ABError::Forbidden("No access to application".to_string()))?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -150,9 +150,9 @@ async fn create_config_json_v1_multipart(
 ) -> airborne_types::Result<Json<Response>> {
     let auth_response = auth_response.into_inner();
     let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to org".to_string()))?;
+        .map_err(|_| ABError::Forbidden("No access to org".to_string()))?;
     let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Unauthorized("No access to application".to_string()))?;
+        .map_err(|_| ABError::Forbidden("No access to application".to_string()))?;
 
     // Parse the JSON request
     let req: ConfigJsonV1Request = serde_json::from_str(&form.json.into_inner())
