@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+use crate::utils::db::models::InviteRole;
+
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum AccessLvl {
     Admin,
@@ -16,11 +18,27 @@ impl AccessLvl {
             Self::Read => "read".to_string(),
         }
     }
+
+    pub fn to_invite_role(&self) -> InviteRole {
+        match self {
+            Self::Admin => InviteRole::Admin,
+            Self::Write => InviteRole::Write,
+            Self::Read => InviteRole::Read,
+        }
+    }
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct ApplicationAccess {
+    pub name: String,
+    pub level: AccessLvl,
+}
+
 #[derive(Deserialize)]
 pub struct UserRequest {
     pub user: String,
     pub access: AccessLvl,
+    pub applications: Option<Vec<ApplicationAccess>>,
 }
 
 #[derive(Deserialize)]
