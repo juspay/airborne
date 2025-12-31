@@ -6,18 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Rocket, ArrowLeft, Calendar } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { useAppContext } from "@/providers/app-context";
 import useSWR from "swr";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ErrorName } from "@/lib/api";
 import { ApiRelease } from "./releases/page";
 import { hasAppAccess } from "@/lib/utils";
 
 export default function ApplicationDetailPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
-  const { data } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
+  const { data, error } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
     apiFetch<any>("/releases/list", { query: { page: 1, count: 5 } }, { token, org, app })
   );
+
+  if (error && error.name === ErrorName.Forbidden) {
+    notFound();
+  }
+
   const releases: ApiRelease[] = data?.data || [];
 
   const router = useRouter();
