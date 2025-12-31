@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use actix_web::{
     body::BoxBody,
     http::{header::HeaderMap, StatusCode},
@@ -21,9 +23,11 @@ use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use http::{HeaderName, HeaderValue};
 use keycloak::KeycloakError;
+use lettre::SmtpTransport;
 use log::error;
 use serde::{Deserialize, Deserializer, Serialize};
 use superposition_sdk::Client;
+use tera::Tera;
 use thiserror::Error;
 
 use crate::{
@@ -41,6 +45,8 @@ pub struct AppState {
     pub sheets_hub: Option<
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
+    pub mailer: Arc<SmtpTransport>,
+    pub tera: Arc<Tera>,
 }
 
 #[derive(Clone, Debug)]
