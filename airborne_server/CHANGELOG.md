@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.11.0 - 2025-12-31
+#### Features
+- Use authenticated superposition - (65f8ba7) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.10.6 - 2025-12-24
 #### Bug Fixes
 - android artifact path - (6c1f553) - yuvrajjsingh0
