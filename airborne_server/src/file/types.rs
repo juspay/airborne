@@ -15,6 +15,8 @@ pub struct FileRequest {
     pub url: String,
     pub tag: Option<String>,
     pub metadata: Option<Value>,
+    pub size: Option<u64>,
+    pub checksum: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
