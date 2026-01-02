@@ -27,6 +27,8 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
   const [filePath, setFilePath] = useState("");
   const [url, setUrl] = useState("");
   const [tag, setTag] = useState("");
+  const [checksum, setChecksum] = useState("");
+  const [size, setSize] = useState("");
   const [metadata, setMetadata] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,12 +48,46 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
       }
     }
 
+    // Validate checksum and size are provided together
+    if ((checksum.trim() && !size.trim()) || (!checksum.trim() && size.trim())) {
+      setError("Both checksum and size must be provided together, or neither");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Validate checksum format (SHA256 hex should be 64 characters)
+    if (checksum.trim()) {
+      const checksumValue = checksum.trim();
+      const hexRegex = /^[a-fA-F0-9]{64}$/;
+      if (!hexRegex.test(checksumValue)) {
+        setError("Checksum must be a valid SHA256 hash (64 hexadecimal characters)");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // Validate size is a valid positive number
+    if (size.trim()) {
+      const sizeNum = Number(size);
+      if (isNaN(sizeNum) || sizeNum <= 0) {
+        setError("Size must be a valid positive number (in bytes)");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       await apiFetch(
         "/file",
         {
           method: "POST",
-          body: { file_path: filePath, url, ...(tag ? { tag } : {}), ...(meta ? { metadata: meta } : {}) },
+          body: {
+            file_path: filePath,
+            url,
+            ...(tag ? { tag } : {}),
+            ...(meta ? { metadata: meta } : {}),
+            ...(checksum.trim() && size.trim() ? { checksum: checksum.trim(), size: Number(size) } : {}),
+          },
         },
         { token, org, app }
       );
@@ -59,6 +95,8 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
       setFilePath("");
       setUrl("");
       setTag("");
+      setChecksum("");
+      setSize("");
       setMetadata("");
       onCreated?.();
     } catch (e: any) {
@@ -100,6 +138,25 @@ export function FileCreationModal({ open, onOpenChange, onCreated }: FileCreatio
           <div className="space-y-2">
             <Label htmlFor="tag">Tag</Label>
             <Input id="tag" placeholder="latest" value={tag} onChange={(e) => setTag(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="checksum">Checksum (SHA256 hex, optional)</Label>
+            <Input
+              id="checksum"
+              placeholder="e.g., a3f2b1c4d5e6f7890abcdef1234567890abcdef1234567890abcdef123456789"
+              value={checksum}
+              onChange={(e) => setChecksum(e.target.value.trim().toLowerCase())}
+              maxLength={64}
+              pattern="[a-fA-F0-9]{64}"
+            />
+            <p className="text-xs text-muted-foreground">
+              Required only for authenticated/private files. Must be 64 hex characters. Must be provided with size.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="size">Size (bytes, optional)</Label>
+            <Input id="size" placeholder="e.g., 1048576" value={size} onChange={(e) => setSize(e.target.value)} />
+            <p className="text-xs text-muted-foreground">File size in bytes. Must be provided with checksum.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="metadata">Metadata (JSON, optional)</Label>
