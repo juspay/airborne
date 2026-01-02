@@ -86,12 +86,47 @@ async fn create_file(
         }),
     }?;
 
-    let (file_size, file_checksum) = utils::download_and_checksum(&req.url.clone())
-        .await
-        .map_err(|e| {
-            info!("Download or checksum failed for URL {}: {:?}", req.url, e);
-            ABError::InternalServerError("Download or checksum failure".to_string())
-        })?;
+    let (file_size, file_checksum) = match (&req.size, &req.checksum) {
+        (Some(provided_size), Some(provided_checksum)) => {
+            info!("Using provided size and checksum");
+
+            // Validate checksum format (SHA256 hex should be 64 characters)
+            if provided_checksum.len() != 64 {
+                return Err(ABError::BadRequest(
+                    "Checksum must be exactly 64 characters (SHA256 hex)".to_string(),
+                ));
+            }
+
+            // Validate checksum is valid hexadecimal
+            if !provided_checksum.chars().all(|c| c.is_ascii_hexdigit()) {
+                return Err(ABError::BadRequest(
+                    "Checksum must contain only hexadecimal characters (0-9, a-f, A-F)".to_string(),
+                ));
+            }
+
+            if *provided_size == 0 {
+                return Err(ABError::BadRequest(
+                    "Size must be greater than 0".to_string(),
+                ));
+            }
+
+            (*provided_size, provided_checksum.to_lowercase())
+        }
+        (None, None) => {
+            info!("Downloading file to calculate size and checksum");
+            utils::download_and_checksum(&req.url.clone())
+                .await
+                .map_err(|_| {
+                    info!("Download or checksum calculation failed");
+                    ABError::InternalServerError("Download or checksum failure".to_string())
+                })?
+        }
+        _ => {
+            return Err(ABError::BadRequest(
+                "Both size and checksum must be provided together, or neither".to_string(),
+            ));
+        }
+    };
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
