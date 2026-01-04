@@ -9,7 +9,6 @@ import com.facebook.react.ReactPackageTurboModuleManagerDelegate
 import com.facebook.react.bridge.JSBundleLoader
 import com.facebook.react.common.annotations.UnstableReactNativeAPI
 import com.facebook.react.defaults.DefaultTurboModuleManagerDelegate
-import com.facebook.react.fabric.ReactNativeConfig
 import com.facebook.react.runtime.BindingsInstaller
 import com.facebook.react.runtime.JSCInstance
 import com.facebook.react.runtime.JSRuntimeFactory
@@ -22,7 +21,6 @@ class AirborneReactHostDelegate(
     private val context: Context,
     private val reactNativeHostWrapper: ReactNativeHost,
     override val bindingsInstaller: BindingsInstaller? = null,
-    private val reactNativeConfig: ReactNativeConfig = ReactNativeConfig.DEFAULT_CONFIG,
     override val turboModuleManagerDelegateBuilder: ReactPackageTurboModuleManagerDelegate.Builder =
         DefaultTurboModuleManagerDelegate.Builder()
 ) : ReactHostDelegate {
@@ -60,10 +58,6 @@ class AirborneReactHostDelegate(
 
     override val reactPackages: List<ReactPackage>
         get() = (reactNativeHostWrapper as? AirborneReactNativeHost)?.packages ?: emptyList()
-
-    override fun getReactNativeConfig(): ReactNativeConfig {
-        return reactNativeConfig
-    }
 
     override fun handleInstanceException(error: Exception) {
     }

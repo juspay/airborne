@@ -12,6 +12,7 @@ import com.facebook.soloader.SoLoader
 import `in`.juspay.airborneplugin.Airborne
 import `in`.juspay.airborneplugin.AirborneInterface
 import `in`.juspay.airborneplugin.AirborneReactNativeHost
+import `in`.juspay.airborneplugin.AirborneReactNativeHostBase
 import org.json.JSONObject
 
 
@@ -44,7 +45,7 @@ class MainApplication : Application(), ReactApplication {
         }
 
     override val reactHost: ReactHost
-        get() = AirborneReactNativeHost.getReactHost(applicationContext, reactNativeHost)
+        get() = AirborneReactNativeHostBase.getReactHost(applicationContext, reactNativeHost)
 
     override fun onCreate() {
         super.onCreate()
