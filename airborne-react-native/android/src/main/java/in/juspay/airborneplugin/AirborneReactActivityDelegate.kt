@@ -13,8 +13,9 @@ class AirborneReactActivityDelegate(
     fabricEnabled: Boolean
 ) : DefaultReactActivityDelegate(activity, mainComponentName, fabricEnabled) {
 
-    private var appState = AppState.BEFORE_APPLOAD;
-    override fun loadApp(appKey: String) {
+    private var appState = AppState.BEFORE_APPLOAD
+    private val TAG = "AirborneReactActivityDelegate"
+    override fun loadApp(appKey: String?) {
         if (reactNativeHost is AirborneReactNativeHost) {
             CoroutineScope(Dispatchers.Default).launch {
 
@@ -30,7 +31,7 @@ class AirborneReactActivityDelegate(
         }
     }
 
-    private fun callLoadApp(appKey: String) {
+    private fun callLoadApp(appKey: String?) {
         super.loadApp(appKey)
         appState = AppState.APP_LOADED
         onResume()
@@ -41,10 +42,10 @@ class AirborneReactActivityDelegate(
             if (appState == AppState.ONRESUME_CALLED) {
                 super.onPause()
             } else {
-                Log.d(AirborneReactNativeHost.toString(), "skipping onPause as onResume is not yet called")
+                Log.d(TAG, "skipping onPause as onResume is not yet called")
             }
         } catch (e: Exception) {
-            Log.e( AirborneReactNativeHost.toString(), "Exception in onPause: ${e.message}")
+            Log.e( TAG, "Exception in onPause: ${e.message}")
         }
     }
 
@@ -54,10 +55,10 @@ class AirborneReactActivityDelegate(
                 super.onResume()
                 appState = AppState.ONRESUME_CALLED
             } else {
-                Log.d(AirborneReactNativeHost.toString(), "skipping onResume as app is not yet loaded")
+                Log.d(TAG, "skipping onResume as app is not yet loaded")
             }
         } catch (e: Exception) {
-            Log.e(AirborneReactNativeHost.toString(), "Exception in onResume: ${e.message}")
+            Log.e(TAG, "Exception in onResume: ${e.message}")
         }
     }
 
@@ -66,10 +67,10 @@ class AirborneReactActivityDelegate(
             if (appState == AppState.ONRESUME_CALLED) {
                 super.onDestroy()
             } else {
-                Log.d(AirborneReactNativeHost.toString(), "skipping onDestroy as onResume is not yet called")
+                Log.d(TAG, "skipping onDestroy as onResume is not yet called")
             }
         } catch (e: Exception) {
-            Log.e(AirborneReactNativeHost.toString(), "Exception in onDestroy: ${e.message}")
+            Log.e(TAG, "Exception in onDestroy: ${e.message}")
         }
     }
 
