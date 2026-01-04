@@ -90,9 +90,14 @@ android {
         }
     }
 
-    if (findReactNativeVersion().tokenize('.')[1].toInteger() >= 78) {
+    def rnMajorVersion = findReactNativeVersion().tokenize('.')[1].toInteger()
+
+    if (rnMajorVersion >= 81) {
         sourceSets.main.java.srcDirs += "src/latest/java"
-    } else {
+    } else if (rnMajorVersion >= 78 && rnMajorVersion < 81) {
+        sourceSets.main.java.srcDirs += "src/rn80/java"
+    }
+    else {
         sourceSets.main.java.srcDirs += "src/rn77/java"
     }
 

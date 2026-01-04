@@ -19,7 +19,7 @@ import java.lang.ref.WeakReference
 
 @OptIn(UnstableReactNativeAPI::class)
 class AirborneReactHostDelegate(
-    private val weakContext: WeakReference<Context>,
+    private val context: Context,
     private val reactNativeHostWrapper: ReactNativeHost,
     override val bindingsInstaller: BindingsInstaller? = null,
     private val reactNativeConfig: ReactNativeConfig = ReactNativeConfig.DEFAULT_CONFIG,
@@ -34,7 +34,7 @@ class AirborneReactHostDelegate(
             bundleName?.let {
                 return if (bundleName.startsWith("assets://")) {
                     JSBundleLoader.createAssetLoader(
-                        weakContext.get(),
+                        context,
                         bundleName,
                         false
                     )
@@ -43,7 +43,7 @@ class AirborneReactHostDelegate(
                 }
             }
             return JSBundleLoader.createAssetLoader(
-                weakContext.get(),
+                context,
                 "assets://index.android.bundle",
                 false
             )
