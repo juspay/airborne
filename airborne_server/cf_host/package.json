@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juspay/airborne"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

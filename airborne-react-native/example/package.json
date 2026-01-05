@@ -2,6 +2,10 @@
   "name": "airborne-react-native-example",
   "version": "0.17.2",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juspay/airborne"
+  },
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",

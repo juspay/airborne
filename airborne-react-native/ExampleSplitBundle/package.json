@@ -12,6 +12,10 @@
     "bundle-common-android": "npx react-native bundle --config common.metro.config.js --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.bundle.android --assets-dest android/app/src/main/res",
     "bundle-business-android": "npx react-native bundle --config business.metro.config.js --platform android --dev false --entry-file business.js --bundle-output android/app/src/main/assets/business.bundle.android --assets-dest android/app/src/main/res"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juspay/airborne"
+  },
   "dependencies": {
     "@react-native/new-app-screen": "0.80.1",
     "airborne-react-native": "*",
