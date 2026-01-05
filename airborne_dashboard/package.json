@@ -14,6 +14,10 @@
     "check": "npm run type-check && npm run lint && npm run format:check",
     "start": "next start"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juspay/airborne.git"
+  },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
