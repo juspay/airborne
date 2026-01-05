@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server_clients-v0.2.2 - 2026-01-05
+#### Bug Fixes
+- added .git to repository url - (4a35c5a) - Yaswanth
+
+- - -
+
 ## airborne_server_clients-v0.2.1 - 2026-01-05
 #### Bug Fixes
 - removed .git from repository url - (9785bd8) - Yaswanth
