@@ -60,6 +60,11 @@ class AirborneReactHostDelegate(
     override val reactPackages: List<ReactPackage>
         get() = (reactNativeHostWrapper as AirborneReactNativeHost).packages
 
+    /**
+     * No-op handler invoked when the React instance throws an exception.
+     *
+     * @param error The exception thrown by the React instance.
+     */
     override fun handleInstanceException(error: Exception) {
     }
 }

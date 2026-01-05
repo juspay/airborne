@@ -47,6 +47,12 @@ class MainApplication : Application(), ReactApplication {
     override val reactHost: ReactHost
         get() = AirborneReactNativeHostBase.getReactHost(applicationContext, reactNativeHost)
 
+    /**
+     * Initialize application-wide components: configure and start the Airborne SDK and initialize SoLoader.
+     *
+     * The Airborne configuration registers a callback (`startApp`) that marks the application boot as complete,
+     * stores the provided JS bundle path in `bundlePath`, and invokes `bootCompleteListener` if present.
+     */
     override fun onCreate() {
         super.onCreate()
 
