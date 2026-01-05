@@ -91,13 +91,11 @@ android {
     }
 
     def rnMinorVersion = findReactNativeVersion().tokenize('.')[1].toInteger()
-
     if (rnMinorVersion >= 81) {
         sourceSets.main.java.srcDirs += "src/latest/java"
     } else if (rnMinorVersion >= 78 && rnMinorVersion < 81) {
         sourceSets.main.java.srcDirs += "src/rn80/java"
-    }
-    else {
+    } else {
         sourceSets.main.java.srcDirs += "src/rn77/java"
     }
 
