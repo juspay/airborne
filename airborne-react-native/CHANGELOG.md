@@ -2,6 +2,42 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.2.0 - 2026-01-05
+#### Features
+- plugin to work with react native version 0.81+ - (ee7e54c) - Yaswanth
+
+- - -
+
+## v0.16.0 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.16.0 [skip ci] - (bdef647) - Airborne Bot
+
+- - -
+
+## v0.15.9 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.9 [skip ci] - (9d3ad53) - Airborne Bot
+
+- - -
+
+## v0.15.8 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.8 [skip ci] - (dffa42b) - Airborne Bot
+
+- - -
+
+## v0.15.7 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.7 [skip ci] - (b10086c) - Airborne Bot
+
+- - -
+
+## v0.15.6 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.6 [skip ci] - (43686ce) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.1.3 - 2025-12-07
 #### Bug Fixes
 - Remove critical vulnerability via npm audit fix - (8c8f631) - George James
