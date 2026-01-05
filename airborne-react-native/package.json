@@ -47,7 +47,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/juspay/airborne.git"
+    "url": "https://github.com/juspay/airborne"
   },
   "author": "juspay <kuntimaddi.manideep@juspay.in> (https://github.com/juspay)",
   "license": "MIT",

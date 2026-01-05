@@ -24,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/juspay/airborne.git"
+    "url": "https://github.com/juspay/airborne"
   },
   "dependencies": {
     "@react-native-community/cli": "18.0.1",

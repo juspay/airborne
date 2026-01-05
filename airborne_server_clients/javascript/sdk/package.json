@@ -49,6 +49,10 @@
         "@smithy/util-retry": "^4.0.2",
         "@smithy/util-utf8": "^4.0.0"
     },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/juspay/airborne"
+    },
     "devDependencies": {
         "@tsconfig/node18": "18.2.4",
         "concurrently": "7.0.0",
