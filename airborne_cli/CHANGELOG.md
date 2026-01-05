@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.6 - 2026-01-05
+#### Bug Fixes
+- removed .git from repository url - (9785bd8) - Yaswanth
+
+- - -
+
 ## airborne_cli-v0.1.5 - 2026-01-05
 #### Bug Fixes
 - added repository urls - (9e84ec5) - Yaswanth

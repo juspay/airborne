@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.10.6 - 2026-01-05
+#### Bug Fixes
+- removed .git from repository url - (9785bd8) - Yaswanth
+
+- - -
+
 ## airborne_dashboard-v0.10.5 - 2026-01-05
 #### Bug Fixes
 - added repository urls - (9e84ec5) - Yaswanth

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.11.1 - 2026-01-05
+#### Bug Fixes
+- removed .git from repository url - (9785bd8) - Yaswanth
+
+- - -
+
 ## airborne_server-v0.11.0 - 2025-12-31
 #### Features
 - Use authenticated superposition - (65f8ba7) - yuvrajjsingh0
