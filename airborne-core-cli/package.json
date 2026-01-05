@@ -13,6 +13,10 @@
     ],
     "outputPath": "dist"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juspay/airborne.git"
+  },
   "dependencies": {
     "airborne-server-sdk": "file:../airborne_server_clients/javascript/sdk",
     "chalk": "^5.6.2",

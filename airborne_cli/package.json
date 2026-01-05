@@ -22,6 +22,10 @@
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/juspay/airborne.git"
+  },
   "dependencies": {
     "@react-native-community/cli": "18.0.1",
     "airborne-core-cli": "file:../airborne-core-cli",
