@@ -2,6 +2,54 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.5 - 2026-01-05
+#### Bug Fixes
+- added repository urls - (9e84ec5) - Yaswanth
+
+- - -
+
+## v0.17.1 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.17.1 [skip ci] - (4c44de0) - Airborne Bot
+
+- - -
+
+## v0.17.0 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.17.0 [skip ci] - (3c25a01) - Airborne Bot
+
+- - -
+
+## v0.16.0 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.16.0 [skip ci] - (bdef647) - Airborne Bot
+
+- - -
+
+## v0.15.9 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.9 [skip ci] - (9d3ad53) - Airborne Bot
+
+- - -
+
+## v0.15.8 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.8 [skip ci] - (dffa42b) - Airborne Bot
+
+- - -
+
+## v0.15.7 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.7 [skip ci] - (b10086c) - Airborne Bot
+
+- - -
+
+## v0.15.6 - 2026-01-05
+#### Miscellaneous Chores
+- **(version)** v0.15.6 [skip ci] - (43686ce) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.1.4 - 2025-12-07
 #### Bug Fixes
 - Remove critical vulnerability via npm audit fix - (8c8f631) - George James

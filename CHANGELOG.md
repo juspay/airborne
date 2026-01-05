@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.17.2 - 1970-01-01
+### Package updates
+- airborne_cli bumped to airborne_cli-v0.1.5
+- airborne_core_cli bumped to airborne_core_cli-v0.2.1
+- airborne_dashboard bumped to airborne_dashboard-v0.10.5
+### Global changes
+
+- - -
+
 ## v0.17.1 - 2026-01-05
 ### Package updates
 - airborne_react_native bumped to airborne_react_native-v0.2.1
