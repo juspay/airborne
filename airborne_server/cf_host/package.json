@@ -5,7 +5,7 @@
   "main": "index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/juspay/airborne"
+    "url": "git+https://github.com/juspay/airborne.git"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
