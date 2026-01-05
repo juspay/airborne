@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.17.1 - 2026-01-05
+### Package updates
+- airborne_react_native bumped to airborne_react_native-v0.2.1
+### Global changes
+#### Bug Fixes
+- updated node version to 24 in release.yaml - (d99f9be) - Yaswanth
+
+- - -
+
 ## v0.17.0 - 1970-01-01
 ### Package updates
 - airborne_react_native bumped to airborne_react_native-v0.2.0

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.2.1 - 2026-01-05
+#### Bug Fixes
+- fixed build gradle format - (f0582ca) - Yaswanth
+
+- - -
+
 ## airborne_react_native-v0.2.0 - 2026-01-05
 #### Features
 - plugin to work with react native version 0.81+ - (ee7e54c) - Yaswanth
