@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.12.3 - 2026-01-06
+#### Bug Fixes
+- return 404 in case of app doesn't exist while serving release - (f7dec1f) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.12.2 - 2026-01-06
 #### Bug Fixes
 - support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput

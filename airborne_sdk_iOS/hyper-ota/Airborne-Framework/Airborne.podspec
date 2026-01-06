@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'Airborne'
-  s.version          = '0.18.2'
+  s.version          = '0.18.3'
   s.summary          = 'An OTA update plugin for Android, iOS and React Native applications.'
   s.description      = <<-DESC
 Hyper OTA empowers developers to effortlessly integrate Over-The-Air (OTA) update capabilities into their Android, iOS, and React Native applications.
