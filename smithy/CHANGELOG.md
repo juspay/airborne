@@ -2,6 +2,114 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## smithy-v0.2.1 - 2026-01-06
+#### Bug Fixes
+- support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput
+
+- - -
+
+## v0.18.1 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.18.1 [skip ci] - (8327914) - Airborne Bot
+
+- - -
+
+## v0.18.0 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.18.0 [skip ci] - (46c02c7) - Airborne Bot
+
+- - -
+
+## v0.17.4 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.17.4 [skip ci] - (0002358) - Airborne Bot
+
+- - -
+
+## v0.17.3 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.17.3 [skip ci] - (72cd2eb) - Airborne Bot
+
+- - -
+
+## v0.17.2 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.17.2 [skip ci] - (0df6583) - Airborne Bot
+
+- - -
+
+## v0.17.1 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.17.1 [skip ci] - (4c44de0) - Airborne Bot
+
+- - -
+
+## v0.17.0 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.17.0 [skip ci] - (3c25a01) - Airborne Bot
+
+- - -
+
+## v0.16.0 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.16.0 [skip ci] - (bdef647) - Airborne Bot
+
+- - -
+
+## v0.15.9 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.9 [skip ci] - (9d3ad53) - Airborne Bot
+
+- - -
+
+## v0.15.8 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.8 [skip ci] - (dffa42b) - Airborne Bot
+
+- - -
+
+## v0.15.7 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.7 [skip ci] - (b10086c) - Airborne Bot
+
+- - -
+
+## v0.15.6 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.6 [skip ci] - (43686ce) - Airborne Bot
+
+- - -
+
+## v0.15.5 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.5 [skip ci] - (0c57af4) - Airborne Bot
+
+- - -
+
+## v0.15.4 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.4 [skip ci] - (4269cd6) - Airborne Bot
+
+- - -
+
+## v0.15.3 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.3 [skip ci] - (bb591e8) - Airborne Bot
+
+- - -
+
+## v0.15.2 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.2 [skip ci] - (0479382) - Airborne Bot
+
+- - -
+
+## v0.15.1 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.15.1 [skip ci] - (a49504e) - Airborne Bot
+
+- - -
+
 ## smithy-v0.2.0 - 2025-11-18
 #### Features
 - add pagination to list packages and releases - (760909b) - Yash Rajput

@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.18.2 - 2026-01-06
+### Package updates
+- airborne_server bumped to airborne_server-v0.12.2
+- airborne_core_cli bumped to airborne_core_cli-v0.2.4
+- airborne_server_clients bumped to airborne_server_clients-v0.2.3
+- airborne_dashboard bumped to airborne_dashboard-v0.11.2
+- airborne_cli bumped to airborne_cli-v0.1.8
+- smithy bumped to smithy-v0.2.1
+### Global changes
+#### Bug Fixes
+- support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput
+
+- - -
+
 ## v0.18.1 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.12.1

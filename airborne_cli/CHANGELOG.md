@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.1.8 - 2026-01-06
+#### Bug Fixes
+- support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput
+
+- - -
+
+## v0.18.1 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.18.1 [skip ci] - (8327914) - Airborne Bot
+
+- - -
+
+## v0.18.0 - 2026-01-06
+#### Miscellaneous Chores
+- **(version)** v0.18.0 [skip ci] - (46c02c7) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.1.7 - 2026-01-05
 #### Bug Fixes
 - added .git to repository url - (4a35c5a) - Yaswanth
