@@ -7,6 +7,8 @@ import `in`.juspay.airborne.LazyDownloadCallback
 import `in`.juspay.airborne.TrackerCallback
 import `in`.juspay.hyperutil.constants.LogLevel
 import org.json.JSONObject
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
 
 @Keep
 class Airborne(
@@ -89,6 +91,18 @@ class Airborne(
     @Keep
     fun getReleaseConfig(): String {
         return applicationManager.readReleaseConfig()
+    }
+
+    /**
+     * Set custom SSL configuration for mTLS support.
+     * Call this before network requests are made to enable client certificate authentication.
+     *
+     * @param sslSocketFactory SSL socket factory configured with client certificate
+     * @param trustManager Trust manager for server certificate validation
+     */
+    @Keep
+    fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
+        applicationManager.setSslConfig(sslSocketFactory, trustManager)
     }
 
     companion object {
