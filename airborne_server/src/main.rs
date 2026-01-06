@@ -37,6 +37,7 @@ use google_sheets4::{
     yup_oauth2::{self, ServiceAccountAuthenticator},
     Sheets,
 };
+use lettre::{transport::smtp::authentication::Credentials, SmtpTransport};
 use log::info;
 use serde_json::json;
 use std::{
@@ -44,6 +45,7 @@ use std::{
     sync::Arc,
 };
 use superposition_sdk::config::Config as SrsConfig;
+use tera::Tera;
 use tracing_actix_web::TracingLogger;
 use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
 
@@ -118,6 +120,11 @@ async fn main() -> std::io::Result<()> {
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
 
+    let mock_email_sending = std::env::var("MOCK_EMAIL_SENDING")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
     let mut force_path_style = false;
@@ -155,6 +162,30 @@ async fn main() -> std::io::Result<()> {
     } else {
         None
     };
+
+    let mailer = if mock_email_sending {
+        // Local testing with Mailcatcher / Mailhog
+        SmtpTransport::builder_dangerous("127.0.0.1")
+            .port(1025)
+            .build()
+    } else {
+        let smtp_host = std::env::var("SMTP_HOST").expect("SMTP_HOST must be set");
+        let smtp_user = std::env::var("SMTP_USER").expect("SMTP_USER must be set");
+        let smtp_password = std::env::var("SMTP_PASSWORD").expect("SMTP_PASSWORD must be set");
+
+        let creds = Credentials::new(smtp_user, smtp_password);
+
+        // STARTTLS for port 587 (submission)
+        SmtpTransport::starttls_relay(&smtp_host)
+            .expect("Failed to connect to SMTP server")
+            .credentials(creds)
+            .build()
+    };
+
+    let tera = Tera::new("templates/**/*").map_err(|e| {
+        println!("Parsing error(s): {}", e);
+        std::io::Error::other("Template parsing error")
+    })?;
 
     // Initialize DB pool
     info!("Creating db pool");
@@ -234,6 +265,8 @@ async fn main() -> std::io::Result<()> {
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
+        mailer: Arc::new(mailer),
+        tera: Arc::new(tera),
     });
 
     // Start the background cleanup job for transaction reconciliation
@@ -273,6 +306,10 @@ async fn main() -> std::io::Result<()> {
                     )
                     .service(
                         web::scope("/dashboard/configuration").service(configuration::add_routes()),
+                    )
+                    .service(
+                        web::scope("/organisation/user/invite")
+                            .service(organisation::user::invite::add_public_routes()),
                     )
                     .service(
                         web::scope("/organisations")

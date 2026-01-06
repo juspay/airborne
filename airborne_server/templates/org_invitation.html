@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Invitation to join {{ organization }} on Airborne</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; background-color:#f9f9fb; font-family:Inter, Arial, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f9f9fb" style="padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff; border-radius:8px; border:1px solid #e5e7eb;">
+          <!-- Header -->
+          <tr>
+            <td align="center" style="padding:40px 20px 20px;">
+              <img alt="Airborne Logo" width="120" style="display:block; margin-bottom:24px; width: 80px;" src="https://airborne.juspay.in/favicon/web-app-manifest-512x512.png" />
+              <h1 style="font-size:28px; font-weight:700; color:#111827; margin:0; font-family:'Space Grotesk', Arial, sans-serif;">You're invited!</h1>
+              <p style="font-size:16px; color:#6b7280; margin:8px 0 0;">Join your team and start building with Airborne</p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:0 32px 32px; color:#111827;">
+              <p style="font-size:16px; margin:24px 0 12px;">Hello,</p>
+
+              <p style="font-size:16px; margin:0 0 24px;">
+                You've been invited to join <strong style="color:#4f46e5;">{{ organization }}</strong>
+                on Airborne with
+                <span style="background:#4f46e5; color:#ffffff; border-radius:4px; padding:2px 8px; font-size:14px;">{{ role }}</span>
+                access.
+              </p>
+
+              <!-- Features -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6; border-radius:6px; padding:16px; border:1px solid #e5e7eb;">
+                <tr>
+                  <td>
+                    <h3 style="font-size:16px; font-weight:600; margin:0 0 12px;">Airborne helps you to:</h3>
+                    <ul style="padding-left:20px; margin:0;">
+                      <li style="font-size:14px; margin-bottom:6px;">🚀 Deploy and manage applications seamlessly</li>
+                      <li style="font-size:14px; margin-bottom:6px;">📊 Real-time analytics and performance monitoring</li>
+                      <li style="font-size:14px; margin-bottom:6px;">🔒 Enterprise-grade security and access controls</li>
+                      <li style="font-size:14px; margin-bottom:6px;">👥 Collaborate with your team members</li>
+                      <li style="font-size:14px;">⚡ Advanced targeting and rollout controls</li>
+                    </ul>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <div style="text-align:center; margin:32px 0 16px;">
+                <p style="font-size:16px; color:#111827; margin-bottom:20px;">Ready to get started? Accept your invitation to join the team:</p>
+                <a href="{{ invitation_url }}" style="background:#4f46e5; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:6px; display:inline-block; font-weight:600; font-size:16px;">
+                  Accept Invitation
+                </a>
+              </div>
+
+              <!-- Note -->
+              <div style="background:#fff8e1; border:1px solid #facc15; padding:12px 16px; border-radius:6px; margin-top:24px;">
+                <p style="font-size:14px; color:#92400e; margin:0;">
+                  <strong>Important:</strong> This invitation will expire in 7 days. If you have any questions or need assistance, please reach out to your team administrator or our support team.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="background:#f3f4f6; padding:24px; border-top:1px solid #e5e7eb;">
+              <p style="font-size:14px; color:#6b7280; margin:0 0 8px;">This email was sent by Airborne on behalf of <strong>{{ organization }}</strong></p>
+              <p style="font-size:14px; color:#6b7280; margin:0 0 16px;">If you believe this email was sent to you by mistake, you can safely ignore it.</p>
+              <p style="margin:0;">
+                <a href="https://airborne.juspay.in" style="color:#4f46e5; text-decoration:none; font-size:14px;">Learn more</a> ·
+                <a href="mailto:superposition@juspay.in" style="color:#4f46e5; text-decoration:none; font-size:14px;">Contact Support</a> ·
+                <a href="https://airborne.juspay.in/docs/home" style="color:#4f46e5; text-decoration:none; font-size:14px;">Documentation</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod invite;
 mod transaction;
-mod types;
+pub mod types;
 mod utils;
 
 use actix_web::{
@@ -27,16 +28,26 @@ use crate::{
     middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, OWNER, READ, WRITE,
     },
-    organisation::{types::OrgError, user::types::*},
-    types as airborne_types,
-    types::{ABError, AppState},
-    utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
+    organisation::{
+        types::OrgError,
+        user::{
+            invite::{
+                create_new_invite, find_existing_pending_invite, generate_invite_token,
+                update_existing_invite,
+            },
+            types::*,
+        },
+    },
+    types::{self as airborne_types, ABError, AppState},
+    utils::{
+        keycloak::{find_org_group, find_user_by_username, prepare_user_action},
+        mail::Mail,
+    },
 };
 
 use self::{
     transaction::{
-        add_user_with_transaction, get_user_current_role, remove_user_with_transaction,
-        update_user_with_transaction,
+        get_user_current_role, remove_user_with_transaction, update_user_with_transaction,
     },
     utils::{check_role_hierarchy, is_last_owner, validate_access_level},
 };
@@ -48,6 +59,7 @@ pub fn add_routes() -> Scope {
         .service(organisation_update_user)
         .service(organisation_remove_user)
         .service(organisation_transfer_ownership)
+        .service(Scope::new("/invite").service(invite::add_routes()))
 }
 
 /// Get organization context and validate user permissions
@@ -154,7 +166,6 @@ async fn organisation_add_user(
 
     // Get organization context and validate requester's permissions
     let (organisation, auth) = get_org_context(&req, WRITE, "add user").await?;
-    let requester_id = &auth.sub;
 
     // Prepare Keycloak admin client
     let (admin, realm) = prepare_user_action(&req, state.clone())
@@ -178,43 +189,124 @@ async fn organisation_add_user(
         }
     }
 
-    // Find target user and organization in parallel
-    let (target_user, org_context) = tokio::join!(
-        find_target_user(&admin, &realm, &body.user),
-        find_organization(&admin, &realm, &organisation)
-    );
+    let _ = find_organization(&admin, &realm, &organisation).await?;
 
-    let target_user = target_user?;
-    let org_context = org_context?;
+    let invite_role = body.access.to_invite_role();
 
-    // Check role hierarchy
-    check_role_hierarchy(
-        &admin,
-        &realm,
-        &org_context.group_id,
-        requester_id,
-        &target_user.user_id,
-    )
-    .await?;
+    // Check if there's an existing pending invite for same org, email, and role
+    match find_existing_pending_invite(&state.db_pool, &organisation, &body.user, &invite_role)
+        .await
+    {
+        Ok(Some(existing_invite)) => {
+            // Update existing invite with new token and timestamp
+            let new_token = generate_invite_token();
+            match update_existing_invite(
+                &state.db_pool,
+                existing_invite.id,
+                new_token.clone(),
+                body.applications.unwrap_or_default(),
+            )
+            .await
+            {
+                Ok(_updated_invite) => {
+                    info!(
+                        "Updated existing invite for {} in org {}",
+                        &body.user, &organisation
+                    );
 
-    debug!(
-        "Adding user {} to org {} with access level {}",
-        body.user, organisation, role_name
-    );
+                    let invitation_url =
+                        format!("{}/invitation/{}", &state.env.public_url, &new_token);
 
-    // Use transaction function to add user
-    add_user_with_transaction(&admin, &realm, &org_context, &target_user, &role_name).await?;
+                    // Send email with updated invite
+                    let mut context = tera::Context::new();
+                    context.insert("name", &body.user);
+                    context.insert("organization", &organisation);
+                    context.insert("role", &role_name);
+                    context.insert("invitation_url", &invitation_url);
 
-    info!(
-        "Successfully added user {} to org {} with access level {}",
-        body.user, organisation, role_name
-    );
+                    let mail = Mail::new(
+                        &state.mailer,
+                        &state.tera,
+                        context,
+                        body.user.clone(),
+                        "You're invited to join an Airborne organization".to_string(),
+                        "org_invitation.txt".to_string(),
+                        Some("org_invitation.html".to_string()),
+                    );
 
-    Ok(Json(UserOperationResponse {
-        user: body.user,
-        success: true,
-        operation: "add".to_string(),
-    }))
+                    match mail.send().await {
+                        Ok(_) => info!("Invitation email sent to {}", &body.user),
+                        Err(e) => {
+                            info!("Failed to send invitation email to {}: {}", &body.user, e)
+                        }
+                    }
+
+                    Ok(Json(UserOperationResponse {
+                        user: body.user,
+                        success: true,
+                        operation: "invite_updated".to_string(),
+                    }))
+                }
+                Err(e) => Err(e),
+            }
+        }
+        Ok(None) => {
+            // No existing invite - create new one
+            let new_token = generate_invite_token();
+            match create_new_invite(
+                &state.db_pool,
+                organisation.clone(),
+                body.applications.unwrap_or_default(),
+                body.user.clone(),
+                invite_role,
+                new_token.clone(),
+            )
+            .await
+            {
+                Ok(_new_invite) => {
+                    info!(
+                        "Created new invite for {} in org {}",
+                        &body.user, &organisation
+                    );
+
+                    let invitation_url =
+                        format!("{}/invitation/{}", &state.env.public_url, &new_token);
+
+                    // Send email with new invite
+                    let mut context = tera::Context::new();
+                    context.insert("name", &body.user);
+                    context.insert("organization", &organisation);
+                    context.insert("role", &role_name);
+                    context.insert("invitation_url", &invitation_url);
+
+                    let mail = Mail::new(
+                        &state.mailer,
+                        &state.tera,
+                        context,
+                        body.user.clone(),
+                        "You're invited to join an Airborne organization".to_string(),
+                        "org_invitation.txt".to_string(),
+                        Some("org_invitation.html".to_string()),
+                    );
+
+                    match mail.send().await {
+                        Ok(_) => info!("Invitation email sent to {}", &body.user),
+                        Err(e) => {
+                            info!("Failed to send invitation email to {}: {}", &body.user, e)
+                        }
+                    }
+
+                    Ok(Json(UserOperationResponse {
+                        user: body.user,
+                        success: true,
+                        operation: "invite_created".to_string(),
+                    }))
+                }
+                Err(e) => Err(e),
+            }
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[post("/update")]
