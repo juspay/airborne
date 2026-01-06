@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.11.0 - 2026-01-06
+#### Features
+- Add optional checksum and size fields for file creation - (075c1f4) - Yash Rajput
+
+- - -
+
 ## airborne_dashboard-v0.10.7 - 2026-01-05
 #### Bug Fixes
 - added .git to repository url - (4a35c5a) - Yaswanth
