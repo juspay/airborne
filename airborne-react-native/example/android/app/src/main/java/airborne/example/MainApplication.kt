@@ -14,6 +14,7 @@ import `in`.juspay.airborneplugin.AirborneInterface
 import `in`.juspay.airborneplugin.AirborneReactNativeHost
 import `in`.juspay.airborneplugin.AirborneReactNativeHostBase
 import org.json.JSONObject
+import java.io.InputStream
 
 
 class MainApplication : Application(), ReactApplication {
@@ -22,6 +23,10 @@ class MainApplication : Application(), ReactApplication {
     var isBootComplete = false
     var bootCompleteListener: (() -> Unit)? = null
     private lateinit var airborne: Airborne
+
+    private var assetMap: HashMap<String, String> = HashMap()
+
+
     override val reactNativeHost: ReactNativeHost =
         object : AirborneReactNativeHost(this@MainApplication) {
             override fun getPackages(): List<ReactPackage> =
@@ -81,6 +86,23 @@ class MainApplication : Application(), ReactApplication {
                         isBootComplete = true
                         bundlePath = indexPath
                         bootCompleteListener?.invoke()
+
+                        val rc = airborne.getReleaseConfig()
+                        try {
+                            val pkgJSON = JSONObject(rc).getJSONObject("package")
+                            val index = pkgJSON.getJSONObject("index")
+                            assetMap[index.getString("url")] = index.getString("file_path")
+                            if (pkgJSON.has("important")) {
+                                val impSplits = pkgJSON.getJSONArray("important")
+                                for (i in 0 until impSplits.length()) {
+                                    val split = impSplits.getJSONObject(i)
+                                    assetMap[split.getString("url")] = split.getString("file_path")
+                                }
+                            }
+                        } catch (_: Exception) {
+                            assetMap = HashMap()
+                        }
+
                     }
                 })
             Log.i("Airborne", "Airborne initialized successfully")
@@ -89,5 +111,22 @@ class MainApplication : Application(), ReactApplication {
         }
 
         SoLoader.init(this, OpenSourceMergedSoMapping)
+    }
+
+    fun getFileContent(assetUrl: String): InputStream? {
+        if (assetMap.containsKey(assetUrl)) {
+            try {
+                val content = airborne.getFileContent(assetMap.getValue(assetUrl)) // try reading a file that doesn't exist and see what happens
+                if (content.isNotEmpty()) {
+                    return content.byteInputStream()
+                } else {
+                    // Get the input stream from assets
+                    val filePath = assetMap.getValue(assetUrl)
+                    return this.assets.open(filePath)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return null
     }
 }
