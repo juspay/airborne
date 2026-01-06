@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.12.1 - 2026-01-06
+#### Bug Fixes
+- Send Forbidden incase of not having enough access instead of Unauthorized - (4a420c2) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.12.0 - 2026-01-06
 #### Features
 - Add optional checksum and size fields for file creation - (075c1f4) - Yash Rajput
