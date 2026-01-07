@@ -303,6 +303,8 @@ async fn issue_token(
     req: Json<PersonalAccessToken>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<UserToken>> {
+    log::info!("[ISSUE TOKEN] Starting token issuance");
+
     let pool = state.db_pool.clone();
     let client_id = req.client_id;
     let user = run_blocking!({
@@ -312,18 +314,35 @@ async fn issue_token(
             .first::<UserCredentialsEntry>(&mut conn)
             .map_err(|e| {
                 log::error!("[ISSUE TOKEN] Failed to load user credentials: {}", e);
-                ABError::InternalServerError(format!("Failed to load user credentials: {}", e))
+                ABError::Unauthorized("Invalid credentials".to_string())
             })?;
         Ok(user)
     })?;
 
-    let decrypted_refresh_token = decrypt_string(&user.password, &req.client_secret).await?;
+    log::info!("[ISSUE TOKEN] User credentials loaded successfully");
+
+    let decrypted_refresh_token = decrypt_string(&user.password, &req.client_secret)
+        .await
+        .map_err(|e| {
+            log::error!("[ISSUE TOKEN] Failed to decrypt refresh token: {:?}", e);
+            ABError::Unauthorized("Invalid credentials".to_string())
+        })?;
+
+    log::info!(
+        "[ISSUE TOKEN] Refresh token decrypted successfully, length: {}, first 10 chars: {}",
+        decrypted_refresh_token.len(),
+        &decrypted_refresh_token.chars().take(10).collect::<String>()
+    );
 
     let url = state.env.keycloak_url.clone();
     let client_id = state.env.client_id.clone();
     let secret = state.env.secret.clone();
     let realm = state.env.realm.clone();
     let url = format!("{}/realms/{}/protocol/openid-connect/token", url, realm);
+
+    log::info!("[ISSUE TOKEN] Keycloak URL: {}", url);
+    log::info!("[ISSUE TOKEN] Realm: {}", realm);
+
     let client = reqwest::Client::new();
     let params = [
         ("client_id", client_id),
@@ -332,21 +351,33 @@ async fn issue_token(
         ("refresh_token", decrypted_refresh_token),
     ];
 
+    log::info!("[ISSUE TOKEN] Sending token refresh request to Keycloak");
+
     let response = client.post(&url).form(&params).send().await.map_err(|e| {
         log::error!("[ISSUE TOKEN] Keycloak request failed: {}", e);
-        ABError::InternalServerError(e.to_string())
+        ABError::InternalServerError("Authentication service unavailable".to_string())
     })?;
+
+    let status = response.status();
+    log::info!("[ISSUE TOKEN] Keycloak response status: {}", status);
 
     if response.status().is_success() {
         let token: UserToken = response.json().await.map_err(|e| {
             log::error!("[ISSUE TOKEN] Failed to parse Keycloak response: {}", e);
-            ABError::InternalServerError(e.to_string())
+            ABError::InternalServerError("Authentication service error".to_string())
         })?;
+        log::info!("[ISSUE TOKEN] Token issued successfully");
         Ok(Json(token))
     } else {
-        log::error!("[ISSUE TOKEN] Keycloak authentication failed: invalid refresh token");
-        Err(ABError::Unauthorized(
-            "Login failed: Wrong Token".to_string(),
-        ))
+        let error_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unable to read error body".to_string());
+        log::error!(
+            "[ISSUE TOKEN] Keycloak authentication failed with status {}: {}",
+            status,
+            error_body
+        );
+        Err(ABError::Unauthorized("Invalid credentials".to_string()))
     }
 }
