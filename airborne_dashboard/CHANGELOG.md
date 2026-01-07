@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.11.3 - 2026-01-07
+#### Bug Fixes
+- bug fixes in navigation and user access - (8736cd8) - yuvrajjsingh0
+
+- - -
+
+## v0.19.0 - 2026-01-07
+#### Miscellaneous Chores
+- **(version)** v0.19.0 [skip ci] - (e5ade3a) - Airborne Bot
+
+- - -
+
+## v0.18.3 - 2026-01-07
+#### Miscellaneous Chores
+- **(version)** v0.18.3 [skip ci] - (9114fb9) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.11.2 - 2026-01-06
 #### Bug Fixes
 - support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput

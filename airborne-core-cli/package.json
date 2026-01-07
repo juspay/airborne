@@ -1,6 +1,6 @@
 {
   "name": "airborne-core-cli",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "type": "module",
   "bin": {
     "airborne-core-cli": "bin.js"
