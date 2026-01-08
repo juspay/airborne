@@ -24,6 +24,7 @@ import {
   RotateCw,
   Pencil,
   Copy,
+  Trash2,
 } from "lucide-react";
 import {
   Dialog,
@@ -132,6 +133,8 @@ export default function ReleaseDetailPage() {
 
   const [isRamping, setIsRamping] = useState(false);
   const [rampDialogOpen, setRampDialogOpen] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
+  const [isDiscardDialogOpen, setIsDiscardDialogOpen] = useState(false);
   const [trafficPct, setTrafficPct] = useState(release?.experiment?.traffic_percentage || 0);
   const [isConcluding, setIsConcluding] = useState(false);
   const [concludeDialogOpen, setConcludeDialogOpen] = useState(false);
@@ -249,6 +252,26 @@ export default function ReleaseDetailPage() {
     }
   };
 
+  const handleDiscardRelease = async () => {
+    setIsDiscarding(true);
+    try {
+      await apiFetch(
+        `/releases/${encodeURIComponent(releaseId)}/discard`,
+        {
+          method: "POST",
+          body: {},
+        },
+        { token, org, app }
+      );
+      mutate();
+      setIsDiscardDialogOpen(false);
+    } catch (error) {
+      console.error("Failed to discard release:", error);
+    } finally {
+      setIsDiscarding(false);
+    }
+  };
+
   const handleCloneRelease = () => {
     setIsCloning(true);
 
@@ -297,18 +320,45 @@ export default function ReleaseDetailPage() {
               {!loadingAccess && hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
                 <>
                   {release.experiment.status === "CREATED" && (
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        router.push(
-                          `/dashboard/${encodeURIComponent(org ?? "")}/${encodeURIComponent(app ?? "")}/releases/${releaseId}/edit`
-                        )
-                      }
-                      size="sm"
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/${encodeURIComponent(org ?? "")}/${encodeURIComponent(app ?? "")}/releases/${releaseId}/edit`
+                          )
+                        }
+                        size="sm"
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+
+                      <Dialog open={isDiscardDialogOpen} onOpenChange={setIsDiscardDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" disabled={isDiscarding}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Discard
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Discard Release</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to discard this release? This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter className="justify-end gap-2">
+                            <Button variant="outline" onClick={() => setIsDiscardDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleDiscardRelease} disabled={isDiscarding}>
+                              {isDiscarding ? "Discarding..." : "Discard"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
 
                   <Button variant="outline" onClick={handleCloneRelease} disabled={isCloning} size="sm">
@@ -316,96 +366,93 @@ export default function ReleaseDetailPage() {
                     {isCloning ? "Cloning..." : "Clone Release"}
                   </Button>
 
-                  {release.experiment.status !== "CONCLUDED" && (
-                    <>
-                      <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" disabled={isRamping}>
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            {isRamping ? "Ramping..." : "Ramp"}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Ramp Release</DialogTitle>
-                            <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
-                          </DialogHeader>
-                          <Input
-                            type="number"
-                            value={trafficPct}
-                            min={0}
-                            max={50}
-                            onChange={(e) => setTrafficPct(Number(e.target.value))}
-                            className="mb-4"
-                          />
-                          <DialogFooter className="justify-end gap-2">
-                            <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
-                              {isRamping ? "Ramping..." : "Ramp"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-
-                      {release.experiment.status !== "CREATED" && (
-                        <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
-                          <DialogTrigger asChild>
-                            <Button disabled={isConcluding}>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              {isConcluding ? "Concluding..." : "Conclude"}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Conclude Release</DialogTitle>
-                              <DialogDescription>
-                                Are you sure you want to conclude this release? This will roll out to 100% and finalize
-                                the deployment.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter className="justify-end gap-2">
-                              <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
-                                Cancel
-                              </Button>
-                              <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
-                                {isConcluding ? "Concluding..." : "Conclude"}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      )}
-                    </>
-                  )}
-
-                  {release.experiment.status === "INPROGRESS" && (
-                    <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
+                  {(release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") && (
+                    <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button disabled={isReverting}>
-                          <RotateCw className="h-4 w-4 mr-2" />
-                          Revert Release
+                        <Button variant="outline" disabled={isRamping}>
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          {isRamping ? "Ramping..." : "Ramp"}
                         </Button>
                       </DialogTrigger>
-
-                      {/* Dialog content */}
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Confirm Revert</DialogTitle>
-                          <DialogDescription>
-                            Are you sure you want to revert this release? This action cannot be undone.
-                          </DialogDescription>
+                          <DialogTitle>Ramp Release</DialogTitle>
+                          <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
                         </DialogHeader>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsRevertDialogOpen(false)}>
+                        <Input
+                          type="number"
+                          value={trafficPct}
+                          min={0}
+                          max={50}
+                          onChange={(e) => setTrafficPct(Number(e.target.value))}
+                          className="mb-4"
+                        />
+                        <DialogFooter className="justify-end gap-2">
+                          <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
                             Cancel
                           </Button>
-                          <Button variant="destructive" onClick={revertRelease} disabled={isReverting}>
-                            {isReverting ? "Reverting..." : "Revert Release"}
+                          <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
+                            {isRamping ? "Ramping..." : "Ramp"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                  )}
+
+                  {release.experiment.status === "INPROGRESS" && (
+                    <>
+                      <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={isConcluding}>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            {isConcluding ? "Concluding..." : "Conclude"}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Conclude Release</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to conclude this release? This will roll out to 100% and finalize
+                              the deployment.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter className="justify-end gap-2">
+                            <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
+                              {isConcluding ? "Concluding..." : "Conclude"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                      <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button disabled={isReverting}>
+                            <RotateCw className="h-4 w-4 mr-2" />
+                            Revert Release
+                          </Button>
+                        </DialogTrigger>
+
+                        {/* Dialog content */}
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Confirm Revert</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to revert this release? This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsRevertDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={revertRelease} disabled={isReverting}>
+                              {isReverting ? "Reverting..." : "Revert Release"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
                 </>
               )}
@@ -473,42 +520,43 @@ export default function ReleaseDetailPage() {
               </div>
 
               {/* Rollout Progress */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Rollout Progress</CardTitle>
-                  <CardDescription>
-                    Max percentage you can choose for your release is capped to 50%, this is to balance traffic between
-                    your A(Control) and B(Experiment) release. To make this release live for everyone, you can conclude
-                    the release.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Traffic Percentage</span>
-                    <span className="text-sm text-muted-foreground">
-                      {currentTrafficPercentage}% of {targetPercentage}%
-                    </span>
-                  </div>
-                  <Progress value={currentTrafficPercentage * 2} className="w-full" />
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium">Strategy</p>
-                      <p className="text-muted-foreground">{"Linear"}</p>
+              {(release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Rollout Progress</CardTitle>
+                    <CardDescription>
+                      Max percentage you can choose for your release is capped to 50%, this is to balance traffic
+                      between your A(Control) and B(Experiment) release. To make this release live for everyone, you can
+                      conclude the release.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Traffic Percentage</span>
+                      <span className="text-sm text-muted-foreground">
+                        {currentTrafficPercentage}% of {targetPercentage}%
+                      </span>
                     </div>
-                    <div>
-                      <p className="font-medium">Created</p>
-                      <p className="text-muted-foreground">
-                        {release.created_at ? new Date(release.created_at).toLocaleDateString() : "—"}
-                      </p>
-                    </div>
-                    {/* <div>
+                    <Progress value={currentTrafficPercentage * 2} className="w-full" />
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium">Strategy</p>
+                        <p className="text-muted-foreground">{"Linear"}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium">Created</p>
+                        <p className="text-muted-foreground">
+                          {release.created_at ? new Date(release.created_at).toLocaleDateString() : "—"}
+                        </p>
+                      </div>
+                      {/* <div>
                         <p className="font-medium">Created By</p>
                         <p className="text-muted-foreground">{release.metadata?.created_by || "—"}</p>
                       </div> */}
-                  </div>
-                </CardContent>
-              </Card>
-
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               {/* Release Info */}
               <Card>
                 <CardHeader>
