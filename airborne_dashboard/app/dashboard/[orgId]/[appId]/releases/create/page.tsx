@@ -81,7 +81,6 @@ type TargetingRule = {
 
 type ReleaseConfigRequest = {
   config: {
-    traffic_percentage: number;
     boot_timeout: number;
     release_config_timeout: number;
     properties: Record<string, any>;
@@ -140,7 +139,6 @@ export default function CreateReleasePage() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [filePriority, setFilePriority] = useState<Record<string, "important" | "lazy">>({});
   const [targetingRules, setTargetingRules] = useState<TargetingRule[]>([]);
-  const [rolloutPercentage] = useState(100);
   const [dimensions, setDimensions] = useState<
     { dimension: string; values: string[]; type?: string; depends_on?: string }[]
   >([]);
@@ -657,7 +655,6 @@ export default function CreateReleasePage() {
 
     const body: ReleaseConfigRequest = {
       config: {
-        traffic_percentage: rolloutPercentage,
         boot_timeout: bootTimeout,
         release_config_timeout: releaseConfigTimeout,
         properties: configProps,
@@ -1734,7 +1731,20 @@ export default function CreateReleasePage() {
                     <code
                       className="language-json"
                       dangerouslySetInnerHTML={{
-                        __html: hljs.highlight(JSON.stringify(releaseConfig, null, 2), { language: "json" }).value,
+                        __html: hljs.highlight(
+                          JSON.stringify(
+                            {
+                              ...releaseConfig,
+                              package: {
+                                ...(selectedPackage?.index && { index: selectedPackage.index }),
+                                ...releaseConfig.package,
+                              },
+                            },
+                            null,
+                            2
+                          ),
+                          { language: "json" }
+                        ).value,
                       }}
                     />
                   </pre>
