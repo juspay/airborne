@@ -185,3 +185,15 @@ pub struct ListExperimentsQuery {
     pub all: bool,
     pub status: Option<ExperimentStatusType>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct DiscardReleaseRequest {
+    pub change_reason: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct DiscardReleaseResponse {
+    pub success: bool,
+    pub message: String,
+    pub experiment_id: String,
+}
