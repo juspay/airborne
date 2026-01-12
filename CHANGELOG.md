@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.21.0 - 2026-01-12
+### Package updates
+- airborne_server bumped to airborne_server-v0.14.0
+### Global changes
+#### Features
+- automatic superposition migrations - (eb24de7) - yuvrajjsingh0
+
+- - -
+
 ## v0.20.1 - 1970-01-01
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.11.4

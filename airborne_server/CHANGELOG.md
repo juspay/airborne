@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.14.0 - 2026-01-12
+#### Features
+- automatic superposition migrations - (eb24de7) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.13.0 - 2026-01-07
 #### Bug Fixes
 - add contexts in logging and reduce parallelism in default config creation - (eb96ceb) - yuvrajjsingh0
