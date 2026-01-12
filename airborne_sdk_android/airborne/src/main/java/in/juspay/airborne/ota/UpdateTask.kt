@@ -41,6 +41,7 @@ import `in`.juspay.airborne.constants.LogLevel
 import `in`.juspay.airborne.constants.LogSubCategory
 import okhttp3.Response
 import okhttp3.ResponseBody
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -70,6 +71,7 @@ internal class UpdateTask(
     private val releaseConfigUrl: String,
     private val fileProviderService: FileProviderService,
     private var localReleaseConfig: ReleaseConfig?,
+    private val blackListedVersions: JSONArray,
     private val fileLock: Any,
     private val tracker: TrackerCallback,
     private val netUtils: NetUtils,
@@ -114,6 +116,8 @@ internal class UpdateTask(
     // TODO Move to storing in main app dir & remove this var.
     private var resourceSaveFuture: Future<Unit>? = null
 
+    private var isCancelled = false
+
     init {
         trackers.add(tracker)
         val sortedHeaders = (rcHeaders ?: emptyMap()).toSortedMap()
@@ -149,6 +153,13 @@ internal class UpdateTask(
         }
     }
 
+    fun cancel() {
+        isCancelled = true
+        packageUpdate?.cancel(true)
+        resourceUpdate?.futures?.forEach { it.cancel(true) }
+        Log.d(TAG, "UpdateTask cancelled.")
+    }
+
     private fun setCurrentResult(
         version: String? = null,
         config: ReleaseConfig.Config? = null,
@@ -176,18 +187,25 @@ internal class UpdateTask(
 
     private fun runInternal() {
         val fetched = fetchReleaseConfig()
-        var shouldDownloadCurLazySplits = false
+        var shouldDownloadCurLazySplits = true
         if (fetched == null) {
             // Unable to fetch so exiting.
             currentResult = UpdateResult.Error.RCFetchError
             onComplete(Stage.INSTALLING)
         } else {
-            updateTimeouts(fetched)
+            val blCheckRes = checkIfVersionBlacklisted(fetched)
+            if (!blCheckRes.configBlackListed) {
+                updateTimeouts(fetched)
+            }
             onComplete(Stage.FETCHING_RC)
             val pupdateStart = System.currentTimeMillis()
-            packageUpdate = doAsync { downloadPackageUpdate(fetched.pkg) }
-            resourceUpdate = ResourceUpdateTask(localReleaseConfig?.resources, fetched.resources)
-            resourceUpdate?.start()
+            if (!blCheckRes.packageBlackListed) {
+                packageUpdate = doAsync { downloadPackageUpdate(fetched.pkg) }
+            }
+            if (!blCheckRes.resBlackListed) {
+                resourceUpdate = ResourceUpdateTask(localReleaseConfig?.resources, fetched.resources)
+                resourceUpdate?.start()
+            }
             var updatedConfig: ReleaseConfig.Config? = null
             if (fetched.version != localReleaseConfig?.version) {
                 if (writeRCVersion(fetched.version)) {
@@ -198,7 +216,7 @@ internal class UpdateTask(
                     Log.d(TAG, "RC Version updated.")
                 }
             }
-            if (fetched.config.version != localReleaseConfig?.config?.version) {
+            if (!blCheckRes.configBlackListed && fetched.config.version != localReleaseConfig?.config?.version) {
                 if (writeConfig(fetched.config)) {
                     updatedConfig = fetched.config
                     setCurrentResult(fetched.version, updatedConfig)
@@ -214,12 +232,10 @@ internal class UpdateTask(
             onComplete(Stage.DOWNLOADING_UPDATES)
             var didPackageUpdate = false
             var updatedPackage: ReleaseConfig.PackageManifest? = null
-            if (!updateTimedOut.get()) {
+            if (presult != null && !updateTimedOut.get()) {
                 Log.d(TAG, "Installing package as updateTimedout is false")
                 val packageInstallFuture = doAsync {
-                    presult?.let {
-                        installPackageUpdate(it, fetched.pkg, pupdateStart)
-                    }
+                    installPackageUpdate(presult, fetched.pkg, pupdateStart)
                 }
                 didPackageUpdate = packageInstallFuture.get()
                 updatedPackage = if (didPackageUpdate) fetched.pkg else null
@@ -422,6 +438,34 @@ internal class UpdateTask(
             }
         }
         return null
+    }
+
+    private fun checkIfVersionBlacklisted(releaseConfig: ReleaseConfig): BlackListResult {
+        var blConfigVersionRes = false
+        var blPkgVersionRes = false
+        var blResourRes = false
+        val curReshHash = try {
+            OTAUtils.SHA256(releaseConfig.resources.toJSON().toString().toByteArray()).toString()
+        } catch (_: Exception) {
+            ""
+        }
+        for (i in 0 until blackListedVersions.length()) {
+            val blVersions = blackListedVersions.getJSONObject(i)
+            val configVersion = blVersions.optString("configVersion", "-1")
+            val pkgVersion = blVersions.optString("pkgVersion", "-1")
+            val resHash = blVersions.optString("resHash", "-1")
+
+            if (!blConfigVersionRes) {
+                blConfigVersionRes = configVersion == releaseConfig.config.version
+            }
+            if (!blPkgVersionRes) {
+                blPkgVersionRes = pkgVersion == releaseConfig.pkg.version
+            }
+            if (!blResourRes) {
+                blResourRes = resHash == curReshHash
+            }
+        }
+        return BlackListResult(blConfigVersionRes, blPkgVersionRes, blResourRes)
     }
 
     private fun installPackageUpdate(
@@ -709,6 +753,10 @@ internal class UpdateTask(
                 Log.d(TAG, "Starting lazy split downloads.")
                 val downloads = splits.map {
                     doAsync {
+                        if (isCancelled) {
+                            Log.d(TAG, "Cancelled, skipping download for ${it.filePath}")
+                            return@doAsync Result.Ok(Unit)
+                        }
                         val result = if (it.isDownloaded == true) {
                             Result.Ok(Unit)
                         } else {
@@ -832,6 +880,13 @@ internal class UpdateTask(
         state.remove(key.name)
         savePersistentState(state)
     }
+
+    // ------ ROLLBACK -----
+//    private fun checkAndCreateDefaultRestorePoint() {
+//        if (!fileProviderService.getFileFromInternalStorage("$packageBackupDir/default/.keep").exists()) {
+//            applicationManager.backupPackage("default")
+//        }
+//    }
 
     // ----- NETWORK-UTILS -----
     private fun downloadFile(
@@ -1221,11 +1276,9 @@ internal class UpdateTask(
             tempWriter: TempWriter
         ): Future<ReleaseConfig.Split?> =
             doAsync {
-                val dest =
-                    if (fromAirborne) "$APP_DIR/$PACKAGE_DIR_NAME" else "$APP_DIR/$RESOURCES_DIR_NAME"
                 if (tempWriter.copyToMain(
                         resource.filePath,
-                        dest
+                        "$APP_DIR/$PACKAGE_DIR_NAME"
                     )
                 ) {
                     resource
@@ -1284,6 +1337,8 @@ internal class UpdateTask(
             object Failed : Package
         }
     }
+
+    private class BlackListResult(val configBlackListed: Boolean, val packageBlackListed: Boolean, val resBlackListed: Boolean)
 
     private enum class Stage {
         INITIALIZING,
