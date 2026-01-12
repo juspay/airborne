@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.11.4 - 2026-01-12
+#### Bug Fixes
+- remove traffic percentage and add package index in confirmation dialog - (5456d2c) - Yash Rajput
+
+- - -
+
+## v0.20.0 - 2026-01-12
+#### Miscellaneous Chores
+- **(version)** v0.20.0 [skip ci] - (ea2c83e) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.11.3 - 2026-01-07
 #### Bug Fixes
 - bug fixes in navigation and user access - (8736cd8) - yuvrajjsingh0
