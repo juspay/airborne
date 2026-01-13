@@ -11,7 +11,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { hasAppAccess } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Pagination,
@@ -48,6 +48,8 @@ export default function ReleasesPage() {
   const [page, setPage] = useState(1);
   const [count] = useState(20); // items per page
   const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const params = useParams<{ appId: string }>();
+  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
 
   const queryParams = {
     page,
@@ -55,8 +57,9 @@ export default function ReleasesPage() {
     ...(filterStatus !== "all" ? { status: filterStatus } : {}),
   };
 
-  const { data, isLoading } = useSWR(token && org && app ? ["/releases/list", queryParams] : null, async () =>
-    apiFetch<any>("/releases/list", { query: queryParams }, { token, org, app })
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
+  const { data, isLoading } = useSWR(token && org && appId ? ["/releases/list", appId, queryParams] : null, async () =>
+    apiFetch<any>("/releases/list", { query: queryParams }, { token, org, app: appId })
   );
 
   const releases: ApiRelease[] = data?.data || [];

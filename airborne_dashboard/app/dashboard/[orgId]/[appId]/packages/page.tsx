@@ -22,6 +22,7 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import { useParams } from "next/navigation";
 
 type ApiPackage = {
   index: string;
@@ -36,14 +37,17 @@ export default function PackagesPage() {
   const count = 10;
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const params = useParams<{ appId: string }>();
+  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
 
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
   const { data, isLoading } = useSWR(
-    token && org && app ? ["/packages/list", debouncedSearchQuery, page, count] : null,
+    token && org && appId ? ["/packages/list", appId, debouncedSearchQuery, page, count] : null,
     async () =>
       apiFetch<any>(
         "/packages/list",
         { query: { page, count, search: searchQuery.trim() ? searchQuery.trim().toLowerCase() : undefined } },
-        { token, org, app }
+        { token, org, app: appId }
       )
   );
   const packages: ApiPackage[] = data?.data || [];

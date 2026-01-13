@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Rocket, ArrowLeft, Calendar } from "lucide-react";
 import Link from "next/link";
-import { notFound, useRouter } from "next/navigation";
+import { notFound, useParams, useRouter } from "next/navigation";
 import { useAppContext } from "@/providers/app-context";
 import useSWR from "swr";
 import { apiFetch, ErrorName } from "@/lib/api";
@@ -15,8 +15,11 @@ import { hasAppAccess } from "@/lib/utils";
 
 export default function ApplicationDetailPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
-  const { data, error } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
-    apiFetch<any>("/releases/list", { query: { page: 1, count: 5 } }, { token, org, app })
+  const params = useParams<{ appId: string }>();
+  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
+  const { data, error } = useSWR(token && org && appId ? ["/releases/list", appId] : null, async () =>
+    apiFetch<any>("/releases/list", { query: { page: 1, count: 5 } }, { token, org, app: appId })
   );
 
   if (error && error.name === ErrorName.Forbidden) {

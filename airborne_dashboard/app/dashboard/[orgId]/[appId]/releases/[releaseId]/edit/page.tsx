@@ -116,10 +116,13 @@ export default function EditReleasePage() {
   };
 
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
-  const params = useParams();
-  const releaseId = params.releaseId as string;
-  const { data } = useSWR(["/releases", releaseId, token, org, app], ([, id, t, o, a]) =>
-    apiFetch<any>(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
+  const params = useParams() as { releaseId: string; appId: string; orgId: string };
+  const releaseId = params.releaseId;
+  const appId = params.appId;
+  const orgId = params.orgId;
+  const { data } = useSWR(
+    token && releaseId && orgId && appId ? ["/releases", releaseId, token, orgId, appId] : null,
+    ([, id, t, o, a]) => apiFetch<any>(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
   );
   const release: ReleasePayload = data;
 
@@ -196,7 +199,7 @@ export default function EditReleasePage() {
           method: "GET",
           headers,
         },
-        { token, org, app }
+        { token, org: orgId, app: appId }
       );
 
       if (data && data.properties && Object.keys(data.properties).length > 0) {
@@ -247,15 +250,15 @@ export default function EditReleasePage() {
     if (currentStep === 2) {
       fetchSchema();
     }
-  }, [currentStep, token, org, app, release]);
+  }, [currentStep, token, orgId, appId, release]);
 
   // Load packages list
   useEffect(() => {
-    if (!token || !org || !app) return;
+    if (!token || !orgId || !appId) return;
     apiFetch<any>(
       "/packages/list",
       { query: { page: pkgPage, count: pkgCount, search: pkgSearch ? pkgSearch : undefined } },
-      { token, org, app }
+      { token, org: orgId, app: appId }
     )
       .then((res) => {
         setPackages(res.data || []);
@@ -263,7 +266,7 @@ export default function EditReleasePage() {
       })
       .catch(() => setPackages([]))
       .finally(() => setPkgLoading(false));
-  }, [token, org, app, pkgCount, pkgPage, debouncedPackageSearch]);
+  }, [token, orgId, appId, pkgCount, pkgPage, debouncedPackageSearch]);
 
   useEffect(() => {
     if (!selectedPackage || !release) return;
@@ -310,12 +313,14 @@ export default function EditReleasePage() {
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 5 ? ["/file/list", debouncedResourceSearch, resourceCurrentPage] : null,
+    token && orgId && appId && currentStep === 5
+      ? ["/file/list", orgId, appId, debouncedResourceSearch, resourceCurrentPage]
+      : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
         { method: "GET", query: { search: resourceSearch || undefined, page: resourceCurrentPage, per_page: perPage } },
-        { token, org, app }
+        { token, org: orgId, app: appId }
       )
   );
 
@@ -721,9 +726,9 @@ export default function EditReleasePage() {
       body.package_id = `version:${selectedPackage.version}`;
     }
     try {
-      await apiFetch(`/releases/${releaseId}`, { method: "PUT", body }, { token, org, app });
+      await apiFetch(`/releases/${releaseId}`, { method: "PUT", body }, { token, org: orgId, app: appId });
       router.push(
-        `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(releaseId)}`
+        `/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases/${encodeURIComponent(releaseId)}`
       );
     } catch (e: any) {
       console.log("Release creation fail", e);
