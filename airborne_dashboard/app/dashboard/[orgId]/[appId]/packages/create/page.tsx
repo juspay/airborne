@@ -21,7 +21,7 @@ import { Search, ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
 import { hasAppAccess } from "@/lib/utils";
 import { notFound } from "next/navigation";
@@ -38,6 +38,8 @@ type ApiResponse = {
 
 export default function CreatePackagePage() {
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
+  const params = useParams<{ appId: string }>();
+  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
   const totalSteps = 2;
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -66,12 +68,15 @@ export default function CreatePackagePage() {
   }, [loadingAccess]);
 
   // Data fetching for file lists
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
   const {
     data: indexFileData,
     error: indexFileError,
     isLoading: indexFileLoading,
   } = useSWR(
-    token && org && app && currentStep === 1 ? ["/file/list", debouncedIndexFileQuery, indexFileCurrentPage] : null,
+    token && org && appId && currentStep === 1
+      ? ["/file/list", appId, debouncedIndexFileQuery, indexFileCurrentPage]
+      : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
@@ -79,17 +84,20 @@ export default function CreatePackagePage() {
           method: "GET",
           query: { search: indexFileSearch || undefined, page: indexFileCurrentPage, per_page: perPage },
         },
-        { token, org, app }
+        { token, org, app: appId }
       )
   );
 
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
   const { data, error, isLoading } = useSWR(
-    token && org && app && currentStep === 2 ? ["/file/list", debouncedSearchQuery, packageFileCurrentPage] : null,
+    token && org && appId && currentStep === 2
+      ? ["/file/list", appId, debouncedSearchQuery, packageFileCurrentPage]
+      : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
         { method: "GET", query: { search: searchQuery || undefined, page: packageFileCurrentPage, per_page: perPage } },
-        { token, org, app }
+        { token, org, app: appId }
       )
   );
 
