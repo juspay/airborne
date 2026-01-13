@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
-import { notFound, useRouter, useSearchParams } from "next/navigation";
+import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { hasAppAccess, parseFileRef } from "@/lib/utils";
 import Link from "next/link";
 import { toastWarning } from "@/hooks/use-toast";
@@ -160,6 +160,8 @@ export default function CreateReleasePage() {
   const filesPerPage = 10;
 
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
+  const params = useParams<{ appId: string }>();
+  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
 
   const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState<boolean>(false);
   const [releaseConfig, setReleaseConfig] = useState<ReleaseConfigRequest | null>(null);
@@ -491,22 +493,26 @@ export default function CreateReleasePage() {
   }, [token, org, app]);
 
   // Load all resources/files with pagination
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
   const {
     data: resourceData,
     error: resourceError,
     isLoading: resourceLoading,
   } = useSWR(
-    token && org && app && currentStep === 6 ? ["/file/list", debouncedResourcesSearch, resourceCurrentPage] : null,
+    token && org && appId && currentStep === 6
+      ? ["/file/list", appId, debouncedResourcesSearch, resourceCurrentPage]
+      : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
         { method: "GET", query: { search: resourceSearch || undefined, page: resourceCurrentPage, per_page: perPage } },
-        { token, org, app }
+        { token, org, app: appId }
       )
   );
 
-  const { data } = useSWR(token && org && app ? ["/releases/list"] : null, async () =>
-    apiFetch<any>("/releases/list", { query: { page: 1, count: 1 } }, { token, org, app })
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
+  const { data } = useSWR(token && org && appId ? ["/releases/list", appId] : null, async () =>
+    apiFetch<any>("/releases/list", { query: { page: 1, count: 1 } }, { token, org, app: appId })
   );
   const releases: ApiRelease[] = data?.data || [];
 

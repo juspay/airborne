@@ -29,6 +29,7 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { hasAppAccess } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useParams } from "next/navigation";
 
 type ApiFile = {
   id: string;
@@ -51,6 +52,8 @@ type ApiResponse = {
 
 export default function FilesPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
+  const params = useParams<{ appId: string }>();
+  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [filterType, setFilterType] = useState("all");
@@ -58,13 +61,14 @@ export default function FilesPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const perPage = 10;
 
+  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
   const { data, error, mutate, isLoading } = useSWR(
-    token && org && app ? ["/file/list", debouncedSearchQuery, currentPage] : null,
+    token && org && appId ? ["/file/list", appId, debouncedSearchQuery, currentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
         { method: "GET", query: { search: searchQuery || undefined, page: currentPage, per_page: perPage } },
-        { token, org, app }
+        { token, org, app: appId }
       )
   );
 
