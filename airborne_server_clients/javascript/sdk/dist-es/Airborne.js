@@ -13,6 +13,7 @@ import { ListFilesCommand, } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommand, } from "./commands/ListOrganisationsCommand";
 import { ListPackagesCommand, } from "./commands/ListPackagesCommand";
 import { ListReleasesCommand, } from "./commands/ListReleasesCommand";
+import { ListVersionsCommand, } from "./commands/ListVersionsCommand";
 import { PostLoginCommand, } from "./commands/PostLoginCommand";
 import { RequestOrganisationCommand, } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommand, } from "./commands/ServeReleaseCommand";
@@ -35,6 +36,7 @@ const commands = {
     ListOrganisationsCommand,
     ListPackagesCommand,
     ListReleasesCommand,
+    ListVersionsCommand,
     PostLoginCommand,
     RequestOrganisationCommand,
     ServeReleaseCommand,

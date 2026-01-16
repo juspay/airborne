@@ -77,11 +77,15 @@ structure ListFilesRequest {
     @httpQuery("page")
     page: Integer
 
-    /// Number of files per page
-    @httpQuery("per_page")
-    per_page: Integer
+    /// Number of versions per page
+    @httpQuery("count")
+    count: Integer
 
-    /// Search query to filter files
+    /// Fetch all files without pagination
+    @httpQuery("all")
+    all: Boolean
+
+    /// Search query to filter file versions
     @httpQuery("search")
     search: String
 
@@ -96,37 +100,44 @@ structure ListFilesRequest {
     application: String
 }
 
+/// Represents a file entry
+structure FileResponseListItem {
+    /// Path where the file is stored on sdk
+    @required
+    file_path: String
+
+    /// id of the latest file
+    @required
+    id: String
+
+    /// version of the latest file
+    @required
+    version: Integer
+
+    /// total versions of the file
+    @required
+    total_versions: Integer
+}
+
 /// List of file responses
 list FileResponseList {
     /// A file response
-    member: CreateFileResponse
+    member: FileResponseListItem
 }
 
 /// List files response
 structure ListFilesResponse {
-    /// Name of the organisation
-    @required
-    organisation: String
-
-    /// Name of the application
-    @required
-    application: String
-
     /// List of files
     @required
-    files: FileResponseList
+    data: FileResponseList
 
-    /// Total number of files
+    /// Total number of pages
     @required
-    total: Integer
+    total_pages: Integer
 
-    /// Current page number
+    /// Total number of items
     @required
-    page: Integer
-
-    /// Number of files per page
-    @required
-    per_page: Integer
+    total_items: Integer
 }
 
 /// Represents a streaming binary blob
@@ -165,6 +176,75 @@ structure UploadFileRequest {
     application: String
 }
 
+/// List versions request
+structure ListVersionsRequest {
+    @httpLabel
+    @required
+    filepath: String
+
+    /// Page number for pagination
+    @httpQuery("page")
+    page: Integer
+
+    /// Number of versions per page
+    @httpQuery("count")
+    count: Integer
+
+    /// Fetch all file versions without pagination
+    @httpQuery("all")
+    all: Boolean
+
+    /// Search query to filter file versions
+    @httpQuery("search")
+    search: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+structure FileVersionItem {
+    /// Version number of the file
+    @required
+    version: Integer
+
+    /// tag of the version
+    tag: String
+
+    /// Date of creation
+    @required
+    created_at: String
+
+    /// Id of the file
+    @required
+    id: String
+}
+
+list FileVersionItemList {
+    member: FileVersionItem
+}
+
+/// List of version responses
+structure ListVersionResponse {
+    /// List of versions
+    @required
+    data: FileVersionItemList
+
+    /// Total number of pages
+    @required
+    total_pages: Integer
+
+    /// Total number of items
+    @required
+    total_items: Integer
+}
+
 /// Create file request operation
 @http(method: "POST", uri: "/api/file")
 @requiresauth
@@ -196,6 +276,19 @@ operation ListFiles {
 operation UploadFile {
     input: UploadFileRequest
     output: CreateFileResponse
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+/// List versions request operation
+@http(method: "GET", uri: "/api/file/{filepath}/versions")
+@requiresauth
+@readonly
+operation ListVersions {
+    input: ListVersionsRequest
+    output: ListVersionResponse
     errors: [
         Unauthorized
         BadRequestError

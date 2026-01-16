@@ -1,6 +1,8 @@
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use actix_web::error::PayloadError;
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use diesel::deserialize::Queryable;
 use http_body::Frame;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -60,14 +62,6 @@ pub struct FileResponse {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct FileListResponse {
-    pub files: Vec<FileResponse>,
-    pub total: usize,
-    pub page: Option<u32>,
-    pub per_page: Option<u32>,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct BulkFileResponse {
     pub created_files: Vec<FileResponse>,
     pub skipped_files: Vec<String>,
@@ -77,9 +71,42 @@ pub struct BulkFileResponse {
 
 #[derive(Deserialize)]
 pub struct FileListQuery {
-    pub page: Option<u32>,
-    pub per_page: Option<u32>,
     pub search: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct FileListItem {
+    pub file_path: String,
+    pub latest_version: i32,
+    pub total_versions: i64,
+    pub id: String,
+}
+
+#[derive(Queryable, Debug, Serialize)]
+pub struct FileSummary {
+    pub file_path: String,
+    pub latest_version: i32,
+    pub total_versions: i64,
+}
+
+#[derive(Deserialize)]
+pub struct FileVersionListQuery {
+    pub search: Option<String>,
+}
+
+#[derive(Queryable, Debug)]
+pub struct FileVersionDBQuery {
+    pub version: i32,
+    pub tag: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, Debug)]
+pub struct FileVersionListItem {
+    pub version: i32,
+    pub tag: Option<String>,
+    pub created_at: String,
+    pub id: String,
 }
 
 #[derive(Deserialize)]
