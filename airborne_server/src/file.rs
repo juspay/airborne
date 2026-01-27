@@ -12,11 +12,13 @@ use actix_web::{
 };
 use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
+use diesel::dsl::{count_distinct, count_star, max};
 use diesel::prelude::*;
 use futures_util::StreamExt;
 use http::HeaderValue;
 use log::info;
 use serde_json::json;
+use std::str::FromStr;
 use tokio::sync::mpsc;
 use tokio::task;
 use uuid::Uuid;
@@ -26,7 +28,7 @@ use crate::{
     file::types::*,
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     run_blocking, types as airborne_types,
-    types::{ABError, AppState, WithHeaders},
+    types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::{
         db::{
             models::{FileEntry as DbFile, NewFileEntry},
@@ -45,6 +47,7 @@ pub fn add_routes() -> Scope {
         .service(list_files)
         .service(get_file)
         .service(update_file)
+        .service(list_versions_for_file)
 }
 
 fn db_file_to_response(file: &DbFile) -> FileResponse {
@@ -400,10 +403,11 @@ async fn get_file(
 
 #[get("/list")]
 async fn list_files(
-    query: Query<FileListQuery>,
+    pagination_query: Query<PaginatedQuery>,
+    file_query: Query<FileListQuery>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
-) -> airborne_types::Result<Json<FileListResponse>> {
+) -> airborne_types::Result<Json<PaginatedResponse<FileListItem>>> {
     let auth_response = auth_response.into_inner();
     let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
     {
@@ -418,66 +422,98 @@ async fn list_files(
     }?;
 
     let pool = state.db_pool.clone();
-    let search_term = query.search.clone();
-    let page = query.page.unwrap_or(1);
-    let per_page = query.per_page.unwrap_or(50).min(200);
 
-    let (file_list, total) = run_blocking!({
+    let search_term = file_query.search.clone();
+
+    let response = run_blocking!({
         let mut conn = pool.get()?;
 
-        let base_query = files
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application));
+        let build_base_query = || {
+            let mut base_query = files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .group_by(file_path)
+                .select((file_path, max(version).assume_not_null(), count_star()))
+                .order_by(file_path.asc())
+                .into_boxed();
 
-        let search_filter = if let Some(search_term) = &search_term {
-            let search_pattern = format!("%{}%", search_term);
-            Some((search_pattern.clone(), search_pattern))
-        } else {
-            None
+            if let Some(ref term) = search_term {
+                let pattern = format!("%{}%", term);
+                base_query = base_query.filter(
+                    file_path
+                        .ilike(pattern.clone())
+                        .or(url.ilike(pattern.clone())),
+                );
+            }
+
+            base_query
         };
 
-        let total = if let Some((ref pattern1, ref pattern2)) = search_filter {
-            base_query
-                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-                .count()
-                .get_result::<i64>(&mut conn)? as usize
-        } else {
-            base_query.count().get_result::<i64>(&mut conn)? as usize
-        };
+        match *pagination_query {
+            PaginatedQuery::All => {
+                let results: Vec<FileSummary> =
+                    build_base_query().load::<FileSummary>(&mut conn)?;
 
-        let offset = ((page - 1) * per_page) as i64;
+                let data = results
+                    .into_iter()
+                    .map(|file| FileListItem {
+                        id: format!("{}@version:{}", file.file_path, file.latest_version),
+                        file_path: file.file_path,
+                        latest_version: file.latest_version,
+                        total_versions: file.total_versions,
+                    })
+                    .collect();
 
-        let file_list = if let Some((ref pattern1, ref pattern2)) = search_filter {
-            base_query
-                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-                .order(created_at.desc())
-                .limit(per_page as i64)
-                .offset(offset)
-                .select(DbFile::as_select())
-                .load::<DbFile>(&mut conn)?
-        } else {
-            base_query
-                .order(created_at.desc())
-                .limit(per_page as i64)
-                .offset(offset)
-                .select(DbFile::as_select())
-                .load::<DbFile>(&mut conn)?
-        };
+                Ok(PaginatedResponse::all(data))
+            }
+            PaginatedQuery::Paginated { page, count } => {
+                let mut count_query = files
+                    .filter(org_id.eq(&organisation))
+                    .filter(app_id.eq(&application))
+                    .into_boxed();
 
-        Ok((file_list, total))
+                if let Some(ref term) = search_term {
+                    let pattern = format!("%{}%", term);
+                    count_query = count_query.filter(
+                        file_path
+                            .ilike(pattern.clone())
+                            .or(url.ilike(pattern.clone())),
+                    );
+                }
+
+                let total_count: i64 = count_query
+                    .select(count_distinct(file_path))
+                    .first::<i64>(&mut conn)?;
+
+                let page = page as i64;
+                let count = count as i64;
+                let offset = (page - 1) * count;
+
+                let results: Vec<FileSummary> = build_base_query()
+                    .offset(offset)
+                    .limit(count)
+                    .load::<FileSummary>(&mut conn)?;
+
+                let data = results
+                    .into_iter()
+                    .map(|file| FileListItem {
+                        id: format!("{}@version:{}", file.file_path, file.latest_version),
+                        file_path: file.file_path,
+                        latest_version: file.latest_version,
+                        total_versions: file.total_versions,
+                    })
+                    .collect();
+                let total_pages = (total_count + count - 1) / count;
+                Ok(PaginatedResponse {
+                    data,
+                    total_items: total_count as u64,
+                    total_pages: total_pages as u32,
+                })
+            }
+        }
     })?;
 
-    let files_response = file_list
-        .into_iter()
-        .map(|f| db_file_to_response(&f))
-        .collect();
-
-    Ok(Json(FileListResponse {
-        files: files_response,
-        total,
-        page: Some(page),
-        per_page: Some(per_page),
-    }))
+    Ok(Json(response))
 }
 
 /// Updates a file's tag
@@ -1005,4 +1041,117 @@ async fn upload_bulk_files(
     }
 
     Ok(Json(BulkFileUploadResponse { uploaded, skipped }))
+}
+
+#[get("/{filepath}/versions")]
+async fn list_versions_for_file(
+    path: Path<String>,
+    pagination_query: Query<PaginatedQuery>,
+    version_query: Query<FileVersionListQuery>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<PaginatedResponse<FileVersionListItem>>> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
+
+    let decoded_path = urlencoding::decode(&path.into_inner())
+        .map_err(|_| ABError::BadRequest("Invalid URL encoding".into()))?
+        .into_owned();
+
+    let pool = state.db_pool.clone();
+    let search = version_query.search.clone();
+    let response: PaginatedResponse<FileVersionListItem> = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let build_base_query = || {
+            let mut base_query = files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(file_path.eq(&decoded_path))
+                .into_boxed();
+
+            if let Some(ref search_str) = search {
+                let normalized = search_str.trim();
+                if !normalized.is_empty() {
+                    let mut normalized = normalized.to_string();
+                    if let Some(stripped) = normalized.strip_prefix(|c| c == 'v' || c == 'V') {
+                        normalized = stripped.to_string();
+                    }
+                    let pattern = format!("%{}%", normalized);
+                    if let Ok(num) = i32::from_str(&normalized) {
+                        // Match either numeric version or tag (including null-safe)
+                        base_query = base_query.filter(version.eq(num).or(tag.ilike(pattern)));
+                    } else {
+                        base_query = base_query.filter(tag.ilike(pattern));
+                    }
+                }
+            }
+            base_query
+        };
+
+        match *pagination_query {
+            PaginatedQuery::All => {
+                let results = build_base_query()
+                    .select((version, tag, created_at))
+                    .order_by(version.desc())
+                    .load::<FileVersionDBQuery>(&mut conn)?;
+
+                let data = results
+                    .into_iter()
+                    .map(|row| FileVersionListItem {
+                        id: format!("{}@version:{}", decoded_path, row.version),
+                        version: row.version,
+                        tag: row.tag,
+                        created_at: row.created_at.to_string(),
+                    })
+                    .collect();
+
+                Ok(PaginatedResponse::all(data))
+            }
+            PaginatedQuery::Paginated { page, count } => {
+                let total_count: i64 = build_base_query()
+                    .select(count_star())
+                    .first::<i64>(&mut conn)?;
+                let page = page as i64;
+                let count = count as i64;
+                let offset = (page - 1) * count;
+
+                let results = build_base_query()
+                    .offset(offset)
+                    .limit(count)
+                    .select((version, tag, created_at))
+                    .order_by(version.desc())
+                    .load::<FileVersionDBQuery>(&mut conn)?;
+
+                let total_pages = (total_count + count - 1) / count;
+                let data = results
+                    .into_iter()
+                    .map(|row| FileVersionListItem {
+                        id: format!("{}@version:{}", decoded_path, row.version),
+                        version: row.version,
+                        tag: row.tag,
+                        created_at: row.created_at.to_string(),
+                    })
+                    .collect();
+
+                Ok(PaginatedResponse {
+                    data,
+                    total_items: total_count as u64,
+                    total_pages: total_pages as u32,
+                })
+            }
+        }
+    })?;
+
+    Ok(Json(response))
 }

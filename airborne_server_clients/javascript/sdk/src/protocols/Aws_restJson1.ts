@@ -56,6 +56,10 @@ import {
   ListReleasesCommandOutput,
 } from "../commands/ListReleasesCommand";
 import {
+  ListVersionsCommandInput,
+  ListVersionsCommandOutput,
+} from "../commands/ListVersionsCommand";
+import {
   PostLoginCommandInput,
   PostLoginCommandOutput,
 } from "../commands/PostLoginCommand";
@@ -83,7 +87,6 @@ import { AirborneServiceException as __BaseException } from "../models/AirborneS
 import {
   BadRequestError,
   ConfigProperties,
-  CreateFileResponse,
   CreateReleaseRequestConfig,
   CreateReleaseRequestPackage,
   DimensionResponse,
@@ -382,7 +385,8 @@ export const se_ListFilesCommand = async(
   b.bp("/api/file/list");
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
-    [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
+    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
     [_s]: [,input[_s]!],
   });
   let body: any;
@@ -457,6 +461,34 @@ export const se_ListReleasesCommand = async(
     [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
     [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
     [_st]: [,input[_st]!],
+  });
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .q(query)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1ListVersionsCommand
+ */
+export const se_ListVersionsCommand = async(
+  input: ListVersionsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file/{filepath}/versions");
+  b.p('filepath', () => input.filepath!, '{filepath}', false)
+  const query: any = map({
+    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
+    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
+    [_s]: [,input[_s]!],
   });
   let body: any;
   b.m("GET")
@@ -868,12 +900,9 @@ export const de_ListFilesCommand = async(
   });
   const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
   const doc = take(data, {
-    'application': __expectString,
-    'files': _ => de_FileResponseList(_, context),
-    'organisation': __expectString,
-    'page': __expectInt32,
-    'per_page': __expectInt32,
-    'total': __expectInt32,
+    'data': _json,
+    'total_items': __expectInt32,
+    'total_pages': __expectInt32,
   });
   Object.assign(contents, doc);
   return contents;
@@ -939,6 +968,29 @@ export const de_ListReleasesCommand = async(
   const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
   const doc = take(data, {
     'data': _ => de_GetReleaseResponseList(_, context),
+    'total_items': __expectInt32,
+    'total_pages': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1ListVersionsCommand
+ */
+export const de_ListVersionsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ListVersionsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'data': _json,
     'total_items': __expectInt32,
     'total_pages': __expectInt32,
   });
@@ -1312,27 +1364,6 @@ const de_CommandError = async(
   }
 
   /**
-   * deserializeAws_restJson1CreateFileResponse
-   */
-  const de_CreateFileResponse = (
-    output: any,
-    context: __SerdeContext
-  ): CreateFileResponse => {
-    return take(output, {
-      'checksum': __expectString,
-      'created_at': __expectString,
-      'file_path': __expectString,
-      'id': __expectString,
-      'metadata': (_: any) => de_Document(_, context),
-      'size': __expectInt32,
-      'status': __expectString,
-      'tag': __expectString,
-      'url': __expectString,
-      'version': __expectInt32,
-    }) as any;
-  }
-
-  /**
    * deserializeAws_restJson1DimensionList
    */
   const de_DimensionList = (
@@ -1378,18 +1409,13 @@ const de_CommandError = async(
 
     }, {} as Record<string, __DocumentType>);}
 
-  /**
-   * deserializeAws_restJson1FileResponseList
-   */
-  const de_FileResponseList = (
-    output: any,
-    context: __SerdeContext
-  ): (CreateFileResponse)[] => {
-    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
-      return de_CreateFileResponse(entry, context);
-    });
-    return retVal;
-  }
+  // de_FileResponseList omitted.
+
+  // de_FileResponseListItem omitted.
+
+  // de_FileVersionItem omitted.
+
+  // de_FileVersionItemList omitted.
 
   /**
    * deserializeAws_restJson1GetReleaseConfig
@@ -1500,7 +1526,6 @@ const de_CommandError = async(
   const _fp = "file_path";
   const _o = "organisation";
   const _p = "page";
-  const _pp = "per_page";
   const _s = "search";
   const _st = "status";
   const _t = "tag";

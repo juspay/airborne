@@ -71,6 +71,20 @@ async fn create_package(
     let package = run_blocking!({
         let mut conn = pool.get()?;
 
+        if !request.files.is_empty() {
+            // Parse and collect all file paths
+            let mut seen_paths = std::collections::HashSet::new();
+            for file_id in &request.files {
+                let (fp, _ver_opt, _tag_opt) = parse_file_key(file_id);
+                if !seen_paths.insert(fp.clone()) {
+                    return Err(ABError::BadRequest(format!(
+                        "Duplicate file path found: {}",
+                        fp
+                    )));
+                }
+            }
+        }
+
         let files: Vec<FileEntry> = if !request.files.is_empty() {
             let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
 
