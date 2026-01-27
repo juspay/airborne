@@ -300,6 +300,7 @@ The server relies on a set of environment variables for its configuration. These
 - `AWS_BUCKET`: Name of the S3 bucket for storing package assets.
 - `PUBLIC_ENDPOINT`: The public-facing URL for accessing assets stored in S3.
 - `DB_URL`: Connection string for the PostgreSQL database (typically KMS encrypted for production).
+- `REDIS_URL`: Connection string for the Redis cache server (e.g., `redis://localhost:6379`).
 - AWS Credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`): For S3 and KMS access. `AWS_ENDPOINT_URL` may be needed for LocalStack.
 
 Refer to the provided `.env.example` or existing setup scripts (`scripts/encrypt_env.sh`, `scripts/generate_env.sh`) for guidance on populating these variables.
@@ -388,6 +389,8 @@ The Airborne Server uses a comprehensive Makefile located at the project root fo
 - **Backend API**: `http://localhost:8081`
 - **Keycloak (Authentication)**: `http://localhost:8180` (Default admin: `admin/admin`)
 - **PostgreSQL Database**: `localhost:5433`
+- **Redis Cache**: `localhost:6379`
+- **Redis Insight (Dashboard)**: `http://localhost:5540`
 - **LocalStack (AWS Mock)**: `http://localhost:4566`
 - **Superposition**: `http://localhost:8080`
 
@@ -407,6 +410,8 @@ make db                     # Start PostgreSQL database
 make db-migration          # Run database migrations
 
 # Infrastructure services
+make redis                 # Start Redis cache server
+make redis-insight         # Start Redis Insight dashboard
 make localstack            # Start LocalStack (AWS mock)
 make superposition         # Start Superposition service
 make keycloak-db           # Start Keycloak database
