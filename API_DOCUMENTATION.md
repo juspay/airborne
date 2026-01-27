@@ -522,7 +522,7 @@ x-application: <application_name>
 ### 4.1 Create Organisation User
 **Endpoint:** `POST /organisation/user/create`
 
-**Description:** Adds a user to an organisation with specified access level.
+**Description:** Adds a user to an organisation with specified access level. If the user exists in the system, they are immediately added to the organization. If the user doesn't exist, an invitation is created and sent via email with a secure token that the user can use to accept the invitation.
 
 **Headers:**
 ```json
@@ -557,13 +557,42 @@ x-application: <application_name>
 {
   "type": "object",
   "properties": {
-    "success": {
-      "type": "boolean"
+    "user": {
+      "type": "string",
+      "description": "Username that was processed"
     },
-    "message": {
-      "type": "string"
+    "success": {
+      "type": "boolean",
+      "description": "Whether the operation was successful"
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["add", "invite_created", "invite_updated"],
+      "description": "Type of operation performed"
     }
   }
+}
+```
+
+**Operation Types:**
+- `add`: User existed and was directly added to the organization
+- `invite_created`: User didn't exist, new invitation was created and email sent
+- `invite_updated`: User didn't exist but had a pending invite, existing invite was updated and email re-sent
+
+**Example Responses:**
+```json
+{
+  "user": "existing_user",
+  "success": true,
+  "operation": "add"
+}
+```
+
+```json
+{
+  "user": "new_user@example.com", 
+  "success": true,
+  "operation": "invite_created"
 }
 ```
 
@@ -697,9 +726,273 @@ x-application: <application_name>
 
 ---
 
-## 5. File Management
+## 5. Invite Management
 
-### 5.1 Create File
+### 5.1 Accept Organization Invite
+**Endpoint:** `POST /organisation/user/invite/accept`
+
+**Description:** Accepts an organization invitation using an invite token. The authenticated user will be added to the organization with the role specified in the invite.
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>"
+}
+```
+
+**Request Body Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "Invite token received via email"
+    }
+  },
+  "required": ["token"]
+}
+```
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Whether the invite was accepted successfully"
+    },
+    "message": {
+      "type": "string",
+      "description": "Success message"
+    },
+    "organization": {
+      "type": "string",
+      "description": "Organization name that was joined"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["admin", "write", "read"],
+      "description": "Role assigned in the organization"
+    }
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "message": "Successfully joined organization my-company as admin",
+  "organization": "my-company",
+  "role": "admin"
+}
+```
+
+**Error Cases:**
+- `400 Bad Request`: Invalid or expired invite token
+- `401 Unauthorized`: Missing authentication or invite email doesn't match authenticated user
+- `404 Not Found`: User not found in system
+- `500 Internal Server Error`: Failed to add user to organization
+
+### 5.2 List Organization Invites
+**Endpoint:** `GET /organisation/user/invite/list`
+
+**Description:** Lists all invites for the authenticated user's organization with search and pagination capabilities. Requires WRITE permission for the organization.
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>"
+}
+```
+
+**Query Parameters:**
+- `search` (optional): Search term for email or role filtering
+- `status` (optional): Filter by invite status (`pending`, `accepted`, `declined`, `expired`)
+- `page` (optional): Page number (default: 1)
+- `per_page` (optional): Items per page (default: 10, max: 100)
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "invites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Invite UUID"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of invitee"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["admin", "write", "read"],
+            "description": "Role to be assigned"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "declined", "expired"],
+            "description": "Current invite status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the invite was created/last updated"
+          }
+        }
+      }
+    },
+    "pagination": {
+      "type": "object",
+      "properties": {
+        "current_page": {
+          "type": "integer",
+          "description": "Current page number"
+        },
+        "per_page": {
+          "type": "integer",
+          "description": "Items per page"
+        },
+        "total_items": {
+          "type": "integer",
+          "description": "Total number of invites"
+        },
+        "total_pages": {
+          "type": "integer",
+          "description": "Total number of pages"
+        }
+      }
+    }
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "invites": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "email": "user@example.com",
+      "role": "admin",
+      "status": "pending",
+      "created_at": "2025-11-03T10:30:00Z"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "per_page": 10,
+    "total_items": 1,
+    "total_pages": 1
+  }
+}
+```
+
+**Example Usage:**
+- List all invites: `GET /organisation/user/invite/list`
+- Search by email: `GET /organisation/user/invite/list?search=john@example.com`
+- Filter pending invites: `GET /organisation/user/invite/list?status=pending`
+- Search admin roles: `GET /organisation/user/invite/list?search=admin`
+- Paginated results: `GET /organisation/user/invite/list?page=2&per_page=20`
+
+### 5.3 Revoke Organization Invite
+**Endpoint:** `POST /organisation/user/invite/{invite_id}/revoke`
+
+**Description:** Revokes (expires) an existing organization invite. Requires WRITE permission for the organization. Only invites belonging to the authenticated user's organization can be revoked.
+
+**Headers:**
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer <jwt_token>",
+  "x-organisation": "<organisation_name>"
+}
+```
+
+**Path Parameters:**
+- `invite_id`: UUID of the invite to revoke
+
+**Response Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Invite UUID"
+    },
+    "org_id": {
+      "type": "string",
+      "description": "Organization ID"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email address of invitee"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["admin", "write", "read"],
+      "description": "Role that was to be assigned"
+    },
+    "status": {
+      "type": "string",
+      "value": "expired",
+      "description": "Updated status (will be 'expired')"
+    },
+    "token": {
+      "type": "string",
+      "description": "Invite token (now invalid)"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the invite was created"
+    }
+  }
+}
+```
+
+**Error Cases:**
+- `400 Bad Request`: Invalid invite ID format
+- `403 Forbidden`: No permission to revoke invite (not in same organization)
+- `404 Not Found`: Invite not found
+- `500 Internal Server Error`: Database error
+
+**Notes:**
+1. **Invite Tokens**: When users don't exist in the system, the `/create` endpoint now automatically creates database invites with secure tokens and sends email notifications.
+
+2. **Email Integration**: All invite endpoints integrate with the email system using Tera templates. Invite emails include:
+   - Organization name
+   - Role being offered
+   - Secure invite token
+   - Accept link (when implemented in frontend)
+
+3. **Token Expiry**: Invite tokens automatically expire after 7 days from creation. Expired tokens cannot be used to accept invites.
+
+4. **Database-Driven**: All invites are stored in the PostgreSQL database with proper enum types for roles and statuses, ensuring data consistency.
+
+5. **Security Features**:
+   - Tokens are 64-character cryptographically secure random strings
+   - Email verification ensures invites can only be accepted by the intended recipient
+   - JWT authentication required for all operations
+   - Organization-level permissions enforced
+
+---
+
+## 6. File Management
+
+### 6.1 Create File
 **Endpoint:** `POST /file`
 
 **Description:** Creates a new file entry by providing a URL.
@@ -782,7 +1075,7 @@ x-application: <application_name>
 }
 ```
 
-### 5.2 Bulk Create Files
+### 6.2 Bulk Create Files
 **Endpoint:** `POST /file/bulk`
 
 **Description:** Creates multiple file entries at once.
@@ -859,7 +1152,7 @@ x-application: <application_name>
 }
 ```
 
-### 5.3 Get File
+### 6.3 Get File
 **Endpoint:** `GET /file`
 
 **Description:** Gets details of a specific file.
@@ -879,7 +1172,7 @@ x-application: <application_name>
 
 **Response Schema:** Same as file creation response.
 
-### 5.4 List Files
+### 6.4 List Files
 **Endpoint:** `GET /file/list`
 
 **Description:** Lists all files for an application with pagination and search.
@@ -924,7 +1217,7 @@ x-application: <application_name>
 }
 ```
 
-### 5.5 Update File Tag
+### 6.5 Update File Tag
 **Endpoint:** `PATCH /file/{file_key}`
 
 **Description:** Updates the tag of an existing file.
@@ -960,9 +1253,9 @@ x-application: <application_name>
 
 ---
 
-## 6. Package Management
+## 7. Package Management
 
-### 6.1 Create Package
+### 7.1 Create Package
 **Endpoint:** `POST /packages`
 
 **Description:** Creates a new package containing multiple files.
@@ -1026,7 +1319,7 @@ x-application: <application_name>
 }
 ```
 
-### 6.2 List Packages
+### 7.2 List Packages
 **Endpoint:** `GET /packages/list`
 
 **Description:** Lists packages for an application with pagination.
@@ -1070,7 +1363,7 @@ x-application: <application_name>
 }
 ```
 
-### 6.3 Get Individual Package
+### 7.3 Get Individual Package
 **Endpoint:** `GET /packages`
 
 **Description:** Gets details of a specific package.
@@ -1114,9 +1407,9 @@ x-application: <application_name>
 
 ---
 
-## 7. Dimension Management
+## 8. Dimension Management
 
-### 7.1 Create Dimension
+### 8.1 Create Dimension
 **Endpoint:** `POST /organisations/applications/dimension/create`
 
 **Description:** Creates a new dimension for application configuration. Supports both standard dimensions and cohort dimensions.
@@ -1215,7 +1508,7 @@ x-application: <application_name>
    }
    ```
 
-### 7.2 List Dimensions
+### 8.2 List Dimensions
 **Endpoint:** `GET /organisations/applications/dimension/list`
 
 **Description:** Lists all dimensions for an application.
@@ -1275,7 +1568,7 @@ x-application: <application_name>
 }
 ```
 
-### 7.3 Update Dimension
+### 8.3 Update Dimension
 **Endpoint:** `PUT /organisations/applications/dimension/{dimension_name}`
 
 **Description:** Updates a dimension's properties.
@@ -1338,7 +1631,7 @@ x-application: <application_name>
 }
 ```
 
-### 7.4 Delete Dimension
+### 8.4 Delete Dimension
 **Endpoint:** `DELETE /organisations/applications/dimension/{dimension_name}`
 
 **Description:** Deletes a dimension from the application.
@@ -1366,11 +1659,11 @@ x-application: <application_name>
 
 ---
 
-## 8. Cohort Dimension Management
+## 9. Cohort Dimension Management
 
 Cohort dimensions allow you to segment users based on version ranges or group memberships. They support both checkpoint-based segmentation (using version comparisons) and group-based segmentation (using explicit member lists).
 
-### 8.1 List Cohort Schema
+### 9.1 List Cohort Schema
 **Endpoint:** `GET /organisations/applications/dimension/{cohort_dimension_name}/cohort`
 
 **Description:** Retrieves the schema and configuration of a cohort dimension.
@@ -1416,7 +1709,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 8.2 Create Cohort Checkpoint
+### 9.2 Create Cohort Checkpoint
 **Endpoint:** `POST /organisations/applications/dimension/{cohort_dimension_name}/cohort/checkpoint`
 
 **Description:** Creates a checkpoint cohort that segments users based on version comparisons (e.g., users with app version >= 2.1.0).
@@ -1475,7 +1768,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 8.3 Create Cohort Group  
+### 9.3 Create Cohort Group  
 **Endpoint:** `POST /organisations/applications/dimension/{cohort_dimension_name}/cohort/group`
 
 **Description:** Creates a group cohort that segments users based on explicit membership lists (e.g., beta testers, VIP users).
@@ -1532,7 +1825,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 8.4 Get Cohort Group Priority
+### 9.4 Get Cohort Group Priority
 **Endpoint:** `GET /organisations/applications/dimension/{cohort_dimension_name}/cohort/group/priority`
 
 **Description:** Retrieves the priority ordering of cohort groups. Groups with lower priority values are evaluated first.
@@ -1566,7 +1859,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 8.5 Update Cohort Group Priority
+### 9.5 Update Cohort Group Priority
 **Endpoint:** `PUT /organisations/applications/dimension/{cohort_dimension_name}/cohort/group/priority`
 
 **Description:** Updates the priority ordering of cohort groups. This affects the order in which groups are evaluated for user segmentation.
@@ -1654,9 +1947,9 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 
 ---
 
-## 9. Release Management
+## 10. Release Management
 
-### 9.1 Create Release
+### 10.1 Create Release
 **Endpoint:** `POST /releases`
 
 **Description:** Creates a new release with configuration and package details.
@@ -1849,7 +2142,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 9.2 List Releases
+### 10.2 List Releases
 **Endpoint:** `GET /releases/list`
 
 **Description:** Lists all releases for an application.
@@ -1894,7 +2187,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 9.3 Get Individual Release
+### 10.3 Get Individual Release
 **Endpoint:** `GET /releases/{release_id}`
 
 **Description:** Gets details of a specific release.
@@ -1986,7 +2279,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 9.4 Ramp Release
+### 10.4 Ramp Release
 **Endpoint:** `POST /releases/{release_id}/ramp`
 
 **Description:** Updates the traffic percentage for a release experiment.
@@ -2045,7 +2338,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 9.5 Conclude Release
+### 10.5 Conclude Release
 **Endpoint:** `POST /releases/{release_id}/conclude`
 
 **Description:** Concludes a release experiment by choosing a winning variant.
@@ -2096,7 +2389,7 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 }
 ```
 
-### 9.6 Serve Release Configuration (Public)
+### 10.6 Serve Release Configuration (Public)
 **Endpoint:** `GET /release/{organisation}/{application}`
 
 **Description:** Public endpoint that serves the live release configuration for client SDKs. No authentication required.
@@ -2203,9 +2496,9 @@ Cohort dimensions allow you to segment users based on version ranges or group me
 
 ---
 
-## 10. Configuration Management
+## 11. Configuration Management
 
-### 10.1 Create Configuration
+### 11.1 Create Configuration
 **Endpoint:** `POST /organisations/applications/config/create`
 
 **Description:** Creates application configuration.
