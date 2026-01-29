@@ -279,9 +279,8 @@ export default function ReleaseDetailPage() {
   const handleCloneRelease = () => {
     setIsCloning(true);
 
-    // Navigate to create page with just the release ID and clone flag
     router.push(
-      `/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases/create?clone=true&releaseId=${encodeURIComponent(releaseId)}`
+      `/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases/${encodeURIComponent(releaseId)}/clone`
     );
 
     // Reset loading state after a short delay (navigation happens asynchronously)

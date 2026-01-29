@@ -72,9 +72,17 @@ pub struct GetReleaseResponse {
     pub created_at: DateTime<Utc>,
     pub config: Config,
     pub package: ServePackage,
-    pub resources: Vec<ServeFile>,
+    pub resources: Vec<Resource>,
     pub experiment: Option<ReleaseExperiment>,
     pub dimensions: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Serialize)]
+pub struct Resource {
+    pub file_id: String,
+    pub file_path: String,
+    pub url: String,
+    pub checksum: String,
 }
 
 #[derive(Serialize, Debug)]
