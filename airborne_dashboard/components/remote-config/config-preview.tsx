@@ -14,7 +14,11 @@ import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { ConfigPreviewProps, ListPropertiesResponse, PropertyEntry } from "@/types/remote-configs";
 import { generateJsonSchema } from "./utils/helpers";
+import hljs from "highlight.js";
+import json from "highlight.js/lib/languages/json";
+import "highlight.js/styles/vs2015.css";
 
+hljs.registerLanguage("json", json);
 interface PropertyCardProps {
   property: PropertyEntry;
   index: number;
@@ -185,15 +189,22 @@ function PropertyCard({ property, index }: PropertyCardProps) {
                   showJsonView ? (
                     <div className="relative">
                       <ScrollArea className="w-full max-h-96">
-                        <pre className="text-sm p-4 bg-muted rounded-lg overflow-auto font-mono">
-                          <code className="text-foreground whitespace-pre">
-                            {JSON.stringify(property.properties, null, 2)}
-                          </code>
+                        <pre className="hljs max-h-96 whitespace-pre-wrap text-sm p-4 bg-muted rounded-lg overflow-auto">
+                          <code
+                            className="language-json"
+                            dangerouslySetInnerHTML={{
+                              __html: hljs.highlight(JSON.stringify(property.properties, null, 2), {
+                                language: "json",
+                              }).value,
+                            }}
+                          />
                         </pre>
                       </ScrollArea>
                     </div>
                   ) : (
-                    <div className="space-y-2">{renderPropertiesVisual(property.properties)}</div>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {renderPropertiesVisual(property.properties)}
+                    </div>
                   )
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">No properties configured</div>
@@ -209,7 +220,11 @@ function PropertyCard({ property, index }: PropertyCardProps) {
 
 function renderPropertiesVisual(properties: any, depth = 0): React.ReactNode {
   if (typeof properties !== "object" || properties === null) {
-    return <span className="text-sm">{typeof properties === "string" ? `"${properties}"` : String(properties)}</span>;
+    return (
+      <span className="text-sm break-all">
+        {typeof properties === "string" ? `"${properties}"` : String(properties)}
+      </span>
+    );
   }
 
   if (Array.isArray(properties)) {
@@ -250,6 +265,9 @@ export function ConfigPreview({ schema }: ConfigPreviewProps) {
   const properties: PropertyEntry[] = propertiesData?.properties || [];
 
   const jsonSchema = generateJsonSchema(schema);
+  const preview = hljs.highlight(JSON.stringify(jsonSchema, null, 2), {
+    language: "json",
+  }).value;
 
   const copyToClipboard = async (content: string, label: string) => {
     try {
@@ -315,8 +333,13 @@ export function ConfigPreview({ schema }: ConfigPreviewProps) {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-96 w-full">
-                <pre className="text-sm p-4 bg-muted rounded-lg overflow-auto">
-                  {JSON.stringify(jsonSchema, null, 2)}
+                <pre className="hljs whitespace-pre-wrap text-sm p-4 bg-muted rounded-lg overflow-auto">
+                  <code
+                    className="language-json"
+                    dangerouslySetInnerHTML={{
+                      __html: preview,
+                    }}
+                  />
                 </pre>
               </ScrollArea>
             </CardContent>
