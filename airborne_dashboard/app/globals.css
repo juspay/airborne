@@ -129,3 +129,11 @@
 button {
   cursor: pointer;
 }
+
+.hljs,
+.hljs code,
+.hljs span {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-all !important;
+}

@@ -454,3 +454,22 @@ export function validateConfigValue(config: ConfigValue, schema: SchemaField[]):
     message: error.message || "Validation error",
   }));
 }
+
+export function buildConfigValuesFromSchema(
+  properties: Record<string, BackendSchemaNode>,
+  remoteConfigValues: Record<string, any> = {}
+): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const key in properties) {
+    if (!properties.hasOwnProperty(key)) continue;
+    const node = properties[key];
+    if (remoteConfigValues[key] !== undefined) {
+      result[key] = remoteConfigValues[key];
+    } else if (node.default_value !== undefined) {
+      result[key] = node.default_value;
+    } else {
+      result[key] = generateDefaultValue(node.schema.type, node.schema);
+    }
+  }
+  return result;
+}

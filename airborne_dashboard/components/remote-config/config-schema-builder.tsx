@@ -971,7 +971,7 @@ export function ConfigSchemaBuilder({ orgId, appId, onSave }: ConfigSchemaBuilde
   "required": ["fieldName"]
 }`}
                       rows={20}
-                      className="font-mono text-sm"
+                      className="font-mono text-sm break-all"
                     />
                   </div>
 
