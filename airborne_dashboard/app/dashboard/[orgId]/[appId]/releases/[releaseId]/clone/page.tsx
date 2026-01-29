@@ -8,7 +8,7 @@ import { hasAppAccess } from "@/lib/utils";
 import { ReleaseBuilder } from "@/components/release";
 import { ApiReleaseData } from "@/types/release";
 
-export default function EditReleasePage() {
+export default function CloneReleasePage() {
   const { token, org, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
   const params = useParams<{ appId: string; releaseId: string }>();
   const releaseId = params.releaseId;
@@ -37,22 +37,22 @@ export default function EditReleasePage() {
     notFound();
   }
 
-  if (releaseError) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-screen">
-        <div className="text-center text-destructive">
-          <p>Failed to load release data for editing.</p>
-        </div>
-      </div>
-    );
-  }
-
   if (releaseLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin inline-block h-8 w-8 border-4 border-current border-t-transparent text-muted-foreground rounded-full mb-4" />
-          <p className="text-muted-foreground">Loading release data for editing...</p>
+          <p className="text-muted-foreground">Loading release data for cloning...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (releaseError) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center text-destructive">
+          <p>Failed to load release data for cloning.</p>
         </div>
       </div>
     );
@@ -62,11 +62,11 @@ export default function EditReleasePage() {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
         <div className="text-center text-destructive">
-          <p>Release data not found. Unable to edit.</p>
+          <p>Release data not found. Unable to clone.</p>
         </div>
       </div>
     );
   }
 
-  return <ReleaseBuilder mode="edit" releaseId={releaseId} initialData={releaseData} />;
+  return <ReleaseBuilder mode="clone" releaseId={releaseId} initialData={releaseData} />;
 }
