@@ -202,14 +202,16 @@ async fn get_release(
                 })
                 .collect();
 
-            let resource_files: Vec<ServeFile> = rc_resources
+            let resource_files: Vec<Resource> = rc_resources
                 .iter()
                 .filter_map(|file_key| {
+                    let file_key_cloned = file_key.clone();
                     let (file_path, _, _) = parse_file_key(file_key);
                     files
                         .iter()
                         .find(|file| file.file_path == file_path.clone())
-                        .map(|file| ServeFile {
+                        .map(|file| Resource {
+                            file_id: file_key_cloned,
                             file_path: file.file_path.clone(),
                             url: file.url.clone(),
                             checksum: file.checksum.clone(),
