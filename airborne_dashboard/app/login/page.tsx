@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const [name, setName] = useState(""); // API expects "name"
@@ -23,13 +24,46 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { setToken, setUser, setOrg: setOrganisation, setApp: setApplication, token, config } = useAppContext();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Get URL parameters for invite flow
+  const inviteToken = searchParams.get("invite_token");
+  const redirectTo = searchParams.get("redirect_to");
+  const inviteEmail = searchParams.get("email");
+
+  const isValidRedirectUrl = (url: string): boolean => {
+    // Only allow relative URLs or same-origin URLs
+    try {
+      const decoded = decodeURIComponent(url);
+      if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+        return true;
+      }
+      const parsedUrl = new URL(decoded, window.location.origin);
+      return parsedUrl.origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    // Pre-fill email if coming from invitation
+    if (inviteEmail && !name) {
+      setName(decodeURIComponent(inviteEmail));
+    }
+  }, [inviteEmail, name]);
 
   useEffect(() => {
     if (token && token != "") {
       console.log("Nav to dashboard effect", token);
-      router.replace("/dashboard");
+
+      // If we have a redirect URL (from invitation), go there instead of dashboard
+      if (redirectTo && isValidRedirectUrl(redirectTo)) {
+        router.replace(decodeURIComponent(redirectTo));
+      } else {
+        router.replace("/dashboard");
+      }
     }
-  }, [token, router]);
+  }, [token, router, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +96,15 @@ export default function LoginPage() {
       const data = await apiFetch<{ auth_url: string; state?: string }>("/users/oauth/url");
       if (data?.auth_url) {
         localStorage.setItem("oauthAction", "login");
+
+        // Store invite parameters for after OAuth callback
+        if (inviteToken) {
+          localStorage.setItem("oauthInviteToken", inviteToken);
+        }
+        if (redirectTo && isValidRedirectUrl(redirectTo)) {
+          localStorage.setItem("oauthRedirectTo", redirectTo);
+        }
+
         window.location.href = data.auth_url;
       } else {
         throw new Error("OAuth URL not available");
@@ -105,9 +148,28 @@ export default function LoginPage() {
         <Card className="border-0 shadow-lg">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl font-[family-name:var(--font-space-grotesk)]">Sign in</CardTitle>
-            <CardDescription>Enter your credentials to access your account</CardDescription>
+            <CardDescription>
+              {inviteToken
+                ? "Sign in to accept your organization invitation"
+                : "Enter your credentials to access your account"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Invitation context banner */}
+            {inviteToken && inviteEmail && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Organization Invitation</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-200">
+                      Sign in with <span className="font-mono font-semibold">{decodeURIComponent(inviteEmail)}</span> to
+                      accept your invitation
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Google Sign In */}
             {config?.google_signin_enabled && (
               <>
@@ -151,7 +213,10 @@ export default function LoginPage() {
             {/* Email/Password Form */}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Username</Label>
+                <Label htmlFor="name">
+                  Email
+                  {inviteEmail && <span className="text-xs text-muted-foreground ml-1">(from invitation)</span>}
+                </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -159,9 +224,25 @@ export default function LoginPage() {
                     placeholder="e.g. alice"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="pl-10"
+                    className={`pl-10 ${inviteEmail ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}`}
                     required
+                    readOnly={!!inviteEmail}
+                    disabled={!!inviteEmail}
                   />
+                  {inviteEmail && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Lock className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>This email is required for your organization invitation</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -205,7 +286,14 @@ export default function LoginPage() {
                     Remember me
                   </Label>
                 </div>
-                <Link href="/register" className="text-sm text-primary hover:underline">
+                <Link
+                  href={
+                    inviteToken
+                      ? `/register?invite_token=${inviteToken}&redirect_to=${encodeURIComponent(redirectTo || "/dashboard")}`
+                      : "/register"
+                  }
+                  className="text-sm text-primary hover:underline"
+                >
                   Create account
                 </Link>
               </div>
@@ -217,7 +305,14 @@ export default function LoginPage() {
 
             <div className="text-center text-sm">
               <span className="text-muted-foreground">Don&#39;t have an account? </span>
-              <Link href="/register" className="text-primary hover:underline font-medium">
+              <Link
+                href={
+                  inviteToken
+                    ? `/register?invite_token=${inviteToken}&redirect_to=${encodeURIComponent(redirectTo || "/dashboard")}`
+                    : "/register"
+                }
+                className="text-primary hover:underline font-medium"
+              >
                 Sign up
               </Link>
             </div>
