@@ -24,6 +24,7 @@ use log::info;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
+use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
 
 use crate::{
@@ -47,7 +48,8 @@ pub fn add_routes(path: &str) -> Scope {
             .service(ramp_release)
             .service(conclude_release)
             .service(get_release)
-            .service(update_release),
+            .service(update_release)
+            .service(discard_release),
     )
 }
 
@@ -1094,6 +1096,88 @@ async fn conclude_release(
         ),
         experiment_id: experiment_id.to_string(),
         chosen_variant: req.chosen_variant.clone(),
+    }))
+}
+
+#[post("/{release_id}/discard")]
+async fn discard_release(
+    release_id: Path<String>,
+    req: Json<DiscardReleaseRequest>,
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<DiscardReleaseResponse>> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
+
+    let experiment_id = release_id.to_string();
+
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
+
+    let experiment_details = state
+        .superposition_client
+        .get_experiment()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .id(experiment_id.to_string())
+        .send()
+        .await
+        .map_err(|e| {
+            info!("Failed to get experiment details: {:?}", e);
+            ABError::InternalServerError(
+                "Failed to get experiment details from Superposition".to_string(),
+            )
+        })?;
+
+    if experiment_details.status != ExperimentStatusType::Created {
+        return Err(ABError::BadRequest(
+            "Release can only be discarded when in CREATED status".to_string(),
+        ));
+    }
+
+    state
+        .superposition_client
+        .discard_experiment()
+        .workspace_id(workspace_name)
+        .org_id(superposition_org_id_from_env)
+        .id(experiment_id.to_string())
+        .change_reason(
+            req.change_reason
+                .clone()
+                .unwrap_or_else(|| format!("Discarding release {} ", release_id)),
+        )
+        .send()
+        .await
+        .map_err(|e| {
+            info!("Failed to discard experiment: {:?}", e);
+            ABError::InternalServerError(
+                "Failed to discard experiment in Superposition".to_string(),
+            )
+        })?;
+
+    info!("Successfully discarded experiment {}", experiment_id);
+
+    Ok(Json(DiscardReleaseResponse {
+        success: true,
+        message: "Release experiment discarded".to_string(),
+        experiment_id: experiment_id.to_string(),
     }))
 }
 
