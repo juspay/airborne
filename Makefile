@@ -9,6 +9,9 @@ GRAFANA_HOST_URL ?= http://localhost:4000
 VICTORIA_METRICS_HOST_URL ?= http://localhost:8428
 POSTGRES_HOST ?= localhost
 POSTGRES_PORT ?= 5433
+REDIS_HOST ?= localhost
+REDIS_PORT ?= 6379
+REDIS_INSIGHT_PORT ?= 5540
 FMT_FLAGS := --all
 LINT_FLAGS := --all-targets
 CARGO_FLAGS := --color always --no-default-features
@@ -63,6 +66,12 @@ KEYCLOAK_DB_UP = $(shell $(call check-container,$(KEYCLOAK_DB_CONTAINER_NAME)))
 KEYCLOAK_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,keycloak))
 KEYCLOAK_UP = $(shell $(call check-container,$(KEYCLOAK_CONTAINER_NAME)))
 
+REDIS_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,redis))
+REDIS_UP = $(shell $(call check-container,$(REDIS_CONTAINER_NAME)))
+
+REDIS_INSIGHT_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,redis-insight))
+REDIS_INSIGHT_UP = $(shell $(call check-container,$(REDIS_INSIGHT_CONTAINER_NAME)))
+
 
 GRAFANA_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,grafana))
 GRAFANA_UP = $(shell $(call check-container,$(GRAFANA_CONTAINER_NAME)))
@@ -82,7 +91,7 @@ CLICKHOUSE_UP = $(shell $(call check-container,$(CLICKHOUSE_CONTAINER_NAME)))
 KAFKA_UI_CONTAINER_NAME = $(shell $(call read-container-name,airborne_analytics_server,kafka-ui))
 KAFKA_UI_UP = $(shell $(call check-container,$(KAFKA_UI_CONTAINER_NAME)))
 
-.PHONY: help env-file analytics-env-file db localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics frontend-check frontend-lint frontend-lint-fix frontend-format
+.PHONY: help env-file analytics-env-file db redis redis-insight redis-insight-status localstack superposition keycloak-db keycloak grafana victoria-metrics zookeeper kafka clickhouse kafka-ui setup airborne-server superposition-init keycloak-init localstack-init db-migration kill run stop cleanup test status lint-fix check fmt lint commit amend amend-no-edit node-dependencies dashboard docs analytics-server run-kafka-clickhouse run-victoria-metrics run-analytics frontend-check frontend-lint frontend-lint-fix frontend-format
 
 default: help
 
@@ -105,6 +114,9 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Infrastructure Services:$(NC)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "db" "Start PostgreSQL database"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "redis" "Start Redis cache server"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "redis-insight" "Start Redis Insight dashboard"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "redis-insight-status" "Check Redis Insight readiness"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "localstack" "Start LocalStack (AWS mock)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "superposition" "Start Superposition service"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "keycloak" "Start Keycloak authentication"
@@ -276,6 +288,57 @@ endif
 	done
 	@echo "$(GREEN) ✅ Keycloak ready$(NC)"
 
+redis:
+ifndef CI
+ifeq ($(REDIS_UP),1)
+	@echo "$(YELLOW)🔴 Starting Redis container...$(NC)"
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d redis
+endif
+else
+	@echo "$(YELLOW)Skipping redis container-setup in CI.$(NC)"
+endif
+	@echo "$(YELLOW)🔴 Waiting for Redis container to be ready...$(NC)"
+	@RETRY=0; \
+	while [ "$$RETRY" -lt 60 ]; do \
+		if $(DOCKER) ps --filter "name=$(REDIS_CONTAINER_NAME)" --filter "status=running" --format "{{.Names}}" | grep -q "$(REDIS_CONTAINER_NAME)"; then \
+			if $(DOCKER) exec $(REDIS_CONTAINER_NAME) redis-cli ping 2>/dev/null | grep -q PONG; then \
+				break; \
+			fi; \
+		fi; \
+		printf "."; sleep 2; RETRY=$$((RETRY + 1)); \
+	done; \
+	if [ "$$RETRY" -eq 60 ]; then \
+		echo "$(RED) ❌ Redis failed to start or respond$(NC)"; \
+		$(DOCKER) logs $(REDIS_CONTAINER_NAME) 2>/dev/null || true; \
+		exit 1; \
+	fi
+	@echo "$(GREEN) ✅ Redis ready$(NC)"
+
+redis-insight:
+ifndef CI
+ifeq ($(REDIS_INSIGHT_UP),1)
+	@echo "$(YELLOW)📊 Starting Redis Insight container...$(NC)"
+	$(COMPOSE) -f airborne_server/docker-compose.yml up -d redis-insight
+endif
+else
+	@echo "$(YELLOW)Skipping redis-insight container-setup in CI.$(NC)"
+endif
+	@echo "$(GREEN)📊 Redis Insight starting in background...$(NC)"
+	@echo "$(YELLOW)   Dashboard will be available at http://localhost:${REDIS_INSIGHT_PORT:-5540} (may take 1-2 minutes)$(NC)"
+	@echo "$(YELLOW)   Use 'make redis-insight-status' to check readiness$(NC)"
+
+redis-insight-status:
+	@echo "$(YELLOW)📊 Checking Redis Insight status...$(NC)"
+	@if $(DOCKER) ps --filter "name=$(REDIS_INSIGHT_CONTAINER_NAME)" --filter "status=running" --format "{{.Names}}" | grep -q "$(REDIS_INSIGHT_CONTAINER_NAME)"; then \
+		if curl -s -f http://localhost:${REDIS_INSIGHT_PORT:-5540} >/dev/null 2>&1; then \
+			echo "$(GREEN)✅ Redis Insight is ready at http://localhost:${REDIS_INSIGHT_PORT:-5540}$(NC)"; \
+		else \
+			echo "$(YELLOW)⏳ Redis Insight container is running but web interface not ready yet$(NC)"; \
+		fi; \
+	else \
+		echo "$(RED)❌ Redis Insight container is not running$(NC)"; \
+	fi
+
 grafana:
 ifndef CI
 ifeq ($(GRAFANA_UP),1)
@@ -401,11 +464,13 @@ dashboard:
 docs:
 	cd airborne_server/docs_react && npm run build:dev
 
-SETUP_DEPS = env-file db superposition keycloak-db keycloak localstack node-dependencies
+SETUP_DEPS = env-file db superposition keycloak-db keycloak redis redis-insight localstack node-dependencies
 # ifdef CI
 # 	SETUP_DEPS += test-tenant
 # endif
 setup: $(SETUP_DEPS)
+
+
 
 airborne-server:
 	@echo "$(YELLOW)Building airborne_server...$(NC)"
@@ -448,7 +513,7 @@ kill:
 	-@pkill -f airborne_server/target/debug/airborne_server 2>/dev/null || true
 	@echo "$(GREEN)✅ Process cleanup completed$(NC)"
 
-run: kill db superposition superposition-init keycloak-db keycloak keycloak-init localstack localstack-init
+run: kill db redis redis-insight superposition superposition-init keycloak-db keycloak keycloak-init localstack localstack-init
 	@trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \
@@ -479,6 +544,8 @@ status:
 	@echo ""
 	@echo "$(YELLOW)🏗️  Infrastructure Services:$(NC)"
 	$(call service_status_simple,PostgreSQL,postgres)
+	$(call service_status_simple,Redis,redis)
+	$(call service_status_simple,Redis Insight,redis-insight)
 	$(call service_status_simple,Superposition,superposition)
 	$(call service_status_simple,Keycloak-DB,keycloak-db)
 	$(call service_status_simple,Keycloak,keycloak)
