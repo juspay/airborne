@@ -12,6 +12,7 @@ import { ListFilesCommandInput, ListFilesCommandOutput } from "../commands/ListF
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "../commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "../commands/ListPackagesCommand";
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "../commands/ListReleasesCommand";
+import { ListVersionsCommandInput, ListVersionsCommandOutput } from "../commands/ListVersionsCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "../commands/PostLoginCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "../commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "../commands/ServeReleaseCommand";
@@ -76,6 +77,10 @@ export declare const se_ListPackagesCommand: (input: ListPackagesCommandInput, c
  * serializeAws_restJson1ListReleasesCommand
  */
 export declare const se_ListReleasesCommand: (input: ListReleasesCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1ListVersionsCommand
+ */
+export declare const se_ListVersionsCommand: (input: ListVersionsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1PostLoginCommand
  */
@@ -156,6 +161,10 @@ export declare const de_ListPackagesCommand: (output: __HttpResponse, context: _
  * deserializeAws_restJson1ListReleasesCommand
  */
 export declare const de_ListReleasesCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListReleasesCommandOutput>;
+/**
+ * deserializeAws_restJson1ListVersionsCommand
+ */
+export declare const de_ListVersionsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListVersionsCommandOutput>;
 /**
  * deserializeAws_restJson1PostLoginCommand
  */

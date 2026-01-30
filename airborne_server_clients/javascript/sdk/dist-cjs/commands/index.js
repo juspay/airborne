@@ -15,6 +15,7 @@ tslib_1.__exportStar(require("./ListFilesCommand"), exports);
 tslib_1.__exportStar(require("./ListOrganisationsCommand"), exports);
 tslib_1.__exportStar(require("./ListPackagesCommand"), exports);
 tslib_1.__exportStar(require("./ListReleasesCommand"), exports);
+tslib_1.__exportStar(require("./ListVersionsCommand"), exports);
 tslib_1.__exportStar(require("./PostLoginCommand"), exports);
 tslib_1.__exportStar(require("./RequestOrganisationCommand"), exports);
 tslib_1.__exportStar(require("./ServeReleaseCommand"), exports);

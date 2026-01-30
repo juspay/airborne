@@ -896,7 +896,7 @@ x-application: <application_name>
 
 **Query Parameters:**
 - `page` (optional): Page number (default: 1)
-- `per_page` (optional): Items per page (default: 50, max: 200)
+- `count` (optional): Items per page default: 10
 - `search` (optional): Search term to filter files
 
 **Response Schema:**
@@ -910,15 +910,13 @@ x-application: <application_name>
         "$ref": "#/components/schemas/FileResponse"
       }
     },
-    "total": {
+    "total_items": {
       "type": "integer",
       "description": "Total number of files"
     },
-    "page": {
-      "type": "integer"
-    },
-    "per_page": {
-      "type": "integer"
+    "total_pages": {
+      "type": "integer",
+       "description": "Total number of pages"
     }
   }
 }

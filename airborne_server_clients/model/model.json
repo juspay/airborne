@@ -1892,6 +1892,9 @@
                     "target": "io.airborne.server#ListReleases"
                 },
                 {
+                    "target": "io.airborne.server#ListVersions"
+                },
+                {
                     "target": "io.airborne.server#PostLogin"
                 },
                 {
@@ -2784,13 +2787,87 @@
         "io.airborne.server#FileResponseList": {
             "type": "list",
             "member": {
-                "target": "io.airborne.server#CreateFileResponse",
+                "target": "io.airborne.server#FileResponseListItem",
                 "traits": {
                     "smithy.api#documentation": "A file response"
                 }
             },
             "traits": {
                 "smithy.api#documentation": "List of file responses"
+            }
+        },
+        "io.airborne.server#FileResponseListItem": {
+            "type": "structure",
+            "members": {
+                "file_path": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Path where the file is stored on sdk",
+                        "smithy.api#required": {}
+                    }
+                },
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "id of the latest file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "version of the latest file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_versions": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "total versions of the file",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Represents a file entry"
+            }
+        },
+        "io.airborne.server#FileVersionItem": {
+            "type": "structure",
+            "members": {
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Version number of the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "tag of the version"
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Date of creation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Id of the file",
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#FileVersionItemList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileVersionItem"
             }
         },
         "io.airborne.server#ForbiddenError": {
@@ -3097,17 +3174,24 @@
                         "smithy.api#httpQuery": "page"
                     }
                 },
-                "per_page": {
+                "count": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Number of files per page",
-                        "smithy.api#httpQuery": "per_page"
+                        "smithy.api#documentation": "Number of versions per page",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Fetch all files without pagination",
+                        "smithy.api#httpQuery": "all"
                     }
                 },
                 "search": {
                     "target": "smithy.api#String",
                     "traits": {
-                        "smithy.api#documentation": "Search query to filter files",
+                        "smithy.api#documentation": "Search query to filter file versions",
                         "smithy.api#httpQuery": "search"
                     }
                 },
@@ -3135,45 +3219,24 @@
         "io.airborne.server#ListFilesResponse": {
             "type": "structure",
             "members": {
-                "organisation": {
-                    "target": "smithy.api#String",
-                    "traits": {
-                        "smithy.api#documentation": "Name of the organisation",
-                        "smithy.api#required": {}
-                    }
-                },
-                "application": {
-                    "target": "smithy.api#String",
-                    "traits": {
-                        "smithy.api#documentation": "Name of the application",
-                        "smithy.api#required": {}
-                    }
-                },
-                "files": {
+                "data": {
                     "target": "io.airborne.server#FileResponseList",
                     "traits": {
                         "smithy.api#documentation": "List of files",
                         "smithy.api#required": {}
                     }
                 },
-                "total": {
+                "total_pages": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Total number of files",
+                        "smithy.api#documentation": "Total number of pages",
                         "smithy.api#required": {}
                     }
                 },
-                "page": {
+                "total_items": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Current page number",
-                        "smithy.api#required": {}
-                    }
-                },
-                "per_page": {
-                    "target": "smithy.api#Integer",
-                    "traits": {
-                        "smithy.api#documentation": "Number of files per page",
+                        "smithy.api#documentation": "Total number of items",
                         "smithy.api#required": {}
                     }
                 }
@@ -3436,6 +3499,120 @@
                         "smithy.api#required": {}
                     }
                 }
+            }
+        },
+        "io.airborne.server#ListVersionResponse": {
+            "type": "structure",
+            "members": {
+                "data": {
+                    "target": "io.airborne.server#FileVersionItemList",
+                    "traits": {
+                        "smithy.api#documentation": "List of versions",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of items",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of version responses"
+            }
+        },
+        "io.airborne.server#ListVersions": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListVersionsRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ListVersionResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List versions request operation",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/file/{filepath}/versions"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#ListVersionsRequest": {
+            "type": "structure",
+            "members": {
+                "filepath": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Page number for pagination",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of versions per page",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Fetch all file versions without pagination",
+                        "smithy.api#httpQuery": "all"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search query to filter file versions",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List versions request"
             }
         },
         "io.airborne.server#NotFoundError": {
