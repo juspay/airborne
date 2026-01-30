@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.14.2 - 2026-01-30
+#### Bug Fixes
+- push superposition-default-configs.json to final docker image - (ab0d014) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.14.1 - 2026-01-30
 #### Bug Fixes
 - Build Release Config and force build - (cdd94a3) - yuvrajjsingh0

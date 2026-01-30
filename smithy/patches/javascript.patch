@@ -4,7 +4,7 @@ index e2148fd0..e5306d95 100644
 +++ b/airborne_server_clients/javascript/sdk/package.json
 @@ -3,13 +3,11 @@
      "description": "airborne-server-sdk client",
-     "version": "0.22.1",
+     "version": "0.22.2",
      "scripts": {
 -        "build": "concurrently 'yarn:build:cjs' 'yarn:build:es' 'yarn:build:types'",
 +        "build": "npm run build:types && npm run build:cjs && npm run build:es",
