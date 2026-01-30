@@ -1,0 +1,207 @@
+import { SchemaField } from "./remote-configs";
+
+export type ReleaseMode = "create" | "clone" | "edit";
+
+export type Pkg = {
+  index: string;
+  tag: string;
+  version: number;
+  files: string[];
+};
+
+export type FileItem = {
+  id: string;
+  file_path: string;
+  version?: number;
+  tag?: string;
+  size?: number;
+};
+
+export type ResourceFile = {
+  id: string;
+  file_path: string;
+  size?: number;
+  created_at?: string;
+  tag: string;
+};
+
+export type FilesApiResponse = {
+  files: ResourceFile[];
+  total: number;
+  page?: number;
+  per_page?: number;
+};
+
+export type TargetingRule = {
+  dimension: string;
+  operator: "equals";
+  values: string;
+};
+
+export type Dimension = {
+  dimension: string;
+  values: string[];
+  type?: string;
+  depends_on?: string;
+};
+
+export type ReleaseConfigRequest = {
+  config: {
+    boot_timeout: number;
+    release_config_timeout: number;
+    properties: Record<string, any>;
+  };
+  package: {
+    important: string[];
+    lazy: string[];
+  };
+  dimensions?: Record<string, string | string[]>;
+  resources: string[];
+  package_id?: string;
+};
+
+export interface InitialPackageInfo {
+  tag: string;
+  version: number;
+  indexFilePath: string;
+  filePriorities: Record<string, "important" | "lazy">;
+}
+
+export interface ReleaseFormState {
+  mode: ReleaseMode;
+  releaseId?: string;
+
+  // Initial data for clone/edit
+  initialPackageInfo: InitialPackageInfo | null;
+  hasExistingReleases: boolean;
+
+  // Navigation
+  currentStep: number;
+  totalSteps: number;
+
+  // Configuration (Step 1)
+  bootTimeout: number;
+  releaseConfigTimeout: number;
+  configProperties: string;
+
+  // Targeting (Step 2)
+  targetingRules: TargetingRule[];
+  dimensions: Dimension[];
+  cohorts: Record<string, string[]>;
+
+  // Remote Config (Step 3)
+  schemaFields: SchemaField[];
+  remoteConfigValues: Record<string, any>;
+  schemaLoading: boolean;
+  schemaError: string | null;
+
+  // Package Selection (Step 4)
+  selectedPackage: Pkg | null;
+  packages: Pkg[];
+  packagesLoading: boolean;
+  pkgSearch: string;
+  pkgPage: number;
+  totalPackagesPage: number;
+
+  // File Priorities (Step 5)
+  files: FileItem[];
+  filePriority: Record<string, "important" | "lazy">;
+  filesSearch: string;
+  filesCurrentPage: number;
+
+  // Resources (Step 6)
+  selectedResources: Set<string>;
+  resourceSearch: string;
+  resourceCurrentPage: number;
+}
+
+export interface ReleaseFormActions {
+  // Navigation
+  setCurrentStep: (step: number) => void;
+  goToNextStep: () => void;
+  goToPreviousStep: () => void;
+
+  // Configuration
+  setBootTimeout: (timeout: number) => void;
+  setReleaseConfigTimeout: (timeout: number) => void;
+  setConfigProperties: (properties: string) => void;
+
+  // Targeting
+  setTargetingRules: (rules: TargetingRule[]) => void;
+  addTargetingRule: () => void;
+  removeTargetingRule: (index: number) => void;
+  updateTargetingRule: (index: number, patch: Partial<TargetingRule>) => void;
+  setDimensions: (dimensions: Dimension[]) => void;
+  setCohorts: (cohorts: Record<string, string[]>) => void;
+  loadCohortsForDimension: (dimensionName: string) => Promise<void>;
+
+  // Remote Config
+  setSchemaFields: (fields: SchemaField[]) => void;
+  setRemoteConfigValues: (values: Record<string, any>) => void;
+  updateRemoteConfigValue: (fieldPath: string, value: any) => void;
+  setSchemaLoading: (loading: boolean) => void;
+  setSchemaError: (error: string | null) => void;
+  fetchSchema: () => Promise<void>;
+
+  // Package Selection
+  setSelectedPackage: (pkg: Pkg | null) => void;
+  setPackages: (packages: Pkg[]) => void;
+  setPackagesLoading: (loading: boolean) => void;
+  setPkgSearch: (search: string) => void;
+  setPkgPage: (page: number) => void;
+  setTotalPackagesPage: (total: number) => void;
+
+  // File Priorities
+  setFiles: (files: FileItem[]) => void;
+  setFilePriority: (priority: Record<string, "important" | "lazy">) => void;
+  updateFilePriority: (fileId: string, priority: "important" | "lazy") => void;
+  setFilesSearch: (search: string) => void;
+  setFilesCurrentPage: (page: number) => void;
+
+  // Resources
+  setSelectedResources: (resources: Set<string>) => void;
+  toggleResource: (resourceId: string) => void;
+  setResourceSearch: (search: string) => void;
+  setResourceCurrentPage: (page: number) => void;
+
+  // Validation
+  canProceedToStep: (step: number) => boolean;
+
+  // Submit
+  createReleaseConfig: () => ReleaseConfigRequest | undefined;
+}
+
+export interface ReleaseFormContextType extends ReleaseFormState, ReleaseFormActions {}
+
+export interface ReleaseStep {
+  number: number;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+export interface PaginationControlsProps {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  maxVisiblePages?: number;
+}
+
+// Release data from API (for clone/edit)
+export interface ApiReleaseData {
+  id: string;
+  config: {
+    boot_timeout: number;
+    release_config_timeout: number;
+    properties: Record<string, any>;
+  };
+  package: {
+    tag: string;
+    version: number;
+    index: { file_path: string };
+    properties: Record<string, any>;
+    important: Array<{ file_path: string }>;
+    lazy: Array<{ file_path: string }>;
+  };
+  dimensions?: Record<string, string | string[]>;
+  resources: Array<{ file_id: string }>;
+}
