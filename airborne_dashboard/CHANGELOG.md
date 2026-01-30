@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.11.6 - 2026-01-30
+#### Bug Fixes
+- Build Release Config and force build - (cdd94a3) - yuvrajjsingh0
+
+- - -
+
 ## airborne_dashboard-v0.11.5 - 2026-01-27
 #### Bug Fixes
 - use parameters to load releases for appId to prevent race - (709f332) - yuvrajjsingh0
