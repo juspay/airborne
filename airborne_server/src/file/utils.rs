@@ -6,33 +6,39 @@ use crate::types as airborne_types;
 use crate::types::ABError;
 
 pub async fn download_and_checksum(file_url: &str) -> airborne_types::Result<(u64, String)> {
-    let bytes = download_and_calculate_filesize(file_url).await?;
+    let bytes = download_and_calculate_filesize(file_url, &None).await?;
     Ok((bytes.1, calculate_checksum(bytes.0).await))
 }
 
-pub async fn download_file_content(url: &str) -> airborne_types::Result<Vec<u8>> {
-    let bytes = download_and_calculate_filesize(url).await?;
+pub async fn download_file_content(
+    url: &str,
+    headers: &Option<Vec<(String, String)>>,
+) -> airborne_types::Result<Vec<u8>> {
+    let bytes = download_and_calculate_filesize(url, headers).await?;
     Ok(bytes.0)
 }
 
-pub async fn download_and_calculate_filesize(url: &str) -> airborne_types::Result<(Vec<u8>, u64)> {
+pub async fn download_and_calculate_filesize(
+    url: &str,
+    headers: &Option<Vec<(String, String)>>,
+) -> airborne_types::Result<(Vec<u8>, u64)> {
     info!("Downloading file from url, {:?}", url);
     let client = reqwest::Client::new();
-    let response = client
-        .get(url)
-        .header("User-Agent", "Airborne-Rust/1.0")
-        .send()
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to download file from {}: {}", url, e))
-        })?
-        .error_for_status()
-        .map_err(|e| {
-            ABError::InternalServerError(format!(
-                "Received error status while downloading {}: {}",
-                url, e
-            ))
-        })?;
+    let mut request = client.get(url).header("User-Agent", "Airborne-Rust/1.0");
+    if let Some(headers) = headers {
+        for (key, value) in headers {
+            request = request.header(key, value);
+        }
+    }
+    let response = request.send().await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to download file from {}: {}", url, e))
+    })?;
+    let response = response.error_for_status().map_err(|e| {
+        ABError::InternalServerError(format!(
+            "Received error status while downloading {}: {}",
+            url, e
+        ))
+    })?;
 
     let bytes = response.bytes().await.map_err(|e| {
         ABError::InternalServerError(format!("Failed to read file content from {}: {}", url, e))

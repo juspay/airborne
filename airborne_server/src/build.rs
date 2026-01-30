@@ -21,6 +21,7 @@ use crate::utils::db::schema::hyperotaserver::builds::{
     application as app_column, build_version, dsl::builds, organisation as org_column,
     release_id as release_id_column,
 };
+use crate::utils::document::value_to_plain_string;
 use crate::utils::s3::push_file_byte_arr;
 use crate::utils::semver::SemVer;
 use crate::{
@@ -177,7 +178,7 @@ struct Arguments {
     organisation: String,
     application: String,
     dimensions: HashMap<String, Value>,
-    _force: bool,
+    force: bool,
 }
 
 struct File {
@@ -207,6 +208,7 @@ async fn create_and_upload_build(
     new_build_version: &SemVer,
     config_document: Option<Document>,
     state: web::Data<AppState>,
+    dimensions: Option<&HashMap<String, Value>>,
 ) -> airborne_types::Result<()> {
     // Extract files from config
     let package_index =
@@ -257,7 +259,7 @@ async fn create_and_upload_build(
 
         // Download each file and add it to the zip
         for file_entry in files {
-            let file_content = download_file_content(&file_entry.file_url).await?;
+            let file_content = download_file_content(&file_entry.file_url, &None).await?;
 
             // Add file to zip with its file path as the name
             zip_builder
@@ -292,10 +294,26 @@ async fn create_and_upload_build(
             })?;
         }
 
-        let file_content = download_file_content(&format!(
-            "{}/release/{}/{}",
-            state.env.public_url, &org, &app
-        ))
+        let headers = match dimensions {
+            Some(dimensions) => {
+                let mut headers = Vec::<(String, String)>::new();
+                headers.push((
+                    "x-dimension".to_string(),
+                    dimensions
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, value_to_plain_string(v)))
+                        .collect::<Vec<_>>()
+                        .join(";"),
+                ));
+                Some(headers)
+            }
+            None => None,
+        };
+
+        let file_content = download_file_content(
+            &format!("{}/release/{}/{}", state.env.public_url, &org, &app),
+            &headers,
+        )
         .await?;
 
         zip_builder
@@ -539,6 +557,7 @@ async fn build(
     release_id: String,
     config_document: Option<Document>,
     state: web::Data<AppState>,
+    dimensions: Option<&HashMap<String, Value>>,
 ) -> airborne_types::Result<SemVer> {
     info!(
         "Starting build for {}/{} with release id {}",
@@ -577,7 +596,15 @@ async fn build(
     // Create and upload build in a separate task
     let state_clone = state.clone();
 
-    create_and_upload_build(org, app, &new_build_version, config_document, state_clone).await?;
+    create_and_upload_build(
+        org,
+        app,
+        &new_build_version,
+        config_document,
+        state_clone,
+        dimensions,
+    )
+    .await?;
 
     let pool = state.db_pool.clone();
     run_blocking!({
@@ -621,7 +648,7 @@ async fn extract_args(
         organisation: org,
         application: app,
         dimensions: context,
-        _force: force,
+        force,
     })
 }
 
@@ -727,35 +754,57 @@ async fn generate(
 
             match latest_build {
                 Some(build_entry) => {
-                    // Spawn build thread only if build entry is present
-                    let build_args = arguments.clone();
-                    let release_id_clone = release_id.clone();
-                    let config_document_clone = config_document.clone();
-                    let state_clone = state.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = build(
-                            build_args.organisation.clone(),
-                            build_args.application.clone(),
-                            release_id_clone,
+                    if arguments.force {
+                        let config_document_clone = config_document.clone();
+                        let state_clone = state.clone();
+                        let new_build_version = build(
+                            arguments.organisation.clone(),
+                            arguments.application.clone(),
+                            release_id.clone(),
                             config_document_clone,
                             state_clone,
+                            Some(&arguments.dimensions),
                         )
-                        .await
-                        {
-                            tracing::error!(?e, "Background build task failed");
-                        } else {
-                            tracing::info!("Background build task completed successfully");
-                        }
-                    });
+                        .await?;
 
-                    // Return existing latest build version
-                    info!(
-                        "Returning latest available build: {}",
-                        build_entry.build_version
-                    );
-                    Ok(BuildResponse {
-                        version: build_entry.build_version,
-                    })
+                        info!("Force created new build version: {}", new_build_version);
+
+                        Ok(BuildResponse {
+                            version: new_build_version,
+                        })
+                    } else {
+                        // Spawn build thread only if build entry is present
+                        let build_args = arguments.clone();
+                        let release_id_clone = release_id.clone();
+                        let config_document_clone = config_document.clone();
+                        let state_clone = state.clone();
+                        let dims_clone = arguments.dimensions;
+                        tokio::spawn(async move {
+                            if let Err(e) = build(
+                                build_args.organisation.clone(),
+                                build_args.application.clone(),
+                                release_id_clone,
+                                config_document_clone,
+                                state_clone,
+                                Some(&dims_clone),
+                            )
+                            .await
+                            {
+                                tracing::error!(?e, "Background build task failed");
+                            } else {
+                                tracing::info!("Background build task completed successfully");
+                            }
+                        });
+
+                        // Return existing latest build version
+                        info!(
+                            "Returning latest available build: {}",
+                            build_entry.build_version
+                        );
+                        Ok(BuildResponse {
+                            version: build_entry.build_version,
+                        })
+                    }
                 }
                 None => {
                     let config_document_clone = config_document.clone();
@@ -767,7 +816,8 @@ async fn generate(
                             arguments.application.clone(),
                             release_id.clone(),
                             config_document_clone,
-                            state_clone
+                            state_clone,
+                            Some(&arguments.dimensions),
                         ).await?;
 
                     info!("Created new build version: {}", new_build_version);

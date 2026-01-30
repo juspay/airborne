@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const backend = (process.env.BACKEND_URL ?? "http://localhost:8081").replace(/\/$/, "");
+const s3URL = (process.env.S3_URL ?? "http://localhost:4566/hyper-ota-bucket").replace(/\/$/, "");
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig = {
@@ -20,6 +21,18 @@ const nextConfig = {
       {
         source: "/release/:path*",
         destination: `${backend}/release/:path*`,
+      },
+      {
+        source: "/build/:path*",
+        destination: `${backend}/build/:path*`,
+      },
+      {
+        source: "/assets/:path*",
+        destination: `${s3URL}/assets/:path*`,
+      },
+      {
+        source: "/builds/:path*",
+        destination: `${s3URL}/builds/:path*`,
       },
     ];
   },

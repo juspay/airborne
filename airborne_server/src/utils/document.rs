@@ -165,3 +165,10 @@ pub fn hashmap_to_json_value(hashmap: &HashMap<String, Document>) -> Value {
         .collect::<Map<_, _>>();
     Value::Object(val_map)
 }
+
+pub fn value_to_plain_string(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s.clone(),
+        _ => v.to_string(),
+    }
+}
