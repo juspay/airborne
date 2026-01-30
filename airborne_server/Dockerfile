@@ -47,4 +47,5 @@ WORKDIR /app
 COPY --from=builder /app/target/release/airborne_server /app/airborne_server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
 COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
+COPY airborne_server/superposition-default-configs.json /app/superposition-default-configs.json
 CMD ["/app/airborne_server"]
