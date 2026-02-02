@@ -23,6 +23,16 @@ service Airborne {
         // package
         CreatePackage
         ListPackages
+        // package groups
+        CreatePackageGroup
+        ListPackageGroups
+        GetPackageGroup
+        UpdatePackageGroupName
+        // package v2 (group-scoped)
+        ListPackagesV2
+        CreatePackageV2
+        GetPackageV2ByVersion
+        GetPackageV2ByTag
         // release
         CreateRelease
         ListReleases

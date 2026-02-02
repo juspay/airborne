@@ -1865,10 +1865,25 @@
                     "target": "io.airborne.server#CreatePackage"
                 },
                 {
+                    "target": "io.airborne.server#CreatePackageGroup"
+                },
+                {
+                    "target": "io.airborne.server#CreatePackageV2"
+                },
+                {
                     "target": "io.airborne.server#CreateRelease"
                 },
                 {
                     "target": "io.airborne.server#DeleteDimension"
+                },
+                {
+                    "target": "io.airborne.server#GetPackageGroup"
+                },
+                {
+                    "target": "io.airborne.server#GetPackageV2ByTag"
+                },
+                {
+                    "target": "io.airborne.server#GetPackageV2ByVersion"
                 },
                 {
                     "target": "io.airborne.server#GetRelease"
@@ -1886,7 +1901,13 @@
                     "target": "io.airborne.server#ListOrganisations"
                 },
                 {
+                    "target": "io.airborne.server#ListPackageGroups"
+                },
+                {
                     "target": "io.airborne.server#ListPackages"
+                },
+                {
+                    "target": "io.airborne.server#ListPackagesV2"
                 },
                 {
                     "target": "io.airborne.server#ListReleases"
@@ -1905,6 +1926,9 @@
                 },
                 {
                     "target": "io.airborne.server#UpdateDimension"
+                },
+                {
+                    "target": "io.airborne.server#UpdatePackageGroupName"
                 },
                 {
                     "target": "io.airborne.server#UploadFile"
@@ -1993,6 +2017,7 @@
                 "tenant_info": {
                     "target": "smithy.api#Document",
                     "traits": {
+                        "smithy.api#documentation": "Tenant information document",
                         "smithy.api#required": {}
                     }
                 }
@@ -2373,11 +2398,67 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create package request operation",
+                "smithy.api#documentation": "Create package request operation (legacy - uses primary group)",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/packages"
                 }
+            }
+        },
+        "io.airborne.server#CreatePackageGroup": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreatePackageGroupRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#PackageGroup"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Create a new package group",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/package-groups"
+                }
+            }
+        },
+        "io.airborne.server#CreatePackageGroupRequest": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the package group",
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Create package group request body"
             }
         },
         "io.airborne.server#CreatePackageRequest": {
@@ -2391,7 +2472,10 @@
                     }
                 },
                 "tag": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional tag for the package (e.g., latest, v1.0, production)"
+                    }
                 },
                 "files": {
                     "target": "io.airborne.server#StringList",
@@ -2418,7 +2502,83 @@
                 }
             },
             "traits": {
-                "smithy.api#documentation": "Create package request"
+                "smithy.api#documentation": "Create package request (legacy - uses primary group)"
+            }
+        },
+        "io.airborne.server#CreatePackageV2": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreatePackageV2Request"
+            },
+            "output": {
+                "target": "io.airborne.server#PackageV2"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Create a package within a package group",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/package-groups/{groupId}/packages"
+                }
+            }
+        },
+        "io.airborne.server#CreatePackageV2Request": {
+            "type": "structure",
+            "members": {
+                "groupId": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "index": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Index file (required for primary groups, must not be provided for non-primary)"
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional tag for the package (e.g., latest, v1.0, production)"
+                    }
+                },
+                "files": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "File ids to be included in the package",
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Create package v2 request body"
             }
         },
         "io.airborne.server#CreateRelease": {
@@ -2466,6 +2626,12 @@
                     "target": "io.airborne.server#CreateReleaseRequestPackage",
                     "traits": {
                         "smithy.api#documentation": "Package details for the release"
+                    }
+                },
+                "sub_packages": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Sub-packages from non-primary groups (format: \"groupid@version\")"
                     }
                 },
                 "dimensions": {
@@ -2581,6 +2747,20 @@
                     "target": "io.airborne.server#ServePackage",
                     "traits": {
                         "smithy.api#documentation": "Package details of the release",
+                        "smithy.api#required": {}
+                    }
+                },
+                "resources": {
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Resources for the release",
+                        "smithy.api#required": {}
+                    }
+                },
+                "sub_packages": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Sub-packages for the release",
                         "smithy.api#required": {}
                     }
                 },
@@ -2808,6 +2988,205 @@
                 "smithy.api#httpError": 403
             }
         },
+        "io.airborne.server#GetPackageGroup": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetPackageGroupRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#PackageGroup"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Get a single package group by ID",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/package-groups/{groupId}"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#GetPackageGroupRequest": {
+            "type": "structure",
+            "members": {
+                "groupId": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Get a single package group request"
+            }
+        },
+        "io.airborne.server#GetPackageV2ByTag": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetPackageV2ByTagRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#PackageV2"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Get a package by tag within a package group",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/package-groups/{groupId}/packages/tag/{tag}"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#GetPackageV2ByTagRequest": {
+            "type": "structure",
+            "members": {
+                "groupId": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tag name",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Get package v2 by tag"
+            }
+        },
+        "io.airborne.server#GetPackageV2ByVersion": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetPackageV2ByVersionRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#PackageV2"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Get a package by version within a package group",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/package-groups/{groupId}/packages/version/{version}"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#GetPackageV2ByVersionRequest": {
+            "type": "structure",
+            "members": {
+                "groupId": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Version number",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Get package v2 by version"
+            }
+        },
         "io.airborne.server#GetRelease": {
             "type": "operation",
             "input": {
@@ -2843,27 +3222,84 @@
                 "version": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Version of the config",
                         "smithy.api#required": {}
                     }
                 },
                 "release_config_timeout": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Timeout for the release config in seconds",
                         "smithy.api#required": {}
                     }
                 },
                 "boot_timeout": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Boot timeout in seconds",
                         "smithy.api#required": {}
                     }
                 },
                 "properties": {
                     "target": "io.airborne.server#ConfigProperties",
                     "traits": {
+                        "smithy.api#documentation": "Configuration properties",
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Release configuration details"
+            }
+        },
+        "io.airborne.server#GetReleasePackage": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name identifier of the package"
+                    }
+                },
+                "group_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group"
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Version of the package"
+                    }
+                },
+                "index": {
+                    "target": "io.airborne.server#ServeFile",
+                    "traits": {
+                        "smithy.api#documentation": "Index file of the package"
+                    }
+                },
+                "properties": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Properties of the package"
+                    }
+                },
+                "important": {
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Important files loaded eagerly"
+                    }
+                },
+                "lazy": {
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Lazy files loaded on demand"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Package details for get release response (includes group_id)"
             }
         },
         "io.airborne.server#GetReleaseRequest": {
@@ -2899,26 +3335,56 @@
             "type": "structure",
             "members": {
                 "id": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Unique identifier of the release"
+                    }
                 },
                 "created_at": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Creation timestamp of the release"
+                    }
                 },
                 "config": {
-                    "target": "io.airborne.server#GetReleaseConfig"
+                    "target": "io.airborne.server#GetReleaseConfig",
+                    "traits": {
+                        "smithy.api#documentation": "Release configuration details"
+                    }
                 },
                 "package": {
-                    "target": "io.airborne.server#ServePackage"
+                    "target": "io.airborne.server#GetReleasePackage",
+                    "traits": {
+                        "smithy.api#documentation": "Package details of the release"
+                    }
+                },
+                "sub_packages": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Sub-packages from non-primary groups"
+                    }
                 },
                 "resources": {
-                    "target": "io.airborne.server#ServeFileList"
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Resource files associated with the release"
+                    }
                 },
                 "experiment": {
-                    "target": "io.airborne.server#ReleaseExperiment"
+                    "target": "io.airborne.server#ReleaseExperiment",
+                    "traits": {
+                        "smithy.api#documentation": "Experiment associated with the release"
+                    }
                 },
                 "dimensions": {
-                    "target": "io.airborne.server#DimensionsMap"
+                    "target": "io.airborne.server#DimensionsMap",
+                    "traits": {
+                        "smithy.api#documentation": "Dimensions associated with the release"
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Response for getting a single release"
             }
         },
         "io.airborne.server#GetReleaseResponseList": {
@@ -2933,6 +3399,7 @@
                 "organisation": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
                         "smithy.api#httpLabel": {},
                         "smithy.api#required": {}
                     }
@@ -2940,6 +3407,7 @@
                 "application": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Name of the application",
                         "smithy.api#httpLabel": {},
                         "smithy.api#required": {}
                     }
@@ -3223,6 +3691,113 @@
                 "smithy.api#documentation": "List organisations response"
             }
         },
+        "io.airborne.server#ListPackageGroups": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListPackageGroupsRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ListPackageGroupsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List all package groups",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/package-groups"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#ListPackageGroupsRequest": {
+            "type": "structure",
+            "members": {
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Offset for pagination (default: 1)",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Limit for pagination (default: 50)",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search term for filtering package groups by name",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "If true, fetch all package groups without pagination",
+                        "smithy.api#httpQuery": "all"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List package groups request"
+            }
+        },
+        "io.airborne.server#ListPackageGroupsResponse": {
+            "type": "structure",
+            "members": {
+                "data": {
+                    "target": "io.airborne.server#PackageGroupList",
+                    "traits": {
+                        "smithy.api#documentation": "List of package groups",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of items",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List package groups response"
+            }
+        },
         "io.airborne.server#ListPackages": {
             "type": "operation",
             "input": {
@@ -3241,7 +3816,7 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List packages request operation",
+                "smithy.api#documentation": "List packages request operation (legacy - uses primary group)",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/packages/list"
@@ -3298,7 +3873,7 @@
                 }
             },
             "traits": {
-                "smithy.api#documentation": "List packages request"
+                "smithy.api#documentation": "List packages request (legacy - uses primary group)"
             }
         },
         "io.airborne.server#ListPackagesResponse": {
@@ -3328,6 +3903,121 @@
             },
             "traits": {
                 "smithy.api#documentation": "List packages response"
+            }
+        },
+        "io.airborne.server#ListPackagesV2": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListPackagesV2Request"
+            },
+            "output": {
+                "target": "io.airborne.server#ListPackagesV2Response"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List packages within a package group",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/package-groups/{groupId}/packages"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#ListPackagesV2Request": {
+            "type": "structure",
+            "members": {
+                "groupId": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Offset for pagination (default: 1)",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Limit for pagination (default: 50)",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search term for filtering packages",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "If true, fetch all packages without pagination",
+                        "smithy.api#httpQuery": "all"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List packages v2 request (group-scoped)"
+            }
+        },
+        "io.airborne.server#ListPackagesV2Response": {
+            "type": "structure",
+            "members": {
+                "data": {
+                    "target": "io.airborne.server#PackageV2List",
+                    "traits": {
+                        "smithy.api#documentation": "List of packages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of items",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List packages v2 response"
             }
         },
         "io.airborne.server#ListReleases": {
@@ -3496,29 +4186,73 @@
             "type": "structure",
             "members": {
                 "tag": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tag of the package"
+                    }
                 },
                 "version": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Version number of the package",
                         "smithy.api#required": {}
                     }
                 },
                 "index": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Index file path",
                         "smithy.api#required": {}
                     }
                 },
                 "files": {
                     "target": "io.airborne.server#StringList",
                     "traits": {
+                        "smithy.api#documentation": "List of file ids in the package",
                         "smithy.api#required": {}
                     }
                 }
             },
             "traits": {
-                "smithy.api#documentation": "Package information"
+                "smithy.api#documentation": "Package information (legacy)"
+            }
+        },
+        "io.airborne.server#PackageGroup": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Unique identifier of the package group",
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the package group",
+                        "smithy.api#required": {}
+                    }
+                },
+                "is_primary": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Whether this is the primary package group",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Package group information"
+            }
+        },
+        "io.airborne.server#PackageGroupList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#PackageGroup"
+            },
+            "traits": {
+                "smithy.api#documentation": "List of package groups"
             }
         },
         "io.airborne.server#PackageList": {
@@ -3528,6 +4262,56 @@
             },
             "traits": {
                 "smithy.api#documentation": "List of packages"
+            }
+        },
+        "io.airborne.server#PackageV2": {
+            "type": "structure",
+            "members": {
+                "index": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Index file path (required for primary groups, absent for non-primary)"
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tag of the package"
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Version number of the package",
+                        "smithy.api#required": {}
+                    }
+                },
+                "files": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "List of file ids in the package",
+                        "smithy.api#required": {}
+                    }
+                },
+                "package_group_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group this package belongs to",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Package V2 information (group-scoped)"
+            }
+        },
+        "io.airborne.server#PackageV2List": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#PackageV2"
+            },
+            "traits": {
+                "smithy.api#documentation": "List of packages v2"
             }
         },
         "io.airborne.server#PostLogin": {
@@ -3558,18 +4342,21 @@
                 "config": {
                     "target": "io.airborne.server#GetReleaseConfig",
                     "traits": {
+                        "smithy.api#documentation": "Release configuration details",
                         "smithy.api#required": {}
                     }
                 },
                 "package": {
                     "target": "io.airborne.server#Package",
                     "traits": {
+                        "smithy.api#documentation": "Package details",
                         "smithy.api#required": {}
                     }
                 },
                 "resources": {
                     "target": "smithy.api#Document",
                     "traits": {
+                        "smithy.api#documentation": "Resources associated with the release",
                         "smithy.api#required": {}
                     }
                 }
@@ -3582,23 +4369,44 @@
             "type": "structure",
             "members": {
                 "experiment_id": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Unique identifier of the experiment"
+                    }
                 },
                 "package_version": {
-                    "target": "smithy.api#Integer"
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Package version used in the experiment"
+                    }
                 },
                 "config_version": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Config version used in the experiment"
+                    }
                 },
                 "created_at": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Creation timestamp of the experiment"
+                    }
                 },
                 "traffic_percentage": {
-                    "target": "smithy.api#Integer"
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Percentage of traffic routed to this experiment"
+                    }
                 },
                 "status": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Current status of the experiment"
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Experiment associated with a release"
             }
         },
         "io.airborne.server#RequestOrganisation": {
@@ -3702,14 +4510,26 @@
             "type": "structure",
             "members": {
                 "file_path": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Path of the file"
+                    }
                 },
                 "url": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "URL to download the file"
+                    }
                 },
                 "checksum": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Checksum of the file"
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Served file with URL and checksum"
             }
         },
         "io.airborne.server#ServeFileList": {
@@ -3722,23 +4542,44 @@
             "type": "structure",
             "members": {
                 "name": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name identifier of the package"
+                    }
                 },
                 "version": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Version of the package"
+                    }
                 },
                 "index": {
-                    "target": "io.airborne.server#ServeFile"
+                    "target": "io.airborne.server#ServeFile",
+                    "traits": {
+                        "smithy.api#documentation": "Index file of the package"
+                    }
                 },
                 "properties": {
-                    "target": "smithy.api#Document"
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Properties of the package"
+                    }
                 },
                 "important": {
-                    "target": "io.airborne.server#ServeFileList"
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Important files loaded eagerly"
+                    }
                 },
                 "lazy": {
-                    "target": "io.airborne.server#ServeFileList"
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Lazy files loaded on demand"
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Package served with a release"
             }
         },
         "io.airborne.server#ServeRelease": {
@@ -3895,6 +4736,73 @@
                         "smithy.api#required": {}
                     }
                 }
+            }
+        },
+        "io.airborne.server#UpdatePackageGroupName": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#UpdatePackageGroupRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#PackageGroup"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Update a package group name",
+                "smithy.api#http": {
+                    "method": "PATCH",
+                    "uri": "/api/package-groups/{groupId}"
+                }
+            }
+        },
+        "io.airborne.server#UpdatePackageGroupRequest": {
+            "type": "structure",
+            "members": {
+                "groupId": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the package group",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "New name for the package group",
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Update package group name request body"
             }
         },
         "io.airborne.server#UploadFile": {

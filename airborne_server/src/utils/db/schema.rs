@@ -2,6 +2,17 @@
 
 pub mod hyperotaserver {
     diesel::table! {
+        hyperotaserver.builds (id) {
+            id -> Uuid,
+            build_version -> Text,
+            organisation -> Text,
+            application -> Text,
+            release_id -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.cleanup_outbox (transaction_id) {
             transaction_id -> Text,
             entity_name -> Text,
@@ -45,6 +56,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.package_groups (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            name -> Text,
+            is_primary -> Bool,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.packages (id) {
             id -> Uuid,
             version -> Int4,
@@ -64,10 +86,11 @@ pub mod hyperotaserver {
             version -> Int4,
             app_id -> Text,
             org_id -> Text,
-            index -> Text,
+            index -> Nullable<Text>,
             files -> Array<Nullable<Text>>,
             tag -> Nullable<Text>,
             created_at -> Timestamptz,
+            package_group_id -> Uuid,
         }
     }
 
@@ -115,22 +138,14 @@ pub mod hyperotaserver {
         }
     }
 
-    diesel::table! {
-        hyperotaserver.builds (id) {
-            id -> Uuid,
-            build_version -> Text,
-            organisation -> Text,
-            application -> Text,
-            release_id -> Text,
-            created_at -> Timestamptz,
-        }
-    }
+    diesel::joinable!(packages_v2 -> package_groups (package_group_id));
 
     diesel::allow_tables_to_appear_in_same_query!(
-        cleanup_outbox,
         builds,
+        cleanup_outbox,
         configs,
         files,
+        package_groups,
         packages,
         packages_v2,
         release_views,

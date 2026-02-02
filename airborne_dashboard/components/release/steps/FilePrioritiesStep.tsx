@@ -46,7 +46,12 @@ export function FilePrioritiesStep() {
         <CardContent>
           <div className="flex items-center gap-2 p-3 bg-blue-10 border border-blue-200 rounded-lg mb-4">
             <Info className="h-4 w-4 text-blue-600" />
-            <div className="text-sm">All files default to Important. Switch to Lazy to defer loading.</div>
+            <div className="text-sm">
+              All files default to Important. Switch to Lazy to defer loading.
+              <span className="block mt-1 text-muted-foreground">
+                Files are merged from multiple packages. Primary package files take precedence for duplicate paths.
+              </span>
+            </div>
           </div>
 
           {files.length > 0 && (

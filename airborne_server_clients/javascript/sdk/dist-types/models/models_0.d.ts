@@ -296,7 +296,7 @@ export interface Organisation {
     access: (string)[] | undefined;
 }
 /**
- * Create package request
+ * Create package request (legacy - uses primary group)
  * @public
  */
 export interface CreatePackageRequest {
@@ -305,6 +305,10 @@ export interface CreatePackageRequest {
      * @public
      */
     index: string | undefined;
+    /**
+     * Optional tag for the package (e.g., latest, v1.0, production)
+     * @public
+     */
     tag?: string | undefined;
     /**
      * Space Separated file ids to be included in the package
@@ -323,18 +327,139 @@ export interface CreatePackageRequest {
     application: string | undefined;
 }
 /**
- * Package information
+ * Package information (legacy)
  * @public
  */
 export interface Package {
+    /**
+     * Tag of the package
+     * @public
+     */
     tag?: string | undefined;
+    /**
+     * Version number of the package
+     * @public
+     */
     version: number | undefined;
+    /**
+     * Index file path
+     * @public
+     */
     index: string | undefined;
     /**
-     * List of strings
+     * List of file ids in the package
      * @public
      */
     files: (string)[] | undefined;
+}
+/**
+ * Create package group request body
+ * @public
+ */
+export interface CreatePackageGroupRequest {
+    /**
+     * Name of the package group
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Package group information
+ * @public
+ */
+export interface PackageGroup {
+    /**
+     * Unique identifier of the package group
+     * @public
+     */
+    id: string | undefined;
+    /**
+     * Name of the package group
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * Whether this is the primary package group
+     * @public
+     */
+    is_primary: boolean | undefined;
+}
+/**
+ * Create package v2 request body
+ * @public
+ */
+export interface CreatePackageV2Request {
+    /**
+     * ID of the package group
+     * @public
+     */
+    groupId: string | undefined;
+    /**
+     * Index file (required for primary groups, must not be provided for non-primary)
+     * @public
+     */
+    index?: string | undefined;
+    /**
+     * Optional tag for the package (e.g., latest, v1.0, production)
+     * @public
+     */
+    tag?: string | undefined;
+    /**
+     * File ids to be included in the package
+     * @public
+     */
+    files: (string)[] | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Package V2 information (group-scoped)
+ * @public
+ */
+export interface PackageV2 {
+    /**
+     * Index file path (required for primary groups, absent for non-primary)
+     * @public
+     */
+    index?: string | undefined;
+    /**
+     * Tag of the package
+     * @public
+     */
+    tag?: string | undefined;
+    /**
+     * Version number of the package
+     * @public
+     */
+    version: number | undefined;
+    /**
+     * List of file ids in the package
+     * @public
+     */
+    files: (string)[] | undefined;
+    /**
+     * ID of the package group this package belongs to
+     * @public
+     */
+    package_group_id: string | undefined;
 }
 /**
  * Create release request config
@@ -398,6 +523,11 @@ export interface CreateReleaseRequest {
      */
     package?: CreateReleaseRequestPackage | undefined;
     /**
+     * Sub-packages from non-primary groups (format: "groupid@version")
+     * @public
+     */
+    sub_packages?: (string)[] | undefined;
+    /**
      * Dimensions for the release in key-value format
      * @public
      */
@@ -423,14 +553,31 @@ export interface CreateReleaseRequest {
  * @public
  */
 export interface ConfigProperties {
+    /**
+     * Tenant information document
+     * @public
+     */
     tenant_info: __DocumentType | undefined;
 }
 /**
+ * Release configuration details
  * @public
  */
 export interface GetReleaseConfig {
+    /**
+     * Version of the config
+     * @public
+     */
     version: string | undefined;
+    /**
+     * Timeout for the release config in seconds
+     * @public
+     */
     release_config_timeout: number | undefined;
+    /**
+     * Boot timeout in seconds
+     * @public
+     */
     boot_timeout: number | undefined;
     /**
      * Configuration properties
@@ -439,33 +586,96 @@ export interface GetReleaseConfig {
     properties: ConfigProperties | undefined;
 }
 /**
+ * Experiment associated with a release
  * @public
  */
 export interface ReleaseExperiment {
+    /**
+     * Unique identifier of the experiment
+     * @public
+     */
     experiment_id?: string | undefined;
+    /**
+     * Package version used in the experiment
+     * @public
+     */
     package_version?: number | undefined;
+    /**
+     * Config version used in the experiment
+     * @public
+     */
     config_version?: string | undefined;
+    /**
+     * Creation timestamp of the experiment
+     * @public
+     */
     created_at?: string | undefined;
+    /**
+     * Percentage of traffic routed to this experiment
+     * @public
+     */
     traffic_percentage?: number | undefined;
+    /**
+     * Current status of the experiment
+     * @public
+     */
     status?: string | undefined;
 }
 /**
+ * Served file with URL and checksum
  * @public
  */
 export interface ServeFile {
+    /**
+     * Path of the file
+     * @public
+     */
     file_path?: string | undefined;
+    /**
+     * URL to download the file
+     * @public
+     */
     url?: string | undefined;
+    /**
+     * Checksum of the file
+     * @public
+     */
     checksum?: string | undefined;
 }
 /**
+ * Package served with a release
  * @public
  */
 export interface ServePackage {
+    /**
+     * Name identifier of the package
+     * @public
+     */
     name?: string | undefined;
+    /**
+     * Version of the package
+     * @public
+     */
     version?: string | undefined;
+    /**
+     * Index file of the package
+     * @public
+     */
     index?: ServeFile | undefined;
+    /**
+     * Properties of the package
+     * @public
+     */
     properties?: __DocumentType | undefined;
+    /**
+     * Important files loaded eagerly
+     * @public
+     */
     important?: (ServeFile)[] | undefined;
+    /**
+     * Lazy files loaded on demand
+     * @public
+     */
     lazy?: (ServeFile)[] | undefined;
 }
 /**
@@ -492,6 +702,16 @@ export interface CreateReleaseResponse {
      * @public
      */
     package: ServePackage | undefined;
+    /**
+     * Resources for the release
+     * @public
+     */
+    resources: (ServeFile)[] | undefined;
+    /**
+     * Sub-packages for the release
+     * @public
+     */
+    sub_packages: (string)[] | undefined;
     /**
      * Experiment details of the release
      * @public
@@ -524,6 +744,79 @@ export interface DeleteDimensionRequest {
     application: string | undefined;
 }
 /**
+ * Get a single package group request
+ * @public
+ */
+export interface GetPackageGroupRequest {
+    /**
+     * ID of the package group
+     * @public
+     */
+    groupId: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Get package v2 by tag
+ * @public
+ */
+export interface GetPackageV2ByTagRequest {
+    /**
+     * ID of the package group
+     * @public
+     */
+    groupId: string | undefined;
+    /**
+     * Tag name
+     * @public
+     */
+    tag: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Get package v2 by version
+ * @public
+ */
+export interface GetPackageV2ByVersionRequest {
+    /**
+     * ID of the package group
+     * @public
+     */
+    groupId: string | undefined;
+    /**
+     * Version number
+     * @public
+     */
+    version: number | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
  * @public
  */
 export interface GetReleaseRequest {
@@ -544,15 +837,90 @@ export interface GetReleaseRequest {
     application: string | undefined;
 }
 /**
+ * Package details for get release response (includes group_id)
+ * @public
+ */
+export interface GetReleasePackage {
+    /**
+     * Name identifier of the package
+     * @public
+     */
+    name?: string | undefined;
+    /**
+     * ID of the package group
+     * @public
+     */
+    group_id?: string | undefined;
+    /**
+     * Version of the package
+     * @public
+     */
+    version?: string | undefined;
+    /**
+     * Index file of the package
+     * @public
+     */
+    index?: ServeFile | undefined;
+    /**
+     * Properties of the package
+     * @public
+     */
+    properties?: __DocumentType | undefined;
+    /**
+     * Important files loaded eagerly
+     * @public
+     */
+    important?: (ServeFile)[] | undefined;
+    /**
+     * Lazy files loaded on demand
+     * @public
+     */
+    lazy?: (ServeFile)[] | undefined;
+}
+/**
+ * Response for getting a single release
  * @public
  */
 export interface GetReleaseResponse {
+    /**
+     * Unique identifier of the release
+     * @public
+     */
     id?: string | undefined;
+    /**
+     * Creation timestamp of the release
+     * @public
+     */
     created_at?: string | undefined;
+    /**
+     * Release configuration details
+     * @public
+     */
     config?: GetReleaseConfig | undefined;
-    package?: ServePackage | undefined;
+    /**
+     * Package details of the release
+     * @public
+     */
+    package?: GetReleasePackage | undefined;
+    /**
+     * Sub-packages from non-primary groups
+     * @public
+     */
+    sub_packages?: (string)[] | undefined;
+    /**
+     * Resource files associated with the release
+     * @public
+     */
     resources?: (ServeFile)[] | undefined;
+    /**
+     * Experiment associated with the release
+     * @public
+     */
     experiment?: ReleaseExperiment | undefined;
+    /**
+     * Dimensions associated with the release
+     * @public
+     */
     dimensions?: Record<string, __DocumentType> | undefined;
 }
 /**
@@ -718,7 +1086,64 @@ export interface ListOrganisationsResponse {
     organisations: (Organisation)[] | undefined;
 }
 /**
- * List packages request
+ * List package groups request
+ * @public
+ */
+export interface ListPackageGroupsRequest {
+    /**
+     * Offset for pagination (default: 1)
+     * @public
+     */
+    page?: number | undefined;
+    /**
+     * Limit for pagination (default: 50)
+     * @public
+     */
+    count?: number | undefined;
+    /**
+     * Search term for filtering package groups by name
+     * @public
+     */
+    search?: string | undefined;
+    /**
+     * If true, fetch all package groups without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * List package groups response
+ * @public
+ */
+export interface ListPackageGroupsResponse {
+    /**
+     * List of package groups
+     * @public
+     */
+    data: (PackageGroup)[] | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
+}
+/**
+ * List packages request (legacy - uses primary group)
  * @public
  */
 export interface ListPackagesRequest {
@@ -763,6 +1188,68 @@ export interface ListPackagesResponse {
      * @public
      */
     data: (Package)[] | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
+    /**
+     * Total number of items
+     * @public
+     */
+    total_items: number | undefined;
+}
+/**
+ * List packages v2 request (group-scoped)
+ * @public
+ */
+export interface ListPackagesV2Request {
+    /**
+     * ID of the package group
+     * @public
+     */
+    groupId: string | undefined;
+    /**
+     * Offset for pagination (default: 1)
+     * @public
+     */
+    page?: number | undefined;
+    /**
+     * Limit for pagination (default: 50)
+     * @public
+     */
+    count?: number | undefined;
+    /**
+     * Search term for filtering packages
+     * @public
+     */
+    search?: string | undefined;
+    /**
+     * If true, fetch all packages without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * List packages v2 response
+ * @public
+ */
+export interface ListPackagesV2Response {
+    /**
+     * List of packages
+     * @public
+     */
+    data: (PackageV2)[] | undefined;
     /**
      * Total number of pages
      * @public
@@ -907,7 +1394,15 @@ export interface RequestOrganisationResponse {
  * @public
  */
 export interface GetServeReleaseInput {
+    /**
+     * Name of the organisation
+     * @public
+     */
     organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
     application: string | undefined;
 }
 /**
@@ -915,12 +1410,20 @@ export interface GetServeReleaseInput {
  * @public
  */
 export interface ReleaseConfig {
+    /**
+     * Release configuration details
+     * @public
+     */
     config: GetReleaseConfig | undefined;
     /**
-     * Package information
+     * Package details
      * @public
      */
     package: Package | undefined;
+    /**
+     * Resources associated with the release
+     * @public
+     */
     resources: __DocumentType | undefined;
 }
 /**
@@ -942,6 +1445,32 @@ export interface UpdateDimensionRequest {
      * @public
      */
     position: number | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Update package group name request body
+ * @public
+ */
+export interface UpdatePackageGroupRequest {
+    /**
+     * ID of the package group
+     * @public
+     */
+    groupId: string | undefined;
+    /**
+     * New name for the package group
+     * @public
+     */
+    name: string | undefined;
     /**
      * Name of the organisation
      * @public

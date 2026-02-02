@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreatePackageGroupAction, CreatePackageV2Action, CreateReleaseAction, DeleteDimensionAction, GetPackageGroupAction, GetPackageV2ByTagAction, GetPackageV2ByVersionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackageGroupsAction, ListPackagesAction, ListPackagesV2Action, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UpdatePackageGroupNameAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -432,7 +432,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create package request operation:
+ Create package request operation (legacy - uses primary group):
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreatePackage \\
@@ -451,7 +451,7 @@ Usage 3 - Mixed Usage:
 
 Parameters:
     --index <string> (required) : Index file id
-    --tag <string> (optional)
+    --tag <string> (optional) : Optional tag for the package (e.g., latest, v1.0, production)
     --files [<string>] (required) : Space Separated file ids to be included in the package
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
@@ -501,11 +501,161 @@ JSON file format (params.json):
 
 
 program
+  .command("CreatePackageGroup")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--name <name>", "name parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Create a new package group:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli CreatePackageGroup \\
+     --name <name> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli CreatePackageGroup @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli CreatePackageGroup @params.json --name <value> --organisation <value> --token <value>
+
+Parameters:
+    --name <string> (required) : Name of the package group
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli CreatePackageGroup \\
+     --name <name> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli CreatePackageGroup @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli CreatePackageGroup @params.json --name <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "name": "example_name",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await CreatePackageGroupAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("CreatePackageV2")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--groupId <groupId>", "groupId parameter")
+ .option("--index <index>", "index parameter")
+ .option("--tag <tag>", "tag parameter")
+ .option("--files <files...>", "files parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Create a package within a package group:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli CreatePackageV2 \\
+     --groupId <groupId> \\
+     --files <files> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--index <index>]
+
+Usage 2 - JSON file:
+  airborne-core-cli CreatePackageV2 @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli CreatePackageV2 @params.json --groupId <value> --index <value> --token <value>
+
+Parameters:
+    --groupId <string> (required) : ID of the package group
+    --index <string> (optional) : Index file (required for primary groups, must not be provided for non-primary)
+    --tag <string> (optional) : Optional tag for the package (e.g., latest, v1.0, production)
+    --files [<string>] (required) : File ids to be included in the package
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli CreatePackageV2 \\
+     --groupId <groupId> \\
+     --files <files> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--index <index>]
+
+2. Using JSON file:
+   $ airborne-core-cli CreatePackageV2 @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli CreatePackageV2 @params.json --groupId <value> --index <value> --token <value>
+
+JSON file format (params.json):
+{
+  "groupId": "example_groupId",
+  "index": "example_index",
+  "tag": "example_tag",
+  "files": "example_files",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await CreatePackageV2Action(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("CreateRelease")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--config <config>", "config parameter")
  .option("--package_id <package_id>", "package_id parameter")
  .option("--package <package>", "package parameter")
+ .option("--sub_packages <sub_packages...>", "sub_packages parameter")
  .option("--dimensions <dimensions>", "dimensions parameter")
  .option("--resources <resources...>", "resources parameter")
  .option("--organisation <organisation>", "organisation parameter")
@@ -538,6 +688,7 @@ Parameters:
         properties <document> (optional) : Properties of the package in Stringified JSON format or a file attachment
         important [<string>] (optional) : Important files in the package
         lazy [<string>] (optional) : Lazy files in the package
+    --sub_packages [<string>] (optional) : Sub-packages from non-primary groups (format: "groupid@version")
     --dimensions (optional) : Dimensions for the release in key-value format
         key <string> : Dimension name
         value <document> : Dimension value
@@ -570,6 +721,7 @@ JSON file format (params.json):
   "config": "example_config",
   "package_id": "example_package_id",
   "package": "example_package",
+  "sub_packages": "example_sub_packages",
   "dimensions": "example_dimensions",
   "resources": "example_resources",
   "organisation": "example_organisation",
@@ -648,6 +800,226 @@ JSON file format (params.json):
     try {
       
       const output = await DeleteDimensionAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetPackageGroup")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--groupId <groupId>", "groupId parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Get a single package group by ID:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetPackageGroup \\
+     --groupId <groupId> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetPackageGroup @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetPackageGroup @params.json --groupId <value> --organisation <value> --token <value>
+
+Parameters:
+    --groupId <string> (required) : ID of the package group
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetPackageGroup \\
+     --groupId <groupId> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetPackageGroup @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetPackageGroup @params.json --groupId <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "groupId": "example_groupId",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetPackageGroupAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetPackageV2ByTag")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--groupId <groupId>", "groupId parameter")
+ .option("--tag <tag>", "tag parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Get a package by tag within a package group:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetPackageV2ByTag \\
+     --groupId <groupId> \\
+     --tag <tag> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetPackageV2ByTag @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetPackageV2ByTag @params.json --groupId <value> --tag <value> --token <value>
+
+Parameters:
+    --groupId <string> (required) : ID of the package group
+    --tag <string> (required) : Tag name
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetPackageV2ByTag \\
+     --groupId <groupId> \\
+     --tag <tag> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetPackageV2ByTag @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetPackageV2ByTag @params.json --groupId <value> --tag <value> --token <value>
+
+JSON file format (params.json):
+{
+  "groupId": "example_groupId",
+  "tag": "example_tag",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetPackageV2ByTagAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetPackageV2ByVersion")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--groupId <groupId>", "groupId parameter")
+ .option("--version <version>", "version parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--version must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Get a package by version within a package group:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetPackageV2ByVersion \\
+     --groupId <groupId> \\
+     --version <version> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetPackageV2ByVersion @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetPackageV2ByVersion @params.json --groupId <value> --version <value> --token <value>
+
+Parameters:
+    --groupId <string> (required) : ID of the package group
+    --version <integer> (required) : Version number
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetPackageV2ByVersion \\
+     --groupId <groupId> \\
+     --version <version> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetPackageV2ByVersion @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetPackageV2ByVersion @params.json --groupId <value> --version <value> --token <value>
+
+JSON file format (params.json):
+{
+  "groupId": "example_groupId",
+  "version": 123,
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetPackageV2ByVersionAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
@@ -1004,6 +1376,95 @@ JSON file format (params.json):
 
 
 program
+  .command("ListPackageGroups")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--page <page>", "page parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--page must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--count <count>", "count parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--count must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--search <search>", "search parameter")
+ .option("--all <all>", "all parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List all package groups:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListPackageGroups \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ListPackageGroups @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListPackageGroups @params.json --page <value> --count <value> --token <value>
+
+Parameters:
+    --page <integer> (optional) : Offset for pagination (default: 1)
+    --count <integer> (optional) : Limit for pagination (default: 50)
+    --search <string> (optional) : Search term for filtering package groups by name
+    --all <boolean> (optional) : If true, fetch all package groups without pagination
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListPackageGroups \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+2. Using JSON file:
+   $ airborne-core-cli ListPackageGroups @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListPackageGroups @params.json --page <value> --count <value> --token <value>
+
+JSON file format (params.json):
+{
+  "page": 123,
+  "count": 123,
+  "search": "example_search",
+  "all": "example_all",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListPackageGroupsAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("ListPackages")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--page <page>", "page parameter", (value) => {
@@ -1026,7 +1487,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List packages request operation:
+ List packages request operation (legacy - uses primary group):
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListPackages \\
@@ -1082,6 +1543,100 @@ JSON file format (params.json):
     try {
       
       const output = await ListPackagesAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("ListPackagesV2")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--groupId <groupId>", "groupId parameter")
+ .option("--page <page>", "page parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--page must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--count <count>", "count parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--count must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--search <search>", "search parameter")
+ .option("--all <all>", "all parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List packages within a package group:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListPackagesV2 \\
+     --groupId <groupId> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ListPackagesV2 @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListPackagesV2 @params.json --groupId <value> --page <value> --token <value>
+
+Parameters:
+    --groupId <string> (required) : ID of the package group
+    --page <integer> (optional) : Offset for pagination (default: 1)
+    --count <integer> (optional) : Limit for pagination (default: 50)
+    --search <string> (optional) : Search term for filtering packages
+    --all <boolean> (optional) : If true, fetch all packages without pagination
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListPackagesV2 \\
+     --groupId <groupId> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+2. Using JSON file:
+   $ airborne-core-cli ListPackagesV2 @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListPackagesV2 @params.json --groupId <value> --page <value> --token <value>
+
+JSON file format (params.json):
+{
+  "groupId": "example_groupId",
+  "page": 123,
+  "count": 123,
+  "search": "example_search",
+  "all": "example_all",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListPackagesV2Action(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
@@ -1347,8 +1902,8 @@ Usage 3 - Mixed Usage:
   $ airborne-core-cli ServeRelease @params.json --organisation <value> --application <value> --token <value>
 
 Parameters:
-    --organisation <string> (required)
-    --application <string> (required)
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
 
 `)
@@ -1410,8 +1965,8 @@ Usage 3 - Mixed Usage:
   $ airborne-core-cli ServeReleaseV2 @params.json --organisation <value> --application <value> --token <value>
 
 Parameters:
-    --organisation <string> (required)
-    --application <string> (required)
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
 
 `)
@@ -1525,6 +2080,79 @@ JSON file format (params.json):
     try {
       
       const output = await UpdateDimensionAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("UpdatePackageGroupName")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--groupId <groupId>", "groupId parameter")
+ .option("--name <name>", "name parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Update a package group name:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli UpdatePackageGroupName \\
+     --groupId <groupId> \\
+     --name <name> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli UpdatePackageGroupName @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli UpdatePackageGroupName @params.json --groupId <value> --name <value> --token <value>
+
+Parameters:
+    --groupId <string> (required) : ID of the package group
+    --name <string> (required) : New name for the package group
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli UpdatePackageGroupName \\
+     --groupId <groupId> \\
+     --name <name> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli UpdatePackageGroupName @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli UpdatePackageGroupName @params.json --groupId <value> --name <value> --token <value>
+
+JSON file format (params.json):
+{
+  "groupId": "example_groupId",
+  "name": "example_name",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await UpdatePackageGroupNameAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {

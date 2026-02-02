@@ -30,11 +30,12 @@ use superposition_sdk::Client;
 
 use crate::{
     middleware::auth::{validate_user, AuthResponse, ADMIN},
+    run_blocking,
     types::{self as airborne_types, ABError, AppState},
     utils::{
         db::{
-            models::{NewWorkspaceName, WorkspaceName},
-            schema::hyperotaserver::workspace_names,
+            models::{NewPackageGroupEntry, NewWorkspaceName, WorkspaceName},
+            schema::hyperotaserver::{package_groups, workspace_names},
         },
         document::schema_doc_to_hashmap,
         keycloak::get_token,
@@ -166,9 +167,6 @@ async fn add_application(
 
     // Create a transaction manager to track resources
     let transaction = TransactionManager::new(&application, "application_create");
-
-    // Get DB connection
-    let mut conn = state.db_pool.get()?;
 
     // Get Keycloak Admin Token
     let client = reqwest::Client::new();
@@ -318,37 +316,45 @@ async fn add_application(
             }
         }
 
-        // Store workspace name in our database with a placeholder, then update to "workspace{id}"
-        let new_workspace_name = NewWorkspaceName {
-            organization_id: &organisation,
-            application_id: &application,
-            workspace_name: "pending",
-        };
-
         let superposition_org_id_from_env = state.env.superposition_org_id.clone();
         info!(
             "Using Superposition Org ID from environment: {}",
             superposition_org_id_from_env
         );
-        // Insert and get the inserted row (to get the id)
-        let mut inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
-            .values(&new_workspace_name)
-            .get_result(&mut conn)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
-            })?;
 
-        let generated_id = inserted_workspace.id;
-        let generated_workspace_name = format!("workspace{}", generated_id);
-        inserted_workspace.workspace_name = generated_workspace_name.clone();
+        let pool = state.db_pool.clone();
+        let org_clone = organisation.clone();
+        let app_clone = application.clone();
+        let inserted_workspace: WorkspaceName = run_blocking!({
+            let mut conn = pool.get()?;
 
-        // Update the workspace_name to "workspace{id}"
-        diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
-            .set(workspace_names::workspace_name.eq(&generated_workspace_name))
-            .execute(&mut conn)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
-            })?;
+            let new_workspace_name = NewWorkspaceName {
+                organization_id: &org_clone,
+                application_id: &app_clone,
+                workspace_name: "pending",
+            };
+
+            let mut inserted: WorkspaceName = diesel::insert_into(workspace_names::table)
+                .values(&new_workspace_name)
+                .get_result(&mut conn)
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
+                })?;
+
+            let generated_id = inserted.id;
+            let generated_workspace_name = format!("workspace{}", generated_id);
+            inserted.workspace_name = generated_workspace_name.clone();
+
+            // Update the workspace_name to "workspace{id}"
+            diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+                .set(workspace_names::workspace_name.eq(&generated_workspace_name))
+                .execute(&mut conn)
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
+                })?;
+
+            Ok(inserted)
+        })?;
 
         // Step 4: Create workspace in Superposition
 
@@ -356,7 +362,7 @@ async fn add_application(
             .superposition_client
             .create_workspace()
             .org_id(superposition_org_id_from_env.clone())
-            .workspace_name(generated_workspace_name.clone())
+            .workspace_name(inserted_workspace.workspace_name.clone())
             .workspace_status(WorkspaceStatus::Enabled)
             .strict_mode(false)
             .allow_experiment_self_approval(true)
@@ -439,6 +445,46 @@ async fn add_application(
             &state,
         )
         .await?;
+
+        // Step 5: Create primary package group for the new application
+        let new_primary_group = NewPackageGroupEntry {
+            org_id: organisation.clone(),
+            app_id: application.clone(),
+            name: "primary".to_string(),
+            is_primary: true,
+        };
+
+        let pool = state.db_pool.clone();
+        if let Err(e) = run_blocking!({
+            let mut conn = pool.get()?;
+            diesel::insert_into(package_groups::table)
+                .values(&new_primary_group)
+                .execute(&mut conn)
+                .map_err(|e| {
+                    ABError::InternalServerError(format!(
+                        "Failed to create primary package group: {}",
+                        e
+                    ))
+                })?;
+            Ok(())
+        }) {
+            // Handle rollback and return error
+            if let Err(rollback_err) = transaction
+                .handle_rollback_if_needed(&admin, &realm, &state)
+                .await
+            {
+                info!("Rollback failed: {}", rollback_err);
+            }
+
+            info!("Failed to create primary package group: {}", e);
+            return Err(ABError::InternalServerError(
+                "Failed to create primary package group".to_string(),
+            ));
+        }
+        info!(
+            "Created primary package group for application: {}",
+            application
+        );
 
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();

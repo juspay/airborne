@@ -66,8 +66,9 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //           tenant_info: "DOCUMENT_VALUE", // required
  * //         },
  * //       },
- * //       package: { // ServePackage
+ * //       package: { // GetReleasePackage
  * //         name: "STRING_VALUE",
+ * //         group_id: "STRING_VALUE",
  * //         version: "STRING_VALUE",
  * //         index: { // ServeFile
  * //           file_path: "STRING_VALUE",
@@ -90,6 +91,9 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //           },
  * //         ],
  * //       },
+ * //       sub_packages: [ // StringList
+ * //         "STRING_VALUE",
+ * //       ],
  * //       resources: [
  * //         {
  * //           file_path: "STRING_VALUE",

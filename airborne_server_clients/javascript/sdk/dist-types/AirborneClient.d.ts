@@ -4,20 +4,28 @@ import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "./com
 import { CreateFileCommandInput, CreateFileCommandOutput } from "./commands/CreateFileCommand";
 import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from "./commands/CreateOrganisationCommand";
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "./commands/CreatePackageCommand";
+import { CreatePackageGroupCommandInput, CreatePackageGroupCommandOutput } from "./commands/CreatePackageGroupCommand";
+import { CreatePackageV2CommandInput, CreatePackageV2CommandOutput } from "./commands/CreatePackageV2Command";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "./commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./commands/DeleteDimensionCommand";
+import { GetPackageGroupCommandInput, GetPackageGroupCommandOutput } from "./commands/GetPackageGroupCommand";
+import { GetPackageV2ByTagCommandInput, GetPackageV2ByTagCommandOutput } from "./commands/GetPackageV2ByTagCommand";
+import { GetPackageV2ByVersionCommandInput, GetPackageV2ByVersionCommandOutput } from "./commands/GetPackageV2ByVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "./commands/ListOrganisationsCommand";
+import { ListPackageGroupsCommandInput, ListPackageGroupsCommandOutput } from "./commands/ListPackageGroupsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
+import { ListPackagesV2CommandInput, ListPackagesV2CommandOutput } from "./commands/ListPackagesV2Command";
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "./commands/ListReleasesCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "./commands/PostLoginCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "./commands/ServeReleaseV2Command";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "./commands/UpdateDimensionCommand";
+import { UpdatePackageGroupNameCommandInput, UpdatePackageGroupNameCommandOutput } from "./commands/UpdatePackageGroupNameCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "./commands/UploadFileCommand";
 import { RuntimeExtension, RuntimeExtensionsConfig } from "./runtimeExtensions";
 import { HostHeaderInputConfig, HostHeaderResolvedConfig } from "@aws-sdk/middleware-host-header";
@@ -31,11 +39,11 @@ export { __Client };
 /**
  * @public
  */
-export type ServiceInputTypes = CreateApplicationCommandInput | CreateDimensionCommandInput | CreateFileCommandInput | CreateOrganisationCommandInput | CreatePackageCommandInput | CreateReleaseCommandInput | DeleteDimensionCommandInput | GetReleaseCommandInput | GetUserCommandInput | ListDimensionsCommandInput | ListFilesCommandInput | ListOrganisationsCommandInput | ListPackagesCommandInput | ListReleasesCommandInput | PostLoginCommandInput | RequestOrganisationCommandInput | ServeReleaseCommandInput | ServeReleaseV2CommandInput | UpdateDimensionCommandInput | UploadFileCommandInput;
+export type ServiceInputTypes = CreateApplicationCommandInput | CreateDimensionCommandInput | CreateFileCommandInput | CreateOrganisationCommandInput | CreatePackageCommandInput | CreatePackageGroupCommandInput | CreatePackageV2CommandInput | CreateReleaseCommandInput | DeleteDimensionCommandInput | GetPackageGroupCommandInput | GetPackageV2ByTagCommandInput | GetPackageV2ByVersionCommandInput | GetReleaseCommandInput | GetUserCommandInput | ListDimensionsCommandInput | ListFilesCommandInput | ListOrganisationsCommandInput | ListPackageGroupsCommandInput | ListPackagesCommandInput | ListPackagesV2CommandInput | ListReleasesCommandInput | PostLoginCommandInput | RequestOrganisationCommandInput | ServeReleaseCommandInput | ServeReleaseV2CommandInput | UpdateDimensionCommandInput | UpdatePackageGroupNameCommandInput | UploadFileCommandInput;
 /**
  * @public
  */
-export type ServiceOutputTypes = CreateApplicationCommandOutput | CreateDimensionCommandOutput | CreateFileCommandOutput | CreateOrganisationCommandOutput | CreatePackageCommandOutput | CreateReleaseCommandOutput | DeleteDimensionCommandOutput | GetReleaseCommandOutput | GetUserCommandOutput | ListDimensionsCommandOutput | ListFilesCommandOutput | ListOrganisationsCommandOutput | ListPackagesCommandOutput | ListReleasesCommandOutput | PostLoginCommandOutput | RequestOrganisationCommandOutput | ServeReleaseCommandOutput | ServeReleaseV2CommandOutput | UpdateDimensionCommandOutput | UploadFileCommandOutput;
+export type ServiceOutputTypes = CreateApplicationCommandOutput | CreateDimensionCommandOutput | CreateFileCommandOutput | CreateOrganisationCommandOutput | CreatePackageCommandOutput | CreatePackageGroupCommandOutput | CreatePackageV2CommandOutput | CreateReleaseCommandOutput | DeleteDimensionCommandOutput | GetPackageGroupCommandOutput | GetPackageV2ByTagCommandOutput | GetPackageV2ByVersionCommandOutput | GetReleaseCommandOutput | GetUserCommandOutput | ListDimensionsCommandOutput | ListFilesCommandOutput | ListOrganisationsCommandOutput | ListPackageGroupsCommandOutput | ListPackagesCommandOutput | ListPackagesV2CommandOutput | ListReleasesCommandOutput | PostLoginCommandOutput | RequestOrganisationCommandOutput | ServeReleaseCommandOutput | ServeReleaseV2CommandOutput | UpdateDimensionCommandOutput | UpdatePackageGroupNameCommandOutput | UploadFileCommandOutput;
 /**
  * @public
  */

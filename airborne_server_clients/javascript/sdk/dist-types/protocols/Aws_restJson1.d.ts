@@ -3,20 +3,28 @@ import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "../co
 import { CreateFileCommandInput, CreateFileCommandOutput } from "../commands/CreateFileCommand";
 import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from "../commands/CreateOrganisationCommand";
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "../commands/CreatePackageCommand";
+import { CreatePackageGroupCommandInput, CreatePackageGroupCommandOutput } from "../commands/CreatePackageGroupCommand";
+import { CreatePackageV2CommandInput, CreatePackageV2CommandOutput } from "../commands/CreatePackageV2Command";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "../commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "../commands/DeleteDimensionCommand";
+import { GetPackageGroupCommandInput, GetPackageGroupCommandOutput } from "../commands/GetPackageGroupCommand";
+import { GetPackageV2ByTagCommandInput, GetPackageV2ByTagCommandOutput } from "../commands/GetPackageV2ByTagCommand";
+import { GetPackageV2ByVersionCommandInput, GetPackageV2ByVersionCommandOutput } from "../commands/GetPackageV2ByVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "../commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "../commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "../commands/ListDimensionsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "../commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "../commands/ListOrganisationsCommand";
+import { ListPackageGroupsCommandInput, ListPackageGroupsCommandOutput } from "../commands/ListPackageGroupsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "../commands/ListPackagesCommand";
+import { ListPackagesV2CommandInput, ListPackagesV2CommandOutput } from "../commands/ListPackagesV2Command";
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "../commands/ListReleasesCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "../commands/PostLoginCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "../commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "../commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "../commands/ServeReleaseV2Command";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "../commands/UpdateDimensionCommand";
+import { UpdatePackageGroupNameCommandInput, UpdatePackageGroupNameCommandOutput } from "../commands/UpdatePackageGroupNameCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "../commands/UploadFileCommand";
 import { HttpRequest as __HttpRequest, HttpResponse as __HttpResponse } from "@smithy/protocol-http";
 import { SerdeContext as __SerdeContext } from "@smithy/types";
@@ -41,6 +49,14 @@ export declare const se_CreateOrganisationCommand: (input: CreateOrganisationCom
  */
 export declare const se_CreatePackageCommand: (input: CreatePackageCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1CreatePackageGroupCommand
+ */
+export declare const se_CreatePackageGroupCommand: (input: CreatePackageGroupCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1CreatePackageV2Command
+ */
+export declare const se_CreatePackageV2Command: (input: CreatePackageV2CommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1CreateReleaseCommand
  */
 export declare const se_CreateReleaseCommand: (input: CreateReleaseCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -48,6 +64,18 @@ export declare const se_CreateReleaseCommand: (input: CreateReleaseCommandInput,
  * serializeAws_restJson1DeleteDimensionCommand
  */
 export declare const se_DeleteDimensionCommand: (input: DeleteDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetPackageGroupCommand
+ */
+export declare const se_GetPackageGroupCommand: (input: GetPackageGroupCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetPackageV2ByTagCommand
+ */
+export declare const se_GetPackageV2ByTagCommand: (input: GetPackageV2ByTagCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetPackageV2ByVersionCommand
+ */
+export declare const se_GetPackageV2ByVersionCommand: (input: GetPackageV2ByVersionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1GetReleaseCommand
  */
@@ -69,9 +97,17 @@ export declare const se_ListFilesCommand: (input: ListFilesCommandInput, context
  */
 export declare const se_ListOrganisationsCommand: (input: ListOrganisationsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1ListPackageGroupsCommand
+ */
+export declare const se_ListPackageGroupsCommand: (input: ListPackageGroupsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1ListPackagesCommand
  */
 export declare const se_ListPackagesCommand: (input: ListPackagesCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1ListPackagesV2Command
+ */
+export declare const se_ListPackagesV2Command: (input: ListPackagesV2CommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1ListReleasesCommand
  */
@@ -97,6 +133,10 @@ export declare const se_ServeReleaseV2Command: (input: ServeReleaseV2CommandInpu
  */
 export declare const se_UpdateDimensionCommand: (input: UpdateDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1UpdatePackageGroupNameCommand
+ */
+export declare const se_UpdatePackageGroupNameCommand: (input: UpdatePackageGroupNameCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1UploadFileCommand
  */
 export declare const se_UploadFileCommand: (input: UploadFileCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -121,6 +161,14 @@ export declare const de_CreateOrganisationCommand: (output: __HttpResponse, cont
  */
 export declare const de_CreatePackageCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreatePackageCommandOutput>;
 /**
+ * deserializeAws_restJson1CreatePackageGroupCommand
+ */
+export declare const de_CreatePackageGroupCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreatePackageGroupCommandOutput>;
+/**
+ * deserializeAws_restJson1CreatePackageV2Command
+ */
+export declare const de_CreatePackageV2Command: (output: __HttpResponse, context: __SerdeContext) => Promise<CreatePackageV2CommandOutput>;
+/**
  * deserializeAws_restJson1CreateReleaseCommand
  */
 export declare const de_CreateReleaseCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateReleaseCommandOutput>;
@@ -128,6 +176,18 @@ export declare const de_CreateReleaseCommand: (output: __HttpResponse, context: 
  * deserializeAws_restJson1DeleteDimensionCommand
  */
 export declare const de_DeleteDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<DeleteDimensionCommandOutput>;
+/**
+ * deserializeAws_restJson1GetPackageGroupCommand
+ */
+export declare const de_GetPackageGroupCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetPackageGroupCommandOutput>;
+/**
+ * deserializeAws_restJson1GetPackageV2ByTagCommand
+ */
+export declare const de_GetPackageV2ByTagCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetPackageV2ByTagCommandOutput>;
+/**
+ * deserializeAws_restJson1GetPackageV2ByVersionCommand
+ */
+export declare const de_GetPackageV2ByVersionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetPackageV2ByVersionCommandOutput>;
 /**
  * deserializeAws_restJson1GetReleaseCommand
  */
@@ -149,9 +209,17 @@ export declare const de_ListFilesCommand: (output: __HttpResponse, context: __Se
  */
 export declare const de_ListOrganisationsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListOrganisationsCommandOutput>;
 /**
+ * deserializeAws_restJson1ListPackageGroupsCommand
+ */
+export declare const de_ListPackageGroupsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListPackageGroupsCommandOutput>;
+/**
  * deserializeAws_restJson1ListPackagesCommand
  */
 export declare const de_ListPackagesCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListPackagesCommandOutput>;
+/**
+ * deserializeAws_restJson1ListPackagesV2Command
+ */
+export declare const de_ListPackagesV2Command: (output: __HttpResponse, context: __SerdeContext) => Promise<ListPackagesV2CommandOutput>;
 /**
  * deserializeAws_restJson1ListReleasesCommand
  */
@@ -176,6 +244,10 @@ export declare const de_ServeReleaseV2Command: (output: __HttpResponse, context:
  * deserializeAws_restJson1UpdateDimensionCommand
  */
 export declare const de_UpdateDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateDimensionCommandOutput>;
+/**
+ * deserializeAws_restJson1UpdatePackageGroupNameCommand
+ */
+export declare const de_UpdatePackageGroupNameCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdatePackageGroupNameCommandOutput>;
 /**
  * deserializeAws_restJson1UploadFileCommand
  */

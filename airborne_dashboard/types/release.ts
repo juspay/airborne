@@ -2,11 +2,18 @@ import { SchemaField } from "./remote-configs";
 
 export type ReleaseMode = "create" | "clone" | "edit";
 
+export type PackageGroup = {
+  id: string;
+  name: string;
+  is_primary: boolean;
+};
+
 export type Pkg = {
   index: string;
   tag: string;
   version: number;
   files: string[];
+  package_group_id?: string;
 };
 
 export type FileItem = {
@@ -15,6 +22,8 @@ export type FileItem = {
   version?: number;
   tag?: string;
   size?: number;
+  sourceGroupId?: string;
+  isPrimary?: boolean;
 };
 
 export type ResourceFile = {
@@ -58,6 +67,7 @@ export type ReleaseConfigRequest = {
   dimensions?: Record<string, string | string[]>;
   resources: string[];
   package_id?: string;
+  sub_packages?: string[]; // Format: "groupId@version"
 };
 
 export interface InitialPackageInfo {
@@ -65,6 +75,12 @@ export interface InitialPackageInfo {
   version: number;
   indexFilePath: string;
   filePriorities: Record<string, "important" | "lazy">;
+  packageGroupId?: string;
+}
+
+export interface InitialSubPackageInfo {
+  groupId: string;
+  version: number;
 }
 
 export interface ReleaseFormState {
@@ -89,8 +105,10 @@ export interface ReleaseFormState {
   schemaFields: SchemaField[];
   remoteConfigValues: Record<string, any>;
 
-  // Package Selection (Step 4)
-  selectedPackage: Pkg | null;
+  // Package Selection (Step 4) - Package Groups
+  sub_packages: InitialSubPackageInfo[];
+  selectedPackagesByGroup: Map<string, Pkg>; // groupId -> selected package
+  selectedPackage: Pkg | null; // Keep for backward compatibility (primary package)
 
   // File Priorities (Step 5)
   files: FileItem[];
@@ -122,7 +140,9 @@ export interface ReleaseFormActions {
   setRemoteConfigValues: (values: Record<string, any>) => void;
   updateRemoteConfigValue: (fieldPath: string, value: any) => void;
 
-  // Package Selection
+  // Package Selection - Package Groups
+  setSelectedPackageForGroup: (groupId: string, pkg: Pkg | null, primary: boolean) => void;
+  getSelectedPackageForGroup: (groupId: string) => Pkg | null;
   setSelectedPackage: (pkg: Pkg | null) => void;
 
   // File Priorities
@@ -171,7 +191,9 @@ export interface ApiReleaseData {
     properties: Record<string, any>;
     important: Array<{ file_path: string }>;
     lazy: Array<{ file_path: string }>;
+    group_id?: string;
   };
+  sub_packages?: string[]; // Format: "groupId@version"
   dimensions?: Record<string, string | string[]>;
   resources: Array<{ file_id: string }>;
 }

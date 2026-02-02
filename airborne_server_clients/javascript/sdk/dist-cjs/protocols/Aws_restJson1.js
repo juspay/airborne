@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.de_UploadFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesV2Command = exports.de_ListPackagesCommand = exports.de_ListPackageGroupsCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_GetPackageV2ByVersionCommand = exports.de_GetPackageV2ByTagCommand = exports.de_GetPackageGroupCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageV2Command = exports.de_CreatePackageGroupCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdatePackageGroupNameCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesV2Command = exports.se_ListPackagesCommand = exports.se_ListPackageGroupsCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_GetPackageV2ByVersionCommand = exports.se_GetPackageV2ByTagCommand = exports.se_GetPackageGroupCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageV2Command = exports.se_CreatePackageGroupCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdatePackageGroupNameCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
@@ -101,6 +102,45 @@ const se_CreatePackageCommand = async (input, context) => {
     return b.build();
 };
 exports.se_CreatePackageCommand = se_CreatePackageCommand;
+const se_CreatePackageGroupCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'name': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CreatePackageGroupCommand = se_CreatePackageGroupCommand;
+const se_CreatePackageV2Command = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'files': _ => (0, smithy_client_1._json)(_),
+        'index': [],
+        'tag': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CreatePackageV2Command = se_CreatePackageV2Command;
 const se_CreateReleaseCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -116,6 +156,7 @@ const se_CreateReleaseCommand = async (input, context) => {
         'package': _ => se_CreateReleaseRequestPackage(_, context),
         'package_id': [],
         'resources': _ => (0, smithy_client_1._json)(_),
+        'sub_packages': _ => (0, smithy_client_1._json)(_),
     }));
     b.m("POST")
         .h(headers)
@@ -138,6 +179,53 @@ const se_DeleteDimensionCommand = async (input, context) => {
     return b.build();
 };
 exports.se_DeleteDimensionCommand = se_DeleteDimensionCommand;
+const se_GetPackageGroupCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetPackageGroupCommand = se_GetPackageGroupCommand;
+const se_GetPackageV2ByTagCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages/tag/{tag}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    b.p('tag', () => input.tag, '{tag}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetPackageV2ByTagCommand = se_GetPackageV2ByTagCommand;
+const se_GetPackageV2ByVersionCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages/version/{version}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    b.p('version', () => input.version.toString(), '{version}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetPackageV2ByVersionCommand = se_GetPackageV2ByVersionCommand;
 const se_GetReleaseCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -214,6 +302,27 @@ const se_ListOrganisationsCommand = async (input, context) => {
     return b.build();
 };
 exports.se_ListOrganisationsCommand = se_ListOrganisationsCommand;
+const se_ListPackageGroupsCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups");
+    const query = (0, smithy_client_1.map)({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_ListPackageGroupsCommand = se_ListPackageGroupsCommand;
 const se_ListPackagesCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -235,6 +344,28 @@ const se_ListPackagesCommand = async (input, context) => {
     return b.build();
 };
 exports.se_ListPackagesCommand = se_ListPackagesCommand;
+const se_ListPackagesV2Command = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    const query = (0, smithy_client_1.map)({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_ListPackagesV2Command = se_ListPackagesV2Command;
 const se_ListReleasesCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -341,6 +472,25 @@ const se_UpdateDimensionCommand = async (input, context) => {
     return b.build();
 };
 exports.se_UpdateDimensionCommand = se_UpdateDimensionCommand;
+const se_UpdatePackageGroupNameCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'name': [],
+    }));
+    b.m("PATCH")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_UpdatePackageGroupNameCommand = se_UpdatePackageGroupNameCommand;
 const se_UploadFileCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -460,6 +610,42 @@ const de_CreatePackageCommand = async (output, context) => {
     return contents;
 };
 exports.de_CreatePackageCommand = de_CreatePackageCommand;
+const de_CreatePackageGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'id': smithy_client_1.expectString,
+        'is_primary': smithy_client_1.expectBoolean,
+        'name': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CreatePackageGroupCommand = de_CreatePackageGroupCommand;
+const de_CreatePackageV2Command = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'files': smithy_client_1._json,
+        'index': smithy_client_1.expectString,
+        'package_group_id': smithy_client_1.expectString,
+        'tag': smithy_client_1.expectString,
+        'version': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CreatePackageV2Command = de_CreatePackageV2Command;
 const de_CreateReleaseCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -475,6 +661,8 @@ const de_CreateReleaseCommand = async (output, context) => {
         'experiment': smithy_client_1._json,
         'id': smithy_client_1.expectString,
         'package': _ => de_ServePackage(_, context),
+        'resources': smithy_client_1._json,
+        'sub_packages': smithy_client_1._json,
     });
     Object.assign(contents, doc);
     return contents;
@@ -491,6 +679,61 @@ const de_DeleteDimensionCommand = async (output, context) => {
     return contents;
 };
 exports.de_DeleteDimensionCommand = de_DeleteDimensionCommand;
+const de_GetPackageGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'id': smithy_client_1.expectString,
+        'is_primary': smithy_client_1.expectBoolean,
+        'name': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetPackageGroupCommand = de_GetPackageGroupCommand;
+const de_GetPackageV2ByTagCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'files': smithy_client_1._json,
+        'index': smithy_client_1.expectString,
+        'package_group_id': smithy_client_1.expectString,
+        'tag': smithy_client_1.expectString,
+        'version': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetPackageV2ByTagCommand = de_GetPackageV2ByTagCommand;
+const de_GetPackageV2ByVersionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'files': smithy_client_1._json,
+        'index': smithy_client_1.expectString,
+        'package_group_id': smithy_client_1.expectString,
+        'tag': smithy_client_1.expectString,
+        'version': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetPackageV2ByVersionCommand = de_GetPackageV2ByVersionCommand;
 const de_GetReleaseCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -505,8 +748,9 @@ const de_GetReleaseCommand = async (output, context) => {
         'dimensions': _ => de_DimensionsMap(_, context),
         'experiment': smithy_client_1._json,
         'id': smithy_client_1.expectString,
-        'package': _ => de_ServePackage(_, context),
+        'package': _ => de_GetReleasePackage(_, context),
         'resources': smithy_client_1._json,
+        'sub_packages': smithy_client_1._json,
     });
     Object.assign(contents, doc);
     return contents;
@@ -581,6 +825,23 @@ const de_ListOrganisationsCommand = async (output, context) => {
     return contents;
 };
 exports.de_ListOrganisationsCommand = de_ListOrganisationsCommand;
+const de_ListPackageGroupsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'data': smithy_client_1._json,
+        'total_items': smithy_client_1.expectInt32,
+        'total_pages': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ListPackageGroupsCommand = de_ListPackageGroupsCommand;
 const de_ListPackagesCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -598,6 +859,23 @@ const de_ListPackagesCommand = async (output, context) => {
     return contents;
 };
 exports.de_ListPackagesCommand = de_ListPackagesCommand;
+const de_ListPackagesV2Command = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'data': smithy_client_1._json,
+        'total_items': smithy_client_1.expectInt32,
+        'total_pages': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ListPackagesV2Command = de_ListPackagesV2Command;
 const de_ListReleasesCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -704,6 +982,23 @@ const de_UpdateDimensionCommand = async (output, context) => {
     return contents;
 };
 exports.de_UpdateDimensionCommand = de_UpdateDimensionCommand;
+const de_UpdatePackageGroupNameCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'id': smithy_client_1.expectString,
+        'is_primary': smithy_client_1.expectBoolean,
+        'name': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_UpdatePackageGroupNameCommand = de_UpdatePackageGroupNameCommand;
 const de_UploadFileCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -909,6 +1204,17 @@ const de_GetReleaseConfig = (output, context) => {
         'version': smithy_client_1.expectString,
     });
 };
+const de_GetReleasePackage = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'group_id': smithy_client_1.expectString,
+        'important': smithy_client_1._json,
+        'index': smithy_client_1._json,
+        'lazy': smithy_client_1._json,
+        'name': smithy_client_1.expectString,
+        'properties': (_) => de_Document(_, context),
+        'version': smithy_client_1.expectString,
+    });
+};
 const de_GetReleaseResponse = (output, context) => {
     return (0, smithy_client_1.take)(output, {
         'config': (_) => de_GetReleaseConfig(_, context),
@@ -916,8 +1222,9 @@ const de_GetReleaseResponse = (output, context) => {
         'dimensions': (_) => de_DimensionsMap(_, context),
         'experiment': smithy_client_1._json,
         'id': smithy_client_1.expectString,
-        'package': (_) => de_ServePackage(_, context),
+        'package': (_) => de_GetReleasePackage(_, context),
         'resources': smithy_client_1._json,
+        'sub_packages': smithy_client_1._json,
     });
 };
 const de_GetReleaseResponseList = (output, context) => {

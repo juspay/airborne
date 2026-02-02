@@ -93,6 +93,43 @@ export const se_CreatePackageCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_CreatePackageGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups");
+    let body;
+    body = JSON.stringify(take(input, {
+        'name': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_CreatePackageV2Command = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'files': _ => _json(_),
+        'index': [],
+        'tag': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_CreateReleaseCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -108,6 +145,7 @@ export const se_CreateReleaseCommand = async (input, context) => {
         'package': _ => se_CreateReleaseRequestPackage(_, context),
         'package_id': [],
         'resources': _ => _json(_),
+        'sub_packages': _ => _json(_),
     }));
     b.m("POST")
         .h(headers)
@@ -124,6 +162,50 @@ export const se_DeleteDimensionCommand = async (input, context) => {
     b.p('dimension', () => input.dimension, '{dimension}', false);
     let body;
     b.m("DELETE")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetPackageGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetPackageV2ByTagCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages/tag/{tag}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    b.p('tag', () => input.tag, '{tag}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetPackageV2ByVersionCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages/version/{version}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    b.p('version', () => input.version.toString(), '{version}', false);
+    let body;
+    b.m("GET")
         .h(headers)
         .b(body);
     return b.build();
@@ -199,6 +281,26 @@ export const se_ListOrganisationsCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_ListPackageGroupsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups");
+    const query = map({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
 export const se_ListPackagesCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -206,6 +308,27 @@ export const se_ListPackagesCommand = async (input, context) => {
         [_xa]: input[_a],
     });
     b.bp("/api/packages/list");
+    const query = map({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+export const se_ListPackagesV2Command = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}/packages");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
@@ -315,6 +438,24 @@ export const se_UpdateDimensionCommand = async (input, context) => {
         'position': [],
     }));
     b.m("PUT")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_UpdatePackageGroupNameCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/package-groups/{groupId}");
+    b.p('groupId', () => input.groupId, '{groupId}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'name': [],
+    }));
+    b.m("PATCH")
         .h(headers)
         .b(body);
     return b.build();
@@ -432,6 +573,40 @@ export const de_CreatePackageCommand = async (output, context) => {
     Object.assign(contents, doc);
     return contents;
 };
+export const de_CreatePackageGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'id': __expectString,
+        'is_primary': __expectBoolean,
+        'name': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_CreatePackageV2Command = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'files': _json,
+        'index': __expectString,
+        'package_group_id': __expectString,
+        'tag': __expectString,
+        'version': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
 export const de_CreateReleaseCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -447,6 +622,8 @@ export const de_CreateReleaseCommand = async (output, context) => {
         'experiment': _json,
         'id': __expectString,
         'package': _ => de_ServePackage(_, context),
+        'resources': _json,
+        'sub_packages': _json,
     });
     Object.assign(contents, doc);
     return contents;
@@ -459,6 +636,58 @@ export const de_DeleteDimensionCommand = async (output, context) => {
         $metadata: deserializeMetadata(output),
     });
     await collectBody(output.body, context);
+    return contents;
+};
+export const de_GetPackageGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'id': __expectString,
+        'is_primary': __expectBoolean,
+        'name': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_GetPackageV2ByTagCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'files': _json,
+        'index': __expectString,
+        'package_group_id': __expectString,
+        'tag': __expectString,
+        'version': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_GetPackageV2ByVersionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'files': _json,
+        'index': __expectString,
+        'package_group_id': __expectString,
+        'tag': __expectString,
+        'version': __expectInt32,
+    });
+    Object.assign(contents, doc);
     return contents;
 };
 export const de_GetReleaseCommand = async (output, context) => {
@@ -475,8 +704,9 @@ export const de_GetReleaseCommand = async (output, context) => {
         'dimensions': _ => de_DimensionsMap(_, context),
         'experiment': _json,
         'id': __expectString,
-        'package': _ => de_ServePackage(_, context),
+        'package': _ => de_GetReleasePackage(_, context),
         'resources': _json,
+        'sub_packages': _json,
     });
     Object.assign(contents, doc);
     return contents;
@@ -546,7 +776,39 @@ export const de_ListOrganisationsCommand = async (output, context) => {
     Object.assign(contents, doc);
     return contents;
 };
+export const de_ListPackageGroupsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'data': _json,
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
 export const de_ListPackagesCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'data': _json,
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_ListPackagesV2Command = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
     }
@@ -658,6 +920,22 @@ export const de_UpdateDimensionCommand = async (output, context) => {
         'mandatory': __expectBoolean,
         'position': __expectInt32,
         'schema': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_UpdatePackageGroupNameCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'id': __expectString,
+        'is_primary': __expectBoolean,
+        'name': __expectString,
     });
     Object.assign(contents, doc);
     return contents;
@@ -866,6 +1144,17 @@ const de_GetReleaseConfig = (output, context) => {
         'version': __expectString,
     });
 };
+const de_GetReleasePackage = (output, context) => {
+    return take(output, {
+        'group_id': __expectString,
+        'important': _json,
+        'index': _json,
+        'lazy': _json,
+        'name': __expectString,
+        'properties': (_) => de_Document(_, context),
+        'version': __expectString,
+    });
+};
 const de_GetReleaseResponse = (output, context) => {
     return take(output, {
         'config': (_) => de_GetReleaseConfig(_, context),
@@ -873,8 +1162,9 @@ const de_GetReleaseResponse = (output, context) => {
         'dimensions': (_) => de_DimensionsMap(_, context),
         'experiment': _json,
         'id': __expectString,
-        'package': (_) => de_ServePackage(_, context),
+        'package': (_) => de_GetReleasePackage(_, context),
         'resources': _json,
+        'sub_packages': _json,
     });
 };
 const de_GetReleaseResponseList = (output, context) => {
