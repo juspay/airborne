@@ -80,11 +80,18 @@ pub struct GetReleaseResponse {
 #[derive(Serialize, Debug)]
 pub struct ReleaseExperiment {
     pub experiment_id: String,
+    pub experiment_variants: ExperimentVariants,
     pub package_version: i32,
     pub config_version: String,
     pub created_at: String,
     pub traffic_percentage: u32,
     pub status: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ExperimentVariants {
+    pub control: String,
+    pub experimentals: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

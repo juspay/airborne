@@ -72,6 +72,10 @@ interface ReleasePackage {
 
 interface ReleaseExperiment {
   experiment_id: string;
+  experiment_variants: {
+    control: string;
+    experimentals: string[];
+  };
   package_version: number;
   config_version: string;
   created_at: ISO8601;
@@ -217,7 +221,7 @@ export default function ReleaseDetailPage() {
         `/releases/${encodeURIComponent(releaseId)}/conclude`,
         {
           method: "POST",
-          body: { chosen_variant: `${releaseId}-experimental_${release.package.version}` },
+          body: { chosen_variant: release.experiment.experiment_variants.experimentals[0] },
         },
         { token, org, app }
       );
@@ -236,7 +240,7 @@ export default function ReleaseDetailPage() {
         `/releases/${encodeURIComponent(releaseId)}/conclude`,
         {
           method: "POST",
-          body: { chosen_variant: `${releaseId}-control` },
+          body: { chosen_variant: release.experiment.experiment_variants.control },
         },
         { token, org, app }
       );

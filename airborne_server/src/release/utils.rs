@@ -25,7 +25,7 @@ use log::info;
 use serde_json::Value;
 use superposition_sdk::{
     operation::list_experiment::ListExperimentOutput,
-    types::{ExperimentSortOn, SortBy, Variant},
+    types::{ExperimentSortOn, SortBy, Variant, VariantType},
 };
 use url::form_urlencoded;
 
@@ -165,6 +165,25 @@ pub fn extract_string_from_experiment(
         .unwrap_or_default()
 }
 
+pub fn extract_variants_from_experiment(variants: &[Variant]) -> ExperimentVariants {
+    let control = variants
+        .iter()
+        .find(|v| v.variant_type == VariantType::Control)
+        .map(|v| v.id.clone())
+        .unwrap_or_default();
+
+    let experimentals = variants
+        .iter()
+        .filter(|v| v.variant_type == VariantType::Experimental)
+        .map(|v| v.id.clone())
+        .collect();
+
+    ExperimentVariants {
+        control,
+        experimentals,
+    }
+}
+
 pub fn extract_file_from_experiment(experimental_variant: &Option<&Variant>, key: &str) -> String {
     extract_string_from_experiment(experimental_variant, key)
 }
@@ -224,6 +243,7 @@ pub fn build_release_experiment_from_experiment(
 ) -> ReleaseExperiment {
     ReleaseExperiment {
         experiment_id: experiment.id.to_string(),
+        experiment_variants: extract_variants_from_experiment(experiment.variants()),
         package_version,
         config_version: format!("v{}", package_version),
         created_at: dt(&experiment.created_at),

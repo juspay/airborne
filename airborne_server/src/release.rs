@@ -282,6 +282,7 @@ async fn get_release(
         resources: resource_files,
         experiment: Some(ReleaseExperiment {
             experiment_id: release_key,
+            experiment_variants: utils::extract_variants_from_experiment(&exp_details.variants),
             package_version: package_version as i32,
             config_version: format!("v{}", package_version),
             created_at: utils::dt(&exp_details.created_at),
@@ -414,8 +415,8 @@ async fn create_release(
             "Release creation for application {} with PATCH-style overrides",
             application
         ))
-        .variants(control_variant)
-        .variants(experimental_variant);
+        .variants(control_variant.clone())
+        .variants(experimental_variant.clone());
 
     let created_experiment_response = created_experiment_response.set_context(Some(
         req.dimensions
@@ -574,6 +575,10 @@ async fn create_release(
         dimensions: dimensions.clone(),
         experiment: Some(ReleaseExperiment {
             experiment_id: experiment_id_for_ramping,
+            experiment_variants: ExperimentVariants {
+                control: control_variant.id,
+                experimentals: vec![experimental_variant.id],
+            },
             package_version: pkg_version,
             config_version: format!("v{}", pkg_version),
             created_at: now.to_string(),
@@ -1623,6 +1628,9 @@ async fn update_release(
         dimensions: dimensions.clone(),
         experiment: Some(ReleaseExperiment {
             experiment_id: release_id,
+            experiment_variants: utils::extract_variants_from_experiment(
+                &experiment_details.variants,
+            ),
             package_version: pkg_version,
             config_version: format!("v{}", pkg_version),
             created_at: created_at.to_string(),
