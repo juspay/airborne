@@ -38,6 +38,21 @@ export function parseFileRef(input: string): ParsedFileRef {
   return { filePath, tag: value };
 }
 
+export function parseSubGroupFileRef(input: string): { groupId: string; version: number } {
+  const s = input.trim();
+  const parts = s.split("@");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid sub-package reference: "${input}" (expected format: "groupId@version")`);
+  }
+  const groupId = parts[0];
+  const versionStr = parts[1];
+  const version = Number(versionStr);
+  if (!Number.isInteger(version)) {
+    throw new Error(`Invalid version in sub-package reference: "${versionStr}" (must be an integer)`);
+  }
+  return { groupId, version };
+}
+
 export function hasAppAccess(orgAccess: string[], appAccess: string[], accessType?: string): boolean {
   // Check if org has admin
   if (orgAccess.includes("admin")) return true;

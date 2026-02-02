@@ -29,11 +29,12 @@ use superposition_sdk::Client;
 
 use crate::{
     middleware::auth::{require_scope_name, AuthResponse},
+    run_blocking,
     types::{self as airborne_types, ABError, AppState},
     utils::{
         db::{
-            models::{NewWorkspaceName, WorkspaceName},
-            schema::hyperotaserver::workspace_names,
+            models::{NewPackageGroupEntry, NewWorkspaceName, WorkspaceName},
+            schema::hyperotaserver::{package_groups, workspace_names},
         },
         document::schema_doc_to_hashmap,
         migrations::{migrate_superposition_workspace, SuperpositionMigrationStrategy},
@@ -219,6 +220,38 @@ async fn add_application(
     )
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace migration error: {}", e)))?;
+
+    let new_primary_group = NewPackageGroupEntry {
+        org_id: organisation.clone(),
+        app_id: application.clone(),
+        name: "primary".to_string(),
+        is_primary: true,
+    };
+
+    let pool = state.db_pool.clone();
+    if let Err(e) = run_blocking!({
+        let mut conn = pool.get()?;
+        diesel::insert_into(package_groups::table)
+            .values(&new_primary_group)
+            .execute(&mut conn)
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to create primary package group: {}",
+                    e
+                ))
+            })?;
+        Ok(())
+    }) {
+        info!("Failed to create primary package group: {}", e);
+        return Err(ABError::InternalServerError(
+            "Failed to create primary package group".to_string(),
+        ));
+    }
+
+    info!(
+        "Created primary package group for application: {}",
+        application
+    );
 
     Ok(Json(Application {
         application,

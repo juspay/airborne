@@ -16,7 +16,7 @@ import { SchemaField } from "@/types/remote-configs";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { validateAllRemoteConfigValues } from "@/components/remote-config/utils/helpers";
-import { parseFileRef } from "@/lib/utils";
+import { parseFileRef, parseSubGroupFileRef } from "@/lib/utils";
 
 const defaultState: ReleaseFormState = {
   mode: "create",
@@ -30,6 +30,8 @@ const defaultState: ReleaseFormState = {
   targetingRules: [],
   schemaFields: [],
   remoteConfigValues: {},
+  sub_packages: [],
+  selectedPackagesByGroup: new Map<string, Pkg>(),
   selectedPackage: null,
   files: [],
   filePriority: {},
@@ -67,6 +69,21 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
 
       state.selectedResources = new Set(initialData.resources.map((res) => res.file_id));
 
+      const allFiles = initialData.package.important.concat(initialData.package.lazy);
+      state.selectedPackage = {
+        index: initialData.package.index.file_path,
+        tag: initialData.package.tag,
+        version: initialData.package.version,
+        files: allFiles.map((file) => file.file_path),
+        package_group_id: initialData.package.group_id,
+      };
+
+      state.sub_packages =
+        initialData.sub_packages?.map((subPkg) => {
+          const { groupId, version } = parseSubGroupFileRef(subPkg);
+          return { groupId, version };
+        }) || [];
+
       const filePriorities: Record<string, "important" | "lazy"> = {};
       initialData.package.important.forEach((file) => {
         filePriorities[file.file_path] = "important";
@@ -75,18 +92,6 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
         filePriorities[file.file_path] = "lazy";
       });
       state.filePriority = filePriorities;
-
-      const allFiles = [
-        ...initialData.package.important.map((file) => file.file_path),
-        ...initialData.package.lazy.map((file) => file.file_path),
-      ];
-
-      state.selectedPackage = {
-        tag: initialData.package.tag,
-        version: initialData.package.version,
-        index: initialData.package.index.file_path,
-        files: allFiles,
-      };
     }
 
     return state;
@@ -107,8 +112,15 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     initialState.selectedResources || new Set<string>()
   );
 
-  const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(null);
+  const [selectedPackagesByGroup, setSelectedPackagesByGroup] = useState<Map<string, Pkg>>(
+    initialState.selectedPackagesByGroup
+  );
 
+  const [selectedPackage, setSelectedPackage] = useState<Pkg | null>(initialState.selectedPackage);
+
+  // Fetch primary package details when initialData has package info
+  // using older package route for backward compatibility
+  // new one requires group id which will not be there for older releases
   useEffect(() => {
     if (!token || !org || !app) return;
     if (!initialState.selectedPackage) return;
@@ -126,6 +138,44 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       });
   }, [initialState.selectedPackage, token, org, app]);
 
+  useEffect(() => {
+    if (!initialState || initialState.sub_packages.length === 0 || !token || !org || !app) return;
+
+    const fetchSubPackageDetails = async () => {
+      const subPackagePromises = initialState.sub_packages.map(async (subPkg) => {
+        try {
+          const res = await apiFetch<Pkg>(
+            `/package-groups/${subPkg.groupId}/packages/version/${subPkg.version}`,
+            {},
+            { token, org, app }
+          );
+
+          if (res) {
+            return { groupId: subPkg.groupId, pkg: res };
+          }
+          return null;
+        } catch (error) {
+          console.error(`Failed to fetch package for group ${subPkg.groupId}:`, error);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(subPackagePromises);
+
+      setSelectedPackagesByGroup((prev) => {
+        const newMap = new Map(prev);
+        results.forEach((result) => {
+          if (result) {
+            newMap.set(result.groupId, result.pkg);
+          }
+        });
+        return newMap;
+      });
+    };
+
+    fetchSubPackageDetails();
+  }, [initialState.sub_packages, token, org, app]);
+
   const { data: releasesData } = useSWR(
     token && org && app ? ["/releases/list", app, "release-form-context"] : null,
     async () => apiFetch<any>("/releases/list", { query: { page: 1, count: 1 } }, { token, org, app })
@@ -139,30 +189,6 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
   const goToPreviousStep = useCallback(() => {
     setCurrentStep((s) => Math.max(s - 1, 1));
   }, []);
-
-  useEffect(() => {
-    if (currentStep !== 5 || !selectedPackage) return;
-
-    const pkgFiles: FileItem[] = [];
-    const existingPriorities = filePriority || initialState.filePriority || {};
-    const mergedPriorities: Record<string, "important" | "lazy"> = {};
-
-    for (const file of selectedPackage.files) {
-      const fileParsed = parseFileRef(file);
-      pkgFiles.push({
-        id: file,
-        file_path: fileParsed.filePath,
-        version: fileParsed.version,
-        tag: fileParsed.tag,
-      });
-
-      const priority = existingPriorities[file] || existingPriorities[fileParsed.filePath] || "important";
-      mergedPriorities[file] = priority;
-    }
-
-    setFiles(pkgFiles);
-    setFilePriority(mergedPriorities);
-  }, [currentStep, selectedPackage, initialState.filePriority]);
 
   const addTargetingRule = useCallback(() => {
     setTargetingRules((r) => [...r, { dimension: "", operator: "equals", values: "" }]);
@@ -202,6 +228,114 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     });
   }, []);
 
+  // Package Groups functions
+  const setSelectedPackageForGroup = (groupId: string, pkg: Pkg | null, primary: boolean) => {
+    if (primary) {
+      setSelectedPackage(pkg);
+    }
+
+    setSelectedPackagesByGroup((prev) => {
+      const newMap = new Map(prev);
+      if (pkg) {
+        newMap.set(groupId, pkg);
+      } else {
+        newMap.delete(groupId);
+      }
+      return newMap;
+    });
+  };
+
+  const getSelectedPackageForGroup = useCallback(
+    (groupId: string): Pkg | null => {
+      return selectedPackagesByGroup.get(groupId) || null;
+    },
+    [selectedPackagesByGroup]
+  );
+
+  // Memoized computation of resolved files from all selected packages
+  // Primary group takes precedence, then latest version wins across sub-groups
+  const { resolvedFiles, resolvedFilePriorities } = useMemo(() => {
+    // Early return for steps other than 5 (File Priorities) to avoid unnecessary computation
+    if (currentStep !== 5) {
+      return { resolvedFiles: [], resolvedFilePriorities: {} };
+    }
+
+    const primaryPackage = selectedPackage !== null ? selectedPackage : null;
+
+    if (!primaryPackage) {
+      return { resolvedFiles: [], resolvedFilePriorities: {} };
+    }
+
+    // Map to track file paths and their best version
+    // Key: file_path, Value: { fileItem, version, isPrimary }
+    const fileMap = new Map<string, { fileItem: FileItem; version: number; isPrimary: boolean }>();
+
+    // First, add all files from primary package (they take precedence)
+    for (const file of primaryPackage.files) {
+      const fileParsed = parseFileRef(file);
+      fileMap.set(fileParsed.filePath, {
+        fileItem: {
+          id: file,
+          file_path: fileParsed.filePath,
+          version: fileParsed.version,
+          tag: fileParsed.tag,
+          sourceGroupId: primaryPackage ? primaryPackage.package_group_id : undefined,
+          isPrimary: true,
+        },
+        version: fileParsed.version || 0,
+        isPrimary: true,
+      });
+    }
+
+    // Then, add files from sub-packages (only if not in primary, or if newer version)
+    selectedPackagesByGroup.forEach((pkg, groupId) => {
+      for (const file of pkg.files) {
+        const fileParsed = parseFileRef(file);
+        const existing = fileMap.get(fileParsed.filePath);
+
+        // If file exists in primary, skip it (primary takes precedence)
+        if (existing?.isPrimary) continue;
+
+        // If file doesn't exist or has older version, use this one
+        if (!existing || (fileParsed.version || 0) > existing.version) {
+          fileMap.set(fileParsed.filePath, {
+            fileItem: {
+              id: file,
+              file_path: fileParsed.filePath,
+              version: fileParsed.version,
+              tag: fileParsed.tag,
+              sourceGroupId: groupId,
+              isPrimary: false,
+            },
+            version: fileParsed.version || 0,
+            isPrimary: false,
+          });
+        }
+      }
+    });
+
+    // Convert map to array
+    const files = Array.from(fileMap.values()).map((entry) => entry.fileItem);
+
+    // Set default priorities (use existing if available from initial data)
+    // Check both file.id (full reference) and file.file_path (just the path) for existing priorities
+    const existingPriorities = filePriority || initialState.filePriority || {};
+    const priorities: Record<string, "important" | "lazy"> = {};
+
+    for (const file of files) {
+      const priority = existingPriorities[file.id] || existingPriorities[file.file_path] || "important";
+      priorities[file.id] = priority;
+    }
+    return { resolvedFiles: files, resolvedFilePriorities: priorities };
+  }, [selectedPackagesByGroup, currentStep, selectedPackage]);
+
+  useEffect(() => {
+    if (currentStep === 5) {
+      setFiles(resolvedFiles);
+      setFilePriority(resolvedFilePriorities);
+    }
+  }, [currentStep, resolvedFiles, resolvedFilePriorities, initialState.filePriority]);
+
   const canProceedToStep = useCallback(
     (step: number) => {
       switch (step) {
@@ -216,6 +350,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
           }
           return true;
         case 4:
+          // Must have primary package selected
           return selectedPackage !== null;
         case 5:
           return true;
@@ -225,7 +360,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
           return false;
       }
     },
-    [schemaFields, remoteConfigValues, selectedPackage]
+    [schemaFields, remoteConfigValues, selectedPackage, selectedPackagesByGroup]
   );
 
   const createReleaseConfig = useCallback((): ReleaseConfigRequest | undefined => {
@@ -237,12 +372,9 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       dimensionsObj[r.dimension] = r.values.length === 1 ? r.values[0] : r.values;
     });
 
-    const importantFiles = Object.entries(filePriority)
-      .filter(([, v]) => v === "important")
-      .map(([k]) => k);
-    const lazyFiles = Object.entries(filePriority)
-      .filter(([, v]) => v === "lazy")
-      .map(([k]) => k);
+    // Build file references - file.id already contains the full reference (e.g., /dist/bundle.js@version:1)
+    const importantFiles = files.filter((file) => filePriority[file.id] === "important").map((file) => file.id);
+    const lazyFiles = files.filter((file) => filePriority[file.id] === "lazy").map((file) => file.id);
 
     const body: ReleaseConfigRequest = {
       config: {
@@ -255,8 +387,24 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       resources: Array.from(selectedResources),
     };
 
-    if (selectedPackage) {
-      body.package_id = `version:${selectedPackage.version}`;
+    // Get primary package
+    const primaryPkg = selectedPackage;
+
+    if (primaryPkg) {
+      body.package_id = `version:${primaryPkg.version}`;
+    }
+
+    // Build sub_packages array: "groupId@version" for non-primary groups
+    // The primary package's group ID is stored in selectedPackage.package_group_id
+    const primaryGroupId = primaryPkg?.package_group_id;
+    const subPackages: string[] = [];
+    selectedPackagesByGroup.forEach((pkg, groupId) => {
+      if (primaryGroupId && groupId === primaryGroupId) return; // Skip primary
+      subPackages.push(`${groupId}@${pkg.version}`);
+    });
+
+    if (subPackages.length > 0) {
+      body.sub_packages = subPackages;
     }
 
     return body;
@@ -265,15 +413,18 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     releaseConfigTimeout,
     remoteConfigValues,
     targetingRules,
+    files,
     filePriority,
     selectedResources,
     selectedPackage,
+    selectedPackagesByGroup,
   ]);
 
   const contextValue = useMemo<ReleaseFormContextType>(
     () => ({
       mode,
       releaseId,
+      sub_packages: initialState.sub_packages,
       hasExistingReleases,
       currentStep,
       totalSteps: defaultState.totalSteps,
@@ -283,6 +434,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       targetingRules,
       schemaFields,
       remoteConfigValues,
+      selectedPackagesByGroup,
       selectedPackage,
       files,
       filePriority,
@@ -301,6 +453,8 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       setSchemaFields,
       setRemoteConfigValues,
       updateRemoteConfigValue,
+      setSelectedPackageForGroup,
+      getSelectedPackageForGroup,
       setSelectedPackage,
       setFiles,
       setFilePriority,
@@ -320,6 +474,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       targetingRules,
       schemaFields,
       remoteConfigValues,
+      selectedPackagesByGroup,
       selectedPackage,
       files,
       filePriority,
@@ -330,6 +485,8 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       removeTargetingRule,
       updateTargetingRule,
       updateRemoteConfigValue,
+      setSelectedPackageForGroup,
+      getSelectedPackageForGroup,
       updateFilePriority,
       toggleResource,
       canProceedToStep,

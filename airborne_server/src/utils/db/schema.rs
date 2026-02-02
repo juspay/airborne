@@ -109,6 +109,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.package_groups (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            name -> Text,
+            is_primary -> Bool,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.packages (id) {
             id -> Uuid,
             version -> Int4,
@@ -128,10 +139,11 @@ pub mod hyperotaserver {
             version -> Int4,
             app_id -> Text,
             org_id -> Text,
-            index -> Text,
+            index -> Nullable<Text>,
             files -> Array<Nullable<Text>>,
             tag -> Nullable<Text>,
             created_at -> Timestamptz,
+            package_group_id -> Uuid,
         }
     }
 
@@ -187,6 +199,7 @@ pub mod hyperotaserver {
         configs,
         files,
         organisation_invites,
+        package_groups,
         packages,
         packages_v2,
         release_views,
