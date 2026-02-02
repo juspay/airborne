@@ -55,6 +55,16 @@
         "description": "Indicating the resources for the package"
     },
     {
+        "key": "sub_packages",
+        "default": [],
+        "description": "Indicating the subpackages for the package"
+    },
+    {
+        "key": "package.group_id",
+        "default": "",
+        "description": "Indicating the group ID of package"
+    },
+    {
         "key": "build.last_created_build_rid",
         "default": "",
         "description": "Release ID of the last created build, overridden per dimension set"

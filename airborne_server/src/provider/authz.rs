@@ -89,9 +89,17 @@ pub trait AuthZProvider: Send + Sync {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(|value| value.to_ascii_lowercase())
+            .or_else(|| {
+                claims
+                    .preferred_username
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(|value| value.to_ascii_lowercase())
+            })
             .ok_or_else(|| {
                 ABError::Unauthorized(
-                    "Email claim is required for authorization subject mapping".to_string(),
+                    "Email or preferred_username claim is required for authorization subject mapping".to_string(),
                 )
             })
     }

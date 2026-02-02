@@ -27,7 +27,7 @@ declare const ListPackagesCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * List packages request operation
+ * List packages request operation (legacy - uses primary group)
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
