@@ -1,0 +1,14 @@
+[
+  {
+    "type": "code",
+    "filename": "readReleaseConfig.js"
+  },
+  {
+    "type": "code",
+    "filename": "getBundlePath.js"
+  },
+  {
+    "type": "code",
+    "filename": "getFileContent.js"
+  }
+]

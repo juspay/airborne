@@ -1,6 +1,6 @@
-This document outlines the steps to integrate the AirborneReact SDK into your iOS application.
+This document outlines the steps to integrate the AirborneReact SDK into your Expo iOS application.
 
-> **Prerequisites:** Make sure you have installed `airborne-react-native` in your React Native project before proceeding. See the **React Plugin** section in the sidebar for installation instructions.
+> **Prerequisites:** Make sure you have installed `airborne-react-native` in your Expo project before proceeding. See the **Expo Plugin** section in the sidebar for installation instructions.
 
 ## Step 1: Add Bridging Header
 
@@ -21,11 +21,12 @@ Replace `<organisation>` and `<application/namespace-name>` with your actual val
 
 ## Step 4: Update application Function
 
-Update the body of the `application` method to:
+Note: In Expo, there are three application functions. Update only the `application(_:didFinishLaunchingWithOptions:)` method to:
 
 1. Save the launch options for later use
 2. Initialize HyperOTA before anything else
 3. Create the main window early
+4. Call the super implementation
 
 ## Step 5: Implement AirborneDelegate Extension
 
@@ -35,7 +36,7 @@ Create an extension on `AppDelegate` that conforms to `AirborneDelegate`. Implem
 - `getBundle()`: Return the bundle containing your JS bundle
 - `getDimensions()`: Return custom dimensions for targeting
 - `onEvent()`: Receive SDK events for logging/analytics
-- `startApp()`: Called when the bundle is ready - initialize React Native with the provided bundle URL
+- `startApp()`: Called when the bundle is ready - initialize React Native with the provided bundle URL and bind the factory
 
 ## Step 6: Update ReactNativeDelegate
 

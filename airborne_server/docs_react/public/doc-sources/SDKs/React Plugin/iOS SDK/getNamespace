@@ -1,3 +1,0 @@
-func getNamespace() -> String {
-  return "your-namespace"
-}

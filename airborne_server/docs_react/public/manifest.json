@@ -18,38 +18,64 @@
     "Events": {
       "files": ["content.json", "doc.md", "events.ts"]
     },
-    "React Plugin": {
+    "Expo Plugin": {
       "Android SDK": {
         "files": [
-          "Get JS Bundle",
-          "Initialise Airborne Instance",
-          "Initialize Airborne.kt",
+          "ClassVariables.kt",
+          "MainActivity.kt",
+          "MainApplicationImports.kt",
+          "ReactNativeHost.kt",
           "content.json",
           "doc.md",
-          "getDimensions.kt",
-          "getNamespace.kt",
-          "onEvent.kt",
-          "startApp.kt"
+          "initializeAirborne.kt",
+          "onCreate.kt"
         ]
       },
-      "files": ["Getting the SDK", "code.kt", "content.json", "doc.md", "order.json"],
+      "files": ["Getting the SDK", "content.json", "doc.md", "order.json"],
       "JS SDK": {
         "files": ["content.json", "doc.md", "getBundlePath.js", "getFileContent.js", "readReleaseConfig.js"]
       },
       "iOS SDK": {
         "files": [
-          "Conform to AirborneReactDelegate",
-          "Import AirborneReact",
-          "Initialize Airborne",
-          "code",
+          "AirborneDelegate.swift",
+          "AppDelegateVariables.swift",
+          "BridgingHeader.h",
+          "ReactNativeDelegate.swift",
+          "applicationFunction.swift",
           "content.json",
-          "delegate.h",
           "doc.md",
-          "getBundle",
-          "getDimensions",
-          "getNamespace",
-          "onBootComplete",
-          "onEvent"
+          "initializeHyperOTA.swift"
+        ]
+      }
+    },
+    "React Plugin": {
+      "Android SDK": {
+        "files": [
+          "ClassVariables.kt",
+          "MainActivity.kt",
+          "MainApplicationImports.kt",
+          "ReactHost.kt",
+          "ReactNativeHost.kt",
+          "content.json",
+          "doc.md",
+          "initializeAirborne.kt",
+          "onCreate.kt"
+        ]
+      },
+      "files": ["Getting the SDK", "content.json", "doc.md", "order.json"],
+      "JS SDK": {
+        "files": ["content.json", "doc.md", "getBundlePath.js", "getFileContent.js", "readReleaseConfig.js"]
+      },
+      "iOS SDK": {
+        "files": [
+          "AirborneDelegate.swift",
+          "AppDelegateVariables.swift",
+          "BridgingHeader.h",
+          "ReactNativeDelegate.swift",
+          "applicationFunction.swift",
+          "content.json",
+          "doc.md",
+          "initializeHyperOTA.swift"
         ]
       }
     },
