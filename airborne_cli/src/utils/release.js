@@ -109,7 +109,13 @@ export async function createLocalReleaseConfig(
       fs.mkdirSync(fullBuildFolderPath, { recursive: true });
     }
 
-    const command = `cd ${options.directory_path} && npx react-native bundle --platform ${platform} --dev false --entry-file ${entry_file} --bundle-output ${build_folder}/${index_file_path} --assets-dest ${build_folder}`;
+    const isExpo = airborneConfig.expo || false;
+    let command;
+    if (isExpo) {
+      command = `cd '${options.directory_path}' && npx expo export:embed --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
+    } else {
+      command = `cd '${options.directory_path}' && npx react-native bundle --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
+    }
 
     const bundleResult = await executeReactNativeBundleCommand(command);
 
@@ -245,7 +251,13 @@ export async function updateLocalReleaseConfig(
       }
     });
 
-    const command = `cd ${options.directory_path} && npx react-native bundle --platform ${platform} --dev false --entry-file ${entry_file} --bundle-output ${build_folder}/${index_file_path} --assets-dest ${build_folder}`;
+    const isExpo = airborneConfig.expo || false;
+    let command;
+    if (isExpo) {
+      command = `cd '${options.directory_path}' && npx expo export:embed --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
+    } else {
+      command = `cd '${options.directory_path}' && npx react-native bundle --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
+    }
 
     const bundleResult = await executeReactNativeBundleCommand(command);
 
