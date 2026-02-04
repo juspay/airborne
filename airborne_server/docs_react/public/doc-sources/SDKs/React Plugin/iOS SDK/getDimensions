@@ -1,3 +1,0 @@
-func getDimensions() -> [String : String] {
-  return [:]
-}

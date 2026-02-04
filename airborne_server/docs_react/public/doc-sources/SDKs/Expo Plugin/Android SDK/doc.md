@@ -1,6 +1,6 @@
-This document outlines the steps to integrate the AirborneReact SDK into your Android application.
+This document outlines the steps to integrate the AirborneReact SDK into your Expo Android application.
 
-> **Prerequisites:** Make sure you have installed `airborne-react-native` in your React Native project before proceeding. See the **React Plugin** section in the sidebar for installation instructions.
+> **Prerequisites:** Make sure you have installed `airborne-react-native` in your Expo project before proceeding. See the **Expo Plugin** section in the sidebar for installation instructions.
 
 ## Step 1: Add Maven Repository
 
@@ -10,7 +10,7 @@ Add the Airborne Maven repository to your project's `build.gradle` (or `settings
 
 In your `MainActivity.kt`, import the `AirborneReactActivityDelegate` and update the `createReactActivityDelegate` function.
 
-This delegate handles the React Native activity lifecycle with Airborne's bundle management.
+This delegate handles the React Native activity lifecycle with Airborne's bundle management, wrapped with Expo's `ReactActivityDelegateWrapper`.
 
 ## Step 3: Add Imports in MainApplication
 
@@ -27,16 +27,13 @@ Create the following variables inside your `MainApplication` class:
 
 ## Step 5: Update ReactNativeHost
 
-Replace the default `ReactNativeHost` with `AirborneReactNativeHost`. This custom host integrates with Airborne to:
+Replace the default `ReactNativeHost` with `AirborneReactNativeHost` wrapped in Expo's `ReactNativeHostWrapper`. This custom host integrates with Airborne to:
 
 - Load the JS bundle from Airborne's managed path via `getJSBundleFile()`
+- Use Expo's virtual metro entry as the main module
 - Support both old and new React Native architecture
 
-## Step 6: Update ReactHost
-
-Update the `reactHost` property to use Airborne's custom implementation. This ensures proper initialization with Airborne's bundle management.
-
-## Step 7: Create initializeAirborne Function
+## Step 6: Create initializeAirborne Function
 
 Create the `initializeAirborne()` function inside your `MainApplication` class. This function:
 
@@ -46,9 +43,11 @@ Create the `initializeAirborne()` function inside your `MainApplication` class. 
    - `onEvent()`: Receive SDK events for logging/analytics
    - `startApp()`: Called when the bundle is ready - sets the bundle path and triggers boot complete
 
-## Step 8: Initialize in onCreate
+Replace `<organisation-name>` and `<application/namespace-name>` with your actual values.
 
-Call `initializeAirborne()` in your `onCreate()` method before loading React Native.
+## Step 7: Update onCreate
+
+Update the `onCreate()` method to initialize Airborne before loading React Native. This ensures Airborne is ready to provide the bundle path when React Native starts.
 
 ## Bundling Release Config (For non-CLI users)
 
