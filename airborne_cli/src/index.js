@@ -52,7 +52,8 @@ program
       -n <namespace> \\
       -j <js-entry-file> \\
       -a <android-index-file> \\
-      -i <ios-index-file>
+      -i <ios-index-file> \\
+      -e
 
   Parameters:
       [directoryPath] (optional) : Directory where config will be created (defaults to current directory)
@@ -61,6 +62,7 @@ program
       -j, --js-entry-file <string> (optional) : Path to the JavaScript entry file
       -a, --android-index-file <string> (optional) : Path to the Android bundle output file
       -i, --ios-index-file <string> (optional) : Path to the iOS bundle output file
+      -e, --expo (optional) : Indicates if the project is using Expo
 
 `
   )
@@ -75,6 +77,7 @@ program
     "Path to the Android bundle output file"
   )
   .option("-i, --ios-index-file <path>", "Path to the iOS bundle output file")
+  .option("-e, --expo", "Indicates if the project is using Expo")
   .addHelpText(
     "after",
     `
@@ -98,6 +101,15 @@ Examples:
    $ airborne-devkit create-local-airborne-config ./my-rn-project \\
      -o "MyCompany" \\
      -n "MyApp"
+
+5. Create config for an Expo project:
+   $ airborne-devkit create-local-airborne-config -e
+
+6. Create config for Expo project with all options:
+   $ airborne-devkit create-local-airborne-config \\
+     -o "MyCompany" \\
+     -n "MyApp" \\
+     -e
 
 Notes:
 - If directoryPath is not provided, current working directory will be used

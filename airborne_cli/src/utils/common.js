@@ -16,6 +16,7 @@ const cliToConfigMap = {
   directoryPath: "directory_path",
   bootTimeout: "boot_timeout",
   releaseConfigTimeout: "release_config_timeout",
+  expo: "expo",
 };
 
 export function normalizeOptions(options = {}) {
@@ -56,6 +57,7 @@ export async function writeAirborneConfig(options) {
     const config = {
       organisation: filledOptions.organisation,
       namespace: filledOptions.namespace,
+      expo: filledOptions.expo,
       js_entry_file: filledOptions.js_entry_file,
       android: {
         index_file_path: filledOptions.android.index_file_path,
@@ -77,6 +79,32 @@ export async function writeAirborneConfig(options) {
 }
 
 export async function fillAirborneConfigOptions(options = {}) {
+  const result = { ...options };
+  const getNested = (obj, path) =>
+    path.split(".").reduce((acc, k) => (acc ? acc[k] : undefined), obj);
+
+  const setNested = (obj, path, value) => {
+    const parts = path.split(".");
+    let temp = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!temp[parts[i]]) temp[parts[i]] = {};
+      temp = temp[parts[i]];
+    }
+    temp[parts[parts.length - 1]] = value;
+  };
+
+  // Ask for expo first
+  if (getNested(result, "expo") === undefined) {
+    const expoValue = await promptWithType(
+      "\n Is this an Expo project? (y/n, default: no): ",
+      "boolean",
+      false
+    );
+    setNested(result, "expo", expoValue);
+  }
+
+  const isExpo = getNested(result, "expo");
+
   const questions = [
     {
       key: "organisation",
@@ -90,9 +118,11 @@ export async function fillAirborneConfigOptions(options = {}) {
     },
     {
       key: "js_entry_file",
-      question: "\n Please enter the JavaScript entry file (e.g., index.js): ",
+      question: isExpo
+        ? "\n Please enter the JavaScript entry file (default: node_modules/expo-router/entry.js): "
+        : "\n Please enter the JavaScript entry file (default: index.js): ",
       expectedType: "string",
-      defaultValue: "index.js",
+      defaultValue: isExpo ? "node_modules/expo-router/entry.js" : "index.js",
     },
     {
       key: "android.index_file_path",
@@ -110,25 +140,11 @@ export async function fillAirborneConfigOptions(options = {}) {
     },
   ];
 
-  const result = { ...options };
-  const getNested = (obj, path) =>
-    path.split(".").reduce((acc, k) => (acc ? acc[k] : undefined), obj);
-
-  const setNested = (obj, path, value) => {
-    const parts = path.split(".");
-    let temp = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (!temp[parts[i]]) temp[parts[i]] = {};
-      temp = temp[parts[i]];
-    }
-    temp[parts[parts.length - 1]] = value;
-  };
-
   for (const { key, question, expectedType, defaultValue } of questions) {
     let value;
 
-    if (getNested(options, key) !== undefined) {
-      value = getNested(options, key);
+    if (getNested(result, key) !== undefined) {
+      value = getNested(result, key);
     } else if (question) {
       value = await promptWithType(question, expectedType, defaultValue);
     }
