@@ -2,6 +2,66 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.2.0 - 2026-02-05
+#### Features
+- add Expo project support in cli - (751a4f5) - Yash Rajput
+
+- - -
+
+## v0.22.2 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.22.2 [skip ci] - (8a99832) - Airborne Bot
+
+- - -
+
+## v0.22.1 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.22.1 [skip ci] - (ad0c79b) - Airborne Bot
+
+- - -
+
+## v0.22.0 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.22.0 [skip ci] - (2caa013) - Airborne Bot
+
+- - -
+
+## v0.21.0 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.21.0 [skip ci] - (62d2ed4) - Airborne Bot
+
+- - -
+
+## v0.20.1 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.20.1 [skip ci] - (4c34176) - Airborne Bot
+
+- - -
+
+## v0.20.0 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.20.0 [skip ci] - (ea2c83e) - Airborne Bot
+
+- - -
+
+## v0.19.1 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.19.1 [skip ci] - (39ef9bf) - Airborne Bot
+
+- - -
+
+## v0.19.0 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.19.0 [skip ci] - (e5ade3a) - Airborne Bot
+
+- - -
+
+## v0.18.3 - 2026-02-05
+#### Miscellaneous Chores
+- **(version)** v0.18.3 [skip ci] - (9114fb9) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.1.8 - 2026-01-06
 #### Bug Fixes
 - support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput
