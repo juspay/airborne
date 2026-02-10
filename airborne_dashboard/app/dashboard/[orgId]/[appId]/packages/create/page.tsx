@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Pagination,
   PaginationContent,
@@ -17,11 +19,11 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { Search, ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package2 } from "lucide-react";
+import { Search, ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package2, Crown, Info } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
 import { hasAppAccess } from "@/lib/utils";
 import { notFound } from "next/navigation";
@@ -36,22 +38,37 @@ type ApiResponse = {
   per_page?: number;
 };
 
+type PackageGroup = {
+  id: string;
+  name: string;
+  is_primary: boolean;
+};
+
 export default function CreatePackagePage() {
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
   const params = useParams<{ appId: string }>();
+  const searchParams = useSearchParams();
   const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
-  const totalSteps = 2;
+
+  // Get group info from URL params
+  const groupIdFromUrl = searchParams.get("groupId");
+  const isPrimaryFromUrl = searchParams.get("isPrimary") === "true";
+
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Step 1: Package Details & Index File
+  // Group selection state
+  const [selectedGroup, setSelectedGroup] = useState<PackageGroup | null>(null);
+  const [groupSearch, setGroupSearch] = useState("");
+  const debouncedGroupSearch = useDebouncedValue(groupSearch, 500);
+
+  // Step 1: Package Details & Index File (only for primary groups)
   const [tag, setTag] = useState("");
-  const [packageProperties] = useState("{}");
   const [selectedIndexFile, setSelectedIndexFile] = useState<ApiFile | null>(null);
   const [indexFileSearch, setIndexFileSearch] = useState("");
   const debouncedIndexFileQuery = useDebouncedValue(indexFileSearch, 500);
   const [indexFileCurrentPage, setIndexFileCurrentPage] = useState(1);
 
-  // Step 2: Package Files
+  // Step 2 (or Step 1 for non-primary): Package Files
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [packageFileCurrentPage, setPackageFileCurrentPage] = useState(1);
@@ -61,21 +78,49 @@ export default function CreatePackagePage() {
   const router = useRouter();
 
   const perPage = 10;
+
   useEffect(() => {
     if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
       notFound();
     }
   }, [loadingAccess]);
 
-  // Data fetching for file lists
-  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
+  // Fetch the specific group if groupId is provided in URL
+  const { data: groupData } = useSWR(
+    token && org && appId && groupIdFromUrl ? [`/package-groups/${groupIdFromUrl}`, appId] : null,
+    async () =>
+      apiFetch<PackageGroup>(`/package-groups/${groupIdFromUrl}`, { method: "GET" }, { token, org, app: appId })
+  );
+
+  // Set selected group from URL param
+  useEffect(() => {
+    if (groupData) {
+      setSelectedGroup(groupData);
+    }
+  }, [groupData]);
+
+  // Fetch groups for selection if no group specified
+  const { data: groupsData, isLoading: groupsLoading } = useSWR(
+    token && org && appId && !groupIdFromUrl ? ["/package-groups", appId, debouncedGroupSearch] : null,
+    async () =>
+      apiFetch<{ data: PackageGroup[] }>(
+        "/package-groups",
+        { query: { search: groupSearch.trim() || undefined } },
+        { token, org, app: appId }
+      )
+  );
+
+  const isPrimary = selectedGroup?.is_primary ?? isPrimaryFromUrl;
+  const effectiveTotalSteps = isPrimary ? 2 : 1;
+
+  // Data fetching for file lists (index file selection - only for primary groups)
   const {
     data: indexFileData,
     error: indexFileError,
     isLoading: indexFileLoading,
   } = useSWR(
-    token && org && appId && currentStep === 1
-      ? ["/file/list", appId, debouncedIndexFileQuery, indexFileCurrentPage]
+    token && org && appId && isPrimary && currentStep === 1
+      ? ["/file/list", appId, debouncedIndexFileQuery, indexFileCurrentPage, "index"]
       : null,
     async () =>
       apiFetch<ApiResponse>(
@@ -88,10 +133,11 @@ export default function CreatePackagePage() {
       )
   );
 
-  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
+  // Data fetching for package files
+  const filesStep = isPrimary ? 2 : 1;
   const { data, error, isLoading } = useSWR(
-    token && org && appId && currentStep === 2
-      ? ["/file/list", appId, debouncedSearchQuery, packageFileCurrentPage]
+    token && org && appId && currentStep === filesStep
+      ? ["/file/list", appId, debouncedSearchQuery, packageFileCurrentPage, "files"]
       : null,
     async () =>
       apiFetch<ApiResponse>(
@@ -110,15 +156,15 @@ export default function CreatePackagePage() {
   const packageFileTotal = data?.total || 0;
   const packageFileTotalPages = Math.ceil(packageFileTotal / perPage);
 
-  // Filter out the selected index file from package files
+  // Filter out the selected index file from package files (only relevant for primary groups)
   const availableFiles = useMemo(() => {
-    if (!selectedIndexFile) return files;
+    if (!isPrimary || !selectedIndexFile) return files;
     return files.filter((f) => {
       const indexKey = selectedIndexFile.id || `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`;
       const fileKey = f.id || `${f.file_path}@version:${f.version}`;
       return fileKey !== indexKey;
     });
-  }, [files, selectedIndexFile]);
+  }, [files, selectedIndexFile, isPrimary]);
 
   const toggle = (fileId: string) => {
     const file_path = fileId.split("@version:")[0];
@@ -135,24 +181,29 @@ export default function CreatePackagePage() {
   };
 
   const canProceedToStep = (step: number) => {
-    switch (step) {
-      case 1:
-        return selectedIndexFile;
-      case 2:
-        return true;
-      default:
-        return false;
+    if (isPrimary) {
+      switch (step) {
+        case 1:
+          return selectedIndexFile;
+        case 2:
+          return true;
+        default:
+          return false;
+      }
+    } else {
+      // Non-primary: only files step
+      return true;
     }
   };
 
   const handleIndexFileSearchChange = (value: string) => {
     setIndexFileSearch(value);
-    setIndexFileCurrentPage(1); // Reset to first page when searching
+    setIndexFileCurrentPage(1);
   };
 
   const handlePackageFileSearchChange = (value: string) => {
     setSearchQuery(value);
-    setPackageFileCurrentPage(1); // Reset to first page when searching
+    setPackageFileCurrentPage(1);
   };
 
   const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
@@ -160,7 +211,6 @@ export default function CreatePackagePage() {
     const maxVisiblePages = 5;
 
     if (totalPages <= maxVisiblePages) {
-      // Show all pages if total pages is small
       for (let i = 1; i <= totalPages; i++) {
         items.push(
           <PaginationItem key={i}>
@@ -178,7 +228,6 @@ export default function CreatePackagePage() {
         );
       }
     } else {
-      // Show first page
       items.push(
         <PaginationItem key={1}>
           <PaginationLink
@@ -194,7 +243,6 @@ export default function CreatePackagePage() {
         </PaginationItem>
       );
 
-      // Show ellipsis if current page is far from start
       if (currentPage > 3) {
         items.push(
           <PaginationItem key="ellipsis1">
@@ -203,7 +251,6 @@ export default function CreatePackagePage() {
         );
       }
 
-      // Show pages around current page
       const start = Math.max(2, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
 
@@ -224,7 +271,6 @@ export default function CreatePackagePage() {
         );
       }
 
-      // Show ellipsis if current page is far from end
       if (currentPage < totalPages - 2) {
         items.push(
           <PaginationItem key="ellipsis2">
@@ -233,7 +279,6 @@ export default function CreatePackagePage() {
         );
       }
 
-      // Show last page
       if (totalPages > 1) {
         items.push(
           <PaginationItem key={totalPages}>
@@ -255,62 +300,146 @@ export default function CreatePackagePage() {
     return items;
   };
 
-  async function onCreate(_submitAsDraft?: boolean) {
+  async function onCreate() {
+    if (!selectedGroup) {
+      toastWarning("No Group Selected", "Please select a package group");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      let properties: Record<string, any> = {};
-      try {
-        properties = packageProperties.trim() ? JSON.parse(packageProperties) : {};
-      } catch {
-        toastWarning("Invalid JSON", "Package properties must be valid JSON");
-        setIsSubmitting(false);
-        return;
-      }
-
       const fileIds = Array.from(selectedFiles.values());
-      const indexPath = selectedIndexFile ? `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}` : "";
+
+      // For primary groups, index is required
+      // For non-primary groups, index should not be provided
+      const indexPath =
+        isPrimary && selectedIndexFile
+          ? `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`
+          : undefined;
 
       await apiFetch(
-        "/packages",
+        `/package-groups/${selectedGroup.id}/packages`,
         {
           method: "POST",
           body: {
-            index: indexPath,
+            ...(indexPath ? { index: indexPath } : {}),
             tag: tag || undefined,
-            properties,
             files: fileIds,
           },
         },
-        { token, org, app }
+        { token, org, app: appId }
       );
-      router.push(`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages`);
+      router.push(`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(appId)}/packages`);
     } catch (e: any) {
       console.log("Package creation failed", e);
-      // Error toast will be shown automatically by apiFetch
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  // If no group specified, show group selection
+  if (!groupIdFromUrl && !selectedGroup) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(appId)}/packages`}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
+              Create Package
+            </h1>
+            <p className="text-muted-foreground mt-2">Select a package group to create a new package in</p>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Group</CardTitle>
+            <CardDescription>Choose which package group this package will belong to</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search package groups..."
+                  value={groupSearch}
+                  onChange={(e) => setGroupSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {groupsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {groupsData?.data.map((group) => (
+                  <div
+                    key={group.id}
+                    className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => {
+                      router.push(
+                        `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(appId)}/packages/create?groupId=${group.id}&isPrimary=${group.is_primary}`
+                      );
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{group.name}</span>
+                      {group.is_primary && (
+                        <Badge variant="default" className="gap-1 bg-amber-500 hover:bg-amber-600">
+                          <Crown className="h-3 w-3" />
+                          Primary
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const steps = isPrimary
+    ? [
+        { number: 1, title: "Package Details & Index File", icon: Package2 },
+        { number: 2, title: "Select Package Files", icon: File },
+      ]
+    : [{ number: 1, title: "Package Details & Files", icon: File }];
+
   return (
     <div className="p-6">
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages`}>
+          <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(appId)}/packages`}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
-            Create Package Version
+            Create Package
           </h1>
-          <p className="text-muted-foreground mt-2">Bundle files together with properties and metadata</p>
+          <p className="text-muted-foreground mt-2">
+            Creating package in <span className="font-medium">{selectedGroup?.name || "..."}</span>
+            {isPrimary && (
+              <Badge variant="outline" className="ml-2 gap-1">
+                <Crown className="h-3 w-3" />
+                Primary Group
+              </Badge>
+            )}
+          </p>
 
           <div className="flex items-center gap-4 mt-6">
-            {[
-              { number: 1, title: "Package Details & Index File", icon: Package2 },
-              { number: 2, title: "Select Package Files", icon: File },
-            ].map((step, index) => {
+            {steps.map((step, index) => {
               const status =
                 step.number < currentStep ? "completed" : step.number === currentStep ? "current" : "upcoming";
               const Icon = step.icon;
@@ -334,7 +463,7 @@ export default function CreatePackagePage() {
                       <div className="text-xs text-muted-foreground">Step {step.number}</div>
                     </div>
                   </div>
-                  {index < 1 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
+                  {index < steps.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground mx-4" />}
                 </div>
               );
             })}
@@ -343,7 +472,8 @@ export default function CreatePackagePage() {
       </div>
 
       <div className="space-y-6">
-        {currentStep === 1 && (
+        {/* Step 1 for Primary Groups: Index File Selection */}
+        {isPrimary && currentStep === 1 && (
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -366,7 +496,16 @@ export default function CreatePackagePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Index File</CardTitle>
-                <CardDescription>Choose the main entry point file for your package</CardDescription>
+                <CardDescription>
+                  Choose the main entry point file for your package.
+                  <Alert className="mt-3">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Index file is <strong>required</strong> for primary package groups. This serves as the main entry
+                      point for OTA updates.
+                    </AlertDescription>
+                  </Alert>
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
@@ -389,13 +528,12 @@ export default function CreatePackagePage() {
                   <div className="text-sm text-muted-foreground">
                     {indexFileSearch
                       ? "No files found matching your search."
-                      : "No files found. Create a file first from the Create menu or the Files page."}
+                      : "No files found. Create a file first from the Files page."}
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground">
                       Showing {Math.min(perPage, indexFiles.length)} of {indexFileTotal} files
-                      {indexFileCurrentPage > 1 && ` (page ${indexFileCurrentPage})`}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       <Table>
@@ -432,7 +570,6 @@ export default function CreatePackagePage() {
                       </Table>
                     </div>
 
-                    {/* Index File Pagination */}
                     {indexFileTotalPages > 1 && (
                       <div className="mt-4">
                         <Pagination>
@@ -447,9 +584,7 @@ export default function CreatePackagePage() {
                                 className={indexFileCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
                               />
                             </PaginationItem>
-
                             {renderPaginationItems(indexFileCurrentPage, indexFileTotalPages, setIndexFileCurrentPage)}
-
                             <PaginationItem>
                               <PaginationNext
                                 href="#"
@@ -471,7 +606,7 @@ export default function CreatePackagePage() {
                 )}
 
                 {selectedIndexFile && (
-                  <div className="mt-4 p-3 bg-green-10 border border-green-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-green-600" />
                       <span className="font-mono text-sm">{selectedIndexFile.file_path}</span>
@@ -484,12 +619,41 @@ export default function CreatePackagePage() {
           </div>
         )}
 
-        {currentStep === 2 && (
+        {/* Step 1 for Non-Primary Groups OR Step 2 for Primary Groups: Package Files */}
+        {((!isPrimary && currentStep === 1) || (isPrimary && currentStep === 2)) && (
           <div className="space-y-6">
+            {/* Show tag field for non-primary groups in the files step */}
+            {!isPrimary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Package Details</CardTitle>
+                  <CardDescription>Basic information about your package</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="tag">Tag</Label>
+                    <Input
+                      id="tag"
+                      placeholder="e.g., latest, v1.0, production"
+                      value={tag}
+                      onChange={(e) => setTag(e.target.value)}
+                    />
+                  </div>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      This is a <strong>secondary package group</strong>. Index file is not required and cannot be
+                      specified.
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Select Package Files</CardTitle>
-                <CardDescription>Choose additional files to include in this package</CardDescription>
+                <CardDescription>Choose files to include in this package</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
@@ -510,13 +674,12 @@ export default function CreatePackagePage() {
                   <div>Loading…</div>
                 ) : availableFiles.length === 0 ? (
                   <div className="text-sm text-muted-foreground">
-                    {searchQuery ? "No files found matching your search" : "No additional files available"}
+                    {searchQuery ? "No files found matching your search" : "No files available"}
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="text-sm text-muted-foreground">
                       Showing {Math.min(perPage, availableFiles.length)} of {packageFileTotal} files
-                      {packageFileCurrentPage > 1 && ` (page ${packageFileCurrentPage})`}
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                       <Table>
@@ -534,7 +697,8 @@ export default function CreatePackagePage() {
                             const selectedFileId = selectedFiles.get(f.file_path);
                             const isThisVersionSelected = selectedFileId === fileId;
                             const isAnotherVersionSelected = selectedFileId && selectedFileId !== fileId;
-                            const isSameAsIndexFile = selectedIndexFile && f.file_path === selectedIndexFile.file_path;
+                            const isSameAsIndexFile =
+                              isPrimary && selectedIndexFile && f.file_path === selectedIndexFile.file_path;
 
                             return (
                               <TableRow
@@ -554,9 +718,7 @@ export default function CreatePackagePage() {
                                     <div className="text-xs text-amber-600 mt-1">Another version already selected</div>
                                   )}
                                   {isSameAsIndexFile && (
-                                    <div className="text-xs text-amber-600 mt-1">
-                                      Another version is selected as the index file
-                                    </div>
+                                    <div className="text-xs text-amber-600 mt-1">Selected as index file</div>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">{f.version}</TableCell>
@@ -568,7 +730,6 @@ export default function CreatePackagePage() {
                       </Table>
                     </div>
 
-                    {/* Package Files Pagination */}
                     {packageFileTotalPages > 1 && (
                       <div className="mt-4">
                         <Pagination>
@@ -583,13 +744,11 @@ export default function CreatePackagePage() {
                                 className={packageFileCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
                               />
                             </PaginationItem>
-
                             {renderPaginationItems(
                               packageFileCurrentPage,
                               packageFileTotalPages,
                               setPackageFileCurrentPage
                             )}
-
                             <PaginationItem>
                               <PaginationNext
                                 href="#"
@@ -626,15 +785,9 @@ export default function CreatePackagePage() {
                             <div className="flex items-center gap-2">
                               <FileText className="h-4 w-4" />
                               <span className="font-mono">{file_path}</span>
-                              {versionPart && <span className="text-muted-foreground">(Version {versionPart})</span>}
+                              {versionPart && <span className="text-muted-foreground">(v{versionPart})</span>}
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                toggle(fileId);
-                              }}
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => toggle(fileId)}>
                               Remove
                             </Button>
                           </div>
@@ -652,7 +805,7 @@ export default function CreatePackagePage() {
       <div className="flex items-center justify-between mt-8 pt-6 border-t">
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages`}>
+            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(appId)}/packages`}>
               Cancel
             </Link>
           </Button>
@@ -663,21 +816,19 @@ export default function CreatePackagePage() {
           )}
         </div>
         <div className="flex gap-2">
-          {currentStep < totalSteps ? (
+          {currentStep < effectiveTotalSteps ? (
             <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
               Next Step
             </Button>
           ) : (
-            <>
-              <Button
-                onClick={() => onCreate()}
-                disabled={!canProceedToStep(1) || !canProceedToStep(2) || isSubmitting}
-                className="gap-2"
-              >
-                <Rocket className="h-4 w-4" />
-                Create Package
-              </Button>
-            </>
+            <Button
+              onClick={() => onCreate()}
+              disabled={isPrimary ? !selectedIndexFile || isSubmitting : isSubmitting}
+              className="gap-2"
+            >
+              <Rocket className="h-4 w-4" />
+              Create Package
+            </Button>
           )}
         </div>
       </div>

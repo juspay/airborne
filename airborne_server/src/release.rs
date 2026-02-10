@@ -145,6 +145,8 @@ async fn get_release(
         utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
     let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
     let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
+    let rc_package_group_id =
+        utils::extract_file_from_experiment(&experimental_variant, "package.groupId");
     let rc_version = utils::extract_string_from_experiment(&experimental_variant, "config.version");
     let rc_boot_timeout =
         utils::extract_integer_from_experiment::<i64>(&experimental_variant, "config.boot_timeout");
@@ -152,6 +154,8 @@ async fn get_release(
         &experimental_variant,
         "config.release_config_timeout",
     );
+    let rc_sub_packages =
+        utils::extract_files_from_experiment(&experimental_variant, "sub_packages");
 
     let (index_file, important_files, lazy_files, resource_files) = {
         let all_files = rc_package_important
@@ -202,14 +206,16 @@ async fn get_release(
                 })
                 .collect();
 
-            let resource_files: Vec<ServeFile> = rc_resources
+            let resource_files: Vec<Resource> = rc_resources
                 .iter()
                 .filter_map(|file_key| {
+                    let file_key_cloned = file_key.clone();
                     let (file_path, _, _) = parse_file_key(file_key);
                     files
                         .iter()
                         .find(|file| file.file_path == file_path.clone())
-                        .map(|file| ServeFile {
+                        .map(|file| Resource {
+                            file_id: file_key_cloned,
                             file_path: file.file_path.clone(),
                             url: file.url.clone(),
                             checksum: file.checksum.clone(),
@@ -271,14 +277,16 @@ async fn get_release(
             version: rc_version,
             properties: Some(nested_config_props_response),
         },
-        package: ServePackage {
+        package: GetReleasePackage {
             name: application.clone(),
             version: package_version.to_string(),
             index: index_file,
             properties: package_properties,
             important: important_files,
             lazy: lazy_files,
+            group_id: rc_package_group_id,
         },
+        sub_packages: rc_sub_packages,
         resources: resource_files,
         experiment: Some(ReleaseExperiment {
             experiment_id: release_key,
@@ -372,6 +380,7 @@ async fn create_release(
         final_properties,
         control_overrides,
         experimental_overrides,
+        sub_packages,
     } = utils::build_overrides(
         &req,
         superposition_org_id_from_env.clone(),
@@ -508,11 +517,13 @@ async fn create_release(
             version: config_version.clone(),
             properties: Some(nested_config_props_response),
         },
+        sub_packages,
         package: ServePackage {
             name: application.clone(),
             version: pkg_version.to_string(),
             index: {
-                let (file_path, _, _) = parse_file_key(&package_data.index);
+                let primary_index = package_data.index.clone().unwrap_or_default();
+                let (file_path, _, _) = parse_file_key(&primary_index);
                 files
                     .iter()
                     .find(|file| file.file_path == file_path.clone())
@@ -700,6 +711,9 @@ async fn list_releases(
             &experimental_variant,
             "config.release_config_timeout",
         );
+        let rc_sub_packages =
+            utils::extract_files_from_experiment(&experimental_variant, "sub_packages");
+
         let rc_config_properties = experimental_variant
             .and_then(|v| v.overrides.as_object())
             .map(|obj| {
@@ -855,6 +869,7 @@ async fn list_releases(
                 important: important_files,
                 lazy: lazy_files,
             },
+            sub_packages: rc_sub_packages,
             resources: resource_files,
             dimensions,
             experiment: Some(utils::build_release_experiment_from_experiment(
@@ -1447,6 +1462,7 @@ async fn update_release(
         final_properties,
         control_overrides,
         experimental_overrides,
+        sub_packages,
     } = utils::build_overrides(
         &req,
         superposition_org_id_from_env.clone(),
@@ -1557,11 +1573,13 @@ async fn update_release(
             version: config_version.clone(),
             properties: Some(nested_config_props_response),
         },
+        sub_packages,
         package: ServePackage {
             name: application.clone(),
             version: pkg_version.to_string(),
             index: {
-                let (file_path, _, _) = parse_file_key(&package_data.index);
+                let primary_index = package_data.index.clone().unwrap_or_default();
+                let (file_path, _, _) = parse_file_key(&primary_index);
                 files
                     .iter()
                     .find(|file| file.file_path == file_path.clone())

@@ -33,8 +33,8 @@ use crate::{
     types::{self as airborne_types, ABError, AppState},
     utils::{
         db::{
-            models::{NewWorkspaceName, WorkspaceName},
-            schema::hyperotaserver::workspace_names,
+            models::{NewPackageGroupEntry, NewWorkspaceName, WorkspaceName},
+            schema::hyperotaserver::{package_groups, workspace_names},
         },
         document::schema_doc_to_hashmap,
         keycloak::get_token,
@@ -439,6 +439,36 @@ async fn add_application(
             &state,
         )
         .await?;
+
+        // Step 5: Create primary package group for the new application
+        let new_primary_group = NewPackageGroupEntry {
+            org_id: organisation.clone(),
+            app_id: application.clone(),
+            name: "primary".to_string(),
+            is_primary: true,
+        };
+
+        if let Err(e) = diesel::insert_into(package_groups::table)
+            .values(&new_primary_group)
+            .execute(&mut conn)
+        {
+            // Handle rollback and return error
+            if let Err(rollback_err) = transaction
+                .handle_rollback_if_needed(&admin, &realm, &state)
+                .await
+            {
+                info!("Rollback failed: {}", rollback_err);
+            }
+
+            return Err(ABError::InternalServerError(format!(
+                "Failed to create primary package group: {}",
+                e
+            )));
+        }
+        info!(
+            "Created primary package group for application: {}",
+            application
+        );
 
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();
