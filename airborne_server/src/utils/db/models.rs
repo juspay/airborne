@@ -1,13 +1,84 @@
 use chrono::{DateTime, Utc};
-use diesel::deserialize::Queryable;
+use diesel::deserialize::{FromSql, Queryable};
+use diesel::pg::{Pg, PgValue};
 use diesel::prelude::*;
+use diesel::serialize::{Output, ToSql};
+use diesel::{AsExpression, FromSqlRow};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 
 use crate::utils::db::schema::hyperotaserver::{
-    builds, cleanup_outbox, configs, files, packages, packages_v2, release_views, releases,
-    user_credentials, workspace_names,
+    builds, cleanup_outbox, configs, files, organisation_invites, packages, packages_v2,
+    release_views, releases, user_credentials, workspace_names,
 };
 use crate::utils::semver::SemVer;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, AsExpression, FromSqlRow)]
+#[diesel(sql_type = crate::utils::db::schema::hyperotaserver::sql_types::InviteRole)]
+pub enum InviteRole {
+    Admin,
+    Read,
+    Write,
+}
+
+impl ToSql<crate::utils::db::schema::hyperotaserver::sql_types::InviteRole, Pg> for InviteRole {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> diesel::serialize::Result {
+        let value = match self {
+            InviteRole::Admin => "admin",
+            InviteRole::Read => "read",
+            InviteRole::Write => "write",
+        };
+        out.write_all(value.as_bytes())?;
+        Ok(diesel::serialize::IsNull::No)
+    }
+}
+
+impl FromSql<crate::utils::db::schema::hyperotaserver::sql_types::InviteRole, Pg> for InviteRole {
+    fn from_sql(bytes: PgValue<'_>) -> diesel::deserialize::Result<Self> {
+        match std::str::from_utf8(bytes.as_bytes())? {
+            "admin" => Ok(InviteRole::Admin),
+            "read" => Ok(InviteRole::Read),
+            "write" => Ok(InviteRole::Write),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, AsExpression, FromSqlRow)]
+#[diesel(sql_type = crate::utils::db::schema::hyperotaserver::sql_types::InviteStatus)]
+pub enum InviteStatus {
+    Pending,
+    Accepted,
+    Declined,
+    Expired,
+}
+
+impl ToSql<crate::utils::db::schema::hyperotaserver::sql_types::InviteStatus, Pg> for InviteStatus {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> diesel::serialize::Result {
+        let value = match self {
+            InviteStatus::Pending => "pending",
+            InviteStatus::Accepted => "accepted",
+            InviteStatus::Declined => "declined",
+            InviteStatus::Expired => "expired",
+        };
+        out.write_all(value.as_bytes())?;
+        Ok(diesel::serialize::IsNull::No)
+    }
+}
+
+impl FromSql<crate::utils::db::schema::hyperotaserver::sql_types::InviteStatus, Pg>
+    for InviteStatus
+{
+    fn from_sql(bytes: PgValue<'_>) -> diesel::deserialize::Result<Self> {
+        match std::str::from_utf8(bytes.as_bytes())? {
+            "pending" => Ok(InviteStatus::Pending),
+            "accepted" => Ok(InviteStatus::Accepted),
+            "declined" => Ok(InviteStatus::Declined),
+            "expired" => Ok(InviteStatus::Expired),
+            _ => Err("Unrecognized enum variant".into()),
+        }
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct File {
@@ -190,5 +261,18 @@ pub struct UserCredentialsEntry {
     pub password: String,
     pub organisation: String,
     pub application: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable, Serialize)]
+#[diesel(table_name = organisation_invites)]
+pub struct OrganisationInviteEntry {
+    pub id: uuid::Uuid,
+    pub org_id: String,
+    pub applications: serde_json::Value,
+    pub email: String,
+    pub role: InviteRole,
+    pub token: String,
+    pub status: InviteStatus,
     pub created_at: DateTime<Utc>,
 }

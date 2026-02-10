@@ -27,19 +27,22 @@ use crate::{
     middleware::auth::{
         validate_required_access, validate_user, Access, AuthResponse, ADMIN, READ,
     },
-    organisation::application::{types::OrgAppError, user::types::*},
-    types as airborne_types,
-    types::{ABError, AppState},
+    organisation::{
+        application::{types::OrgAppError, user::types::*},
+        user::types::UserContext,
+    },
+    types::{self as airborne_types, ABError, AppState},
     utils::keycloak::{find_org_group, find_user_by_username, prepare_user_action},
 };
 
 use self::{
     transaction::{
-        add_user_with_transaction, get_user_current_role, remove_user_with_transaction,
-        update_user_with_transaction,
+        get_user_current_role, remove_user_with_transaction, update_user_with_transaction,
     },
     utils::{check_role_hierarchy, is_last_admin_in_application, validate_access_level},
 };
+
+pub use crate::organisation::application::user::transaction::add_user_with_transaction;
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -137,7 +140,7 @@ async fn find_target_user(
 }
 
 /// Find an application and extract its context
-async fn find_application(
+pub async fn find_application(
     admin: &keycloak::KeycloakAdmin,
     realm: &str,
     org_name: &str,
