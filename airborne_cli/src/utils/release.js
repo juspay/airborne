@@ -141,11 +141,13 @@ export async function createLocalReleaseConfig(
         properties: {},
       },
       package: {
+        name: airborneConfig.namespace,
         version: "",
         prooerties: {},
         index: {
           file_path: airborneConfig[platform].index_file_path,
           url: "",
+          checksum: "",
         },
         important: remotebundleContents
           .filter(
@@ -291,11 +293,13 @@ export async function updateLocalReleaseConfig(
         properties: existingReleaseConfig?.config?.properties || {},
       },
       package: {
+        name: airborneConfig.namespace,
         version: existingReleaseConfig?.package?.version || "",
         properties: existingReleaseConfig?.package?.properties || {},
         index: {
           file_path: airborneConfig[options.platform].index_file_path,
-          url: existingReleaseConfig?.package?.index?.url || "",
+          url: "",
+          checksum: "",
         },
         important: remotebundleContents
           .filter(
@@ -305,10 +309,14 @@ export async function updateLocalReleaseConfig(
           .map((item) => ({
             file_path: item.path,
             url: "",
+            checksum: "",
           })),
-        lazy: existingReleaseConfig?.package?.lazy || [],
+        lazy: [],
       },
-      resources: existingReleaseConfig?.resources || [],
+      resources: (existingReleaseConfig?.resources || []).filter(
+        (res) =>
+          !remotebundleContents.some((item) => item.path === res.file_path)
+      ),
     };
 
     await writeReleaseConfig(
