@@ -33,4 +33,14 @@ NSString *const LAZY_PACKAGE_NOTIFICATION = @"AJPLazyPackageNotification";
 
 NSString *const APPL_MANAGER_SUB_CAT = @"hyperota";
 
+// Backup and Rollback Constants
+NSString *const JUSPAY_BACKUP_DIR = @"JuspayBackup";
+NSString *const JUSPAY_BACKUP_TEMP_DIR = @"backup_temp";
+NSString *const JUSPAY_BACKUP_MAIN_DIR = @"backup";
+
+NSString *const BACKUP_STAGE_KEY = @"backup_stage";
+NSString *const BACKUP_INPLACE_KEY = @"backup_inplace";
+NSString *const ROLLBACK_IN_PROGRESS_KEY = @"rollback_in_progress";
+NSString *const BLACKLISTED_VERSIONS_KEY = @"blacklisted_versions";
+
 @end

@@ -248,16 +248,16 @@ public class FileProviderService {
 
     @SuppressWarnings("UnusedReturnValue")
     public boolean updateFile(@NonNull Context context, String fileName, byte[] content) {
-        return writeToFile(context, fileName, content, false);
+        return writeToFileAtomic(context, fileName, content, false);
     }
 
     public boolean updateFile(String fileName, byte[] content) {
-        return writeToFile(Workspace.getCtx(), fileName, content, false);
+        return writeToFileAtomic(Workspace.getCtx(), fileName, content, false);
     }
 
     @SuppressWarnings("UnusedReturnValue")
     public boolean updateCertificate(@NonNull Context context, String fileName, byte[] content) {
-        return writeToFile(context, fileName, content, true);
+        return writeToFileAtomic(context, fileName, content, true);
     }
 
     boolean copyFile(File from, File to) {
@@ -294,12 +294,13 @@ public class FileProviderService {
         }
     }
 
-    private boolean writeToFile(@NonNull Context context, String realFileName, byte[] content, boolean isCertificate) {
+    private boolean writeToFileAtomic(@NonNull Context context, String realFileName, byte[] content, boolean isCertificate) {
         deleteFileFromCache(realFileName);
-        return writeToFile(getFileFromInternalStorageInternal(realFileName), content, isCertificate);
+        return writeToFile(getFileFromInternalStorageInternal(realFileName), content, isCertificate, true);
     }
 
-    boolean writeToFile(File file, byte[] content, boolean isCertificate) {
+    // This write file takes care of atomicity by writing the file to a temp file and then renaming that to the original file name.
+    public boolean writeToFile(File file, byte[] content, boolean isCertificate, boolean writeAtomic) {
 
         final TrackerCallback tracker = otaServices.getTrackerCallback();
         try {
@@ -311,9 +312,12 @@ public class FileProviderService {
                 content = decodeResponse.getContent();
             }
 
-            File tempFile = new File(file.getParentFile(), "temp_" + decodedFileName);
+            File tempFile = new File(file.getParentFile(), writeAtomic ? "temp_" + decodedFileName : decodedFileName);
             try (FileOutputStream fos = new FileOutputStream(tempFile)) {
                 fos.write(content);
+                if (!writeAtomic) {
+                    return true;
+                }
                 return tempFile.renameTo(new File(file.getParentFile(), decodedFileName));
             } catch (Exception e) {
                 tracker.trackException(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.FILE_PROVIDER_SERVICE, "Exception writing decrypted js file " + decodedFileName, e);
@@ -362,7 +366,7 @@ public class FileProviderService {
         return getFileFromInternalStorageInternal(fileName);
     }
 
-    private File getFileFromInternalStorageInternal(String fileName) {
+    public File getFileFromInternalStorageInternal(String fileName) {
 
         Log.d(LOG_TAG, "Getting file from internal storage. Filename: " + fileName);
 

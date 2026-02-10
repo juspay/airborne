@@ -55,18 +55,11 @@ object OTAUtils {
     @JvmStatic
     @Throws(CertificateException::class)
     fun validatePinning(chain: Array<X509Certificate>, validPins: Set<String?>): Boolean {
-        val md: MessageDigest
         val certChainMsg = StringBuilder()
-        try {
-            md = MessageDigest.getInstance("SHA-256")
-        } catch (e: NoSuchAlgorithmException) {
-            throw CertificateException("couldn't create digest")
-        }
 
         for (cert in chain) {
             val publicKey = cert.publicKey.encoded
-            md.update(publicKey, 0, publicKey.size)
-            val pin = Base64.encodeToString(md.digest(), Base64.NO_WRAP)
+            val pin = Base64.encodeToString(SHA256(publicKey), Base64.NO_WRAP)
             certChainMsg.append("    sha256/").append(pin).append(" : ")
                 .append(cert.subjectDN.toString()).append("\n")
             return !validPins.contains(pin)
@@ -99,5 +92,17 @@ object OTAUtils {
             // TODO trackException(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.HELPER, "Exception trying to calculate md5sum from given string", e)
         }
         return null
+    }
+
+    @Throws(CertificateException::class)
+    fun SHA256(content: ByteArray): ByteArray {
+        val md: MessageDigest
+        try {
+            md = MessageDigest.getInstance("SHA-256")
+        } catch (_: NoSuchAlgorithmException) {
+            throw CertificateException("couldn't create digest")
+        }
+        md.update(content)
+        return md.digest()
     }
 }
