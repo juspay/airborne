@@ -82,6 +82,8 @@ export const uploadFiles = async (filesToUpload, config) => {
     errors: [],
   };
 
+  const fileResults = {};
+
   try {
     for (let index = 0; index < filesToUpload.length; index++) {
       const fileObj = filesToUpload[index];
@@ -90,10 +92,10 @@ export const uploadFiles = async (filesToUpload, config) => {
       try {
         console.log(`${fileProgress} 🔍 Processing ${fileObj.file_path}...`);
 
-        const storedChecksum = await getMappedChecksum(
+        const stored = await getMappedChecksumAndURL(
           config.directory_path,
           fileObj.file_path,
-          config.tag
+          config
         );
 
         const baseDir = path.isAbsolute(config.directory_path)
@@ -115,10 +117,11 @@ export const uploadFiles = async (filesToUpload, config) => {
 
         const checksum = await sha256FileHex(fileFullPath);
 
-        if (storedChecksum === checksum) {
+        if (stored?.checksum === checksum) {
           console.log(
             `${fileProgress} ✅ File already exists, checksum matches`
           );
+          fileResults[fileObj.file_path] = { url: stored.url, checksum: stored.checksum };
           results.existing++;
           continue;
         }
@@ -144,10 +147,17 @@ export const uploadFiles = async (filesToUpload, config) => {
         await createFileMapping(
           config.directory_path,
           uploadOutput.file_path,
-          uploadOutput.id,
-          uploadOutput.checksum,
-          uploadOutput.tag
+          {
+            id: uploadOutput.id,
+            checksum: uploadOutput.checksum,
+            url: uploadOutput.url,
+            organisation: config.organisation,
+            namespace: config.namespace,
+            tag: uploadOutput.tag,
+          }
         );
+
+        fileResults[fileObj.file_path] = { url: uploadOutput.url, checksum: uploadOutput.checksum };
 
         // Check if this was a new upload or existing file returned
         if (uploadOutput.checksum === checksum) {
@@ -185,6 +195,8 @@ export const uploadFiles = async (filesToUpload, config) => {
     console.error("\n💥 Upload process failed:", err.message);
     throw err;
   }
+
+  return fileResults;
 };
 
 export async function createFiles(filesToCreate, config, prefixUrl) {
@@ -199,6 +211,8 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
     errors: [],
   };
 
+  const fileResults = {};
+
   try {
     for (let index = 0; index < filesToCreate.length; index++) {
       const fileObj = filesToCreate[index];
@@ -207,10 +221,10 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
       try {
         console.log(`${fileProgress} 🔍 Processing ${fileObj.file_path}...`);
 
-        const storedChecksum = await getMappedChecksum(
+        const stored = await getMappedChecksumAndURL(
           config.directory_path,
           fileObj.file_path,
-          config.tag
+          config
         );
 
         const baseDir = path.isAbsolute(config.directory_path)
@@ -230,14 +244,15 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
           throw new Error(`File not found: ${fileFullPath}`);
         }
 
-        if (storedChecksum) {
+        if (stored?.checksum) {
           console.log(`${fileProgress} 🔐 Calculating checksum...`);
           const checksum = await sha256FileHex(fileFullPath);
 
-          if (storedChecksum === checksum) {
+          if (stored.checksum === checksum) {
             console.log(
               `${fileProgress} ✅ File already exists, checksum matches`
             );
+            fileResults[fileObj.file_path] = { url: stored.url, checksum: stored.checksum };
             results.existing++;
             continue;
           }
@@ -270,10 +285,17 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
         await createFileMapping(
           config.directory_path,
           output.file_path,
-          output.id,
-          output.checksum,
-          output.tag
+          {
+            id: output.id,
+            checksum: output.checksum,
+            url: output.url,
+            organisation: config.organisation,
+            namespace: config.namespace,
+            tag: output.tag,
+          }
         );
+
+        fileResults[fileObj.file_path] = { url: output.url, checksum: output.checksum };
 
         console.log(
           `${fileProgress} ✅ Successfully processed file record for ${fileObj.file_path}`
@@ -304,14 +326,14 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
     console.error("\n💥 File creation process failed:", err.message);
     throw err;
   }
+
+  return fileResults;
 }
 
 export async function createFileMapping(
   directory_path,
   file_path,
-  id,
-  checksum,
-  tag
+  { id, checksum, url, organisation, namespace, tag }
 ) {
   const airborneDir = path.join(directory_path, ".airborne");
   const mappingFile = path.join(airborneDir, "mappings.json");
@@ -329,12 +351,18 @@ export async function createFileMapping(
       tag = "__default__";
     }
 
-    if (!mappings[tag]) {
-      mappings[tag] = {};
+    if (!mappings[organisation]) {
+      mappings[organisation] = {};
+    }
+    if (!mappings[organisation][namespace]) {
+      mappings[organisation][namespace] = {};
+    }
+    if (!mappings[organisation][namespace][tag]) {
+      mappings[organisation][namespace][tag] = {};
     }
 
-    // Update or insert mapping with checksum
-    mappings[tag][file_path] = { id, checksum };
+    // Update or insert mapping with checksum and url
+    mappings[organisation][namespace][tag][file_path] = { id, checksum, url };
 
     // Write updated mappings back
     await fs.promises.writeFile(
@@ -348,7 +376,7 @@ export async function createFileMapping(
   }
 }
 
-export async function getMappedChecksum(directory_path, file_path, tag) {
+export async function getMappedChecksumAndURL(directory_path, file_path, { organisation, namespace, tag }) {
   const mappingFile = path.join(directory_path, ".airborne", "mappings.json");
   if (!tag) {
     tag = "__default__";
@@ -357,13 +385,15 @@ export async function getMappedChecksum(directory_path, file_path, tag) {
   try {
     const data = await fs.promises.readFile(mappingFile, "utf8");
     const mappings = JSON.parse(data);
-    return mappings[tag][file_path]?.checksum || null;
+    const entry = mappings[organisation]?.[namespace]?.[tag]?.[file_path];
+    if (!entry) return null;
+    return { checksum: entry.checksum || null, url: entry.url || null };
   } catch (err) {
     return null;
   }
 }
 
-export async function readFileMapping(directory_path, file_path, tag) {
+export async function readFileMapping(directory_path, file_path, { organisation, namespace, tag }) {
   const mappingFile = path.join(directory_path, ".airborne", "mappings.json");
 
   if (!tag) {
@@ -373,7 +403,7 @@ export async function readFileMapping(directory_path, file_path, tag) {
   try {
     const data = await fs.promises.readFile(mappingFile, "utf8");
     const mappings = JSON.parse(data);
-    return mappings[tag][file_path] || null;
+    return mappings[organisation]?.[namespace]?.[tag]?.[file_path] || null;
   } catch (err) {
     return null;
   }
