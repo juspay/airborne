@@ -28,7 +28,7 @@
     "@tailwindcss/typography": "^0.5.16",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@uiw/react-json-view": "^2.0.0-alpha.32",
-    "axios": "^1.11.0",
+    "axios": "^1.13.5",
     "framer-motion": "^12.19.2",
     "lucide-react": "^0.525.0",
     "react": "^19.1.4",
