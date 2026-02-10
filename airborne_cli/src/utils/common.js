@@ -4,11 +4,76 @@ import { createHash } from "crypto";
 import { createReadStream } from "fs";
 import { promptWithType } from "./prompt.js";
 
+function persistToConfig(configPath, platform, fields, label) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    if (!raw[platform]) {
+      raw[platform] = {};
+    }
+    for (const [key, value] of Object.entries(fields)) {
+      raw[platform][key] = value;
+    }
+    fs.writeFileSync(configPath, JSON.stringify(raw, null, 2), "utf8");
+    const keys = Object.keys(fields).join(", ");
+    console.log(`✅ Updated ${label} ${keys} in ${configPath}`);
+  } catch (err) {
+    console.error(
+      `⚠️  Could not persist ${label} config to file:`,
+      err.message
+    );
+  }
+}
+
+export async function readAndResolveAirborneConfig(directoryPath, platform) {
+  const airborneConfig = await readAirborneConfig(directoryPath);
+  const configPath = path.join(directoryPath, "airborne-config.json");
+  const label = platform === "android" ? "Android" : "iOS";
+
+  if (!airborneConfig[platform]) {
+    airborneConfig[platform] = {};
+  }
+
+  const fieldsToPersist = {};
+
+  if (!airborneConfig[platform].organisation) {
+    const oldOrganisation = airborneConfig.organisation || undefined;
+
+    airborneConfig[platform].organisation = await promptWithType(
+      `\n Please enter the ${label} organisation name${oldOrganisation ? ` (default: ${oldOrganisation})` : ""}: `,
+      "string",
+      oldOrganisation
+    );
+    fieldsToPersist.organisation = airborneConfig[platform].organisation;
+  }
+
+  if (!airborneConfig[platform].namespace) {
+    const oldNamespace = airborneConfig.namespace || undefined;
+
+    airborneConfig[platform].namespace = await promptWithType(
+      `\n Please enter the ${label} namespace/application name${oldNamespace ? ` (default: ${oldNamespace})` : ""}: `,
+      "string",
+      oldNamespace
+    );
+    fieldsToPersist.namespace = airborneConfig[platform].namespace;
+  }
+
+  if (Object.keys(fieldsToPersist).length > 0) {
+    persistToConfig(configPath, platform, fieldsToPersist, label);
+  }
+
+  airborneConfig.namespace = airborneConfig[platform].namespace;
+  airborneConfig.organisation = airborneConfig[platform].organisation;
+
+  return airborneConfig;
+}
+
 const cliToConfigMap = {
   platform: "platform",
   tag: "tag",
-  organisation: "organisation",
-  namespace: "namespace",
+  androidOrganisation: "android.organisation",
+  iosOrganisation: "ios.organisation",
+  androidNamespace: "android.namespace",
+  iosNamespace: "ios.namespace",
   jsEntryFile: "js_entry_file",
   androidIndex: "android.index_file_path",
   iosIndex: "ios.index_file_path",
@@ -55,14 +120,16 @@ export async function writeAirborneConfig(options) {
   try {
     const filledOptions = await fillAirborneConfigOptions(options);
     const config = {
-      organisation: filledOptions.organisation,
-      namespace: filledOptions.namespace,
       expo: filledOptions.expo,
       js_entry_file: filledOptions.js_entry_file,
       android: {
+        organisation: filledOptions.android.organisation,
+        namespace: filledOptions.android.namespace,
         index_file_path: filledOptions.android.index_file_path,
       },
       ios: {
+        organisation: filledOptions.ios.organisation,
+        namespace: filledOptions.ios.namespace,
         index_file_path: filledOptions.ios.index_file_path,
       },
     };
@@ -107,13 +174,23 @@ export async function fillAirborneConfigOptions(options = {}) {
 
   const questions = [
     {
-      key: "organisation",
-      question: "\n Please enter the organisation name: ",
+      key: "android.organisation",
+      question: "\n Please enter the Android organisation name: ",
       expectedType: "string",
     },
     {
-      key: "namespace",
-      question: "\n Please enter namespace/application name: ",
+      key: "ios.organisation",
+      question: "\n Please enter the iOS organisation name: ",
+      expectedType: "string",
+    },
+    {
+      key: "android.namespace",
+      question: "\n Please enter the Android namespace/application name: ",
+      expectedType: "string",
+    },
+    {
+      key: "ios.namespace",
+      question: "\n Please enter the iOS namespace/application name: ",
       expectedType: "string",
     },
     {

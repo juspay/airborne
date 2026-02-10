@@ -17,7 +17,7 @@ export async function createPackageFromLocalRelease(
     const indexMapping = await readFileMapping(
       airborneConfig.directory_path,
       indexFilePath,
-      airborneConfig.tag
+      airborneConfig
     );
     if (!indexMapping) {
       throw new Error(`Missing upload for index file: ${indexFilePath}`);
@@ -36,7 +36,7 @@ export async function createPackageFromLocalRelease(
       const mapping = await readFileMapping(
         airborneConfig.directory_path,
         file_path,
-        airborneConfig.tag
+        airborneConfig
       );
       if (!mapping) {
         throw new Error(`Missing mapping for file: ${file_path}`);
