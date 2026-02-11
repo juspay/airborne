@@ -148,7 +148,7 @@ export async function CreateApplicationAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new CreateApplicationCommand(finalOptions);
   return await client.send(command);
 }
@@ -172,7 +172,7 @@ export async function CreateDimensionAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new CreateDimensionCommand(finalOptions);
   return await client.send(command);
 }
@@ -201,7 +201,7 @@ export async function CreateFileAction(paramsFile, options){
     finalOptions.metadata = JSON.stringify(finalOptions.metadata);
   }
 
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new CreateFileCommand(finalOptions);
   return await client.send(command);
 }
@@ -225,7 +225,7 @@ export async function CreateOrganisationAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new CreateOrganisationCommand(finalOptions);
   return await client.send(command);
 }
@@ -249,7 +249,7 @@ export async function CreatePackageAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new CreatePackageCommand(finalOptions);
   return await client.send(command);
 }
@@ -273,7 +273,7 @@ export async function CreateReleaseAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new CreateReleaseCommand(finalOptions);
   return await client.send(command);
 }
@@ -297,7 +297,7 @@ export async function DeleteDimensionAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new DeleteDimensionCommand(finalOptions);
   return await client.send(command);
 }
@@ -321,7 +321,7 @@ export async function GetReleaseAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new GetReleaseCommand(finalOptions);
   return await client.send(command);
 }
@@ -345,7 +345,7 @@ export async function GetUserAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new GetUserCommand(finalOptions);
   return await client.send(command);
 }
@@ -369,7 +369,7 @@ export async function ListDimensionsAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ListDimensionsCommand(finalOptions);
   return await client.send(command);
 }
@@ -393,7 +393,7 @@ export async function ListFilesAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ListFilesCommand(finalOptions);
   return await client.send(command);
 }
@@ -417,7 +417,7 @@ export async function ListOrganisationsAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ListOrganisationsCommand(finalOptions);
   return await client.send(command);
 }
@@ -441,7 +441,7 @@ export async function ListPackagesAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ListPackagesCommand(finalOptions);
   return await client.send(command);
 }
@@ -465,7 +465,7 @@ export async function ListReleasesAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ListReleasesCommand(finalOptions);
   return await client.send(command);
 }
@@ -513,7 +513,7 @@ export async function RequestOrganisationAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new RequestOrganisationCommand(finalOptions);
   return await client.send(command);
 }
@@ -537,7 +537,7 @@ export async function ServeReleaseAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ServeReleaseCommand(finalOptions);
   return await client.send(command);
 }
@@ -561,7 +561,7 @@ export async function ServeReleaseV2Action(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new ServeReleaseV2Command(finalOptions);
   return await client.send(command);
 }
@@ -585,7 +585,7 @@ export async function UpdateDimensionAction(paramsFile, options){
   
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new UpdateDimensionCommand(finalOptions);
   return await client.send(command);
 }
@@ -618,7 +618,7 @@ export async function UploadFileAction(paramsFile, options){
 
 
   
-  const client = await getClient(options.token, true);
+  const client = await getClient(finalOptions.token, true);
   const command = new UploadFileCommand(finalOptions);
   return await client.send(command);
 }
