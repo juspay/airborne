@@ -39,6 +39,7 @@ Create the `initializeAirborne()` function inside your `MainApplication` class. 
 
 1. Creates an `Airborne` instance with your server URL
 2. Implements `AirborneInterface` with the required callbacks:
+   - `getNamespace()`: Return the application/namespace name used for bundle management
    - `getDimensions()`: Return custom dimensions for targeting (e.g., app version, user segment)
    - `onEvent()`: Receive SDK events for logging/analytics
    - `startApp()`: Called when the bundle is ready - sets the bundle path and triggers boot complete
