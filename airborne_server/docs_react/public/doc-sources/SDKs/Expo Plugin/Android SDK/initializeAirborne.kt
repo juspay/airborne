@@ -7,6 +7,10 @@ private fun initializeAirborne() {
             "https://airborne.juspay.in/release/<organisation-name>/<application/namespace-name>",
             object : AirborneInterface() {
 
+                override fun getNamespace(): String {
+                    return "<application/namespace-name>"
+                }
+
                 override fun getDimensions(): HashMap<String, String> {
                     val map = HashMap<String, String>()
                     // Add custom dimensions for targeting, e.g.:
