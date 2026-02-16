@@ -727,6 +727,10 @@ pub async fn build_overrides(
 
     if let Some(Document::Object(obj)) = &config_document {
         for (key, value) in obj {
+            // Skip build-tracking keys that are not part of release experiments
+            if key.starts_with("build.") {
+                continue;
+            }
             control_overrides.insert(key.clone(), value.clone());
         }
     } else {

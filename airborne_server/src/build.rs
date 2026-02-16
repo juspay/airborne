@@ -8,7 +8,7 @@ use aws_smithy_types::Document;
 use bytes::Bytes;
 use diesel::prelude::*;
 use http::HeaderValue;
-use log::info;
+use log::{error, info};
 use serde::Serialize;
 use serde_json::Value;
 use zip::write::FileOptions;
@@ -18,8 +18,9 @@ use crate::file::utils::download_file_content;
 use crate::release::utils::get_files_by_file_keys_async;
 use crate::types::WithHeaders;
 use crate::utils::db::schema::hyperotaserver::builds::{
-    application as app_column, build_version, dsl::builds, organisation as org_column,
-    release_id as release_id_column,
+    application as app_column, build_version, dsl::builds, major_version as major_col,
+    minor_version as minor_col, organisation as org_column, patch_version as patch_col,
+    release_id as release_id_column, status as status_col,
 };
 use crate::utils::document::value_to_plain_string;
 use crate::utils::s3::push_file_byte_arr;
@@ -484,69 +485,79 @@ async fn create_and_upload_build(
         )
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to upload POM to S3: {}", e)))?;
+    }
 
-        // Get existing Maven metadata from S3 and merge with new version
-        let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), &org, &app);
-        let existing_versions = match state
-            .s3_client
-            .get_object()
-            .bucket(state.env.bucket_name.clone())
-            .key(&maven_metadata_path)
-            .send()
-            .await
-        {
-            Ok(resp) => {
-                let data = resp
-                    .body
-                    .collect()
-                    .await
-                    .map_err(|e| {
-                        ABError::InternalServerError(format!(
-                            "Failed to read existing Maven metadata: {}",
-                            e
-                        ))
-                    })?
-                    .into_bytes();
+    Ok(())
+}
 
-                let metadata_content = String::from_utf8(data.to_vec()).map_err(|e| {
+/// Update maven-metadata.xml in S3.
+async fn update_maven_metadata(
+    org: &String,
+    app: &String,
+    new_build_version: &SemVer,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<()> {
+    // Get existing Maven metadata from S3 and merge with new version
+    let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), org, app);
+    let existing_versions = match state
+        .s3_client
+        .get_object()
+        .bucket(state.env.bucket_name.clone())
+        .key(&maven_metadata_path)
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let data = resp
+                .body
+                .collect()
+                .await
+                .map_err(|e| {
                     ABError::InternalServerError(format!(
-                        "Failed to parse Maven metadata as UTF-8: {}",
+                        "Failed to read existing Maven metadata: {}",
                         e
                     ))
-                })?;
+                })?
+                .into_bytes();
 
-                parse_existing_maven_metadata(&metadata_content).unwrap_or_else(|e| {
-                    log::warn!("Failed to parse maven metadata: {}", e);
-                    Vec::new()
-                })
-            }
-            Err(_) => {
-                // No existing metadata, start with empty list
+            let metadata_content = String::from_utf8(data.to_vec()).map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to parse Maven metadata as UTF-8: {}",
+                    e
+                ))
+            })?;
+
+            parse_existing_maven_metadata(&metadata_content).unwrap_or_else(|e| {
+                log::warn!("Failed to parse maven metadata: {}", e);
                 Vec::new()
-            }
-        };
-
-        // Merge existing versions with new version
-        let mut versions = existing_versions;
-        if !versions.contains(new_build_version) {
-            versions.push(new_build_version.clone());
-            versions.sort();
+            })
         }
+        Err(_) => {
+            // No existing metadata, start with empty list
+            Vec::new()
+        }
+    };
 
-        // Generate and upload Maven metadata
-        let maven_metadata_content = generate_maven_metadata_content(&org, &app, versions);
-        let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), &org, &app);
-        push_file_byte_arr(
-            &state.s3_client,
-            state.env.bucket_name.clone(),
-            maven_metadata_content.into_bytes(),
-            maven_metadata_path,
-        )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to upload Maven metadata to S3: {}", e))
-        })?;
+    // Merge existing versions with new version
+    let mut versions = existing_versions;
+    if !versions.contains(new_build_version) {
+        versions.push(new_build_version.clone());
+        versions.sort();
     }
+
+    // Generate and upload Maven metadata
+    let maven_metadata_content = generate_maven_metadata_content(org, app, versions);
+    let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), org, app);
+    push_file_byte_arr(
+        &state.s3_client,
+        state.env.bucket_name.clone(),
+        maven_metadata_content.into_bytes(),
+        maven_metadata_path,
+    )
+    .await
+    .map_err(|e| {
+        ABError::InternalServerError(format!("Failed to upload Maven metadata to S3: {}", e))
+    })?;
 
     Ok(())
 }
@@ -558,22 +569,100 @@ async fn build(
     config_document: Option<Document>,
     state: web::Data<AppState>,
     dimensions: Option<&HashMap<String, Value>>,
+    workspace_name: String,
 ) -> airborne_types::Result<SemVer> {
     info!(
         "Starting build for {}/{} with release id {}",
         org, app, release_id
     );
 
+    // --- Step 0: Check if a build already exists for this release_id ---
+    {
+        let pool = state.db_pool.clone();
+        let org_check = org.clone();
+        let app_check = app.clone();
+        let rid_check = release_id.clone();
+
+        let existing = run_blocking!({
+            let mut conn = pool.get()?;
+            builds
+                .filter(org_column.eq(&org_check))
+                .filter(app_column.eq(&app_check))
+                .filter(release_id_column.eq(&rid_check))
+                .first::<BuildEntry>(&mut conn)
+                .optional()
+                .map_err(|e| ABError::InternalServerError(format!("Failed to check build: {}", e)))
+        })?;
+
+        if let Some(existing) = existing {
+            if existing.status == "READY" {
+                info!(
+                    "Build already exists for release_id {}: {}",
+                    release_id, existing.build_version
+                );
+                if let Some(dims) = dimensions {
+                    if let Err(e) = update_superposition_build_rid(
+                        &state,
+                        &workspace_name,
+                        &org,
+                        &app,
+                        &release_id,
+                        dims,
+                    )
+                    .await
+                    {
+                        error!(
+                            "Failed to update superposition build rid key for existing build: {}",
+                            e
+                        );
+                    }
+                }
+                return Ok(existing.build_version);
+            }
+
+            // Status is BUILDING — check if it's stale (older than 5 minutes)
+            let age = chrono::Utc::now() - existing.created_at;
+            if age > chrono::Duration::minutes(5) {
+                info!(
+                    "Stale BUILDING row for release_id {} (version {}, age {}s) — deleting",
+                    release_id,
+                    existing.build_version,
+                    age.num_seconds()
+                );
+                let pool = state.db_pool.clone();
+                let build_id = existing.id;
+                let _ = run_blocking!({
+                    let mut conn = pool.get()?;
+                    diesel::delete(builds.find(build_id))
+                        .execute(&mut conn)
+                        .map_err(|e| {
+                            ABError::InternalServerError(format!(
+                                "Failed to delete stale BUILDING row: {}",
+                                e
+                            ))
+                        })
+                });
+                // Fall through to create a new build
+            }
+            // else: BUILDING and < 5 min old — another request is working on it,
+            // fall through and the UNIQUE constraint will handle dedup
+        }
+    }
+
+    // --- Step 1: Claim a version via INSERT with UNIQUE constraint retry ---
+    let version_claim_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+
     let pool = state.db_pool.clone();
     let org_clone = org.clone();
     let app_clone = app.clone();
+
+    // Query the latest version using integer columns for proper numeric ordering
     let latest_build_version = run_blocking!({
         let mut conn = pool.get()?;
-        // Get the latest build version for this org/app to increment
         builds
             .filter(org_column.eq(&org_clone))
             .filter(app_column.eq(&app_clone))
-            .order(build_version.desc())
+            .order((major_col.desc(), minor_col.desc(), patch_col.desc()))
             .select(build_version)
             .first::<SemVer>(&mut conn)
             .optional()
@@ -582,38 +671,235 @@ async fn build(
             })
     })?;
 
-    // Generate new semver version by incrementing the last part
-    let new_build_version = increment_build_version(latest_build_version);
-    info!("Creating new build: {}", new_build_version);
+    let mut version_candidate = increment_build_version(latest_build_version);
+    let mut new_build_version: Option<SemVer> = None;
+    let mut attempt: u32 = 0;
 
-    let new_build = NewBuildEntry {
-        build_version: new_build_version.clone(),
-        organisation: org.clone(),
-        application: app.clone(),
-        release_id,
-    };
+    loop {
+        if std::time::Instant::now() >= version_claim_deadline {
+            break;
+        }
+        let pool = state.db_pool.clone();
+        let org_insert = org.clone();
+        let app_insert = app.clone();
+        let rid_insert = release_id.clone();
+        let ver_insert = version_candidate.clone();
 
-    // Create and upload build in a separate task
-    let state_clone = state.clone();
+        let insert_result = run_blocking!({
+            let mut conn = pool.get()?;
+            let new_build = NewBuildEntry {
+                build_version: ver_insert.clone(),
+                organisation: org_insert,
+                application: app_insert,
+                release_id: rid_insert,
+                major_version: ver_insert.major as i32,
+                minor_version: ver_insert.minor as i32,
+                patch_version: ver_insert.patch as i32,
+                status: "BUILDING".to_string(),
+            };
+            match diesel::insert_into(builds)
+                .values(&new_build)
+                .execute(&mut conn)
+            {
+                Ok(rows) => Ok(rows),
+                Err(diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UniqueViolation,
+                    _,
+                )) => Err(ABError::Conflict("__UNIQUE_VIOLATION__".to_string())),
+                Err(e) => Err(ABError::InternalServerError(format!(
+                    "Failed to insert build: {}",
+                    e
+                ))),
+            }
+        });
 
-    create_and_upload_build(
-        org,
-        app,
+        match insert_result {
+            Ok(_) => {
+                info!(
+                    "Claimed version {} for {}/{} on attempt {}",
+                    version_candidate, org, app, attempt
+                );
+                new_build_version = Some(version_candidate);
+                break;
+            }
+            Err(e) => {
+                // Check if this is a UNIQUE constraint violation (our retry signal)
+                let is_unique_violation = matches!(&e,
+                    ABError::Conflict(msg) if msg == "__UNIQUE_VIOLATION__"
+                );
+
+                if !is_unique_violation {
+                    return Err(e);
+                }
+
+                // UNIQUE constraint violation — check if another request already built for this release_id
+                let pool = state.db_pool.clone();
+                let org_check = org.clone();
+                let app_check = app.clone();
+                let rid_check = release_id.clone();
+
+                let existing_for_release = run_blocking!({
+                    let mut conn = pool.get()?;
+                    builds
+                        .filter(org_column.eq(&org_check))
+                        .filter(app_column.eq(&app_check))
+                        .filter(release_id_column.eq(&rid_check))
+                        .filter(status_col.eq("READY"))
+                        .first::<BuildEntry>(&mut conn)
+                        .optional()
+                        .map_err(|e| {
+                            ABError::InternalServerError(format!(
+                                "Failed to check release_id build: {}",
+                                e
+                            ))
+                        })
+                })?;
+
+                if let Some(existing) = existing_for_release {
+                    // Another request already built for this release_id and it's READY
+                    info!(
+                        "Build already created by another request for release_id {}: {}",
+                        release_id, existing.build_version
+                    );
+                    if let Some(dims) = dimensions {
+                        if let Err(e) = update_superposition_build_rid(
+                            &state,
+                            &workspace_name,
+                            &org,
+                            &app,
+                            &release_id,
+                            dims,
+                        )
+                        .await
+                        {
+                            error!("Failed to update superposition build rid key for existing build: {}", e);
+                        }
+                    }
+                    return Ok(existing.build_version);
+                }
+
+                // Version number conflict — re-query actual latest from DB and increment
+                info!(
+                    "Version {} conflict for {}/{}, re-querying latest (attempt {})",
+                    version_candidate, org, app, attempt
+                );
+                let pool = state.db_pool.clone();
+                let org_requery = org.clone();
+                let app_requery = app.clone();
+                let refreshed = run_blocking!({
+                    let mut conn = pool.get()?;
+                    builds
+                        .filter(org_column.eq(&org_requery))
+                        .filter(app_column.eq(&app_requery))
+                        .order((major_col.desc(), minor_col.desc(), patch_col.desc()))
+                        .select(build_version)
+                        .first::<SemVer>(&mut conn)
+                        .optional()
+                        .map_err(|e| {
+                            ABError::InternalServerError(format!(
+                                "Failed to re-query latest version: {}",
+                                e
+                            ))
+                        })
+                })?;
+                version_candidate = increment_build_version(refreshed);
+                attempt += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        }
+    }
+
+    let new_build_version = new_build_version.ok_or_else(|| {
+        ABError::InternalServerError(format!(
+            "Failed to claim a version for {}/{} after 5s timeout ({} attempts)",
+            org, app, attempt
+        ))
+    })?;
+
+    // --- Step 2: Create and upload build artifacts (zip/aar/pom) ---
+    let file_upload_result = create_and_upload_build(
+        org.clone(),
+        app.clone(),
         &new_build_version,
         config_document,
-        state_clone,
+        state.clone(),
         dimensions,
     )
-    .await?;
+    .await;
 
-    let pool = state.db_pool.clone();
-    run_blocking!({
-        let mut conn = pool.get()?;
-        diesel::insert_into(builds)
-            .values(&new_build)
+    if file_upload_result.is_err() {
+        // Upload failed → delete the BUILDING row so the version slot is freed
+        let pool = state.db_pool.clone();
+        let org_cleanup = org.clone();
+        let app_cleanup = app.clone();
+        let rid_cleanup = release_id.clone();
+
+        let cleanup_result = run_blocking!({
+            let mut conn = pool.get()?;
+            diesel::delete(
+                builds
+                    .filter(org_column.eq(&org_cleanup))
+                    .filter(app_column.eq(&app_cleanup))
+                    .filter(release_id_column.eq(&rid_cleanup)),
+            )
             .execute(&mut conn)
-            .map_err(|e| ABError::InternalServerError(format!("Failed to insert new build: {}", e)))
-    })?;
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to clean up build after upload failure: {}",
+                    e
+                ))
+            })
+        });
+
+        if let Err(e) = cleanup_result {
+            error!("Failed to clean up build after upload failure: {}", e);
+        }
+
+        return Err(ABError::InternalServerError(
+            "Failed to create and upload build artifacts".to_string(),
+        ));
+    }
+
+    // --- Step 3: Mark build as READY ---
+    {
+        let pool = state.db_pool.clone();
+        let org_ready = org.clone();
+        let app_ready = app.clone();
+        let rid_ready = release_id.clone();
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            diesel::update(
+                builds
+                    .filter(org_column.eq(&org_ready))
+                    .filter(app_column.eq(&app_ready))
+                    .filter(release_id_column.eq(&rid_ready)),
+            )
+            .set(status_col.eq("READY"))
+            .execute(&mut conn)
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to mark build as READY: {}", e))
+            })
+        })?;
+
+        info!(
+            "Build {} for {}/{} marked as READY",
+            new_build_version, org, app
+        );
+    }
+
+    // --- Step 4: Update maven-metadata.xml ---
+    update_maven_metadata(&org, &app, &new_build_version, &state).await?;
+
+    // --- Step 5: Update superposition key ONLY now that status = READY ---
+    if let Some(dims) = dimensions {
+        if let Err(e) =
+            update_superposition_build_rid(&state, &workspace_name, &org, &app, &release_id, dims)
+                .await
+        {
+            error!("Failed to update superposition build rid key: {}", e);
+        }
+    }
 
     Ok(new_build_version)
 }
@@ -641,7 +927,8 @@ async fn extract_args(
         .get("x-force")
         .and_then(|val| val.to_str().ok())
         .map(String::from)
-        .unwrap_or_default()
+        .map(|v| v.to_ascii_lowercase())
+        .unwrap_or("true".to_string())
         == "true";
 
     Ok(Arguments {
@@ -652,13 +939,84 @@ async fn extract_args(
     })
 }
 
+/// Update the `build.last_created_build_rid` key in Superposition for the given dimension context.
+/// Creates an experiment with the dimension context, ramps to 50%, and concludes it immediately.
+async fn update_superposition_build_rid(
+    state: &web::Data<AppState>,
+    workspace_name: &str,
+    org: &str,
+    app: &str,
+    release_id: &str,
+    dimensions: &HashMap<String, Value>,
+) -> airborne_types::Result<()> {
+    let superposition_org = state.env.superposition_org_id.clone();
+
+    if dimensions.is_empty() {
+        // No dimensions → update the default config value directly
+        state
+            .superposition_client
+            .update_default_config()
+            .org_id(superposition_org.clone())
+            .workspace_id(workspace_name.to_string())
+            .key("build.last_created_build_rid".to_string())
+            .value(Document::String(release_id.to_string()))
+            .change_reason(format!(
+                "Build created for {}/{} with release {}",
+                org, app, release_id
+            ))
+            .send()
+            .await
+            .map_err(|e| {
+                info!("Failed to update default config for build rid: {:?}", e);
+                ABError::InternalServerError(
+                    "Failed to update build.last_created_build_rid in Superposition".to_string(),
+                )
+            })?;
+    } else {
+        // Dimensions present → create/update a context override
+        let context: HashMap<String, Document> = dimensions
+            .iter()
+            .map(|(k, v)| (k.clone(), release::utils::value_to_document(v)))
+            .collect();
+
+        state
+            .superposition_client
+            .create_context()
+            .org_id(superposition_org.clone())
+            .workspace_id(workspace_name.to_string())
+            .set_context(Some(context))
+            .r#override(
+                "build.last_created_build_rid".to_string(),
+                Document::String(release_id.to_string()),
+            )
+            .description(format!(
+                "build.last_created_build_rid override for {}/{}",
+                org, app
+            ))
+            .change_reason(format!(
+                "Build created for {}/{} with release {}",
+                org, app, release_id
+            ))
+            .send()
+            .await
+            .map_err(|e| {
+                info!("Failed to create context override for build rid: {:?}", e);
+                ABError::InternalServerError(
+                    "Failed to update build.last_created_build_rid in Superposition".to_string(),
+                )
+            })?;
+    }
+
+    Ok(())
+}
+
 async fn generate(
     arguments: Arguments,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<BuildResponse> {
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    // Get workspace name (similar to serve_release)
+    // Get workspace name
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
         arguments.application.clone(),
@@ -667,7 +1025,6 @@ async fn generate(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
-    // Get resolved config from Superposition (similar to serve_release)
     let resolved_config_builder = arguments.dimensions.iter().fold(
         state
             .superposition_client
@@ -689,12 +1046,21 @@ async fn generate(
 
     let config_document = resolved_config.config;
 
-    // Extract release version from config (similar to serve_release)
+    // Extract current release_id and last built release_id from resolved config
     let release_id =
         release::utils::extract_string_from_configs(&config_document, "config.version")
             .unwrap_or_default();
 
-    info!("release_id: {}", release_id);
+    let last_built_rid = release::utils::extract_string_from_configs(
+        &config_document,
+        "build.last_created_build_rid",
+    )
+    .unwrap_or_default();
+
+    info!(
+        "Build check for {}/{}: current release_id={}, last_built_rid={}",
+        arguments.organisation, arguments.application, release_id, last_built_rid
+    );
 
     if release_id.is_empty() {
         return Err(ABError::InternalServerError(
@@ -702,133 +1068,126 @@ async fn generate(
         ));
     }
 
-    let pool = state.db_pool.clone();
-    let org = arguments.organisation.clone();
-    let app = arguments.application.clone();
-    let release_id_interal = release_id.clone();
-    // Check if build already exists for this release version
-    let existing_build = run_blocking!({
-        let mut conn = pool.get()?;
-        builds
-            .filter(org_column.eq(&org))
-            .filter(app_column.eq(&app))
-            .filter(release_id_column.eq(&release_id_interal))
-            .first::<BuildEntry>(&mut conn)
-            .optional()
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to query existing builds: {}", e))
-            })
-    })?;
+    // --- Case 1: Build already exists for this dimension's release ---
+    if !last_built_rid.is_empty() && release_id == last_built_rid {
+        let pool = state.db_pool.clone();
+        let org = arguments.organisation.clone();
+        let app = arguments.application.clone();
+        let rid = release_id.clone();
 
-    match existing_build {
-        Some(build_entry) => {
-            // Return existing build version
+        let existing_build = run_blocking!({
+            let mut conn = pool.get()?;
+            builds
+                .filter(org_column.eq(&org))
+                .filter(app_column.eq(&app))
+                .filter(release_id_column.eq(&rid))
+                .filter(status_col.eq("READY"))
+                .first::<BuildEntry>(&mut conn)
+                .optional()
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to query existing builds: {}", e))
+                })
+        })?;
+
+        if let Some(build_entry) = existing_build {
             info!(
-                "Found existing build entry for org: {} app: {}, dimensions: {} as version: {}",
-                &arguments.organisation,
-                &arguments.application,
-                serde_json::to_string(&arguments.dimensions).unwrap_or_default(),
-                &build_entry.build_version
+                "Build already exists for {}/{} release_id={} → version {}",
+                arguments.organisation,
+                arguments.application,
+                release_id,
+                build_entry.build_version
             );
-            Ok(BuildResponse {
+            return Ok(BuildResponse {
                 version: build_entry.build_version,
-            })
+            });
         }
-        None => {
-            let pool = state.db_pool.clone();
-            let org = arguments.organisation.clone();
-            let app = arguments.application.clone();
-            // Check what is latest available version for the current application
-            let latest_build = run_blocking!({
-                let mut conn = pool.get()?;
-                builds
-                    .filter(org_column.eq(&org))
-                    .filter(app_column.eq(&app))
-                    .order(build_version.desc())
-                    .first::<BuildEntry>(&mut conn)
-                    .optional()
-                    .map_err(|e| {
-                        ABError::InternalServerError(format!("Failed to query latest build: {}", e))
-                    })
-            })?;
+        // If the superposition key says we built it but the row is missing,
+        // fall through to create a new build
+        info!(
+            "Superposition says last_built_rid={} but no DB row found, rebuilding",
+            last_built_rid
+        );
+    }
 
-            match latest_build {
-                Some(build_entry) => {
-                    if arguments.force {
-                        let config_document_clone = config_document.clone();
-                        let state_clone = state.clone();
-                        let new_build_version = build(
-                            arguments.organisation.clone(),
-                            arguments.application.clone(),
-                            release_id.clone(),
-                            config_document_clone,
-                            state_clone,
-                            Some(&arguments.dimensions),
-                        )
-                        .await?;
+    // --- Case 2: New build needed ---
+    // Check if there's an existing build for the old release (last_built_rid) to return immediately
+    if !arguments.force && !last_built_rid.is_empty() {
+        let pool = state.db_pool.clone();
+        let org = arguments.organisation.clone();
+        let app = arguments.application.clone();
+        let old_rid = last_built_rid.clone();
 
-                        info!("Force created new build version: {}", new_build_version);
+        let latest_build = run_blocking!({
+            let mut conn = pool.get()?;
+            builds
+                .filter(org_column.eq(&org))
+                .filter(app_column.eq(&app))
+                .filter(release_id_column.eq(&old_rid))
+                .filter(status_col.eq("READY"))
+                .first::<BuildEntry>(&mut conn)
+                .optional()
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to query latest build: {}", e))
+                })
+        })?;
 
-                        Ok(BuildResponse {
-                            version: new_build_version,
-                        })
-                    } else {
-                        // Spawn build thread only if build entry is present
-                        let build_args = arguments.clone();
-                        let release_id_clone = release_id.clone();
-                        let config_document_clone = config_document.clone();
-                        let state_clone = state.clone();
-                        let dims_clone = arguments.dimensions;
-                        tokio::spawn(async move {
-                            if let Err(e) = build(
-                                build_args.organisation.clone(),
-                                build_args.application.clone(),
-                                release_id_clone,
-                                config_document_clone,
-                                state_clone,
-                                Some(&dims_clone),
-                            )
-                            .await
-                            {
-                                tracing::error!(?e, "Background build task failed");
-                            } else {
-                                tracing::info!("Background build task completed successfully");
-                            }
-                        });
+        if let Some(build_entry) = latest_build {
+            // Return latest version immediately and build in background
+            let build_args = arguments.clone();
+            let release_id_clone = release_id.clone();
+            let config_document_clone = config_document.clone();
+            let state_clone = state.clone();
+            let dims_clone = arguments.dimensions.clone();
+            let workspace_clone = workspace_name.clone();
 
-                        // Return existing latest build version
-                        info!(
-                            "Returning latest available build: {}",
-                            build_entry.build_version
-                        );
-                        Ok(BuildResponse {
-                            version: build_entry.build_version,
-                        })
+            tokio::spawn(async move {
+                match build(
+                    build_args.organisation.clone(),
+                    build_args.application.clone(),
+                    release_id_clone.clone(),
+                    config_document_clone,
+                    state_clone.clone(),
+                    Some(&dims_clone),
+                    workspace_clone,
+                )
+                .await
+                {
+                    Ok(version) => {
+                        info!("Background build completed: version {}", version);
+                    }
+                    Err(e) => {
+                        error!("Background build task failed: {}", e);
                     }
                 }
-                None => {
-                    let config_document_clone = config_document.clone();
-                    let state_clone = state.clone();
-                    let new_build_version =
-                        // Run build function synchronously if no builds exist and return the new version
-                        build(
-                            arguments.organisation.clone(),
-                            arguments.application.clone(),
-                            release_id.clone(),
-                            config_document_clone,
-                            state_clone,
-                            Some(&arguments.dimensions),
-                        ).await?;
+            });
 
-                    info!("Created new build version: {}", new_build_version);
-
-                    Ok(BuildResponse {
-                        version: new_build_version,
-                    })
-                }
-            }
+            info!(
+                "Returning latest available build {} while building in background",
+                build_entry.build_version
+            );
+            return Ok(BuildResponse {
+                version: build_entry.build_version,
+            });
         }
     }
+
+    // --- Case 3: Force mode, or first-ever build — run synchronously ---
+    let new_build_version = build(
+        arguments.organisation.clone(),
+        arguments.application.clone(),
+        release_id.clone(),
+        config_document,
+        state.clone(),
+        Some(&arguments.dimensions),
+        workspace_name,
+    )
+    .await?;
+
+    info!("Created new build version: {}", new_build_version);
+
+    Ok(BuildResponse {
+        version: new_build_version,
+    })
 }
 
 #[get("{organisation}/{application}")]

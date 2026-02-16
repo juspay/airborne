@@ -97,6 +97,9 @@ pub enum ABError {
     #[error("{0}")]
     Forbidden(String),
 
+    #[error("{0}")]
+    Conflict(String),
+
     #[error("R2D2 error: {0}")]
     R2D2Error(#[from] r2d2::Error),
 }
@@ -189,6 +192,7 @@ impl AppError for ABError {
             ABError::Unauthorized(_) => ABErrorCodes::Unauthorized.label(),
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
+            ABError::Conflict(_) => ABErrorCodes::Conflict.label(),
             ABError::R2D2Error(_) => ABErrorCodes::InternalServerError.label(),
             ABError::OrgAppError(org_app_error) => org_app_error.code(),
             ABError::OrgError(org_error) => org_error.code(),
@@ -202,6 +206,7 @@ impl AppError for ABError {
             ABError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
+            ABError::Conflict(_) => StatusCode::CONFLICT,
             ABError::R2D2Error(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ABError::OrgAppError(org_app_error) => org_app_error.status_code(),
             ABError::OrgError(org_error) => org_error.status_code(),
@@ -255,6 +260,7 @@ pub enum ABErrorCodes {
     Unauthorized,
     BadRequest,
     Forbidden,
+    Conflict,
 }
 
 impl HasLabel for ABErrorCodes {
@@ -265,6 +271,7 @@ impl HasLabel for ABErrorCodes {
             ABErrorCodes::Unauthorized => "AB_004",
             ABErrorCodes::BadRequest => "AB_005",
             ABErrorCodes::Forbidden => "AB_006",
+            ABErrorCodes::Conflict => "AB_007",
         }
     }
 }
