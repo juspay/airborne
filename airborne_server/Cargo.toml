@@ -17,6 +17,7 @@ aws-smithy-types = "1.2.5"
 base64 = "0.22"
 bytes = "1"
 chrono = { workspace = true }
+dashmap = "=6.1.0"
 diesel = { version = "2.2", features = [
     "postgres",
     "r2d2",
@@ -34,14 +35,19 @@ http = "0.2.12"
 http-body = "1.0.1"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
+lazy_static = "=1.5.0"
 log = "0.4.27"
+open-feature = "=0.2.7"
+prometheus = "=0.14.0"
 r2d2 = "=0.8.10"
+redis = { version = "0.32.7", features = ["tokio-comp", "aio", "connection-manager"] }
 reqwest = { version = "^0.12.5", features = ["blocking", "stream"] }
 rustls = { version = "0.23.5" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = "0.10"
-superposition_sdk = "0.91.1"
+superposition_provider = "0.97.0"
+superposition_sdk = "0.92.0"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

@@ -43,6 +43,7 @@ use serde_json::json;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
+    time::Duration,
 };
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
@@ -54,8 +55,13 @@ use crate::{
         auth::Auth,
         request::{req_id_header_mw, WithRequestId},
     },
-    utils::migrations::{
-        get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+    utils::{
+        metrics::push_metrics_task,
+        migrations::{
+            get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+        },
+        redis::RedisCache,
+        superposition_provider::ProviderRegistry,
     },
 };
 
@@ -88,6 +94,7 @@ async fn main() -> std::io::Result<()> {
         std::env::var("SUPERPOSITION_ORG_ID").expect("SUPERPOSITION_ORG_ID must be set");
     let bucket_name = std::env::var("AWS_BUCKET").expect("AWS_BUCKET must be set");
     let public_url = std::env::var("PUBLIC_ENDPOINT").expect("PUBLIC_ENDPOINT must be set");
+    let redis_url = std::env::var("REDIS_URL").ok();
     let port =
         std::env::var("PORT").map_or(8081, |v| v.parse().expect("PORT must be a valid number"));
     let enable_google_signin = std::env::var("ENABLE_GOOGLE_SIGNIN")
@@ -130,6 +137,32 @@ async fn main() -> std::io::Result<()> {
         .split(',')
         .map(|s| s.trim().into())
         .collect();
+
+    let clear_unused_providers = std::env::var("SUPERPOSITION_CLEAR_UNUSED_PROVIDER")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
+
+    let unused_provider_ttl =
+        std::env::var("SUPERPOSITION_UNUSED_PROVIDER_TTL").map_or(43200, |v| {
+            v.parse()
+                .expect("SUPERPOSITION_UNUSED_PROVIDER_TTL must be a valid number")
+        });
+
+    let unused_provider_check_interval =
+        std::env::var("SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL").map_or(1500, |v| {
+            v.parse()
+                .expect("SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL must be a valid number")
+        });
+
+    let victoria_metrics_url = std::env::var("VICTORIA_METRICS_INSERT_URL");
+
+    // Push metrics to Victoria Metrics
+    if victoria_metrics_url.is_ok() {
+        info!("Starting Victoria Metrics push task");
+        let metrics_url = victoria_metrics_url.unwrap_or_default();
+        tokio::spawn(push_metrics_task(metrics_url));
+    }
 
     //Need to check if this ENV exists on pod
     let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
@@ -191,7 +224,7 @@ async fn main() -> std::io::Result<()> {
         secret: secret.clone(),
         realm,
         bucket_name,
-        superposition_org_id: superposition_org_id_env,
+        superposition_org_id: superposition_org_id_env.clone(),
         enable_google_signin,
         organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
@@ -239,17 +272,58 @@ async fn main() -> std::io::Result<()> {
         SrsConfig::builder()
             .endpoint_url(cac_url.clone())
             .behavior_version_latest()
-            .bearer_token(superposition_token.into())
+            .bearer_token(superposition_token.clone().into())
             .build(),
     );
+
+    // Initialize Redis client
+    let redis_cache = if let Some(redis_url) = redis_url {
+        info!("Initializing Redis cache");
+
+        let redis_client =
+            redis::Client::open(redis_url.as_str()).expect("Failed to create Redis client");
+
+        Some(
+            RedisCache::new(redis_client, "airborne".to_string())
+                .await
+                .expect("Failed to create Redis cache instance"),
+        )
+    } else {
+        info!("REDIS_URL not set, skipping Redis cache initialization");
+        None
+    };
+
+    let provider_url = cac_url + "/";
+
+    let provider_registry = Arc::new(ProviderRegistry::new(
+        superposition_org_id_env.clone(),
+        superposition_token.clone(),
+        provider_url.clone(),
+    ));
+
+    if clear_unused_providers {
+        info!("Starting unused superposition provider eviction task with TTL {} seconds and check interval {} seconds", unused_provider_ttl, unused_provider_check_interval);
+
+        let provider_registry_clone = provider_registry.clone();
+        tokio::spawn(async move {
+            provider_registry_clone
+                .run_ttl_eviction(
+                    Duration::from_secs(unused_provider_ttl),
+                    Duration::from_secs(unused_provider_check_interval),
+                )
+                .await;
+        });
+    }
 
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
         db_pool: pool,
+        redis_cache,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
+        provider_registry,
     });
 
     // Start the background cleanup job for transaction reconciliation
@@ -267,7 +341,7 @@ async fn main() -> std::io::Result<()> {
                 superposition_migration.err()
             );
         } else {
-            println!("Superposition migration completed successfully");
+            info!("Superposition migration completed successfully");
         }
     }
 

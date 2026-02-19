@@ -1,22 +1,16 @@
 pub mod utils;
 use crate::{
     package::{types::*, utils::parse_package_key},
+    release::utils::get_files_by_file_keys_async,
     run_blocking,
-    types::{
-        WithHeaders, {ABError, PaginatedQuery, PaginatedResponse},
-    },
+    types::{ABError, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::db::{
-        models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
-        schema::hyperotaserver::{
-            files::{
-                app_id as file_app_id, file_path, org_id as file_org_id, table as files_table,
-                tag as file_tag, version as file_version,
-            },
-            packages_v2::{
-                app_id as package_app_id, index as package_index, org_id as package_org_id,
-                table as packages_table, tag as package_tag, version as package_version,
-            },
+        models::{NewPackageV2Entry, PackageV2Entry},
+        schema::hyperotaserver::packages_v2::{
+            app_id as package_app_id, index as package_index, org_id as package_org_id,
+            table as packages_table, tag as package_tag, version as package_version,
         },
+        DbPool,
     },
 };
 use actix_web::{
@@ -26,14 +20,10 @@ use actix_web::{
 };
 
 use crate::{
-    file::utils::parse_file_key,
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
     types as airborne_types,
     types::AppState,
 };
-use diesel::expression::BoxableExpression;
-use diesel::pg::Pg;
-use diesel::sql_types::Bool;
 use diesel::RunQueryDsl;
 use diesel::{dsl::count_star, prelude::*};
 
@@ -68,51 +58,29 @@ async fn create_package(
     let pool = state.db_pool.clone();
     let request = req.into_inner();
 
+    let files = get_files_by_file_keys_async(
+        state.db_pool.clone(),
+        &state.redis_cache,
+        organisation.clone(),
+        application.clone(),
+        request.files.clone(),
+    )
+    .await?;
+
+    if files.len() != request.files.len() {
+        return Err(ABError::BadRequest("Some files not found".to_string()));
+    }
+
+    let opt_pkg_tag = request.tag.clone();
+    let db_organisation = organisation.clone();
+    let db_application = application.clone();
+    let db_pkg_index = request.index.clone();
     let package = run_blocking!({
         let mut conn = pool.get()?;
 
-        let files: Vec<FileEntry> = if !request.files.is_empty() {
-            let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
-
-            for file_id in &request.files {
-                let (fp, ver_opt, tag_opt) = parse_file_key(file_id);
-
-                if let Some(v) = ver_opt {
-                    file_conds.push(Box::new(file_path.eq(fp.clone()).and(file_version.eq(v))));
-                } else if let Some(t) = tag_opt {
-                    file_conds.push(Box::new(
-                        file_path
-                            .eq(fp.clone())
-                            .and(file_tag.is_not_distinct_from(t.clone())),
-                    ));
-                } else {
-                    return Err(ABError::BadRequest("Invalid file key format".to_string()));
-                }
-            }
-
-            let combined = file_conds
-                .into_iter()
-                .reduce(|a, b| Box::new(a.or(b)))
-                .unwrap_or(Box::new(file_path.eq("")));
-
-            let files: Vec<FileEntry> = files_table
-                .into_boxed::<Pg>()
-                .filter(file_org_id.eq(&organisation))
-                .filter(file_app_id.eq(&application))
-                .filter(combined)
-                .load(&mut conn)?;
-            files
-        } else {
-            vec![]
-        };
-
-        if files.len() != request.files.len() {
-            return Err(ABError::BadRequest("Some files not found".to_string()));
-        }
-
         let latest_package = packages_table
-            .filter(package_org_id.eq(&organisation))
-            .filter(package_app_id.eq(&application))
+            .filter(package_org_id.eq(&db_organisation))
+            .filter(package_app_id.eq(&db_application))
             .order(package_version.desc())
             .select(PackageV2Entry::as_select())
             .first::<PackageV2Entry>(&mut conn)
@@ -125,10 +93,10 @@ async fn create_package(
         };
 
         let new_package = NewPackageV2Entry {
-            index: request.index.clone(),
-            org_id: organisation.clone(),
-            app_id: application.clone(),
-            tag: request.tag.clone(),
+            index: db_pkg_index.clone(),
+            org_id: db_organisation.clone(),
+            app_id: db_application.clone(),
+            tag: opt_pkg_tag.clone(),
             version: new_version,
             files: files
                 .iter()
@@ -143,6 +111,18 @@ async fn create_package(
 
         Ok(result)
     })?;
+
+    // remove this tag package from redis cache if exists
+    if let Some(pkg_tag) = request.tag.clone() {
+        if let Some(ref cache) = state.redis_cache {
+            let cache_key = cache.key(
+                &organisation,
+                &application,
+                &["package", &format!("tag:{}", &pkg_tag)],
+            );
+            let _ = cache.del(&cache_key).await;
+        }
+    }
 
     Ok(
         WithHeaders::new(Json(utils::db_response_to_package(package)))
@@ -178,6 +158,48 @@ async fn get_package(
 
     let pool = state.db_pool.clone();
 
+    let package = match state.redis_cache {
+        Some(ref cache) => {
+            let cache_key = cache.key(&organisation, &application, &["package", &package_id]);
+
+            const WEEK: usize = 7 * 24 * 60 * 60; // 604800
+
+            cache
+                .get_or_try_set::<Package, _, _>(&cache_key, WEEK, || async {
+                    get_package_from_db(
+                        organisation.to_owned(),
+                        application.to_owned(),
+                        opt_pkg_version,
+                        opt_pkg_tag.to_owned(),
+                        pool.to_owned(),
+                    )
+                    .await
+                })
+                .await
+        }
+        None => {
+            let package = get_package_from_db(
+                organisation.to_owned(),
+                application.to_owned(),
+                opt_pkg_version,
+                opt_pkg_tag.to_owned(),
+                pool.to_owned(),
+            )
+            .await?;
+            Ok(package)
+        }
+    }?;
+
+    Ok(Json(package))
+}
+
+async fn get_package_from_db(
+    organisation: String,
+    application: String,
+    opt_pkg_version: Option<i32>,
+    opt_pkg_tag: Option<String>,
+    pool: DbPool,
+) -> airborne_types::Result<Package> {
     let package = run_blocking!({
         let mut conn = pool.get()?;
 
@@ -202,7 +224,7 @@ async fn get_package(
         }
     })?;
 
-    Ok(Json(utils::db_response_to_package(package)))
+    Ok(utils::db_response_to_package(package))
 }
 
 #[get("/list")]
