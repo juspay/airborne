@@ -51,7 +51,7 @@ class AirborneReactActivityDelegate(
 
     override fun onResume() {
         try {
-            if (appState == AppState.APP_LOADED) {
+            if (appState == AppState.APP_LOADED || appState == AppState.ONRESUME_CALLED) {
                 super.onResume()
                 appState = AppState.ONRESUME_CALLED
             } else {
