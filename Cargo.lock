@@ -313,7 +313,7 @@ dependencies = [
 
 [[package]]
 name = "airborne_analytics_server"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "airborne_server"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "actix-files",
  "actix-multipart",

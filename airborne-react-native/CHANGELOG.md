@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.3.2 - 2026-02-19
+#### Bug Fixes
+- app not responding when returning from background - (62ad9bf) - Yash Rajput
+
+- - -
+
 ## airborne_react_native-v0.3.1 - 2026-02-10
 #### Bug Fixes
 - update airborne sdk dependency version - (0ca6b30) - Yash Rajput
