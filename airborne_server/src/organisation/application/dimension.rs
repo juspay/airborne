@@ -86,22 +86,18 @@ async fn create_dimension_api(
 
     // Find the highest position using nested match statements
     let highest_position = match req.dimension_type {
-        DimensionType::Cohort => match &current_dimensions.data {
-            Some(dimensions) => dimensions
+        DimensionType::Cohort => {
+            let dimensions = &current_dimensions.data;
+            dimensions
                 .iter()
                 .find(|d| d.dimension == req.depends_on.clone().unwrap_or_default())
                 .map(|d| d.position)
-                .ok_or_else(|| ABError::NotFound("Dependency dimension not found".to_string()))?,
-            None => {
-                return Err(ABError::NotFound(
-                    "Dependency dimension not found".to_string(),
-                ))
-            }
-        },
-        DimensionType::Standard => match &current_dimensions.data {
-            Some(dimensions) => dimensions.iter().map(|d| d.position).max().unwrap_or(0) + 1,
-            None => 1,
-        },
+                .ok_or_else(|| ABError::NotFound("Dependency dimension not found".to_string()))?
+        }
+        DimensionType::Standard => {
+            let dimensions = &current_dimensions.data;
+            dimensions.iter().map(|d| d.position).max().unwrap_or(0) + 1
+        }
     };
 
     let dim_schema = req.schema.to_json();
@@ -228,11 +224,10 @@ async fn list_dimensions_api(
         .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;
 
     Ok(Json(ListDimensionsResponse {
-        total_pages: dimensions.total_pages,
-        total_items: dimensions.total_items,
+        total_pages: Some(dimensions.total_pages),
+        total_items: Some(dimensions.total_items),
         data: dimensions
             .data
-            .unwrap_or_default()
             .into_iter()
             .map(|d| Dimension {
                 dimension: d.dimension,
@@ -240,7 +235,7 @@ async fn list_dimensions_api(
                 schema: hashmap_to_json_value(&d.schema),
                 description: d.description,
                 change_reason: d.change_reason,
-                mandatory: d.mandatory,
+                mandatory: Some(d.mandatory),
                 dimension_type: match d.dimension_type {
                     superposition_sdk::types::DimensionType::LocalCohort(_) => {
                         DimensionType::Cohort
@@ -321,7 +316,7 @@ async fn update_dimension_api(
         schema: hashmap_to_json_value(&update_dimension.schema),
         description: update_dimension.description,
         change_reason: update_dimension.change_reason,
-        mandatory: update_dimension.mandatory,
+        mandatory: Some(update_dimension.mandatory),
         dimension_type: match update_dimension.dimension_type {
             superposition_sdk::types::DimensionType::LocalCohort(_) => DimensionType::Cohort,
             _ => DimensionType::Standard,
@@ -412,7 +407,6 @@ async fn create_release_view_api(
 
     let valid_dimension_names: std::collections::HashSet<String> = existing_dimensions
         .data
-        .unwrap_or_default()
         .into_iter()
         .map(|d| d.dimension)
         .collect();
@@ -629,7 +623,6 @@ async fn update_release_view_api(
 
     let valid_dimension_names: std::collections::HashSet<String> = existing_dimensions
         .data
-        .unwrap_or_default()
         .into_iter()
         .map(|d| d.dimension)
         .collect();

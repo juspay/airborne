@@ -30,7 +30,7 @@ use diesel::{QueryDsl, RunQueryDsl, SelectableHelper};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use superposition_sdk::types::DefaultConfigFull;
+use superposition_sdk::types::DefaultConfigResponse;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -168,9 +168,9 @@ pub async fn migrate_superposition_workspace(
         .await
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
-    let server_configs: Vec<DefaultConfigFull> = all_configs.data.clone().unwrap_or_default();
+    let server_configs: Vec<DefaultConfigResponse> = all_configs.data.clone();
 
-    let configs_to_be_removed: Vec<DefaultConfigFull> = server_configs
+    let configs_to_be_removed: Vec<DefaultConfigResponse> = server_configs
         .clone()
         .into_iter()
         .filter(|srv| !local_keys.contains(&srv.key) && !srv.key.starts_with("config.properties."))
