@@ -53,5 +53,10 @@
         "key": "resources",
         "default": [],
         "description": "Indicating the resources for the package"
+    },
+    {
+        "key": "build.last_created_build_rid",
+        "default": "",
+        "description": "Release ID of the last created build, overridden per dimension set"
     }
 ]
