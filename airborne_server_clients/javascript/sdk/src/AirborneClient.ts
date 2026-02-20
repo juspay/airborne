@@ -62,6 +62,10 @@ import {
   ListReleasesCommandOutput,
 } from "./commands/ListReleasesCommand";
 import {
+  ListVersionsCommandInput,
+  ListVersionsCommandOutput,
+} from "./commands/ListVersionsCommand";
+import {
   PostLoginCommandInput,
   PostLoginCommandOutput,
 } from "./commands/PostLoginCommand";
@@ -165,6 +169,7 @@ export type ServiceInputTypes =
   | ListOrganisationsCommandInput
   | ListPackagesCommandInput
   | ListReleasesCommandInput
+  | ListVersionsCommandInput
   | PostLoginCommandInput
   | RequestOrganisationCommandInput
   | ServeReleaseCommandInput
@@ -190,6 +195,7 @@ export type ServiceOutputTypes =
   | ListOrganisationsCommandOutput
   | ListPackagesCommandOutput
   | ListReleasesCommandOutput
+  | ListVersionsCommandOutput
   | PostLoginCommandOutput
   | RequestOrganisationCommandOutput
   | ServeReleaseCommandOutput

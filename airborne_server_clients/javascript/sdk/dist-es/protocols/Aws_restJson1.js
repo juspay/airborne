@@ -179,7 +179,8 @@ export const se_ListFilesCommand = async (input, context) => {
     b.bp("/api/file/list");
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
         [_s]: [, input[_s]],
     });
     let body;
@@ -232,6 +233,27 @@ export const se_ListReleasesCommand = async (input, context) => {
         [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
         [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
         [_st]: [, input[_st]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+export const se_ListVersionsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file/{filepath}/versions");
+    b.p('filepath', () => input.filepath, '{filepath}', false);
+    const query = map({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+        [_s]: [, input[_s]],
     });
     let body;
     b.m("GET")
@@ -522,12 +544,9 @@ export const de_ListFilesCommand = async (output, context) => {
     });
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
-        'application': __expectString,
-        'files': _ => de_FileResponseList(_, context),
-        'organisation': __expectString,
-        'page': __expectInt32,
-        'per_page': __expectInt32,
-        'total': __expectInt32,
+        'data': _json,
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
     });
     Object.assign(contents, doc);
     return contents;
@@ -572,6 +591,22 @@ export const de_ListReleasesCommand = async (output, context) => {
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
         'data': _ => de_GetReleaseResponseList(_, context),
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_ListVersionsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'data': _json,
         'total_items': __expectInt32,
         'total_pages': __expectInt32,
     });
@@ -813,20 +848,6 @@ const de_ConfigProperties = (output, context) => {
         'tenant_info': (_) => de_Document(_, context),
     });
 };
-const de_CreateFileResponse = (output, context) => {
-    return take(output, {
-        'checksum': __expectString,
-        'created_at': __expectString,
-        'file_path': __expectString,
-        'id': __expectString,
-        'metadata': (_) => de_Document(_, context),
-        'size': __expectInt32,
-        'status': __expectString,
-        'tag': __expectString,
-        'url': __expectString,
-        'version': __expectInt32,
-    });
-};
 const de_DimensionList = (output, context) => {
     const retVal = (output || []).filter((e) => e != null).map((entry) => {
         return de_DimensionResponse(entry, context);
@@ -851,12 +872,6 @@ const de_DimensionsMap = (output, context) => {
         acc[key] = de_Document(value, context);
         return acc;
     }, {});
-};
-const de_FileResponseList = (output, context) => {
-    const retVal = (output || []).filter((e) => e != null).map((entry) => {
-        return de_CreateFileResponse(entry, context);
-    });
-    return retVal;
 };
 const de_GetReleaseConfig = (output, context) => {
     return take(output, {
@@ -911,7 +926,6 @@ const _d = "dimension";
 const _fp = "file_path";
 const _o = "organisation";
 const _p = "page";
-const _pp = "per_page";
 const _s = "search";
 const _st = "status";
 const _t = "tag";

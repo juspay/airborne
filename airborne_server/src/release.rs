@@ -362,6 +362,23 @@ async fn create_release(
         ));
     }
 
+    if let Some(resources) = &req.resources {
+        if !resources.is_empty() {
+            // Parse and collect all file paths
+            let mut seen_paths = std::collections::HashSet::new();
+
+            for file_id in resources {
+                let (fp, _ver_opt, _tag_opt) = parse_file_key(file_id);
+                if !seen_paths.insert(fp.clone()) {
+                    return Err(ABError::BadRequest(format!(
+                        "Duplicate file path found: {}",
+                        fp
+                    )));
+                }
+            }
+        }
+    }
+
     let BuildOverrides {
         final_important,
         package_data,
@@ -1520,6 +1537,23 @@ async fn update_release(
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
+
+    if let Some(resources) = &req.resources {
+        if !resources.is_empty() {
+            // Parse and collect all file paths
+            let mut seen_paths = std::collections::HashSet::new();
+
+            for file_id in resources {
+                let (fp, _ver_opt, _tag_opt) = parse_file_key(file_id);
+                if !seen_paths.insert(fp.clone()) {
+                    return Err(ABError::BadRequest(format!(
+                        "Duplicate file path found: {}",
+                        fp
+                    )));
+                }
+            }
+        }
+    }
 
     let release_id = path.into_inner();
 

@@ -20,6 +20,7 @@ service Airborne {
         CreateFile
         ListFiles
         UploadFile
+        ListVersions
         // package
         CreatePackage
         ListPackages

@@ -4,16 +4,8 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Search, MoreHorizontal, Edit, Filter } from "lucide-react";
+import { Search, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Pagination,
@@ -29,25 +21,20 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { hasAppAccess } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { FileTable } from "@/components/files/files-tables";
 import { useParams } from "next/navigation";
 
 type ApiFile = {
-  id: string;
   file_path: string;
-  url: string;
-  version: number;
-  tag?: string;
-  size?: number;
-  status?: string;
-  created_at?: string;
-  metadata?: Record<string, any>;
+  latest_version: number;
+  total_versions: number;
+  id: string;
 };
 
 type ApiResponse = {
-  files: ApiFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
+  data: ApiFile[];
+  total_items: number;
+  total_pages: number;
 };
 
 export default function FilesPage() {
@@ -62,31 +49,19 @@ export default function FilesPage() {
   const perPage = 10;
 
   // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
-  const { data, error, mutate, isLoading } = useSWR(
+  const { data, mutate, isLoading } = useSWR(
     token && org && appId ? ["/file/list", appId, debouncedSearchQuery, currentPage] : null,
     async () =>
       apiFetch<ApiResponse>(
         "/file/list",
-        { method: "GET", query: { search: searchQuery || undefined, page: currentPage, per_page: perPage } },
+        { method: "GET", query: { search: searchQuery || undefined, page: currentPage, count: perPage } },
         { token, org, app: appId }
       )
   );
 
-  const files: ApiFile[] = data?.files || [];
-  const total = data?.total || 0;
-  const totalPages = Math.ceil(total / perPage);
-
-  async function updateTag(f: ApiFile) {
-    const currentKey = f.id || f.file_path;
-    const newTag = prompt(`Update tag for ${currentKey}`, f.tag || "");
-    if (!newTag) return;
-    await apiFetch(
-      `/file/${encodeURIComponent(currentKey)}`,
-      { method: "PATCH", body: { tag: newTag } },
-      { token, org, app }
-    );
-    mutate();
-  }
+  const files: ApiFile[] = data?.data || [];
+  const total = data?.total_items || 0;
+  const totalPages = data?.total_pages || 0;
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -245,71 +220,7 @@ export default function FilesPage() {
           <CardDescription>URL-registered files for your application</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Path</TableHead>
-                <TableHead>Tag</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {error && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-red-600">
-                    Failed to load files
-                  </TableCell>
-                </TableRow>
-              )}
-              {!error && files.length === 0 && !isLoading && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    {searchQuery
-                      ? "No files found matching your search."
-                      : "No files found. Create your first file to get started."}
-                  </TableCell>
-                </TableRow>
-              )}
-              {!error &&
-                files
-                  .filter((f) => (filterType === "all" ? true : f.status === filterType))
-                  .map((f) => (
-                    <TableRow key={f.id || f.file_path}>
-                      <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                      <TableCell>{f.tag && <Badge variant="outline">{f.tag}</Badge>}</TableCell>
-                      <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                      <TableCell className="max-w-[280px] truncate text-muted-foreground">{f.url}</TableCell>
-                      <TableCell>
-                        <Badge variant={f.status === "ready" ? "default" : "secondary"}>{f.status || "—"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {f.created_at ? new Date(f.created_at).toLocaleString() : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => updateTag(f)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Update Tag
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
+          <FileTable files={files} isLoading={isLoading} />
 
           {/* Pagination Controls */}
           {totalPages > 1 && (

@@ -5,12 +5,12 @@ import {
   ServiceOutputTypes,
 } from "../AirborneClient";
 import {
-  ListFilesRequest,
-  ListFilesResponse,
+  ListVersionResponse,
+  ListVersionsRequest,
 } from "../models/models_0";
 import {
-  de_ListFilesCommand,
-  se_ListFilesCommand,
+  de_ListVersionsCommand,
+  se_ListVersionsCommand,
 } from "../protocols/Aws_restJson1";
 import { getSerdePlugin } from "@smithy/middleware-serde";
 import { Command as $Command } from "@smithy/smithy-client";
@@ -24,25 +24,26 @@ export { $Command };
 /**
  * @public
  *
- * The input for {@link ListFilesCommand}.
+ * The input for {@link ListVersionsCommand}.
  */
-export interface ListFilesCommandInput extends ListFilesRequest {}
+export interface ListVersionsCommandInput extends ListVersionsRequest {}
 /**
  * @public
  *
- * The output of {@link ListFilesCommand}.
+ * The output of {@link ListVersionsCommand}.
  */
-export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBearer {}
+export interface ListVersionsCommandOutput extends ListVersionResponse, __MetadataBearer {}
 
 /**
- * List files request operation
+ * List versions request operation
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
- * import { AirborneClient, ListFilesCommand } from "airborne-server-sdk"; // ES Modules import
- * // const { AirborneClient, ListFilesCommand } = require("airborne-server-sdk"); // CommonJS import
+ * import { AirborneClient, ListVersionsCommand } from "airborne-server-sdk"; // ES Modules import
+ * // const { AirborneClient, ListVersionsCommand } = require("airborne-server-sdk"); // CommonJS import
  * const client = new AirborneClient(config);
- * const input = { // ListFilesRequest
+ * const input = { // ListVersionsRequest
+ *   filepath: "STRING_VALUE", // required
  *   page: Number("int"),
  *   count: Number("int"),
  *   all: true || false,
@@ -50,15 +51,15 @@ export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBea
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
- * const command = new ListFilesCommand(input);
+ * const command = new ListVersionsCommand(input);
  * const response = await client.send(command);
- * // { // ListFilesResponse
- * //   data: [ // FileResponseList // required
- * //     { // FileResponseListItem
- * //       file_path: "STRING_VALUE", // required
- * //       id: "STRING_VALUE", // required
+ * // { // ListVersionResponse
+ * //   data: [ // FileVersionItemList // required
+ * //     { // FileVersionItem
  * //       version: Number("int"), // required
- * //       total_versions: Number("int"), // required
+ * //       tag: "STRING_VALUE",
+ * //       created_at: "STRING_VALUE", // required
+ * //       id: "STRING_VALUE", // required
  * //     },
  * //   ],
  * //   total_pages: Number("int"), // required
@@ -67,10 +68,10 @@ export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBea
  *
  * ```
  *
- * @param ListFilesCommandInput - {@link ListFilesCommandInput}
- * @returns {@link ListFilesCommandOutput}
- * @see {@link ListFilesCommandInput} for command's `input` shape.
- * @see {@link ListFilesCommandOutput} for command's `response` shape.
+ * @param ListVersionsCommandInput - {@link ListVersionsCommandInput}
+ * @returns {@link ListVersionsCommandOutput}
+ * @see {@link ListVersionsCommandInput} for command's `input` shape.
+ * @see {@link ListVersionsCommandOutput} for command's `response` shape.
  * @see {@link AirborneClientResolvedConfig | config} for AirborneClient's `config` shape.
  *
  * @throws {@link Unauthorized} (client fault)
@@ -93,30 +94,30 @@ export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBea
  *
  * @public
  */
-export class ListFilesCommand extends $Command.classBuilder<ListFilesCommandInput, ListFilesCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>()
+export class ListVersionsCommand extends $Command.classBuilder<ListVersionsCommandInput, ListVersionsCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>()
       .m(function (this: any, Command: any, cs: any, config: AirborneClientResolvedConfig, o: any) {
           return [
 
   getSerdePlugin(config, this.serialize, this.deserialize),
       ];
   })
-  .s("Airborne", "ListFiles", {
+  .s("Airborne", "ListVersions", {
 
   })
-  .n("AirborneClient", "ListFilesCommand")
+  .n("AirborneClient", "ListVersionsCommand")
   .f(void 0, void 0)
-  .ser(se_ListFilesCommand)
-  .de(de_ListFilesCommand)
+  .ser(se_ListVersionsCommand)
+  .de(de_ListVersionsCommand)
 .build() {
 /** @internal type navigation helper, not in runtime. */
 declare protected static __types: {
   api: {
-      input: ListFilesRequest;
-      output: ListFilesResponse;
+      input: ListVersionsRequest;
+      output: ListVersionResponse;
   };
   sdk: {
-      input: ListFilesCommandInput;
-      output: ListFilesCommandOutput;
+      input: ListVersionsCommandInput;
+      output: ListVersionsCommandOutput;
   };
 };
 }
