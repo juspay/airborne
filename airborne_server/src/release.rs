@@ -116,13 +116,13 @@ async fn get_release(
         utils::extract_integer_from_experiment::<i64>(&experimental_variant, "package.version");
 
     let package_properties = experimental_variant
-        .and_then(|v| v.overrides.as_object())
+        .map(|v| &v.overrides)
         .and_then(|obj| obj.get("package.properties"))
         .and_then(utils::document_to_value)
         .unwrap_or_default();
 
     let rc_properties = experimental_variant
-        .and_then(|v| v.overrides.as_object())
+        .map(|v| &v.overrides)
         .map(|obj| {
             obj.iter()
                 .filter_map(|(k, v)| {
@@ -389,7 +389,7 @@ async fn create_release(
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
         .variant_type(superposition_sdk::types::VariantType::Control)
-        .overrides(Document::Object(control_overrides))
+        .set_overrides(Some(control_overrides))
         .build()
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
@@ -398,7 +398,7 @@ async fn create_release(
     let experimental_variant = VariantBuilder::default()
         .id(experimental_variant_id.clone())
         .variant_type(superposition_sdk::types::VariantType::Experimental)
-        .overrides(Document::Object(experimental_overrides))
+        .set_overrides(Some(experimental_overrides))
         .build()
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
@@ -675,7 +675,7 @@ async fn list_releases(
                 as i32;
 
         let rc_package_properties = experimental_variant
-            .and_then(|v| v.overrides.as_object())
+            .map(|v| &v.overrides)
             .and_then(|obj| obj.get("package.properties"))
             .and_then(utils::document_to_value)
             .unwrap_or_default();
@@ -708,7 +708,7 @@ async fn list_releases(
             "config.release_config_timeout",
         );
         let rc_config_properties = experimental_variant
-            .and_then(|v| v.overrides.as_object())
+            .map(|v| &v.overrides)
             .map(|obj| {
                 obj.iter()
                     .filter_map(|(k, v)| {
@@ -1296,7 +1296,7 @@ async fn serve_release_handler(
         ABError::InternalServerError(format!("Failed to get resolved config: {}", e))
     })?;
 
-    let config_document = resolved_config.config;
+    let config_document = Some(resolved_config.config);
 
     let rc_package_important =
         utils::extract_files_from_configs(&config_document, "package.important")
@@ -1580,13 +1580,13 @@ async fn update_release(
 
     let control_variant = VariantUpdateRequestBuilder::default()
         .id(format!("{:}-control", release_id))
-        .overrides(Document::Object(control_overrides))
+        .set_overrides(Some(control_overrides))
         .build()
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
     let experiment_variant = VariantUpdateRequestBuilder::default()
         .id(experiment_variant_id.clone())
-        .overrides(Document::Object(experimental_overrides))
+        .set_overrides(Some(experimental_overrides))
         .build()
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 

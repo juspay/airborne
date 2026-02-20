@@ -102,7 +102,7 @@ pub fn extract_files_from_experiment(
     key: &str,
 ) -> Vec<String> {
     experimental_variant
-        .and_then(|v| v.overrides.as_object())
+        .map(|v| &v.overrides)
         .and_then(|obj| obj.get(key))
         .and_then(|doc| {
             if let Document::Array(arr) = doc {
@@ -129,7 +129,7 @@ where
     T: Default + From<i32> + From<i64> + From<u32>,
 {
     experimental_variant
-        .and_then(|v| v.overrides.as_object())
+        .map(|v| &v.overrides)
         .and_then(|obj| obj.get(key))
         .and_then(|doc: &Document| {
             if let Document::Number(s) = doc {
@@ -153,7 +153,7 @@ pub fn extract_string_from_experiment(
     key: &str,
 ) -> String {
     experimental_variant
-        .and_then(|v| v.overrides.as_object())
+        .map(|v| &v.overrides)
         .and_then(|obj| obj.get(key))
         .and_then(|doc| {
             if let Document::String(s) = doc {
@@ -469,7 +469,7 @@ pub async fn build_overrides(
     let config_document = match resolved_config {
         Ok(config) => {
             info!("config from superposition: {:?}", config);
-            config.config
+            Some(config.config)
         }
         Err(e) => {
             info!("Failed to get resolved config: {}", e);
@@ -863,10 +863,10 @@ pub async fn list_experiments_by_context(
         experiments_builder = experiments_builder.all(true);
     } else {
         if let Some(p) = experiment_query.page {
-            experiments_builder = experiments_builder.page(p);
+            experiments_builder = experiments_builder.page(p as i32);
         }
         if let Some(c) = experiment_query.count {
-            experiments_builder = experiments_builder.count(c);
+            experiments_builder = experiments_builder.count(c as i32);
         }
     }
 

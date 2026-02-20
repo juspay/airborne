@@ -358,7 +358,6 @@ async fn add_application(
             .org_id(superposition_org_id_from_env.clone())
             .workspace_name(generated_workspace_name.clone())
             .workspace_status(WorkspaceStatus::Enabled)
-            .strict_mode(false)
             .allow_experiment_self_approval(true)
             .workspace_admin_email("pp-sdk@juspay.in".to_string())
             .send()
