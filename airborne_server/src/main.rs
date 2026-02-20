@@ -321,6 +321,11 @@ async fn main() -> std::io::Result<()> {
                             .wrap(Auth)
                             .service(package::add_routes()),
                     )
+                    .service(
+                        web::scope("/package-groups")
+                            .wrap(Auth)
+                            .service(package::add_package_group_routes()),
+                    )
                     .service(release::add_routes("releases")),
             )
     })

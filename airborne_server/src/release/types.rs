@@ -12,6 +12,7 @@ pub struct CreateReleaseRequest {
     pub config: ConfigRequest,
     pub package_id: Option<String>,
     pub package: Option<PackageRequest>,
+    pub sub_packages: Option<Vec<String>>,
     pub dimensions: Option<HashMap<String, serde_json::Value>>,
     pub resources: Option<Vec<String>>,
 }
@@ -62,6 +63,7 @@ pub struct CreateReleaseResponse {
     pub config: Config,
     pub package: ServePackage,
     pub resources: Vec<ServeFile>,
+    pub sub_packages: Vec<String>,
     pub experiment: Option<ReleaseExperiment>,
     pub dimensions: HashMap<String, serde_json::Value>,
 }
@@ -71,10 +73,30 @@ pub struct GetReleaseResponse {
     pub id: String,
     pub created_at: DateTime<Utc>,
     pub config: Config,
-    pub package: ServePackage,
-    pub resources: Vec<ServeFile>,
+    pub package: GetReleasePackage,
+    pub sub_packages: Vec<String>,
+    pub resources: Vec<Resource>,
     pub experiment: Option<ReleaseExperiment>,
     pub dimensions: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Serialize)]
+pub struct Resource {
+    pub file_id: String,
+    pub file_path: String,
+    pub url: String,
+    pub checksum: String,
+}
+
+#[derive(Serialize)]
+pub struct GetReleasePackage {
+    pub name: String,
+    pub group_id: String,
+    pub version: String,
+    pub index: ServeFile,
+    pub properties: Value,
+    pub important: Vec<ServeFile>,
+    pub lazy: Vec<ServeFile>,
 }
 
 #[derive(Serialize, Debug)]
@@ -180,6 +202,7 @@ pub struct BuildOverrides {
     pub final_properties: Option<Value>,
     pub control_overrides: HashMap<String, Document>,
     pub experimental_overrides: HashMap<String, Document>,
+    pub sub_packages: Vec<String>,
 }
 
 pub struct ListExperimentsQuery {

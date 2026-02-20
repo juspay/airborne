@@ -55,7 +55,6 @@ interface ChecksummedFile {
   url: string;
   checksum: string;
 }
-
 interface ReleaseConfig {
   boot_timeout: number;
   release_config_timeout: number;
@@ -101,10 +100,14 @@ export interface ReleasePayload {
 function toServeReleaseConfig(payload: ReleasePayload): ServeReleaseConfig {
   const { config, resources, package: pkg } = payload;
   const { version, properties, index, important, lazy } = pkg;
-
+  const filteredResources = resources.map((res) => ({
+    file_path: res.file_path,
+    url: res.url,
+    checksum: res.checksum,
+  }));
   return {
     config,
-    resources,
+    resources: filteredResources,
     package: { version, properties, index, important, lazy },
   };
 }
@@ -256,9 +259,8 @@ export default function ReleaseDetailPage() {
   const handleCloneRelease = () => {
     setIsCloning(true);
 
-    // Navigate to create page with just the release ID and clone flag
     router.push(
-      `/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases/create?clone=true&releaseId=${encodeURIComponent(releaseId)}`
+      `/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/releases/${encodeURIComponent(releaseId)}/clone`
     );
 
     // Reset loading state after a short delay (navigation happens asynchronously)

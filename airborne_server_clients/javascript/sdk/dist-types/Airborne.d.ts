@@ -4,20 +4,28 @@ import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "./com
 import { CreateFileCommandInput, CreateFileCommandOutput } from "./commands/CreateFileCommand";
 import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from "./commands/CreateOrganisationCommand";
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "./commands/CreatePackageCommand";
+import { CreatePackageGroupCommandInput, CreatePackageGroupCommandOutput } from "./commands/CreatePackageGroupCommand";
+import { CreatePackageV2CommandInput, CreatePackageV2CommandOutput } from "./commands/CreatePackageV2Command";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "./commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./commands/DeleteDimensionCommand";
+import { GetPackageGroupCommandInput, GetPackageGroupCommandOutput } from "./commands/GetPackageGroupCommand";
+import { GetPackageV2ByTagCommandInput, GetPackageV2ByTagCommandOutput } from "./commands/GetPackageV2ByTagCommand";
+import { GetPackageV2ByVersionCommandInput, GetPackageV2ByVersionCommandOutput } from "./commands/GetPackageV2ByVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "./commands/ListOrganisationsCommand";
+import { ListPackageGroupsCommandInput, ListPackageGroupsCommandOutput } from "./commands/ListPackageGroupsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
+import { ListPackagesV2CommandInput, ListPackagesV2CommandOutput } from "./commands/ListPackagesV2Command";
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "./commands/ListReleasesCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "./commands/PostLoginCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "./commands/ServeReleaseV2Command";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "./commands/UpdateDimensionCommand";
+import { UpdatePackageGroupNameCommandInput, UpdatePackageGroupNameCommandOutput } from "./commands/UpdatePackageGroupNameCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "./commands/UploadFileCommand";
 import { HttpHandlerOptions as __HttpHandlerOptions } from "@smithy/types";
 export interface Airborne {
@@ -52,6 +60,18 @@ export interface Airborne {
     createPackage(args: CreatePackageCommandInput, cb: (err: any, data?: CreatePackageCommandOutput) => void): void;
     createPackage(args: CreatePackageCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreatePackageCommandOutput) => void): void;
     /**
+     * @see {@link CreatePackageGroupCommand}
+     */
+    createPackageGroup(args: CreatePackageGroupCommandInput, options?: __HttpHandlerOptions): Promise<CreatePackageGroupCommandOutput>;
+    createPackageGroup(args: CreatePackageGroupCommandInput, cb: (err: any, data?: CreatePackageGroupCommandOutput) => void): void;
+    createPackageGroup(args: CreatePackageGroupCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreatePackageGroupCommandOutput) => void): void;
+    /**
+     * @see {@link CreatePackageV2Command}
+     */
+    createPackageV2(args: CreatePackageV2CommandInput, options?: __HttpHandlerOptions): Promise<CreatePackageV2CommandOutput>;
+    createPackageV2(args: CreatePackageV2CommandInput, cb: (err: any, data?: CreatePackageV2CommandOutput) => void): void;
+    createPackageV2(args: CreatePackageV2CommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreatePackageV2CommandOutput) => void): void;
+    /**
      * @see {@link CreateReleaseCommand}
      */
     createRelease(args: CreateReleaseCommandInput, options?: __HttpHandlerOptions): Promise<CreateReleaseCommandOutput>;
@@ -63,6 +83,24 @@ export interface Airborne {
     deleteDimension(args: DeleteDimensionCommandInput, options?: __HttpHandlerOptions): Promise<DeleteDimensionCommandOutput>;
     deleteDimension(args: DeleteDimensionCommandInput, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
     deleteDimension(args: DeleteDimensionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
+    /**
+     * @see {@link GetPackageGroupCommand}
+     */
+    getPackageGroup(args: GetPackageGroupCommandInput, options?: __HttpHandlerOptions): Promise<GetPackageGroupCommandOutput>;
+    getPackageGroup(args: GetPackageGroupCommandInput, cb: (err: any, data?: GetPackageGroupCommandOutput) => void): void;
+    getPackageGroup(args: GetPackageGroupCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetPackageGroupCommandOutput) => void): void;
+    /**
+     * @see {@link GetPackageV2ByTagCommand}
+     */
+    getPackageV2ByTag(args: GetPackageV2ByTagCommandInput, options?: __HttpHandlerOptions): Promise<GetPackageV2ByTagCommandOutput>;
+    getPackageV2ByTag(args: GetPackageV2ByTagCommandInput, cb: (err: any, data?: GetPackageV2ByTagCommandOutput) => void): void;
+    getPackageV2ByTag(args: GetPackageV2ByTagCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetPackageV2ByTagCommandOutput) => void): void;
+    /**
+     * @see {@link GetPackageV2ByVersionCommand}
+     */
+    getPackageV2ByVersion(args: GetPackageV2ByVersionCommandInput, options?: __HttpHandlerOptions): Promise<GetPackageV2ByVersionCommandOutput>;
+    getPackageV2ByVersion(args: GetPackageV2ByVersionCommandInput, cb: (err: any, data?: GetPackageV2ByVersionCommandOutput) => void): void;
+    getPackageV2ByVersion(args: GetPackageV2ByVersionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetPackageV2ByVersionCommandOutput) => void): void;
     /**
      * @see {@link GetReleaseCommand}
      */
@@ -96,11 +134,23 @@ export interface Airborne {
     listOrganisations(args: ListOrganisationsCommandInput, cb: (err: any, data?: ListOrganisationsCommandOutput) => void): void;
     listOrganisations(args: ListOrganisationsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListOrganisationsCommandOutput) => void): void;
     /**
+     * @see {@link ListPackageGroupsCommand}
+     */
+    listPackageGroups(args: ListPackageGroupsCommandInput, options?: __HttpHandlerOptions): Promise<ListPackageGroupsCommandOutput>;
+    listPackageGroups(args: ListPackageGroupsCommandInput, cb: (err: any, data?: ListPackageGroupsCommandOutput) => void): void;
+    listPackageGroups(args: ListPackageGroupsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListPackageGroupsCommandOutput) => void): void;
+    /**
      * @see {@link ListPackagesCommand}
      */
     listPackages(args: ListPackagesCommandInput, options?: __HttpHandlerOptions): Promise<ListPackagesCommandOutput>;
     listPackages(args: ListPackagesCommandInput, cb: (err: any, data?: ListPackagesCommandOutput) => void): void;
     listPackages(args: ListPackagesCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListPackagesCommandOutput) => void): void;
+    /**
+     * @see {@link ListPackagesV2Command}
+     */
+    listPackagesV2(args: ListPackagesV2CommandInput, options?: __HttpHandlerOptions): Promise<ListPackagesV2CommandOutput>;
+    listPackagesV2(args: ListPackagesV2CommandInput, cb: (err: any, data?: ListPackagesV2CommandOutput) => void): void;
+    listPackagesV2(args: ListPackagesV2CommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListPackagesV2CommandOutput) => void): void;
     /**
      * @see {@link ListReleasesCommand}
      */
@@ -137,6 +187,12 @@ export interface Airborne {
     updateDimension(args: UpdateDimensionCommandInput, options?: __HttpHandlerOptions): Promise<UpdateDimensionCommandOutput>;
     updateDimension(args: UpdateDimensionCommandInput, cb: (err: any, data?: UpdateDimensionCommandOutput) => void): void;
     updateDimension(args: UpdateDimensionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdateDimensionCommandOutput) => void): void;
+    /**
+     * @see {@link UpdatePackageGroupNameCommand}
+     */
+    updatePackageGroupName(args: UpdatePackageGroupNameCommandInput, options?: __HttpHandlerOptions): Promise<UpdatePackageGroupNameCommandOutput>;
+    updatePackageGroupName(args: UpdatePackageGroupNameCommandInput, cb: (err: any, data?: UpdatePackageGroupNameCommandOutput) => void): void;
+    updatePackageGroupName(args: UpdatePackageGroupNameCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdatePackageGroupNameCommandOutput) => void): void;
     /**
      * @see {@link UploadFileCommand}
      */
