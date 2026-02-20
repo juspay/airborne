@@ -2,6 +2,36 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.11.7 - 2026-02-20
+#### Bug Fixes
+- use actual experiment variant IDs for release conclude and revert - (5a343d4) - Yash Rajput
+
+- - -
+
+## v0.23.2 - 2026-02-20
+#### Miscellaneous Chores
+- **(version)** v0.23.2 [skip ci] - (1a6ac61) - Airborne Bot
+
+- - -
+
+## v0.23.1 - 2026-02-20
+#### Miscellaneous Chores
+- **(version)** v0.23.1 [skip ci] - (1644fd6) - Airborne Bot
+
+- - -
+
+## v0.23.0 - 2026-02-20
+#### Miscellaneous Chores
+- **(version)** v0.23.0 [skip ci] - (0d2fcd5) - Airborne Bot
+
+- - -
+
+## v0.22.2 - 2026-02-20
+#### Miscellaneous Chores
+- **(version)** v0.22.2 [skip ci] - (8a99832) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.11.6 - 2026-01-30
 #### Bug Fixes
 - Build Release Config and force build - (cdd94a3) - yuvrajjsingh0
