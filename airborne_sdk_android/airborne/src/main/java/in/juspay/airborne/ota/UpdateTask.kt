@@ -177,9 +177,13 @@ internal class UpdateTask(
     private fun runInternal() {
         val fetched = fetchReleaseConfig()
         var shouldDownloadCurLazySplits = false
+        var presult: Update.Package? = null
+        var newReleaseFailed = false
         if (fetched == null) {
             // Unable to fetch so exiting.
             currentResult = UpdateResult.Error.RCFetchError
+            newReleaseFailed = true
+            shouldDownloadCurLazySplits = true
             onComplete(Stage.INSTALLING)
         } else {
             updateTimeouts(fetched)
@@ -209,7 +213,7 @@ internal class UpdateTask(
                     Log.d(TAG, "Config updated.")
                 }
             }
-            val presult = packageUpdate?.get()
+            presult = packageUpdate?.get()
             resourceUpdate?.awaitResourceUpdates()
             onComplete(Stage.DOWNLOADING_UPDATES)
             var didPackageUpdate = false
@@ -224,7 +228,7 @@ internal class UpdateTask(
                 didPackageUpdate = packageInstallFuture.get()
                 updatedPackage = if (didPackageUpdate) fetched.pkg else null
             } else if (presult != null && fetched.pkg.lazy.isEmpty()) {
-                saveDownloadedPackages(presult, fetched.pkg)
+                saveDownloadedPackages(presult!!, fetched.pkg)
             }
             val resources = resourceUpdate?.installDownloadedResources()
             resourceUpdate?.completeResourceDownload()
@@ -232,10 +236,8 @@ internal class UpdateTask(
             onComplete(Stage.INSTALLING)
             setCurrentResult(fetched.version, updatedConfig, updatedPackage, resources)
             shouldDownloadCurLazySplits = updateTimedOut.get() || !didPackageUpdate
-            if (presult is Update.Package.Finished) {
-                Log.d(TAG, "Starting lazy splits download of new pkg version ${fetched.pkg.version}")
-                downloadLazySplits(presult.tempWriter, fetched.pkg, !shouldDownloadCurLazySplits)
-            }
+            newReleaseFailed = !updateTimedOut.get() &&
+                (presult is Update.Package.Failed || !didPackageUpdate)
         }
 
         if (shouldDownloadCurLazySplits) {
@@ -245,6 +247,17 @@ internal class UpdateTask(
             )
             localReleaseConfig?.pkg?.let { downloadLazySplits(null, it, true) }
         }
+
+        val shouldDownloadNewLazy = fetched != null && !newReleaseFailed &&
+            (presult is Update.Package.Finished || updateTimedOut.get())
+        if (shouldDownloadNewLazy) {
+            val tw = (presult as? Update.Package.Finished)?.tempWriter
+            Log.d(TAG, "Starting lazy splits download of new pkg version ${fetched!!.pkg.version}")
+            downloadLazySplits(tw, fetched.pkg, !shouldDownloadCurLazySplits)
+        } else if (newReleaseFailed) {
+            Log.d(TAG, "Skipping new release lazy splits download due to download failure.")
+        }
+
         onComplete(Stage.LAZY_DOWNLOADING)
     }
 

@@ -51,6 +51,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     AJPApplicationManifest* _downloadedApplicationManifest;
     MutableAppResources* _availableLazySplits;
     MutableAppResources* _availableResources;
+    NSMutableSet<NSString *> *_downloadedSplits;
     
     BOOL _callbacksFired;
 }
@@ -254,6 +255,20 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     [self initializeLazyResourcesDownloadStatus];
     _availableLazySplits = [self dictionaryFromResources:self.package.lazy];
     _availableResources = [NSMutableDictionary dictionaryWithDictionary:self.resources.resources];
+    
+    // Initialize downloadedSplits with currently available files on disk
+    _downloadedSplits = [NSMutableSet set];
+    for (AJPResource *split in [self.package allImportantSplits]) {
+        [_downloadedSplits addObject:split.filePath];
+    }
+    for (AJPLazyResource *lazy in self.package.lazy) {
+        if (lazy.isDownloaded) {
+            [_downloadedSplits addObject:lazy.filePath];
+        }
+    }
+    for (NSString *key in self.resources.resources) {
+        [_downloadedSplits addObject:key];
+    }
     [self.tracker trackInfo:@"init_with_local_config_versions" value:[@{@"package_version":self.package.version, @"config_version":self.config.version} mutableCopy]];
 }
 
@@ -668,6 +683,31 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     return [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:JUSPAY_PACKAGE_DIR];
 }
 
+- (NSString * _Nullable)getPathForAssetsInReleaseConfig:(NSString *)resourcePath {
+    if (resourcePath == nil || resourcePath.length == 0) {
+        return nil;
+    }
+
+    // Check if the file is in the current release config and downloaded
+    BOOL isAvailable;
+    @synchronized(self->_downloadedSplits) {
+        isAvailable = [self->_downloadedSplits containsObject:resourcePath];
+    }
+
+    if (!isAvailable) {
+        return nil;
+    }
+
+    NSString *resolvedPath = [self getPathForPackageFile:[self jsFileNameFor:resourcePath]];
+    return resolvedPath;
+}
+
+- (NSSet<NSString *> *)getDownloadedSplits {
+    @synchronized(self->_downloadedSplits) {
+        return [self->_downloadedSplits copy];
+    }
+}
+
 - (void)startDownload {
     self.releaseConfigDownloadStatus = DOWNLOADING;
     self.importantPackageDownloadStatus = DOWNLOADING;
@@ -688,6 +728,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             self.lazyPackageDownloadStatus = COMPLETED;
             [self cleanUpUnwantedFiles];
             [self fireCallbacks];
+            [self retryFailedLazyDownloads];
         }
         [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_NOTIFICATION
                                                             object:nil
@@ -717,55 +758,88 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                 if (!downloadFailed) { // Important packages downloaded successfully/No updates.
                     [strongSelf didFinishImportantPackageWithLazyDownloadComplete:timedOut];
                     
-                    // Start lazy packages download.
-                    NSArray<AJPResource *> *toDownload = [self getResourcesFrom:strongSelf.downloadedLazy filtering:strongSelf.currentLazy];
-                    NSString *packageVersion = timedOut ? strongSelf.downloadedApplicationManifest.package.version : strongSelf.package.version;
-                    [strongSelf downloadLazyPackageResources:toDownload version:packageVersion singleDownloadHandler:^(BOOL status, AJPResource *resource) {
-                        if (!weakSelf) {
-                            return;
-                        }
-                        __strong AJPApplicationManager* strongSelf = weakSelf;
+                    if (timedOut) {
                         
-                        if (timedOut) {
-                            if (!status) {
+                        [strongSelf retryFailedLazyDownloadsWithCompletion:^{
+                            if (!weakSelf) {
                                 return;
                             }
-                            
-                            for (NSUInteger i = 0; i < strongSelf.downloadedLazy.count; i++) {
-                                AJPLazyResource *lazyResource = strongSelf.downloadedLazy[i];
-                                if ([lazyResource.filePath isEqualToString:resource.filePath]) {
-                                    lazyResource.isDownloaded = status;
-                                    strongSelf.downloadedLazy[i] = lazyResource;
-                                    break;
+                            __strong AJPApplicationManager* strongSelf = weakSelf;
+                            NSArray<AJPResource *> *toDownload = [strongSelf getResourcesFrom:strongSelf.downloadedLazy filtering:strongSelf.currentLazy];
+                            NSString *packageVersion = strongSelf.downloadedApplicationManifest.package.version;
+                            [strongSelf downloadLazyPackageResources:toDownload version:packageVersion singleDownloadHandler:^(BOOL status, AJPResource *resource) {
+                                if (!weakSelf) {
+                                    return;
+                                }
+                                __strong AJPApplicationManager* strongSelf = weakSelf;
+                                
+                                if (!status) {
+                                    return;
+                                }
+                                
+                                @synchronized(strongSelf.downloadedLazy) {
+                                    for (NSUInteger i = 0; i < strongSelf.downloadedLazy.count; i++) {
+                                        AJPLazyResource *lazyResource = strongSelf.downloadedLazy[i];
+                                        if ([lazyResource.filePath isEqualToString:resource.filePath]) {
+                                            lazyResource.isDownloaded = status;
+                                            strongSelf.downloadedLazy[i] = lazyResource;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } downloadCompletion:^{
+                                if (!weakSelf) {
+                                    return;
+                                }
+                                __strong AJPApplicationManager* strongSelf = weakSelf;
+                                
+                                strongSelf.downloadedApplicationManifest.package.lazy = strongSelf.downloadedLazy;
+                                [strongSelf updatePackageInTemp:strongSelf.downloadedApplicationManifest.package];
+                            }];
+                        }];
+                    } else {
+                        NSArray<AJPResource *> *toDownload = [strongSelf getResourcesFrom:strongSelf.downloadedLazy filtering:strongSelf.currentLazy];
+                        NSSet<NSString *> *pendingLazyPaths = [NSSet setWithArray:[toDownload valueForKey:@"filePath"]];
+                        // Rebuild downloadedSplits for the new release config
+                        @synchronized(strongSelf->_downloadedSplits) {
+                            [strongSelf->_downloadedSplits removeAllObjects];
+                            // Add all important splits (already moved to main)
+                            for (AJPResource *split in [strongSelf.package allImportantSplits]) {
+                                [strongSelf->_downloadedSplits addObject:split.filePath];
+                            }
+                            // Add lazy splits that don't need downloading
+                            for (AJPLazyResource *lazy in strongSelf.downloadedLazy) {
+                                if (![pendingLazyPaths containsObject:lazy.filePath]) {
+                                    [strongSelf->_downloadedSplits addObject:lazy.filePath];
                                 }
                             }
-                            return;
+                            // Resources are added to downloadedSplits in downloadResourcesWithCurrentResources
                         }
-                        
-                        if (status) { // Download success
-                            // Move downloaded lazy package to main.
-                            AJPLazyResource *lazyResource = (AJPLazyResource *)resource;
-                            [strongSelf moveLazyPackageFromTempToMain:lazyResource];
-                        }
-                        [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @NO, @"downloadStatus": @(status), @"url": resource.url, @"filePath": resource.filePath}];
-                    } downloadCompletion:^{
-                        if (!weakSelf) {
-                            return;
-                        }
-                        __strong AJPApplicationManager* strongSelf = weakSelf;
-                        
-                        if (timedOut) {
-                            strongSelf.downloadedApplicationManifest.package.lazy = strongSelf.downloadedLazy;
-                            [strongSelf updatePackageInTemp:strongSelf.downloadedApplicationManifest.package];
+                        NSString *packageVersion = strongSelf.package.version;
+                        [strongSelf downloadLazyPackageResources:toDownload version:packageVersion singleDownloadHandler:^(BOOL status, AJPResource *resource) {
+                            if (!weakSelf) {
+                                return;
+                            }
+                            __strong AJPApplicationManager* strongSelf = weakSelf;
                             
-                            return;
-                        }
-                        
-                        [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @YES}];
-                    }];
+                            if (status) { // Download success
+                                // Move downloaded lazy package to main.
+                                AJPLazyResource *lazyResource = (AJPLazyResource *)resource;
+                                [strongSelf moveLazyPackageFromTempToMain:lazyResource];
+                            }
+                            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @NO, @"downloadStatus": @(status), @"url": resource.url, @"filePath": resource.filePath}];
+                        } downloadCompletion:^{
+                            if (!weakSelf) {
+                                return;
+                            }
+                            __strong AJPApplicationManager* strongSelf = weakSelf;
+                            
+                            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @YES}];
+                        }];
+                    }
                 } else {
-                    // Don't download lazy pacakge if important pacakge download failed.
                     [strongSelf didFinishImportantPackageWithLazyDownloadComplete:YES];
+                    [strongSelf retryFailedLazyDownloads];
                 }
             }
         }];
@@ -935,10 +1009,11 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             logData[@"is_success"] = @YES;
             if(error != nil) {
                 logData[@"is_success"] = @NO;
+                
                 logData[@"error"] = [error localizedDescription];
                 logData[@"mesage"] = @"Failed to parse release config";
             }
-            if (error == nil && manifest != nil) {
+            if ( error == nil && manifest != nil) {
                 logData[@"new_rc_version"] = manifest.config.version;
             }
             [self.tracker trackInfo:@"release_config_fetch" value:logData];
@@ -1226,6 +1301,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     } else {
         [self updateAvailableResource:resource.filePath withResource:resource];
         [self updateLazyPackageDownloadStatus:resource withStatus:YES];
+        @synchronized(self->_downloadedSplits) {
+            [self->_downloadedSplits addObject:resource.filePath];
+        }
     }
 }
 
@@ -1242,7 +1320,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
     dispatch_group_t group = dispatch_group_create();
     __weak AJPApplicationManager* weakSelf = self;
-    
+
     for (AJPResource *split in resourcesToDownload) {
         dispatch_group_enter(group);
         dispatch_group_async(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -1323,6 +1401,54 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         }];
     } else {
         [self.tracker trackInfo:@"no_failed_lazy_downloads" value:[@{} mutableCopy]];
+    }
+}
+
+- (void)retryFailedLazyDownloadsWithCompletion:(void (^)(void))completion {
+    NSMutableArray<AJPLazyResource *> *failedDownloads = [NSMutableArray array];
+    
+    // Find all lazy resources that are marked as not downloaded
+    @synchronized(self.package) {
+        for (AJPLazyResource *resource in self.package.lazy) {
+            if (!resource.isDownloaded) {
+                [failedDownloads addObject:resource];
+            }
+        }
+    }
+    
+    if (failedDownloads.count > 0) {
+        [self.tracker trackInfo:@"retrying_failed_lazy_downloads" value:[@{@"count": @(failedDownloads.count)} mutableCopy]];
+        
+        __weak AJPApplicationManager *weakSelf = self;
+        [self downloadLazyPackageResources:failedDownloads version:self.package.version singleDownloadHandler:^(BOOL status, AJPResource *resource) {
+            if (status && [resource isKindOfClass:[AJPLazyResource class]]) {
+                if (weakSelf) {
+                    __strong AJPApplicationManager* strongSelf = weakSelf;
+                    AJPLazyResource *lazyResource = (AJPLazyResource *)resource;
+                    [strongSelf moveLazyPackageFromTempToMain:lazyResource];
+                }
+            }
+            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION
+                                                                object:nil
+                                                              userInfo:@{
+                                                                    @"lazyDownloadsComplete": @NO,
+                                                                    @"downloadStatus": @(status),
+                                                                    @"url": resource.url,
+                                                                    @"filePath": resource.filePath
+                                                              }];
+        } downloadCompletion:^{
+            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION
+                                                                object:nil
+                                                              userInfo:@{@"lazyDownloadsComplete": @YES}];
+            if (completion) {
+                completion();
+            }
+        }];
+    } else {
+        [self.tracker trackInfo:@"no_failed_lazy_downloads" value:[@{} mutableCopy]];
+        if (completion) {
+            completion();
+        }
     }
 }
 
@@ -1504,6 +1630,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                 @"new_resources_count": @(newResources.count),
                                 @"resources_to_download": @(resourcesToDownload.count)} mutableCopy]];
     
+    // Add resources that don't need downloading to downloadedSplits
+    NSSet<NSString *> *pendingResourcePaths = [NSSet setWithArray:[resourcesToDownload valueForKey:@"filePath"]];
+    @synchronized(self->_downloadedSplits) {
+        for (NSString *key in newResources) {
+            if (![pendingResourcePaths containsObject:key]) {
+                [self->_downloadedSplits addObject:key];
+            }
+        }
+    }
+    
     if (resourcesToDownload.count == 0) {
         downloadCompletion();
         return;
@@ -1551,7 +1687,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                             value:[@{@"resource": resource.filePath} mutableCopy]];
                 }
                 
-                dispatch_group_leave(group);   
+                dispatch_group_leave(group);
             }];
         });
     }
@@ -1568,6 +1704,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     // Update the available resources
     [self updateAvailableResource:resource.filePath withResource:resource];
+    @synchronized(self->_downloadedSplits) {
+        [self->_downloadedSplits addObject:resource.filePath];
+    }
     
     // Update the resources file
     [self updateResources:self.availableResources];
@@ -1916,10 +2055,17 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (void)downloadFileFromURL:(NSURL *)resourceURL andSaveInFilePath:(NSString *)filePath inFolder:(NSString*)folderName checksum:(NSString *)checksum completionHandler:(void (^)(NSError*))completionHandler {
+    static dispatch_semaphore_t downloadSemaphore;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        downloadSemaphore = dispatch_semaphore_create(6);
+    });
 
     NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970] * 1000;
     __weak AJPApplicationManager* weakSelf = self;
+    dispatch_semaphore_wait(downloadSemaphore, DISPATCH_TIME_FOREVER);
     [self.remoteFileUtil downloadFileFromURL:[resourceURL absoluteString] andSaveFileAtUrl:[self.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName] checksum:checksum callback:^(Boolean status, id  _Nullable data, NSString * _Nullable error, NSURLResponse* response) {
+        dispatch_semaphore_signal(downloadSemaphore);
         if(weakSelf) {
             __strong AJPApplicationManager* strongSelf = weakSelf;
             if (status) {
