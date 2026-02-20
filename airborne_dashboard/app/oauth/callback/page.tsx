@@ -31,7 +31,7 @@ type OAuthPatResponse = {
 export default function OAuthCallback() {
   const params = useSearchParams();
   const router = useRouter();
-  const { setToken, setUser, token, org, app, setOrg, setApp, loading } = useApp();
+  const { setToken, setUser, token, org, app, loading } = useApp();
   const processedCode = useRef(false);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function OAuthCallback() {
       try {
         const endpoint = actionToEndpoint[oauthAction] ?? "/users/oauth/login";
 
-        const res = await apiFetch<OAuthUserResponse | OAuthPatResponse>(
+        let res = await apiFetch<OAuthUserResponse | OAuthPatResponse>(
           endpoint,
           {
             method: "POST",
@@ -72,18 +72,26 @@ export default function OAuthCallback() {
           );
           return;
         }
+        res = res as OAuthUserResponse;
 
-        // normal login/signup flow
-        const userRes = res as OAuthUserResponse;
-        setToken(userRes.user_token?.access_token || "");
-        setUser({ user_id: userRes.user_id, name: userRes.username, is_super_admin: userRes.is_super_admin });
-        const organisation = userRes.organisations?.[0]?.name || "";
-        const application = userRes.organisations?.[0]?.applications?.[0]?.application || "";
-        setOrg(organisation);
-        setApp(application);
+        console.log("token exchange", oauthAction, res);
+        setToken(res.user_token?.access_token || "");
+        setUser({ user_id: res.user_id, name: res.username, is_super_admin: res.is_super_admin }); // OAuth users will get name from API response
 
-        window.location.replace("/dashboard");
-      } catch (e) {
+        // Check if we have invite-related redirect parameters stored
+        const storedRedirectTo = localStorage.getItem("oauthRedirectTo");
+
+        // Clean up stored parameters
+        localStorage.removeItem("oauthRedirectTo");
+        localStorage.removeItem("oauthInviteToken");
+
+        // Redirect to invitation page if we came from an invitation, otherwise dashboard
+        if (storedRedirectTo) {
+          window.location.replace(storedRedirectTo);
+        } else {
+          window.location.replace("/dashboard");
+        }
+      } catch (e: any) {
         console.log("Google Callback Error", e);
         router.replace("/login");
       }

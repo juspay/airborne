@@ -49,13 +49,6 @@ pub struct UserInfo {
     pub roles: Vec<String>,
 }
 
-// Helper structs
-
-pub struct UserContext {
-    pub user_id: String,
-    pub username: String,
-}
-
 pub struct AppContext {
     pub org_name: String,
     pub app_name: String,
