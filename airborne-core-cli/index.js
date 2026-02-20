@@ -67,7 +67,6 @@ export async function getBaseUrl() {
     const config = await readConfigFile();
     return config.baseUrl || null; // return null if not set
   } catch (err) {
-    console.error("Error reading endpoint:", err);
     return null;
   }
 }
@@ -1021,7 +1020,11 @@ program
   return parsed;
 })
  .option("--search <search>", "search parameter")
- .option("--all <all>", "all parameter")
+ .option("--all <all>", "all parameter", (value) => {
+  if (value.toLowerCase() === 'true') return true;
+  if (value.toLowerCase() === 'false') return false;
+  throw new Error("--all must be true or false");
+})
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
@@ -1110,7 +1113,11 @@ program
   }
   return parsed;
 })
- .option("--all <all>", "all parameter")
+ .option("--all <all>", "all parameter", (value) => {
+  if (value.toLowerCase() === 'true') return true;
+  if (value.toLowerCase() === 'false') return false;
+  throw new Error("--all must be true or false");
+})
  .option("--status <status>", "status parameter")
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")

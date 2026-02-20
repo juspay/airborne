@@ -3,7 +3,7 @@
 import { Command, InvalidOptionArgumentError } from "commander";
 import coreCli from "airborne-core-cli";
 import {
-  readAirborneConfig,
+  readAndResolveAirborneConfig,
   writeAirborneConfig,
   normalizeOptions,
   formatCommand,
@@ -17,11 +17,22 @@ import {
   readReleaseConfig,
   releaseConfigExists,
   updateLocalReleaseConfig,
+  writeReleaseConfig,
 } from "./utils/release.js";
 import { createFiles, uploadFiles } from "./utils/file.js";
 import { createPackageFromLocalRelease } from "./utils/package.js";
 import { PostLoginAction } from "airborne-core-cli/action";
+import { getBaseUrl, setBaseUrl } from "airborne-core-cli";
 const program = new Command();
+
+try{
+  const baseUrl = await getBaseUrl();
+  if(!baseUrl){
+    await setBaseUrl("https://airborne.juspay.in");
+  }
+}catch(err){
+   await setBaseUrl("https://airborne.juspay.in");
+}
 
 program
   .name("airborne-devkit")
@@ -48,8 +59,10 @@ program
 
   Usage 2 - With all options specified:
     $ airborne-devkit create-local-airborne-config [directoryPath] \\
-      -o <organisation> \\
-      -n <namespace> \\
+      --android-organisation <android-organisation> \\
+      --ios-organisation <ios-organisation> \\
+      --android-namespace <android-namespace> \\
+      --ios-namespace <ios-namespace> \\
       -j <js-entry-file> \\
       -a <android-index-file> \\
       -i <ios-index-file> \\
@@ -57,8 +70,10 @@ program
 
   Parameters:
       [directoryPath] (optional) : Directory where config will be created (defaults to current directory)
-      -o, --organisation <string> (optional) : Organisation name of the package
-      -n, --namespace <string> (optional) : Namespace or application name of the package
+      --android-organisation <string> (optional) : Organisation name for Android
+      --ios-organisation <string> (optional) : Organisation name for iOS
+      --android-namespace <string> (optional) : Namespace or application name for Android
+      --ios-namespace <string> (optional) : Namespace or application name for iOS
       -j, --js-entry-file <string> (optional) : Path to the JavaScript entry file
       -a, --android-index-file <string> (optional) : Path to the Android bundle output file
       -i, --ios-index-file <string> (optional) : Path to the iOS bundle output file
@@ -66,10 +81,21 @@ program
 
 `
   )
-  .option("-o, --organisation <org>", "Organisation name of the package")
   .option(
-    "-n, --namespace <namespace>",
-    "Namespace or application name of the package"
+    "--android-organisation <org>",
+    "Organisation name for Android"
+  )
+  .option(
+    "--ios-organisation <org>",
+    "Organisation name for iOS"
+  )
+  .option(
+    "--android-namespace <namespace>",
+    "Namespace or application name for Android"
+  )
+  .option(
+    "--ios-namespace <namespace>",
+    "Namespace or application name for iOS"
   )
   .option("-j, --js-entry-file <path>", "Path to the JavaScript entry file")
   .option(
@@ -91,29 +117,35 @@ Examples:
 
 3. Create config with all options specified:
    $ airborne-devkit create-local-airborne-config \\
-     -o "MyCompany" \\
-     -n "MyApp" \\
+     --android-organisation "MyCompany" \\
+     --ios-organisation "MyCompany" \\
+     --android-namespace "MyApp" \\
+     --ios-namespace "MyApp" \\
      -j "index.js" \\
      -a "android/app/build/generated/assets/react/release/index.android.bundle" \\
      -i "ios/main.jsbundle"
 
 4. Create config in specific directory with options:
    $ airborne-devkit create-local-airborne-config ./my-rn-project \\
-     -o "MyCompany" \\
-     -n "MyApp"
+     --android-organisation "MyCompany" \\
+     --ios-organisation "MyCompany" \\
+     --android-namespace "MyApp" \\
+     --ios-namespace "MyApp"
 
 5. Create config for an Expo project:
    $ airborne-devkit create-local-airborne-config -e
 
 6. Create config for Expo project with all options:
    $ airborne-devkit create-local-airborne-config \\
-     -o "MyCompany" \\
-     -n "MyApp" \\
+     --android-organisation "MyCompany" \\
+     --ios-organisation "MyCompany" \\
+     --android-namespace "MyApp" \\
+     --ios-namespace "MyApp" \\
      -e
 
 Notes:
 - If directoryPath is not provided, current working directory will be used
-- If organisation or namespace and others are not provided, you'll be prompted to enter them
+- If organisations, namespaces, and others are not provided, you'll be prompted to enter them
 - Command will fail if an airborne config already exists in the target directory`
   )
   .action(async (directoryPath, options) => {
@@ -245,8 +277,9 @@ Notes:
         );
       }
       const normalizedOptions = normalizeOptions(options);
-      const airborneConfig = await readAirborneConfig(
-        normalizedOptions.directory_path
+      const airborneConfig = await readAndResolveAirborneConfig(
+        normalizedOptions.directory_path,
+        normalizedOptions.platform
       );
       const releaseConfig = await releaseConfigExists(
         normalizedOptions.directory_path,
@@ -383,7 +416,10 @@ Notes:
       }
       const normalizedOptions = normalizeOptions(options);
 
-      const config = await readAirborneConfig(normalizedOptions.directory_path);
+      const config = await readAndResolveAirborneConfig(
+        normalizedOptions.directory_path,
+        options.platform
+      );
       await updateLocalReleaseConfig(
         config,
         normalizedOptions,
@@ -492,8 +528,9 @@ Notes:
         );
       }
       const normalizedOptions = normalizeOptions(options);
-      let airborneConfig = await readAirborneConfig(
-        normalizedOptions.directory_path
+      let airborneConfig = await readAndResolveAirborneConfig(
+        normalizedOptions.directory_path,
+        normalizedOptions.platform
       );
 
       airborneConfig = { ...airborneConfig, ...normalizedOptions };
@@ -502,27 +539,81 @@ Notes:
         airborneConfig.platform,
         airborneConfig.namespace
       );
-      const filesToUpload = releaseConfig.package.important.concat(
-        releaseConfig.package.index
-      );
+
       try {
         airborneConfig.token = await loadToken(normalizedOptions.directory_path)
           .access_token;
       } catch (err) {
         throw new Error("Please log in first");
       }
+
+      let baseUrl;
       if (!options.upload) {
-        let baseUrl = await promptWithType(
+        baseUrl = await promptWithType(
           "\n Provide your base url for files: ",
           "string"
         );
         if (baseUrl[baseUrl.length - 1] !== "/") {
           baseUrl = baseUrl + "/";
         }
-        await createFiles(filesToUpload, airborneConfig, baseUrl);
-      } else {
-        await uploadFiles(filesToUpload, airborneConfig);
       }
+
+      const processFiles = async (files) => {
+        if (!files || files.length === 0) return;
+        if (options.upload) {
+          return await uploadFiles(files, airborneConfig);
+        } else {
+          return await createFiles(files, airborneConfig, baseUrl);
+        }
+      };
+
+      const applyResults = (entries, results) => {
+        if (!entries || !results) return;
+        for (const entry of entries) {
+          if (results[entry.file_path]) {
+            entry.url = results[entry.file_path].url;
+            entry.checksum = results[entry.file_path].checksum;
+          }
+        }
+      };
+
+      console.log("Processing index file");
+      const indexFiles = [releaseConfig.package.index];
+      const indexResults = await processFiles(indexFiles);
+      applyResults(indexFiles, indexResults);
+      releaseConfig.package.index = indexFiles[0];
+
+      const importantFiles = releaseConfig.package.important || [];
+      if (importantFiles.length > 0) {
+        console.log("Processing important files");
+        const importantResults = await processFiles(importantFiles);
+        applyResults(importantFiles, importantResults);
+        releaseConfig.package.important = importantFiles;
+      }
+
+      const lazyFiles = releaseConfig.package.lazy || [];
+      if (lazyFiles.length > 0) {
+        console.log("Processing lazy files");
+        const lazyResults = await processFiles(lazyFiles);
+        applyResults(lazyFiles, lazyResults);
+        releaseConfig.package.lazy = lazyFiles;
+      }
+
+      const resourceFiles = releaseConfig.resources || [];
+      if (resourceFiles.length > 0) {
+        console.log("Processing resource files");
+        const resourceResults = await processFiles(resourceFiles);
+        applyResults(resourceFiles, resourceResults);
+        releaseConfig.resources = resourceFiles;
+      }
+
+      await writeReleaseConfig(
+        releaseConfig,
+        airborneConfig.platform,
+        airborneConfig.namespace,
+        airborneConfig.directory_path
+      );
+
       process.exit(0);
     } catch (err) {
       console.error("❌ Failed to create remote files:", err.message);
@@ -631,8 +722,9 @@ Notes:
         );
       }
       const normalizedOptions = normalizeOptions(options);
-      let airborneConfig = await readAirborneConfig(
-        normalizedOptions.directory_path
+      let airborneConfig = await readAndResolveAirborneConfig(
+        normalizedOptions.directory_path,
+        normalizedOptions.platform
       );
 
       airborneConfig = { ...airborneConfig, ...normalizedOptions };
