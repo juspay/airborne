@@ -85,6 +85,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 @property (nonatomic, strong) AJPFileUtil* fileUtil;
 @property (nonatomic, strong) AJPRemoteFileUtil* remoteFileUtil;
 
+// Helper method to check if a resource already exists in package important splits
+- (BOOL)isResourceExistingInPackageImportantSplits:(AJPResource *)resource package:(AJPApplicationPackage *)package;
+
 @end
 
 @implementation AJPApplicationManager
@@ -675,7 +678,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     self.resourceDownloadStatus = DOWNLOADING;
     [self fetchReleaseConfigWithCompletionHandler:^(AJPApplicationManifest* manifest,NSError* error) {
         if (error==nil && manifest != nil) {
-            self.downloadedApplicationManifest = manifest;
+            AJPApplicationManifest *transformedManifest = [self transformDownloadedManifest:manifest];
+            self.downloadedApplicationManifest = transformedManifest ?: manifest;
             self.releaseConfigDownloadStatus = COMPLETED;
             [self cleanUpUnwantedFiles];
             [self updateConfig:manifest.config];
@@ -952,6 +956,75 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     }];
 
     [manifestDataTask resume];
+}
+
+- (BOOL)isResourceExistingInPackageImportantSplits:(AJPResource *)resource package:(AJPApplicationPackage *)package {
+    if (!resource || !package) {
+        return NO;
+    }
+    
+    NSArray<AJPResource *> *allImportantSplits = [package allImportantSplits];
+    for (AJPResource *existingResource in allImportantSplits) {
+        if ([existingResource.filePath isEqualToString:resource.filePath]) {
+            return YES;
+        }
+    }
+    
+    return NO;
+}
+
+- (AJPApplicationManifest *)transformDownloadedManifest:(AJPApplicationManifest *)downloadedManifest {
+    if (!downloadedManifest) {
+        return nil;
+    }
+    
+    AJPApplicationManifest *localManifest = [self getCurrentApplicationManifest];
+    
+    AJPApplicationPackage *transformedPackage = [[AJPApplicationPackage alloc] init];
+    transformedPackage.version = downloadedManifest.package.version;
+    transformedPackage.name = downloadedManifest.package.name;
+    transformedPackage.important = [downloadedManifest.package.important mutableCopy];
+    transformedPackage.lazy = [downloadedManifest.package.lazy mutableCopy];
+    
+    AJPApplicationResources *transformedResources = [[AJPApplicationResources alloc] init];
+    transformedResources.resources = [downloadedManifest.resources.resources mutableCopy];
+    
+    NSDictionary<NSString*, AJPResource*> *localResources = localManifest.resources.resources;
+    NSMutableDictionary<NSString*, AJPResource*> *newResources = [transformedResources.resources mutableCopy];
+    
+    NSMutableArray<AJPResource*> *resourcesToMoveToImportant = [NSMutableArray array];
+    
+    for (NSString *resourceKey in newResources) {
+        AJPResource *newResource = newResources[resourceKey];
+        AJPResource *localResource = localResources[resourceKey];
+        
+        // Check if resource is new or updated AND not already in local package important splits
+        if ((!localResource || ![newResource.url.absoluteString isEqualToString:localResource.url.absoluteString]) &&
+            ![self isResourceExistingInPackageImportantSplits:newResource package:localManifest.package]) {
+            [resourcesToMoveToImportant addObject:newResource];
+        }
+    }
+    
+    if (resourcesToMoveToImportant.count > 0) {
+        NSMutableArray<AJPResource*> *updatedImportantSplits = [transformedPackage.important mutableCopy];
+        [updatedImportantSplits addObjectsFromArray:resourcesToMoveToImportant];
+        transformedPackage.important = updatedImportantSplits;
+        
+        for (AJPResource *resource in resourcesToMoveToImportant) {
+            [newResources removeObjectForKey:resource.filePath];
+        }
+        transformedResources.resources = newResources;
+        
+        [self.tracker trackInfo:@"manifest_transformation"
+                          value:[@{@"resources_moved_to_important": @(resourcesToMoveToImportant.count)} mutableCopy]];
+    }
+    
+    AJPApplicationManifest *transformedManifest = [[AJPApplicationManifest alloc]
+                                                   initWithPackage:transformedPackage
+                                                   config:downloadedManifest.config
+                                                   resources:transformedResources];
+    
+    return transformedManifest;
 }
 
 # pragma mark - Config
