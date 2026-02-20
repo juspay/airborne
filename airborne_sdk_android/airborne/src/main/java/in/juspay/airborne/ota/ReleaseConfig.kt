@@ -41,7 +41,7 @@ internal data class ReleaseConfig(
         private fun JSONArray.getSplit(i: Int) =
             try {
                 val json = this.getJSONObject(i)
-                Split(json.getURL("url"), json.getString("file_path"), if (json.has("is_downloaded")) json.getBoolean("is_downloaded") else null)
+                Split(json.getURL("url"), json.getString("file_path"), if (json.has("is_downloaded")) json.getBoolean("is_downloaded") else null, if (json.has("checksum")) json.getString("checksum") else "")
             } catch (e: JSONException) {
                 throw JSONException("JSON at index '$i' is not a valid Split")
             }
@@ -85,7 +85,7 @@ internal data class ReleaseConfig(
         fun packageFromJSON(json: JSONObject): PackageManifest {
             val indexValue = json.get("index")
             val indexSplit: Split = if (indexValue is JSONObject) {
-                Split(indexValue.getURL("url"), indexValue.getString("file_path"), if (json.has("is_downloaded")) json.getBoolean("is_downloaded") else null)
+                Split(indexValue.getURL("url"), indexValue.getString("file_path"), if (json.has("is_downloaded")) json.getBoolean("is_downloaded") else null, if (indexValue.has("checksum")) indexValue.getString("checksum") else "")
             } else {
                 Split(json.getURL("index"))
             }
@@ -140,15 +140,30 @@ internal data class ReleaseConfig(
                 .put("properties", properties)
     }
 
-    data class Split(val url: URL, var filePath: String, var isDownloaded: Boolean?) {
+    data class Split(val url: URL, var filePath: String, var isDownloaded: Boolean?, val checksum: String) {
         val fileName = filePath.split("/").last()
 
-        constructor(url: URL) : this(url, url.path.split("/").last(), null)
+        constructor(url: URL) : this(url, url.path.split("/").last(), null, "")
 
         override fun equals(other: Any?): Boolean {
-            return other is Split &&
-                url == other.url &&
-                filePath == other.filePath
+            if (this === other) return true
+            if (other !is Split) return false
+
+            if (url != other.url) return false
+            if (filePath != other.filePath) return false
+
+            // Only compare checksum if both are non-null and non-empty
+            val thisChecksumValid = !checksum.isNullOrEmpty()
+            val otherChecksumValid = !other.checksum.isNullOrEmpty()
+
+            if (thisChecksumValid && otherChecksumValid) {
+                if (checksum != other.checksum) return false
+            } else {
+                // If either is null/empty, treat them as unequal
+                return false
+            }
+
+            return true
         }
 
         override fun hashCode(): Int {
@@ -156,7 +171,7 @@ internal data class ReleaseConfig(
         }
 
         fun toJSON(): JSONObject {
-            val json = JSONObject().put("url", this.url.toString()).put("file_path", this.filePath)
+            val json = JSONObject().put("url", this.url.toString()).put("file_path", this.filePath).put("checksum", this.checksum)
             isDownloaded?.let {
                 json.put("is_downloaded", isDownloaded)
             }
