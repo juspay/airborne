@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.15.0 - 2026-02-20
+#### Features
+- add discard release functionality - (ab7abe4) - Yash Rajput
+
+- - -
+
 ## airborne_server-v0.14.3 - 2026-02-20
 #### Bug Fixes
 - use actual experiment variant IDs for release conclude and revert - (5a343d4) - Yash Rajput

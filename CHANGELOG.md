@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.24.0 - 1970-01-01
+### Package updates
+- airborne_dashboard bumped to airborne_dashboard-v0.12.0
+- airborne_server bumped to airborne_server-v0.15.0
+### Global changes
+
+- - -
+
 ## v0.23.3 - 1970-01-01
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.11.7

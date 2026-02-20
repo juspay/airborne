@@ -1,6 +1,6 @@
 {
   "name": "airborne-devkit",
-  "version": "0.23.3",
+  "version": "0.24.0",
   "description": "Cli for Airborne",
   "main": "src/index.js",
   "type": "module",

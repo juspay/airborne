@@ -1,6 +1,6 @@
 {
   "name": "airborne-react-native",
-  "version": "0.23.3",
+  "version": "0.24.0",
   "description": "Airborne",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
