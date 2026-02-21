@@ -51,6 +51,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     AJPApplicationManifest* _downloadedApplicationManifest;
     MutableAppResources* _availableLazySplits;
     MutableAppResources* _availableResources;
+    NSMutableSet<NSString *> *_downloadedSplits;
     
     BOOL _callbacksFired;
 }
@@ -254,6 +255,28 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     [self initializeLazyResourcesDownloadStatus];
     _availableLazySplits = [self dictionaryFromResources:self.package.lazy];
     _availableResources = [NSMutableDictionary dictionaryWithDictionary:self.resources.resources];
+    
+    _downloadedSplits = [NSMutableSet set];
+    
+    [_downloadedSplits addObject:self.package.index.filePath];
+    
+    for (AJPResource *split in [self.package allImportantSplits]) {
+        [_downloadedSplits addObject:split.filePath];
+    }
+    for (AJPLazyResource *lazy in self.package.lazy) {
+        if (lazy.isDownloaded) {
+            [_downloadedSplits addObject:lazy.filePath];
+        }
+    }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    for (NSString *key in self.resources.resources) {
+        NSString *fileName = [self jsFileNameFor:key];
+        NSString *filePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
+        NSString *fullPath = [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:JUSPAY_PACKAGE_DIR];
+        if ([fm fileExistsAtPath:fullPath]) {
+            [_downloadedSplits addObject:key];
+        }
+    }
     [self.tracker trackInfo:@"init_with_local_config_versions" value:[@{@"package_version":self.package.version, @"config_version":self.config.version} mutableCopy]];
 }
 
@@ -668,6 +691,31 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     return [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:JUSPAY_PACKAGE_DIR];
 }
 
+- (NSString * _Nullable)getPathForAssetsInReleaseConfig:(NSString *)resourcePath {
+    if (resourcePath == nil || resourcePath.length == 0) {
+        return nil;
+    }
+
+    BOOL isAvailable;
+    [self.collectionsLock lock];
+    isAvailable = [self->_downloadedSplits containsObject:resourcePath];
+    [self.collectionsLock unlock];
+
+    if (!isAvailable) {
+        return nil;
+    }
+
+    NSString *resolvedPath = [self getPathForPackageFile:[self jsFileNameFor:resourcePath]];
+    return resolvedPath;
+}
+
+- (NSSet<NSString *> *)getDownloadedSplits {
+    [self.collectionsLock lock];
+    NSSet<NSString *> *copy = [self->_downloadedSplits copy];
+    [self.collectionsLock unlock];
+    return copy;
+}
+
 - (void)startDownload {
     self.releaseConfigDownloadStatus = DOWNLOADING;
     self.importantPackageDownloadStatus = DOWNLOADING;
@@ -759,6 +807,38 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                         }];
                     } else {
                         NSArray<AJPResource *> *toDownload = [strongSelf getResourcesFrom:strongSelf.downloadedLazy filtering:strongSelf.currentLazy];
+                        NSSet<NSString *> *pendingLazyPaths = [NSSet setWithArray:[toDownload valueForKey:@"filePath"]];
+
+                        [strongSelf.collectionsLock lock];
+
+                        NSMutableSet<NSString *> *validPaths = [NSMutableSet set];
+
+                        [validPaths addObject:strongSelf.package.index.filePath];
+
+                        for (AJPResource *split in [strongSelf.package allImportantSplits]) {
+                            [validPaths addObject:split.filePath];
+                        }
+
+                        for (AJPLazyResource *lazy in strongSelf.downloadedLazy) {
+                            if (![pendingLazyPaths containsObject:lazy.filePath] && lazy.isDownloaded) {
+                                [validPaths addObject:lazy.filePath];
+                            }
+                        }
+
+                        for (NSString *resourcePath in strongSelf->_availableResources) {
+                            [validPaths addObject:resourcePath];
+                        }
+
+                        NSSet<NSString *> *currentSplits = [strongSelf->_downloadedSplits copy];
+                        for (NSString *path in currentSplits) {
+                            if (![validPaths containsObject:path]) {
+                                [strongSelf->_downloadedSplits removeObject:path];
+                            }
+                        }
+
+                        [strongSelf->_downloadedSplits unionSet:validPaths];
+
+                        [strongSelf.collectionsLock unlock];
                         NSString *packageVersion = strongSelf.package.version;
                         [strongSelf downloadLazyPackageResources:toDownload version:packageVersion singleDownloadHandler:^(BOOL status, AJPResource *resource) {
                             if (!weakSelf) {
@@ -1243,6 +1323,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     } else {
         [self updateAvailableResource:resource.filePath withResource:resource];
         [self updateLazyPackageDownloadStatus:resource withStatus:YES];
+        [self.collectionsLock lock];
+        [self->_downloadedSplits addObject:resource.filePath];
+        [self.collectionsLock unlock];
     }
 }
 
@@ -1569,6 +1652,15 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                 @"new_resources_count": @(newResources.count),
                                 @"resources_to_download": @(resourcesToDownload.count)} mutableCopy]];
     
+    NSSet<NSString *> *pendingResourcePaths = [NSSet setWithArray:[resourcesToDownload valueForKey:@"filePath"]];
+    [self.collectionsLock lock];
+    for (NSString *key in newResources) {
+        if (![pendingResourcePaths containsObject:key]) {
+            [self->_downloadedSplits addObject:key];
+        }
+    }
+    [self.collectionsLock unlock];
+    
     if (resourcesToDownload.count == 0) {
         downloadCompletion();
         return;
@@ -1616,7 +1708,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                             value:[@{@"resource": resource.filePath} mutableCopy]];
                 }
                 
-                dispatch_group_leave(group);   
+                dispatch_group_leave(group);
             }];
         });
     }
@@ -1633,6 +1725,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     // Update the available resources
     [self updateAvailableResource:resource.filePath withResource:resource];
+    [self.collectionsLock lock];
+    [self->_downloadedSplits addObject:resource.filePath];
+    [self.collectionsLock unlock];
     
     // Update the resources file
     [self updateResources:self.availableResources];
