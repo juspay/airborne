@@ -175,6 +175,23 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (NSString *)getPathForPackageFile:(NSString *)fileName;
 
+/**
+ * Looks up a file path in the current release config and returns the on-disk storage path
+ * if the file is available. Returns nil if not in the config or not yet downloaded.
+ *
+ * @param filePath Relative path to look up (e.g., "images/logo.png").
+ * @return Full storage path if the file is in the release config and downloaded, nil otherwise.
+ */
+- (NSString * _Nullable)getPathForAssetsInReleaseConfig:(NSString *)filePath;
+
+/**
+ * Returns the set of file paths that are part of the current release config and available on disk.
+ *
+ * @return NSSet of file path strings for downloaded splits currently on disk.
+ */
+- (NSSet<NSString *> *)getDownloadedSplits;
+
+
 @end
 
 NS_ASSUME_NONNULL_END
