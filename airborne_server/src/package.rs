@@ -1,5 +1,6 @@
 pub mod utils;
 use crate::{
+    file::types::FileStatus,
     package::{types::*, utils::parse_package_key},
     run_blocking,
     types::{
@@ -9,8 +10,8 @@ use crate::{
         models::{FileEntry, NewPackageV2Entry, PackageV2Entry},
         schema::hyperotaserver::{
             files::{
-                app_id as file_app_id, file_path, org_id as file_org_id, table as files_table,
-                tag as file_tag, version as file_version,
+                app_id as file_app_id, file_path, org_id as file_org_id, status as file_status,
+                table as files_table, tag as file_tag, version as file_version,
             },
             packages_v2::{
                 app_id as package_app_id, index as package_index, org_id as package_org_id,
@@ -99,6 +100,7 @@ async fn create_package(
                 .into_boxed::<Pg>()
                 .filter(file_org_id.eq(&organisation))
                 .filter(file_app_id.eq(&application))
+                .filter(file_status.ne(FileStatus::Deleted))
                 .filter(combined)
                 .load(&mut conn)?;
             files

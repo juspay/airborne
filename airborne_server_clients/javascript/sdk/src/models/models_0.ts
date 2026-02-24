@@ -638,6 +638,102 @@ export interface DeleteDimensionRequest {
 }
 
 /**
+ * Delete file request
+ * @public
+ */
+export interface DeleteFileRequest {
+  /**
+   * File key in the format "$file_path@version:$version_number" or "$file_path@tag:$tag"
+   * @public
+   */
+  file_id: string | undefined;
+
+  /**
+   * Whether to delete all versions of the file
+   * @public
+   */
+  delete_all_versions?: boolean | undefined;
+
+  /**
+   * Name of the organisation
+   * @public
+   */
+  organisation: string | undefined;
+
+  /**
+   * Name of the application
+   * @public
+   */
+  application: string | undefined;
+}
+
+/**
+ * Delete file response
+ * @public
+ */
+export interface DeleteFileResponse {
+  /**
+   * id of the file
+   * @public
+   */
+  id: string | undefined;
+
+  /**
+   * Path where the file is stored on sdk
+   * @public
+   */
+  file_path: string | undefined;
+
+  /**
+   * URL from where the file can be downloaded
+   * @public
+   */
+  url: string | undefined;
+
+  /**
+   * List of deleted versions
+   * @public
+   */
+  versions: (number)[] | undefined;
+
+  /**
+   * Tag associated with the file
+   * @public
+   */
+  tag?: string | undefined;
+
+  /**
+   * Size of the file in bytes
+   * @public
+   */
+  size: number | undefined;
+
+  /**
+   * Checksum of the file
+   * @public
+   */
+  checksum: string | undefined;
+
+  /**
+   * Metadata associated with the file
+   * @public
+   */
+  metadata: __DocumentType | undefined;
+
+  /**
+   * Status of the file
+   * @public
+   */
+  status: string | undefined;
+
+  /**
+   * Date of creation of the file
+   * @public
+   */
+  created_at: string | undefined;
+}
+
+/**
  * @public
  */
 export interface GetReleaseRequest {
