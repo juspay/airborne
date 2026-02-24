@@ -12,6 +12,11 @@
       "software.amazon.smithy:smithy-codegen-core:1.57.1",
       "software.amazon.smithy:smithy-aws-traits:1.57.1",
       "software.amazon.smithy.typescript:smithy-aws-typescript-codegen:0.29.0"
+    ],
+    "repositories": [
+      {
+        "url": "https://repo1.maven.org/maven2"
+      }
     ]
   },
   "plugins": {

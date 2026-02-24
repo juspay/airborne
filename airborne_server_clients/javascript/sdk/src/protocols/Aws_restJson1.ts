@@ -28,6 +28,10 @@ import {
   DeleteDimensionCommandOutput,
 } from "../commands/DeleteDimensionCommand";
 import {
+  DeleteFileCommandInput,
+  DeleteFileCommandOutput,
+} from "../commands/DeleteFileCommand";
+import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
 } from "../commands/GetReleaseCommand";
@@ -299,6 +303,31 @@ export const se_DeleteDimensionCommand = async(
   let body: any;
   b.m("DELETE")
   .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1DeleteFileCommand
+ */
+export const se_DeleteFileCommand = async(
+  input: DeleteFileCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file");
+  const query: any = map({
+    [_fi]: [,__expectNonNull(input[_fi]!, `file_id`)],
+    [_dav]: [() => input.delete_all_versions !== void 0, () => (input[_dav]!.toString())],
+  });
+  let body: any;
+  b.m("DELETE")
+  .h(headers)
+  .q(query)
   .b(body);
   return b.build();
 }
@@ -777,6 +806,36 @@ export const de_DeleteDimensionCommand = async(
     $metadata: deserializeMetadata(output),
   });
   await collectBody(output.body, context);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1DeleteFileCommand
+ */
+export const de_DeleteFileCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<DeleteFileCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'checksum': __expectString,
+    'created_at': __expectString,
+    'file_path': __expectString,
+    'id': __expectString,
+    'metadata': _ => de_Document(_, context),
+    'size': __expectInt32,
+    'status': __expectString,
+    'tag': __expectString,
+    'url': __expectString,
+    'versions': _json,
+  });
+  Object.assign(contents, doc);
   return contents;
 }
 
@@ -1332,6 +1391,8 @@ const de_CommandError = async(
     }) as any;
   }
 
+  // de_DeletedVersionsList omitted.
+
   /**
    * deserializeAws_restJson1DimensionList
    */
@@ -1497,6 +1558,8 @@ const de_CommandError = async(
   const _c = "count";
   const _ch = "checksum";
   const _d = "dimension";
+  const _dav = "delete_all_versions";
+  const _fi = "file_id";
   const _fp = "file_path";
   const _o = "organisation";
   const _p = "page";

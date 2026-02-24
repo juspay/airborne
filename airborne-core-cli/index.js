@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, DeleteFileAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -648,6 +648,79 @@ JSON file format (params.json):
     try {
       
       const output = await DeleteDimensionAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("DeleteFile")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--file_id <file_id>", "file_id parameter")
+ .option("--delete_all_versions <delete_all_versions>", "delete_all_versions parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Delete file request operation:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli DeleteFile \\
+     --file_id <file_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--delete_all_versions <delete_all_versions>]
+
+Usage 2 - JSON file:
+  airborne-core-cli DeleteFile @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli DeleteFile @params.json --file_id <value> --delete_all_versions <value> --token <value>
+
+Parameters:
+    --file_id <string> (required) : File key in the format "$file_path@version:$version_number" or "$file_path@tag:$tag"
+    --delete_all_versions <boolean> (optional) : Whether to delete all versions of the file
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli DeleteFile \\
+     --file_id <file_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--delete_all_versions <delete_all_versions>]
+
+2. Using JSON file:
+   $ airborne-core-cli DeleteFile @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli DeleteFile @params.json --file_id <value> --delete_all_versions <value> --token <value>
+
+JSON file format (params.json):
+{
+  "file_id": "example_file_id",
+  "delete_all_versions": "example_delete_all_versions",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await DeleteFileAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {

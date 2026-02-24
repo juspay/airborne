@@ -5,6 +5,7 @@ import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from 
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "../commands/CreatePackageCommand";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "../commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "../commands/DeleteDimensionCommand";
+import { DeleteFileCommandInput, DeleteFileCommandOutput } from "../commands/DeleteFileCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "../commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "../commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "../commands/ListDimensionsCommand";
@@ -48,6 +49,10 @@ export declare const se_CreateReleaseCommand: (input: CreateReleaseCommandInput,
  * serializeAws_restJson1DeleteDimensionCommand
  */
 export declare const se_DeleteDimensionCommand: (input: DeleteDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1DeleteFileCommand
+ */
+export declare const se_DeleteFileCommand: (input: DeleteFileCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1GetReleaseCommand
  */
@@ -128,6 +133,10 @@ export declare const de_CreateReleaseCommand: (output: __HttpResponse, context: 
  * deserializeAws_restJson1DeleteDimensionCommand
  */
 export declare const de_DeleteDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<DeleteDimensionCommandOutput>;
+/**
+ * deserializeAws_restJson1DeleteFileCommand
+ */
+export declare const de_DeleteFileCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<DeleteFileCommandOutput>;
 /**
  * deserializeAws_restJson1GetReleaseCommand
  */

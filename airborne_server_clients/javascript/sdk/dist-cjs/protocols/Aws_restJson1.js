@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.de_UploadFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_DeleteFileCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_DeleteFileCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
@@ -138,6 +138,25 @@ const se_DeleteDimensionCommand = async (input, context) => {
     return b.build();
 };
 exports.se_DeleteDimensionCommand = se_DeleteDimensionCommand;
+const se_DeleteFileCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file");
+    const query = (0, smithy_client_1.map)({
+        [_fi]: [, (0, smithy_client_1.expectNonNull)(input[_fi], `file_id`)],
+        [_dav]: [() => input.delete_all_versions !== void 0, () => (input[_dav].toString())],
+    });
+    let body;
+    b.m("DELETE")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_DeleteFileCommand = se_DeleteFileCommand;
 const se_GetReleaseCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -491,6 +510,30 @@ const de_DeleteDimensionCommand = async (output, context) => {
     return contents;
 };
 exports.de_DeleteDimensionCommand = de_DeleteDimensionCommand;
+const de_DeleteFileCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'checksum': smithy_client_1.expectString,
+        'created_at': smithy_client_1.expectString,
+        'file_path': smithy_client_1.expectString,
+        'id': smithy_client_1.expectString,
+        'metadata': _ => de_Document(_, context),
+        'size': smithy_client_1.expectInt32,
+        'status': smithy_client_1.expectString,
+        'tag': smithy_client_1.expectString,
+        'url': smithy_client_1.expectString,
+        'versions': smithy_client_1._json,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_DeleteFileCommand = de_DeleteFileCommand;
 const de_GetReleaseCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -951,6 +994,8 @@ const _al = "all";
 const _c = "count";
 const _ch = "checksum";
 const _d = "dimension";
+const _dav = "delete_all_versions";
+const _fi = "file_id";
 const _fp = "file_path";
 const _o = "organisation";
 const _p = "page";

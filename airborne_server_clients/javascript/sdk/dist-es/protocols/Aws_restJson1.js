@@ -128,6 +128,24 @@ export const se_DeleteDimensionCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_DeleteFileCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file");
+    const query = map({
+        [_fi]: [, __expectNonNull(input[_fi], `file_id`)],
+        [_dav]: [() => input.delete_all_versions !== void 0, () => (input[_dav].toString())],
+    });
+    let body;
+    b.m("DELETE")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
 export const se_GetReleaseCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -459,6 +477,29 @@ export const de_DeleteDimensionCommand = async (output, context) => {
         $metadata: deserializeMetadata(output),
     });
     await collectBody(output.body, context);
+    return contents;
+};
+export const de_DeleteFileCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'checksum': __expectString,
+        'created_at': __expectString,
+        'file_path': __expectString,
+        'id': __expectString,
+        'metadata': _ => de_Document(_, context),
+        'size': __expectInt32,
+        'status': __expectString,
+        'tag': __expectString,
+        'url': __expectString,
+        'versions': _json,
+    });
+    Object.assign(contents, doc);
     return contents;
 };
 export const de_GetReleaseCommand = async (output, context) => {
@@ -908,6 +949,8 @@ const _al = "all";
 const _c = "count";
 const _ch = "checksum";
 const _d = "dimension";
+const _dav = "delete_all_versions";
+const _fi = "file_id";
 const _fp = "file_path";
 const _o = "organisation";
 const _p = "page";

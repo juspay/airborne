@@ -8,6 +8,7 @@ tslib_1.__exportStar(require("./CreateOrganisationCommand"), exports);
 tslib_1.__exportStar(require("./CreatePackageCommand"), exports);
 tslib_1.__exportStar(require("./CreateReleaseCommand"), exports);
 tslib_1.__exportStar(require("./DeleteDimensionCommand"), exports);
+tslib_1.__exportStar(require("./DeleteFileCommand"), exports);
 tslib_1.__exportStar(require("./GetReleaseCommand"), exports);
 tslib_1.__exportStar(require("./GetUserCommand"), exports);
 tslib_1.__exportStar(require("./ListDimensionsCommand"), exports);

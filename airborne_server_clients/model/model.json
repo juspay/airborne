@@ -1871,6 +1871,9 @@
                     "target": "io.airborne.server#DeleteDimension"
                 },
                 {
+                    "target": "io.airborne.server#DeleteFile"
+                },
+                {
                     "target": "io.airborne.server#GetRelease"
                 },
                 {
@@ -2655,6 +2658,163 @@
                         "smithy.api#required": {}
                     }
                 }
+            }
+        },
+        "io.airborne.server#DeleteFile": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#DeleteFileRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#DeleteFileResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Delete file request operation",
+                "smithy.api#http": {
+                    "method": "DELETE",
+                    "uri": "/api/file"
+                },
+                "smithy.api#idempotent": {}
+            }
+        },
+        "io.airborne.server#DeleteFileRequest": {
+            "type": "structure",
+            "members": {
+                "file_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "File key in the format \"$file_path@version:$version_number\" or \"$file_path@tag:$tag\"",
+                        "smithy.api#httpQuery": "file_id",
+                        "smithy.api#required": {}
+                    }
+                },
+                "delete_all_versions": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Whether to delete all versions of the file",
+                        "smithy.api#httpQuery": "delete_all_versions"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Delete file request"
+            }
+        },
+        "io.airborne.server#DeleteFileResponse": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "id of the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "file_path": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Path where the file is stored on sdk",
+                        "smithy.api#required": {}
+                    }
+                },
+                "url": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "URL from where the file can be downloaded",
+                        "smithy.api#required": {}
+                    }
+                },
+                "versions": {
+                    "target": "io.airborne.server#DeletedVersionsList",
+                    "traits": {
+                        "smithy.api#documentation": "List of deleted versions",
+                        "smithy.api#required": {}
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tag associated with the file"
+                    }
+                },
+                "size": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Size of the file in bytes",
+                        "smithy.api#required": {}
+                    }
+                },
+                "checksum": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Checksum of the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "metadata": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Metadata associated with the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "status": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Status of the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Date of creation of the file",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Delete file response"
+            }
+        },
+        "io.airborne.server#DeletedVersionsList": {
+            "type": "list",
+            "member": {
+                "target": "smithy.api#Integer",
+                "traits": {
+                    "smithy.api#documentation": "A deleted version number"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of deleted versions"
             }
         },
         "io.airborne.server#DimensionList": {
