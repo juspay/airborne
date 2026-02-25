@@ -39,13 +39,22 @@ pub fn parse_definition_map_object(
 
         match k_enum {
             JsonLogicKey::And => {
-                let Document::Object(nested) = v else {
+                let Document::Array(arr) = v else {
                     return Err(ABError::BadRequest(
-                        "Key 'and' must map to an object of nested comparators".into(),
+                        "Key 'and' must map to an array of nested comparators".into(),
                     ));
                 };
-                let nested_map = parse_definition_map_object(nested)?;
-                out.insert(JsonLogicKey::And, DefinitionValue::Node(nested_map));
+                let mut conditions: Vec<DefinitionValue> = Vec::new();
+                for item in arr {
+                    let Document::Object(nested) = item else {
+                        return Err(ABError::BadRequest(
+                            "Each element in 'and' array must be an object".into(),
+                        ));
+                    };
+                    let nested_map = parse_definition_map_object(nested)?;
+                    conditions.push(DefinitionValue::Node(nested_map));
+                }
+                out.insert(JsonLogicKey::And, DefinitionValue::Array(conditions));
             }
             _ => {
                 if let Document::Object(_) = v {
