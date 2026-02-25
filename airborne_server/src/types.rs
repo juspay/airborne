@@ -361,10 +361,19 @@ impl<T> PaginatedResponse<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PaginatedQuery {
     All,
     Paginated { page: u32, count: u32 },
+}
+
+fn de_u32_from_str<'de, D>(d: D) -> std::result::Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(d)?;
+    opt.map(|s| s.parse().map_err(serde::de::Error::custom))
+        .transpose()
 }
 
 impl<'de> Deserialize<'de> for PaginatedQuery {
@@ -374,8 +383,11 @@ impl<'de> Deserialize<'de> for PaginatedQuery {
     {
         #[derive(Deserialize)]
         struct Helper {
+            #[serde(default, deserialize_with = "de_u32_from_str")]
             count: Option<u32>,
+            #[serde(default, deserialize_with = "de_u32_from_str")]
             page: Option<u32>,
+            #[serde(default)]
             all: Option<bool>,
         }
 

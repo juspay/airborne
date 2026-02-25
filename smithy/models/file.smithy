@@ -85,6 +85,10 @@ structure ListFilesRequest {
     @httpQuery("search")
     search: String
 
+    /// Tags to filter files by (comma-separated for multiple values, e.g., "prod,dev,staging")
+    @httpQuery("tags")
+    tags: String
+
     /// Name of the organisation
     @httpHeader("x-organisation")
     @required
@@ -196,6 +200,212 @@ operation ListFiles {
 operation UploadFile {
     input: UploadFileRequest
     output: CreateFileResponse
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+/// List file tags request
+structure ListFileTagsRequest {
+    /// Page number for pagination
+    @httpQuery("page")
+    page: Integer
+
+    /// Number of tags per page
+    @httpQuery("per_page")
+    per_page: Integer
+
+    /// Search query to filter tags
+    @httpQuery("search")
+    search: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// File tag response
+structure FileTagResponse {
+    /// The tag value
+    @required
+    tag: String
+
+    /// Number of files with this tag
+    @required
+    count: Integer
+}
+
+/// List of file tag responses
+list FileTagResponseList {
+    /// A file tag response
+    member: FileTagResponse
+}
+
+/// List file tags response
+structure ListFileTagsResponse {
+    /// List of tags
+    @required
+    tags: FileTagResponseList
+
+    /// Total number of unique tags
+    @required
+    total: Integer
+
+    /// Current page number
+    @required
+    page: Integer
+
+    /// Number of tags per page
+    @required
+    per_page: Integer
+}
+
+/// List file tags operation
+@http(method: "GET", uri: "/api/file/tags")
+@requiresauth
+@readonly
+operation ListFileTags {
+    input: ListFileTagsRequest
+    output: ListFileTagsResponse
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+/// Represents a version within a file group
+structure FileGroupVersion {
+    /// The version number
+    @required
+    version: Integer
+
+    /// URL from where the file can be downloaded
+    @required
+    url: String
+
+    /// Size of the file in bytes
+    @required
+    size: Integer
+
+    /// Date when this version was created
+    @required
+    created_at: String
+}
+
+/// List of file group versions
+list FileGroupVersionList {
+    /// A file group version
+    member: FileGroupVersion
+}
+
+/// Represents a tag associated with a specific version
+structure FileGroupTag {
+    /// The tag value
+    @required
+    tag: String
+
+    /// The version this tag is associated with
+    @required
+    version: Integer
+}
+
+/// List of file group tags
+list FileGroupTagList {
+    /// A file group tag
+    member: FileGroupTag
+}
+
+/// Represents a group of file versions
+structure FileGroup {
+    /// The file path (unique identifier for the group)
+    @required
+    file_path: String
+
+    /// Total number of versions for this file
+    @required
+    total_versions: Integer
+
+    /// List of all versions
+    @required
+    versions: FileGroupVersionList
+
+    /// List of tags associated with versions
+    @required
+    tags: FileGroupTagList
+}
+
+/// List of file groups
+list FileGroupList {
+    /// A file group
+    member: FileGroup
+}
+
+/// List file groups request
+structure ListFileGroupsRequest {
+    /// Page number for pagination
+    @httpQuery("page")
+    page: Integer
+
+    /// Number of groups per page
+    @httpQuery("count")
+    count: Integer
+
+    /// Search query to filter files by path
+    @httpQuery("search")
+    search: String
+
+    /// Tags to filter files by (comma-separated for multiple values)
+    @httpQuery("tags")
+    tags: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// List file groups response
+structure ListFileGroupsResponse {
+    /// List of file groups
+    @required
+    groups: FileGroupList
+
+    /// Total number of groups matching the query
+    @required
+    total_items: Integer
+
+    /// Total number of pages
+    @required
+    total_pages: Integer
+
+    /// Current page number
+    @required
+    page: Integer
+
+    /// Number of groups per page
+    @required
+    count: Integer
+}
+
+/// List file groups operation
+@http(method: "GET", uri: "/api/file/groups")
+@requiresauth
+@readonly
+operation ListFileGroups {
+    input: ListFileGroupsRequest
+    output: ListFileGroupsResponse
     errors: [
         Unauthorized
         BadRequestError

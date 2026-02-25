@@ -1,138 +1,50 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import useSWR from "swr";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationEllipsis,
-} from "@/components/ui/pagination";
-import { Search, ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package2 } from "lucide-react";
+import { ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package2 } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
 import { hasAppAccess } from "@/lib/utils";
 import { notFound } from "next/navigation";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-
-type ApiFile = { id?: string; file_path: string; url: string; version: number; tag?: string; size?: number };
-
-type ApiResponse = {
-  files: ApiFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
-};
+import { FileChooser, SelectedFile } from "@/components/file-chooser";
 
 export default function CreatePackagePage() {
   const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
-  const params = useParams<{ appId: string }>();
-  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
   const totalSteps = 2;
   const [currentStep, setCurrentStep] = useState(1);
 
   // Step 1: Package Details & Index File
   const [tag, setTag] = useState("");
   const [packageProperties] = useState("{}");
-  const [selectedIndexFile, setSelectedIndexFile] = useState<ApiFile | null>(null);
-  const [indexFileSearch, setIndexFileSearch] = useState("");
-  const debouncedIndexFileQuery = useDebouncedValue(indexFileSearch, 500);
-  const [indexFileCurrentPage, setIndexFileCurrentPage] = useState(1);
+  const [selectedIndexFile, setSelectedIndexFile] = useState<SelectedFile | null>(null);
 
   // Step 2: Package Files
-  const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
-  const [packageFileCurrentPage, setPackageFileCurrentPage] = useState(1);
-  const [selectedFiles, setSelectedFiles] = useState<Map<string, string>>(new Map()); // Map<file_path, file_id>
+  const [selectedPackageFiles, setSelectedPackageFiles] = useState<SelectedFile[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  const perPage = 10;
   useEffect(() => {
     if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
       notFound();
     }
-  }, [loadingAccess]);
+  }, [loadingAccess, org, app, getOrgAccess, getAppAccess, hasAppAccess]);
 
-  // Data fetching for file lists
-  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
-  const {
-    data: indexFileData,
-    error: indexFileError,
-    isLoading: indexFileLoading,
-  } = useSWR(
-    token && org && appId && currentStep === 1
-      ? ["/file/list", appId, debouncedIndexFileQuery, indexFileCurrentPage]
-      : null,
-    async () =>
-      apiFetch<ApiResponse>(
-        "/file/list",
-        {
-          method: "GET",
-          query: { search: indexFileSearch || undefined, page: indexFileCurrentPage, per_page: perPage },
-        },
-        { token, org, app: appId }
-      )
-  );
+  // File selection handlers
+  const handleIndexFileChange = useCallback((files: SelectedFile[]) => {
+    setSelectedIndexFile(files.length > 0 ? files[0] : null);
+  }, []);
 
-  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
-  const { data, error, isLoading } = useSWR(
-    token && org && appId && currentStep === 2
-      ? ["/file/list", appId, debouncedSearchQuery, packageFileCurrentPage]
-      : null,
-    async () =>
-      apiFetch<ApiResponse>(
-        "/file/list",
-        { method: "GET", query: { search: searchQuery || undefined, page: packageFileCurrentPage, per_page: perPage } },
-        { token, org, app: appId }
-      )
-  );
-
-  const indexFiles: ApiFile[] = indexFileData?.files || [];
-  const files: ApiFile[] = data?.files || [];
-
-  // Pagination data
-  const indexFileTotal = indexFileData?.total || 0;
-  const indexFileTotalPages = Math.ceil(indexFileTotal / perPage);
-  const packageFileTotal = data?.total || 0;
-  const packageFileTotalPages = Math.ceil(packageFileTotal / perPage);
-
-  // Filter out the selected index file from package files
-  const availableFiles = useMemo(() => {
-    if (!selectedIndexFile) return files;
-    return files.filter((f) => {
-      const indexKey = selectedIndexFile.id || `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`;
-      const fileKey = f.id || `${f.file_path}@version:${f.version}`;
-      return fileKey !== indexKey;
-    });
-  }, [files, selectedIndexFile]);
-
-  const toggle = (fileId: string) => {
-    const file_path = fileId.split("@version:")[0];
-
-    setSelectedFiles((prev) => {
-      const newMap = new Map(prev);
-      if (newMap.has(file_path)) {
-        newMap.delete(file_path);
-      } else {
-        newMap.set(file_path, fileId);
-      }
-      return newMap;
-    });
-  };
+  const handlePackageFilesChange = useCallback((files: SelectedFile[]) => {
+    setSelectedPackageFiles(files);
+  }, []);
 
   const canProceedToStep = (step: number) => {
     switch (step) {
@@ -143,116 +55,6 @@ export default function CreatePackagePage() {
       default:
         return false;
     }
-  };
-
-  const handleIndexFileSearchChange = (value: string) => {
-    setIndexFileSearch(value);
-    setIndexFileCurrentPage(1); // Reset to first page when searching
-  };
-
-  const handlePackageFileSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setPackageFileCurrentPage(1); // Reset to first page when searching
-  };
-
-  const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
-    const items = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      // Show all pages if total pages is small
-      for (let i = 1; i <= totalPages; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onPageChange(i);
-              }}
-              isActive={currentPage === i}
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
-    } else {
-      // Show first page
-      items.push(
-        <PaginationItem key={1}>
-          <PaginationLink
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onPageChange(1);
-            }}
-            isActive={currentPage === 1}
-          >
-            1
-          </PaginationLink>
-        </PaginationItem>
-      );
-
-      // Show ellipsis if current page is far from start
-      if (currentPage > 3) {
-        items.push(
-          <PaginationItem key="ellipsis1">
-            <PaginationEllipsis />
-          </PaginationItem>
-        );
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) {
-        items.push(
-          <PaginationItem key={i}>
-            <PaginationLink
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onPageChange(i);
-              }}
-              isActive={currentPage === i}
-            >
-              {i}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
-
-      // Show ellipsis if current page is far from end
-      if (currentPage < totalPages - 2) {
-        items.push(
-          <PaginationItem key="ellipsis2">
-            <PaginationEllipsis />
-          </PaginationItem>
-        );
-      }
-
-      // Show last page
-      if (totalPages > 1) {
-        items.push(
-          <PaginationItem key={totalPages}>
-            <PaginationLink
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                onPageChange(totalPages);
-              }}
-              isActive={currentPage === totalPages}
-            >
-              {totalPages}
-            </PaginationLink>
-          </PaginationItem>
-        );
-      }
-    }
-
-    return items;
   };
 
   async function onCreate(_submitAsDraft?: boolean) {
@@ -267,18 +69,24 @@ export default function CreatePackagePage() {
         return;
       }
 
-      const fileIds = Array.from(selectedFiles.values());
+      // Convert SelectedFile[] to file_id strings
+      const fileIds = selectedPackageFiles.map((f) => `${f.file_path}@version:${f.version}`);
+      // Filter out the index file from the package files if it was selected
+      const filteredFileIds = selectedIndexFile
+        ? fileIds.filter((id) => !id.startsWith(`${selectedIndexFile.file_path}@`))
+        : fileIds;
       const indexPath = selectedIndexFile ? `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}` : "";
 
       await apiFetch(
         "/packages",
         {
           method: "POST",
+
           body: {
             index: indexPath,
             tag: tag || undefined,
             properties,
-            files: fileIds,
+            files: filteredFileIds,
           },
         },
         { token, org, app }
@@ -369,109 +177,13 @@ export default function CreatePackagePage() {
                 <CardDescription>Choose the main entry point file for your package</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search files..."
-                      value={indexFileSearch}
-                      onChange={(e) => handleIndexFileSearchChange(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
-                {indexFileError ? (
-                  <div className="text-red-600">Failed to load files</div>
-                ) : indexFileLoading ? (
-                  <div>Loading…</div>
-                ) : indexFiles.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">
-                    {indexFileSearch
-                      ? "No files found matching your search."
-                      : "No files found. Create a file first from the Create menu or the Files page."}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {Math.min(perPage, indexFiles.length)} of {indexFileTotal} files
-                      {indexFileCurrentPage > 1 && ` (page ${indexFileCurrentPage})`}
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>File</TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Tag</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {indexFiles.map((f) => {
-                            const key = f.id || `${f.file_path}@version:${f.version}`;
-                            const isSelected =
-                              selectedIndexFile &&
-                              (selectedIndexFile.id ||
-                                `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`) === key;
-                            return (
-                              <TableRow key={key}>
-                                <TableCell>
-                                  <Checkbox
-                                    checked={!!isSelected}
-                                    onCheckedChange={() => setSelectedIndexFile(isSelected ? null : f)}
-                                  />
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                                <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                                <TableCell className="text-muted-foreground">{f.tag || "—"}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    {/* Index File Pagination */}
-                    {indexFileTotalPages > 1 && (
-                      <div className="mt-4">
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (indexFileCurrentPage > 1) setIndexFileCurrentPage(indexFileCurrentPage - 1);
-                                }}
-                                className={indexFileCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                              />
-                            </PaginationItem>
-
-                            {renderPaginationItems(indexFileCurrentPage, indexFileTotalPages, setIndexFileCurrentPage)}
-
-                            <PaginationItem>
-                              <PaginationNext
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (indexFileCurrentPage < indexFileTotalPages)
-                                    setIndexFileCurrentPage(indexFileCurrentPage + 1);
-                                }}
-                                className={
-                                  indexFileCurrentPage >= indexFileTotalPages ? "pointer-events-none opacity-50" : ""
-                                }
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      </div>
-                    )}
-                  </div>
-                )}
-
+                <FileChooser
+                  mode="single"
+                  selected={selectedIndexFile ? [selectedIndexFile] : []}
+                  onChange={handleIndexFileChange}
+                />
                 {selectedIndexFile && (
-                  <div className="mt-4 p-3 bg-green-10 border border-green-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-green-600" />
                       <span className="font-mono text-sm">{selectedIndexFile.file_path}</span>
@@ -492,195 +204,56 @@ export default function CreatePackagePage() {
                 <CardDescription>Choose additional files to include in this package</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search files..."
-                      value={searchQuery}
-                      onChange={(e) => handlePackageFileSearchChange(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-
-                {error ? (
-                  <div className="text-red-600">Failed to load files</div>
-                ) : isLoading ? (
-                  <div>Loading…</div>
-                ) : availableFiles.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">
-                    {searchQuery ? "No files found matching your search" : "No additional files available"}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground">
-                      Showing {Math.min(perPage, availableFiles.length)} of {packageFileTotal} files
-                      {packageFileCurrentPage > 1 && ` (page ${packageFileCurrentPage})`}
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]"></TableHead>
-                            <TableHead>File</TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Tag</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {availableFiles.map((f) => {
-                            const fileId = f.id || `${f.file_path}@version:${f.version}`;
-                            const selectedFileId = selectedFiles.get(f.file_path);
-                            const isThisVersionSelected = selectedFileId === fileId;
-                            const isAnotherVersionSelected = selectedFileId && selectedFileId !== fileId;
-                            const isSameAsIndexFile = selectedIndexFile && f.file_path === selectedIndexFile.file_path;
-
-                            return (
-                              <TableRow
-                                key={fileId}
-                                className={isAnotherVersionSelected || isSameAsIndexFile ? "opacity-50" : ""}
-                              >
-                                <TableCell>
-                                  <Checkbox
-                                    checked={isThisVersionSelected}
-                                    disabled={!!isAnotherVersionSelected || !!isSameAsIndexFile}
-                                    onCheckedChange={() => toggle(fileId)}
-                                  />
-                                </TableCell>
-                                <TableCell className="font-mono text-sm">
-                                  {f.file_path}
-                                  {isAnotherVersionSelected && (
-                                    <div className="text-xs text-amber-600 mt-1">Another version already selected</div>
-                                  )}
-                                  {isSameAsIndexFile && (
-                                    <div className="text-xs text-amber-600 mt-1">
-                                      Another version is selected as the index file
-                                    </div>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                                <TableCell className="text-muted-foreground">{f.tag || "—"}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    {/* Package Files Pagination */}
-                    {packageFileTotalPages > 1 && (
-                      <div className="mt-4">
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (packageFileCurrentPage > 1) setPackageFileCurrentPage(packageFileCurrentPage - 1);
-                                }}
-                                className={packageFileCurrentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                              />
-                            </PaginationItem>
-
-                            {renderPaginationItems(
-                              packageFileCurrentPage,
-                              packageFileTotalPages,
-                              setPackageFileCurrentPage
-                            )}
-
-                            <PaginationItem>
-                              <PaginationNext
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (packageFileCurrentPage < packageFileTotalPages)
-                                    setPackageFileCurrentPage(packageFileCurrentPage + 1);
-                                }}
-                                className={
-                                  packageFileCurrentPage >= packageFileTotalPages
-                                    ? "pointer-events-none opacity-50"
-                                    : ""
-                                }
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedFiles.size > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <Label>Selected Files ({selectedFiles.size})</Label>
-                    <div className="max-h-40 overflow-y-auto space-y-1">
-                      {Array.from(selectedFiles.values()).map((fileId) => {
-                        const [file_path, versionPart] = fileId.split("@version:");
-                        return (
-                          <div
-                            key={file_path}
-                            className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-                          >
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              <span className="font-mono">{file_path}</span>
-                              {versionPart && <span className="text-muted-foreground">(Version {versionPart})</span>}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                toggle(fileId);
-                              }}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <FileChooser
+                  mode="multi"
+                  selected={selectedPackageFiles}
+                  onChange={handlePackageFilesChange}
+                  excludeFiles={selectedIndexFile ? [selectedIndexFile.file_path] : []}
+                />
               </CardContent>
             </Card>
           </div>
         )}
       </div>
 
-      <div className="flex items-center justify-between mt-8 pt-6 border-t">
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages`}>
-              Cancel
-            </Link>
-          </Button>
-          {currentStep > 1 && (
-            <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
-              Previous
+      {/* Fixed Bottom Bar */}
+      <div className="fixed bottom-0 left-64 right-0 bg-background border-t p-4 z-50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-6">
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages`}>
+                Cancel
+              </Link>
             </Button>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {currentStep < totalSteps ? (
-            <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
-              Next Step
-            </Button>
-          ) : (
-            <>
-              <Button
-                onClick={() => onCreate()}
-                disabled={!canProceedToStep(1) || !canProceedToStep(2) || isSubmitting}
-                className="gap-2"
-              >
-                <Rocket className="h-4 w-4" />
-                Create Package
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={() => setCurrentStep((s) => s - 1)}>
+                Previous
               </Button>
-            </>
-          )}
+            )}
+          </div>
+          <div className="flex gap-2">
+            {currentStep < totalSteps ? (
+              <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceedToStep(currentStep)}>
+                Next Step
+              </Button>
+            ) : (
+              <>
+                <Button
+                  onClick={() => onCreate()}
+                  disabled={!canProceedToStep(1) || !canProceedToStep(2) || isSubmitting}
+                  className="gap-2"
+                >
+                  <Rocket className="h-4 w-4" />
+                  Create Package
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Spacer for fixed bottom bar */}
+      <div className="h-20" />
     </div>
   );
 }
