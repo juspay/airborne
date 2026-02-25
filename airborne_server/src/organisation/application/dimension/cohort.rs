@@ -199,29 +199,29 @@ async fn create_cohort_checkpoint_api(
         };
 
         let mut logic_hashmap = HashMap::new();
+        let mut and_conditions: Vec<types::DefinitionValue> = Vec::new();
+
+        // Retain existing definition
+        if let Some(existing) = cohort_dimension.definitions.get(&last_checkpoint) {
+            // put first key of existing into and_conditions as a Node
+            if let Some((key, val)) = existing.iter().next() {
+                let mut inner_map = HashMap::new();
+                inner_map.insert(key.clone(), val.clone());
+                and_conditions.push(types::DefinitionValue::Node(inner_map));
+            }
+        }
+
+        // Add upper bound as a Leaf
+        let mut upper_bound_map = HashMap::new();
+        upper_bound_map.insert(
+            comparator,
+            types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.value])),
+        );
+        and_conditions.push(types::DefinitionValue::Node(upper_bound_map));
+
         logic_hashmap.insert(
             types::JsonLogicKey::And,
-            types::DefinitionValue::Node({
-                let mut inner_map = HashMap::new();
-
-                // Retain existing definition
-                if let Some(existing) = cohort_dimension.definitions.get(&last_checkpoint) {
-                    // put first key of existing into inner_map
-                    if let Some((key, val)) = existing.iter().next() {
-                        inner_map.insert(key.clone(), val.clone());
-                    }
-                }
-
-                // Add upper bound
-                inner_map.insert(
-                    comparator,
-                    types::DefinitionValue::Leaf(
-                        serde_json::json!([{ "var": depends_on }, req.value]),
-                    ),
-                );
-
-                inner_map
-            }),
+            types::DefinitionValue::Array(and_conditions),
         );
 
         if cohort_dimension

@@ -63,6 +63,7 @@ pub type DefinitionMap = HashMap<JsonLogicKey, DefinitionValue>;
 #[serde(untagged)]
 pub enum DefinitionValue {
     Node(DefinitionMap),
+    Array(Vec<DefinitionValue>),
     Leaf(Value),
 }
 
@@ -77,6 +78,7 @@ impl DefinitionValue {
                 }
                 Value::Object(obj)
             }
+            DefinitionValue::Array(arr) => Value::Array(arr.iter().map(|v| v.to_json()).collect()),
         }
     }
 }
