@@ -6,15 +6,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Search, MoreHorizontal, Edit, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Search, ChevronDown, ChevronRight, File, Filter, Plus, Loader2, Pencil } from "lucide-react";
+import { FileCreationModal } from "@/components/file-creation-modal";
+import { useAppContext } from "@/providers/app-context";
+import { apiFetch } from "@/lib/api";
+import { hasAppAccess } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { toastSuccess, toastError } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Pagination,
   PaginationContent,
@@ -24,81 +33,133 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import { FileCreationModal } from "@/components/file-creation-modal";
-import { useAppContext } from "@/providers/app-context";
-import { apiFetch } from "@/lib/api";
-import { hasAppAccess } from "@/lib/utils";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useParams } from "next/navigation";
+import type { FileGroup, FileGroupsResponse, TagInfo, TagsResponse } from "@/types/files";
 
-type ApiFile = {
-  id: string;
-  file_path: string;
-  url: string;
-  version: number;
-  tag?: string;
-  size?: number;
-  status?: string;
-  created_at?: string;
-  metadata?: Record<string, any>;
-};
-
-type ApiResponse = {
-  files: ApiFile[];
-  total: number;
-  page?: number;
-  per_page?: number;
-};
+const FILES_PER_PAGE = 15;
 
 export default function FilesPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
-  const params = useParams<{ appId: string }>();
-  const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
-  const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
-  const [filterType, setFilterType] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const perPage = 10;
 
-  // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
-  const { data, error, mutate, isLoading } = useSWR(
-    token && org && appId ? ["/file/list", appId, debouncedSearchQuery, currentPage] : null,
-    async () =>
-      apiFetch<ApiResponse>(
-        "/file/list",
-        { method: "GET", query: { search: searchQuery || undefined, page: currentPage, per_page: perPage } },
-        { token, org, app: appId }
-      )
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(searchQuery, 300);
+  const [selectedTag, setSelectedTag] = useState<string>("all");
+
+  // Pagination
+  const [page, setPage] = useState(1);
+
+  // UI state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+
+  // Edit Tag dialog state
+  const [isEditTagDialogOpen, setIsEditTagDialogOpen] = useState(false);
+  const [editingVersion, setEditingVersion] = useState<{
+    filePath: string;
+    version: number;
+    currentTag: string;
+  } | null>(null);
+  const [newTagValue, setNewTagValue] = useState("");
+  const [isUpdatingTag, setIsUpdatingTag] = useState(false);
+
+  // Fetch file groups with pagination
+  const {
+    data: groupsData,
+    isLoading,
+    mutate,
+  } = useSWR(token && org && app ? ["/file/groups", app, debouncedSearch, selectedTag, page] : null, async () =>
+    apiFetch<FileGroupsResponse>(
+      "/file/groups",
+      {
+        method: "GET",
+        query: {
+          page,
+          count: FILES_PER_PAGE,
+          search: debouncedSearch || undefined,
+          tags: selectedTag !== "all" ? selectedTag : undefined,
+        },
+      },
+      { token, org, app }
+    )
   );
 
-  const files: ApiFile[] = data?.files || [];
-  const total = data?.total || 0;
-  const totalPages = Math.ceil(total / perPage);
+  // Fetch all tags for the dropdown
+  const { data: tagsData } = useSWR(
+    token && org && app ? ["/file/tags", app] : null,
+    async () =>
+      apiFetch<TagsResponse>("/file/tags", { method: "GET", query: { page: 1, count: 100 } }, { token, org, app }),
+    { revalidateOnFocus: false }
+  );
 
-  async function updateTag(f: ApiFile) {
-    const currentKey = f.id || f.file_path;
-    const newTag = prompt(`Update tag for ${currentKey}`, f.tag || "");
-    if (!newTag) return;
-    await apiFetch(
-      `/file/${encodeURIComponent(currentKey)}`,
-      { method: "PATCH", body: { tag: newTag } },
-      { token, org, app }
-    );
-    mutate();
-  }
+  const groups = groupsData?.groups || [];
+  const totalPages = groupsData?.total_pages || 1;
+  const tags = tagsData?.data || [];
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
-    setCurrentPage(1); // Reset to first page when searching
+    setPage(1);
   };
 
-  const renderPaginationItems = () => {
+  const handleTagChange = (tag: string) => {
+    setSelectedTag(tag);
+    setPage(1);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const getVersionTag = (group: FileGroup, version: number) => {
+    return group.tags.find((t) => t.version === version)?.tag;
+  };
+
+  // Handle opening edit tag dialog
+  const handleEditTag = (filePath: string, version: number, currentTag: string) => {
+    setEditingVersion({ filePath, version, currentTag });
+    setNewTagValue(currentTag);
+    setIsEditTagDialogOpen(true);
+  };
+
+  // Handle updating tag
+  const handleUpdateTag = async () => {
+    if (!editingVersion || !token || !org || !app) return;
+
+    setIsUpdatingTag(true);
+    try {
+      const fileKey = `${editingVersion.filePath}@version:${editingVersion.version}`;
+      await apiFetch(
+        `/file/${encodeURIComponent(fileKey)}`,
+        {
+          method: "PATCH",
+          body: { tag: newTagValue },
+        },
+        { token, org, app }
+      );
+      toastSuccess("Tag updated successfully");
+      mutate(); // Refresh the data
+      setIsEditTagDialogOpen(false);
+    } catch (error) {
+      toastError("Failed to update tag", error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setIsUpdatingTag(false);
+    }
+  };
+
+  // Pagination component (same pattern as packages/releases pages)
+  const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
     const items = [];
     const maxVisiblePages = 5;
 
     if (totalPages <= maxVisiblePages) {
-      // Show all pages if total pages is small
       for (let i = 1; i <= totalPages; i++) {
         items.push(
           <PaginationItem key={i}>
@@ -106,7 +167,7 @@ export default function FilesPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                setCurrentPage(i);
+                onPageChange(i);
               }}
               isActive={currentPage === i}
             >
@@ -116,14 +177,14 @@ export default function FilesPage() {
         );
       }
     } else {
-      // Show first page
+      // First page
       items.push(
         <PaginationItem key={1}>
           <PaginationLink
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              setCurrentPage(1);
+              onPageChange(1);
             }}
             isActive={currentPage === 1}
           >
@@ -132,7 +193,7 @@ export default function FilesPage() {
         </PaginationItem>
       );
 
-      // Show ellipsis if current page is far from start
+      // Ellipsis if needed
       if (currentPage > 3) {
         items.push(
           <PaginationItem key="ellipsis1">
@@ -141,7 +202,7 @@ export default function FilesPage() {
         );
       }
 
-      // Show pages around current page
+      // Pages around current
       const start = Math.max(2, currentPage - 1);
       const end = Math.min(totalPages - 1, currentPage + 1);
 
@@ -152,7 +213,7 @@ export default function FilesPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                setCurrentPage(i);
+                onPageChange(i);
               }}
               isActive={currentPage === i}
             >
@@ -162,7 +223,7 @@ export default function FilesPage() {
         );
       }
 
-      // Show ellipsis if current page is far from end
+      // Ellipsis if needed
       if (currentPage < totalPages - 2) {
         items.push(
           <PaginationItem key="ellipsis2">
@@ -171,7 +232,7 @@ export default function FilesPage() {
         );
       }
 
-      // Show last page
+      // Last page
       if (totalPages > 1) {
         items.push(
           <PaginationItem key={totalPages}>
@@ -179,7 +240,7 @@ export default function FilesPage() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                setCurrentPage(totalPages);
+                onPageChange(totalPages);
               }}
               isActive={currentPage === totalPages}
             >
@@ -201,152 +262,265 @@ export default function FilesPage() {
           <p className="text-muted-foreground mt-2">Manage your application assets and resources</p>
         </div>
         {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
-          <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
+          <Button className="gap-2" onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="h-4 w-4" />
             Create File
           </Button>
         )}
       </div>
 
+      {/* Filters Card - Same pattern as releases/packages pages */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search files by path, tag, or metadata..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search files by path..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <Select value={filterType} onValueChange={setFilterType}>
+
+            <Select value={selectedTag} onValueChange={handleTagChange}>
               <SelectTrigger className="w-48">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter" />
+                <SelectValue placeholder="Filter by tag" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="ready">Ready</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="all">All tags</SelectItem>
+                {tags.map((tagInfo: TagInfo) => (
+                  <SelectItem key={tagInfo.tag} value={tagInfo.tag}>
+                    {tagInfo.tag} ({tagInfo.count})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
 
+      {/* Files Table - Same pattern as packages/releases pages */}
       <Card>
         <CardHeader>
           <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
-            Files{" "}
-            {isLoading ? "" : `(${total} total, showing ${Math.min(perPage, files.length)} on page ${currentPage})`}
+            Files ({isLoading ? "..." : groupsData?.total_items || 0})
           </CardTitle>
-          <CardDescription>URL-registered files for your application</CardDescription>
+          <CardDescription>All files with version history and tags</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Path</TableHead>
-                <TableHead>Tag</TableHead>
-                <TableHead>Version</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {error && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-red-600">
-                    Failed to load files
-                  </TableCell>
-                </TableRow>
-              )}
-              {!error && files.length === 0 && !isLoading && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    {searchQuery
-                      ? "No files found matching your search."
-                      : "No files found. Create your first file to get started."}
-                  </TableCell>
-                </TableRow>
-              )}
-              {!error &&
-                files
-                  .filter((f) => (filterType === "all" ? true : f.status === filterType))
-                  .map((f) => (
-                    <TableRow key={f.id || f.file_path}>
-                      <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                      <TableCell>{f.tag && <Badge variant="outline">{f.tag}</Badge>}</TableCell>
-                      <TableCell className="text-muted-foreground">{f.version}</TableCell>
-                      <TableCell className="max-w-[280px] truncate text-muted-foreground">{f.url}</TableCell>
-                      <TableCell>
-                        <Badge variant={f.status === "ready" ? "default" : "secondary"}>{f.status || "—"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {f.created_at ? new Date(f.created_at).toLocaleString() : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => updateTag(f)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Update Tag
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="mt-6">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage > 1) setCurrentPage(currentPage - 1);
-                      }}
-                      className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-
-                  {renderPaginationItems()}
-
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                      }}
-                      className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="text-muted-foreground">Loading files...</span>
+              </div>
             </div>
+          ) : groups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <File className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No files found</h3>
+              <p className="text-muted-foreground mb-4">
+                {debouncedSearch || selectedTag !== "all"
+                  ? "No files match your filters."
+                  : "You haven't created any files yet."}
+              </p>
+              {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) &&
+                debouncedSearch === "" &&
+                selectedTag === "all" && (
+                  <Button className="gap-2" onClick={() => setIsCreateModalOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Create your first file
+                  </Button>
+                )}
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>File Path</TableHead>
+                    <TableHead>Latest Version</TableHead>
+                    <TableHead>Tags</TableHead>
+                    <TableHead>Size</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groups.map((group: FileGroup) => {
+                    const isExpanded = expandedGroup === group.file_path;
+                    const latestVersion = group.versions[0];
+
+                    return [
+                      <TableRow
+                        key={group.file_path}
+                        className="cursor-pointer hover:bg-muted"
+                        onClick={() => setExpandedGroup(isExpanded ? null : group.file_path)}
+                      >
+                        <TableCell>
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{group.file_path}</TableCell>
+                        <TableCell>{latestVersion ? `${latestVersion.version}` : "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {group.tags.slice(0, 2).map((t) => (
+                              <Badge key={t.tag} variant="outline" className="text-[10px]">
+                                {t.tag}
+                              </Badge>
+                            ))}
+                            {group.tags.length > 2 && (
+                              <span className="text-[10px] text-muted-foreground">+{group.tags.length - 2}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {latestVersion ? formatFileSize(latestVersion.size) : "—"}
+                        </TableCell>
+                      </TableRow>,
+                      isExpanded && (
+                        <TableRow key={`${group.file_path}-expanded`} className="bg-muted/30">
+                          <TableCell colSpan={5} className="p-0">
+                            <div className="py-2">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                    <TableHead className="pl-10 w-20">Version</TableHead>
+                                    <TableHead>Tag</TableHead>
+                                    <TableHead>URL</TableHead>
+                                    <TableHead>Size</TableHead>
+                                    <TableHead>Created</TableHead>
+                                    <TableHead className="w-24">Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {group.versions.map((version) => {
+                                    const versionTag = getVersionTag(group, version.version);
+                                    return (
+                                      <TableRow key={version.version} className="hover:bg-muted/50">
+                                        <TableCell className="pl-10 font-medium">{version.version}</TableCell>
+                                        <TableCell>
+                                          {versionTag ? (
+                                            <Badge variant="secondary" className="text-[10px]">
+                                              {versionTag}
+                                            </Badge>
+                                          ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground text-xs truncate max-w-xs">
+                                          {version.url}
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground text-xs">
+                                          {formatFileSize(version.size)}
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground text-xs">
+                                          {formatDate(version.created_at)}
+                                        </TableCell>
+                                        <TableCell>
+                                          {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-7 px-2"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleEditTag(group.file_path, version.version, versionTag || "");
+                                              }}
+                                            >
+                                              <Pencil className="h-3.5 w-3.5 mr-1" />
+                                              Edit Tag
+                                            </Button>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    ];
+                  })}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (page > 1) setPage(page - 1);
+                          }}
+                          className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+
+                      {renderPaginationItems(page, totalPages, setPage)}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (page < totalPages) setPage(page + 1);
+                          }}
+                          className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
 
       <FileCreationModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} onCreated={() => mutate()} />
+
+      {/* Edit Tag Dialog */}
+      <Dialog open={isEditTagDialogOpen} onOpenChange={setIsEditTagDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Tag</DialogTitle>
+            <DialogDescription>
+              Update the tag for {editingVersion?.filePath} (v{editingVersion?.version})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="tag">Tag</Label>
+              <Input
+                id="tag"
+                placeholder="e.g., latest, production, v1.0"
+                value={newTagValue}
+                onChange={(e) => setNewTagValue(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditTagDialogOpen(false)} disabled={isUpdatingTag}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateTag} disabled={isUpdatingTag}>
+              {isUpdatingTag ? "Updating..." : "Update Tag"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+pub mod groups;
 pub mod types;
 pub mod utils;
 
@@ -16,6 +17,7 @@ use diesel::prelude::*;
 use futures_util::StreamExt;
 use http::HeaderValue;
 use log::info;
+use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio::task;
@@ -43,8 +45,10 @@ pub fn add_routes() -> Scope {
         .service(upload_file)
         .service(upload_bulk_files)
         .service(list_files)
+        .service(list_file_tags)
         .service(get_file)
         .service(update_file)
+        .service(groups::add_routes())
 }
 
 fn db_file_to_response(file: &DbFile) -> FileResponse {
@@ -398,6 +402,17 @@ async fn get_file(
     Ok(Json(db_file_to_response(&file)))
 }
 
+/// Parse comma-separated tags into a vector
+fn parse_tags(tags: Option<&str>) -> Vec<String> {
+    tags.map(|t| {
+        t.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
 #[get("/list")]
 async fn list_files(
     query: Query<FileListQuery>,
@@ -419,50 +434,64 @@ async fn list_files(
 
     let pool = state.db_pool.clone();
     let search_term = query.search.clone();
+    let tags_filter = parse_tags(query.tags.as_deref());
     let page = query.page.unwrap_or(1);
     let per_page = query.per_page.unwrap_or(50).min(200);
 
     let (file_list, total) = run_blocking!({
         let mut conn = pool.get()?;
 
-        let base_query = files
-            .filter(org_id.eq(&organisation))
-            .filter(app_id.eq(&application));
+        // Get total count - rebuild query for count
+        let total = {
+            let mut count_query = files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .into_boxed();
 
-        let search_filter = if let Some(search_term) = &search_term {
-            let search_pattern = format!("%{}%", search_term);
-            Some((search_pattern.clone(), search_pattern))
-        } else {
-            None
+            if let Some(search_term) = &search_term {
+                let pattern = format!("%{}%", search_term);
+                count_query =
+                    count_query.filter(file_path.ilike(pattern.clone()).or(url.ilike(pattern)));
+            }
+
+            if !tags_filter.is_empty() {
+                if tags_filter.len() == 1 {
+                    count_query = count_query.filter(tag.eq(&tags_filter[0]));
+                } else {
+                    count_query = count_query.filter(tag.eq_any(tags_filter.clone()));
+                }
+            }
+
+            count_query.count().get_result::<i64>(&mut conn)? as usize
         };
 
-        let total = if let Some((ref pattern1, ref pattern2)) = search_filter {
-            base_query
-                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-                .count()
-                .get_result::<i64>(&mut conn)? as usize
-        } else {
-            base_query.count().get_result::<i64>(&mut conn)? as usize
-        };
-
+        // Fetch paginated results - rebuild query for data
         let offset = ((page - 1) * per_page) as i64;
 
-        let file_list = if let Some((ref pattern1, ref pattern2)) = search_filter {
-            base_query
-                .filter(file_path.ilike(pattern1).or(url.ilike(pattern2)))
-                .order(created_at.desc())
-                .limit(per_page as i64)
-                .offset(offset)
-                .select(DbFile::as_select())
-                .load::<DbFile>(&mut conn)?
-        } else {
-            base_query
-                .order(created_at.desc())
-                .limit(per_page as i64)
-                .offset(offset)
-                .select(DbFile::as_select())
-                .load::<DbFile>(&mut conn)?
-        };
+        let mut data_query = files
+            .filter(org_id.eq(&organisation))
+            .filter(app_id.eq(&application))
+            .into_boxed();
+
+        if let Some(search_term) = &search_term {
+            let pattern = format!("%{}%", search_term);
+            data_query = data_query.filter(file_path.ilike(pattern.clone()).or(url.ilike(pattern)));
+        }
+
+        if !tags_filter.is_empty() {
+            if tags_filter.len() == 1 {
+                data_query = data_query.filter(tag.eq(&tags_filter[0]));
+            } else {
+                data_query = data_query.filter(tag.eq_any(tags_filter.clone()));
+            }
+        }
+
+        let file_list = data_query
+            .order(created_at.desc())
+            .limit(per_page as i64)
+            .offset(offset)
+            .select(DbFile::as_select())
+            .load::<DbFile>(&mut conn)?;
 
         Ok((file_list, total))
     })?;
@@ -477,6 +506,106 @@ async fn list_files(
         total,
         page: Some(page),
         per_page: Some(per_page),
+    }))
+}
+
+#[derive(Deserialize)]
+pub struct ListFileTagsQuery {
+    #[serde(flatten)]
+    pub pagination: crate::types::PaginatedQuery,
+    pub search: Option<String>,
+}
+
+#[get("/tags")]
+async fn list_file_tags(
+    query: Query<ListFileTagsQuery>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<crate::types::PaginatedResponse<FileTagInfo>>> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), READ)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
+
+    let pool = state.db_pool.clone();
+    let query = query.into_inner();
+    let pagination = query.pagination;
+    let search_term = query.search.clone();
+
+    let (tags, total_items, total_pages) = run_blocking!({
+        let mut conn = pool.get()?;
+
+        // Base query closure - creates the base query that we can reuse
+        let base_query = || {
+            files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(tag.is_not_null())
+        };
+
+        // Get total count of matching unique tags
+        let total_items: i64 = match &search_term {
+            Some(search) => base_query()
+                .filter(tag.ilike(format!("%{}%", search)))
+                .select(diesel::dsl::count_distinct(tag))
+                .first(&mut conn)?,
+            None => base_query()
+                .select(diesel::dsl::count_distinct(tag))
+                .first(&mut conn)?,
+        };
+
+        // Determine pagination params
+        let (page, count) = match pagination {
+            crate::types::PaginatedQuery::All => (1u32, total_items as u32),
+            crate::types::PaginatedQuery::Paginated { page, count } => (page, count),
+        };
+
+        // Fetch tags with their counts
+        let tag_results: Vec<(Option<String>, i64)> = match &search_term {
+            Some(search) => base_query()
+                .filter(tag.ilike(format!("%{}%", search)))
+                .group_by(tag)
+                .select((tag, diesel::dsl::count_star()))
+                .order(diesel::dsl::count_star().desc())
+                .limit(count as i64)
+                .offset(((page.saturating_sub(1)) * count) as i64)
+                .load(&mut conn)?,
+            None => base_query()
+                .group_by(tag)
+                .select((tag, diesel::dsl::count_star()))
+                .order(diesel::dsl::count_star().desc())
+                .limit(count as i64)
+                .offset(((page.saturating_sub(1)) * count) as i64)
+                .load(&mut conn)?,
+        };
+
+        // Map to FileTagInfo, filtering out null tags
+        let tags: Vec<FileTagInfo> = tag_results
+            .into_iter()
+            .filter_map(|(tag_opt, count)| tag_opt.map(|t| FileTagInfo { tag: t, count }))
+            .collect();
+
+        let total_pages = if total_items == 0 {
+            1u32
+        } else {
+            ((total_items as f64) / (count as f64)).ceil() as u32
+        };
+
+        Ok((tags, total_items as u64, total_pages))
+    })?;
+
+    Ok(Json(crate::types::PaginatedResponse {
+        data: tags,
+        total_items,
+        total_pages,
     }))
 }
 

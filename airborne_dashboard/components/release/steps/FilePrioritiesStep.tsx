@@ -3,7 +3,6 @@
 import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, FileText, Info } from "lucide-react";
@@ -84,8 +83,7 @@ export function FilePrioritiesStep() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>File</TableHead>
-                    <TableHead>Tag</TableHead>
+                    <TableHead>File Path</TableHead>
                     <TableHead>Version</TableHead>
                     <TableHead>Priority</TableHead>
                   </TableRow>
@@ -96,9 +94,6 @@ export function FilePrioritiesStep() {
                     return (
                       <TableRow key={id}>
                         <TableCell className="font-mono text-sm">{f.file_path}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{f.tag || "N/A"}</Badge>
-                        </TableCell>
                         <TableCell className="text-muted-foreground">{f.version || "N/A"}</TableCell>
                         <TableCell>
                           <Select

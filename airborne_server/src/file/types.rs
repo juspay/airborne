@@ -80,6 +80,13 @@ pub struct FileListQuery {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
     pub search: Option<String>,
+    pub tags: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct FileTagInfo {
+    pub tag: String,
+    pub count: i64,
 }
 
 #[derive(Deserialize)]

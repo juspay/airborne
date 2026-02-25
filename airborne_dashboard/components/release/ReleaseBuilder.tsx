@@ -129,31 +129,37 @@ function ReleaseBuilderContent() {
         {currentStep === 6 && <ResourcesStep />}
       </div>
 
-      <div className="flex items-center justify-between mt-8 pt-6 border-t">
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases`}>
-              Cancel
-            </Link>
-          </Button>
-          {currentStep > 1 && (
-            <Button variant="outline" onClick={goToPreviousStep}>
-              Previous
+      {/* Fixed Bottom Bar */}
+      <div className="fixed bottom-0 left-64 right-0 bg-background border-t p-4 z-50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-6">
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases`}>
+                Cancel
+              </Link>
             </Button>
-          )}
-        </div>
-        <div className="flex gap-2">
-          {currentStep < totalSteps ? (
-            <Button onClick={goToNextStep} disabled={!canProceedToStep(currentStep)}>
-              Next Step
-            </Button>
-          ) : (
-            <Button onClick={handleCreateClick} disabled={isSubmitting}>
-              {getActionButtonText()}
-            </Button>
-          )}
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={goToPreviousStep}>
+                Previous
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {currentStep < totalSteps ? (
+              <Button onClick={goToNextStep} disabled={!canProceedToStep(currentStep)}>
+                Next Step
+              </Button>
+            ) : (
+              <Button onClick={handleCreateClick} disabled={isSubmitting}>
+                {getActionButtonText()}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Spacer for fixed bottom bar */}
+      <div className="h-20" />
 
       {isConfirmationDialogOpen && releaseConfig && (
         <ReleaseConfirmationDialog
