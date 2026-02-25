@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.12.1 - 2026-02-25
+#### Bug Fixes
+- refactor release creation, edit and clone mode - (c74f3d0) - Yash Rajput
+
+- - -
+
+## v0.24.1 - 2026-02-25
+#### Miscellaneous Chores
+- **(version)** v0.24.1 [skip ci] - (c89ac50) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.12.0 - 2026-02-20
 #### Features
 - add discard release functionality - (ab7abe4) - Yash Rajput

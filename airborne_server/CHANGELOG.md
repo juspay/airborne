@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.15.2 - 2026-02-25
+#### Bug Fixes
+- refactor release creation, edit and clone mode - (c74f3d0) - Yash Rajput
+
+- - -
+
 ## airborne_server-v0.15.1 - 2026-02-25
 #### Bug Fixes
 - Cohort JSONLogic - (d375209) - yuvrajjsingh0
