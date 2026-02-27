@@ -8,19 +8,25 @@
 #import "AJPNetworkClient.h"
 #import "AJPHelpers.h"
 
+@interface AJPNetworkClient ()
+
+@property (nonatomic, strong) NSURLSession *sharedSession;
+
+@end
+
 @implementation AJPNetworkClient
 
 - (id)init {
     self = [super init];
     if (self) {
         self.defaultHeaders = [NSMutableDictionary new];
+        NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+        self.sharedSession = [NSURLSession sessionWithConfiguration:config delegate:nil delegateQueue:nil];
     }
     return self;
 }
 
 - (void)apiCallForURL:(NSString *)url requestType:(RequestType)requestType params:(id)params header:(NSDictionary *)headers options:(NSDictionary *)options responseBlock:(AJPAPIResponseBlock)responseBlock sessionDelegate:(id<NSURLSessionDelegate> _Nullable)sessionDelegate {
-    
-    NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
     
     int connectionTimeout = -1, readTimeout = -1;
     
@@ -35,11 +41,19 @@
         }
     }
     
-    if (readTimeout != -1) {
-        [config setTimeoutIntervalForResource: readTimeout/1000.0f];
+    // Reuse the shared session when no custom delegate or resource timeout is needed.
+    // Create a new session only when a sessionDelegate is provided (e.g. SSL pinning)
+    // or a custom readTimeout requires a different session configuration.
+    NSURLSession *session;
+    if (sessionDelegate != nil || readTimeout != -1) {
+        NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
+        if (readTimeout != -1) {
+            [config setTimeoutIntervalForResource: readTimeout/1000.0f];
+        }
+        session = [NSURLSession sessionWithConfiguration:config delegate:sessionDelegate delegateQueue:nil];
+    } else {
+        session = self.sharedSession;
     }
-    
-    NSURLSession *session = [NSURLSession sessionWithConfiguration:config delegate:sessionDelegate delegateQueue:nil];
     
     NSMutableURLRequest *urlRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]];
     if ( connectionTimeout != -1) {
