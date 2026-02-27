@@ -14,6 +14,7 @@
 
 #![deny(unused_crate_dependencies)]
 mod build;
+mod config;
 mod dashboard;
 mod docs;
 mod file;
@@ -31,6 +32,7 @@ use actix_web::{
     App, HttpResponse, HttpServer,
 };
 use aws_sdk_s3::config::Builder;
+use config::AppConfig;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
 use google_sheets4::{
@@ -46,7 +48,7 @@ use std::{
 };
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
-use utils::{db, kms::decrypt_kms, transaction_manager::start_cleanup_job};
+use utils::{db, transaction_manager::start_cleanup_job};
 
 use crate::{
     dashboard::configuration,
@@ -54,8 +56,11 @@ use crate::{
         auth::Auth,
         request::{req_id_header_mw, WithRequestId},
     },
-    utils::migrations::{
-        get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+    utils::{
+        interceptor::CookieIntercept,
+        migrations::{
+            get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+        },
     },
 };
 
@@ -72,97 +77,61 @@ async fn main() -> std::io::Result<()> {
     let log_format = std::env::var("LOG_FORMAT").unwrap_or_default();
     utils::init_tracing(log_format);
 
-    // Load Environment variables
-    dotenv().ok(); // Load .env file
+    dotenv().ok();
 
-    let url = std::env::var("KEYCLOAK_URL").expect("KEYCLOAK_URL must be set");
-    let keycloak_external_url = std::env::var("KEYCLOAK_EXTERNAL_URL")
-        .unwrap_or_else(|_| url.replace("keycloak:8080", "localhost:8180"));
-    let client_id = std::env::var("KEYCLOAK_CLIENT_ID").expect("KEYCLOAK_CLIENT_ID must be set");
-    let enc_sec = std::env::var("KEYCLOAK_SECRET").expect("KEYCLOAK_SECRET must be set");
-    let enc_superposition_token = std::env::var("SUPERPOSITION_TOKEN");
-    let realm = std::env::var("KEYCLOAK_REALM").expect("KEYCLOAK_REALM must be set");
-    let publickey = std::env::var("KEYCLOAK_PUBLIC_KEY").expect("KEYCLOAK_PUBLIC_KEY must be set");
-    let cac_url = std::env::var("SUPERPOSITION_URL").expect("SUPERPOSITION_URL must be set");
-    let superposition_org_id_env =
-        std::env::var("SUPERPOSITION_ORG_ID").expect("SUPERPOSITION_ORG_ID must be set");
-    let bucket_name = std::env::var("AWS_BUCKET").expect("AWS_BUCKET must be set");
-    let public_url = std::env::var("PUBLIC_ENDPOINT").expect("PUBLIC_ENDPOINT must be set");
-    let port =
-        std::env::var("PORT").map_or(8081, |v| v.parse().expect("PORT must be a valid number"));
-    let enable_google_signin = std::env::var("ENABLE_GOOGLE_SIGNIN")
-        .ok()
-        .and_then(|v| v.parse::<bool>().ok())
-        .unwrap_or_default();
-    let organisation_creation_disabled = std::env::var("ORGANISATION_CREATION_DISABLED")
-        .ok()
-        .and_then(|v| v.parse::<bool>().ok())
-        .unwrap_or_default();
+    let shared_config = aws_config::from_env().load().await;
+    let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
 
-    let spreadsheet_id = if organisation_creation_disabled {
-        std::env::var("GOOGLE_SPREADSHEET_ID")
-            .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true")
-    } else {
-        "".to_string()
-    };
-    let cf_distribution_id = std::env::var("CLOUDFRONT_DISTRIBUTION_ID").unwrap_or_default();
+    let app_config = AppConfig::build(&aws_kms_client)
+        .await
+        .expect("Failed to build AppConfig");
 
-    let server_path_prefix =
-        std::env::var("SERVER_PATH_PREFIX").unwrap_or_else(|_| "api".to_string());
+    let superposition_migration_strategy =
+        SuperpositionMigrationStrategy::from(app_config.superposition_migration_strategy.clone());
 
-    let num_workers = std::env::var("ACTIX_WORKERS").map_or(4, |v| {
-        v.parse().expect("ACTIX_WORKERS must be a valid number")
-    });
-
-    let keep_alive = std::env::var("KEEP_ALIVE").map_or(30, |v| {
-        v.parse().expect("KEEP_ALIVE must be a valid number")
-    });
-
-    let backlog = std::env::var("BACKLOG")
-        .map_or(1024, |v| v.parse().expect("BACKLOG must be a valid number"));
-
-    let superposition_migration_strategy = SuperpositionMigrationStrategy::from(
-        std::env::var("SUPERPOSITION_MIGRATION_STRATEGY").unwrap_or_else(|_| "PATCH".into()),
-    );
-
-    let migrations_to_run_on_boot: Vec<String> = std::env::var("MIGRATIONS_TO_RUN_ON_BOOT")
-        .unwrap_or_else(|_| "".into())
+    let migrations_to_run_on_boot: Vec<String> = app_config
+        .migrations_to_run_on_boot
         .split(',')
         .map(|s| s.trim().into())
         .collect();
 
-    //Need to check if this ENV exists on pod
-    let uses_local_stack = std::env::var("AWS_ENDPOINT_URL");
-    let mut force_path_style = false;
-    if uses_local_stack.is_ok() {
-        force_path_style = true;
-    }
+    let force_path_style = app_config.aws_endpoint_url.is_some();
 
-    let shared_config = aws_config::from_env().load().await;
-
-    let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
     if migrations_to_run_on_boot.contains(&"db".to_string()) {
         info!("Running pending database migrations");
-        let mut conn = db::establish_connection(&aws_kms_client).await;
+        let mut conn = db::establish_connection(&app_config).await;
         conn.run_pending_migrations(MIGRATIONS)
             .expect("Failed to run pending migrations");
     }
 
-    let gsa_creds: Option<yup_oauth2::ServiceAccountKey> = if organisation_creation_disabled {
-        let creds_from_path = if let Ok(path) = std::env::var("GCP_SERVICE_ACCOUNT_PATH") {
-            yup_oauth2::read_service_account_key(path).await.ok()
-        } else {
-            None
-        };
+    let organisation_creation_disabled = app_config.organisation_creation_disabled;
 
-        let creds_from_env = if let Ok(encrypted) = std::env::var("GOOGLE_SERVICE_ACCOUNT_KEY") {
-            let decrypted = decrypt_kms(&aws_kms_client, encrypted).await;
-            serde_json::from_str::<yup_oauth2::ServiceAccountKey>(&decrypted).ok()
-        } else {
-            None
-        };
+    let spreadsheet_id = if organisation_creation_disabled {
+        Some(
+            app_config
+                .google_spreadsheet_id
+                .clone()
+                .expect("GOOGLE_SPREADSHEET_ID must be set if ORGANISATION_CREATION_DISABLED=true"),
+        )
+    } else {
+        None
+    };
+
+    let server_path_prefix = app_config.server_path_prefix.clone();
+
+    let gsa_creds: Option<yup_oauth2::ServiceAccountKey> = if organisation_creation_disabled {
+        let creds_from_path = app_config
+            .gcp_service_account_path
+            .as_ref()
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .and_then(|content| serde_json::from_str(&content).ok());
+
+        let creds_from_env = app_config
+            .google_service_account_key
+            .as_ref()
+            .and_then(|json_str| serde_json::from_str(json_str).ok());
 
         creds_from_path.or(creds_from_env)
     } else {
@@ -171,38 +140,37 @@ async fn main() -> std::io::Result<()> {
 
     // Initialize DB pool
     info!("Creating db pool");
-    let pool = db::establish_pool(&aws_kms_client).await;
-    let secret = decrypt_kms(&aws_kms_client, enc_sec).await;
-    let superposition_token = if let Ok(enc_token) = enc_superposition_token {
-        decrypt_kms(&aws_kms_client, enc_token).await
-    } else {
-        "".to_string()
-    };
+    let pool = db::establish_pool(&app_config).await;
+
+    let secret = app_config.keycloak_secret.clone();
+    let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
+
+    let cac_url = app_config.superposition_url.clone();
+    let superposition_org_id_env = app_config.superposition_org_id.clone();
 
     let env = types::Environment {
-        public_url,
-        keycloak_url: url,
-        keycloak_external_url,
+        public_url: app_config.public_endpoint.clone(),
+        keycloak_url: app_config.keycloak_url.clone(),
+        keycloak_external_url: app_config.keycloak_external_url.clone(),
         keycloak_public_key: format!(
             "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
-            publickey
+            app_config.keycloak_public_key
         ),
-        client_id,
+        client_id: app_config.keycloak_client_id.clone(),
         secret: secret.clone(),
-        realm,
-        bucket_name,
-        superposition_org_id: superposition_org_id_env,
-        enable_google_signin,
-        organisation_creation_disabled,
-        google_spreadsheet_id: spreadsheet_id.clone(),
-        cloudfront_distribution_id: cf_distribution_id.clone(),
+        realm: app_config.keycloak_realm.clone(),
+        bucket_name: app_config.aws_bucket.clone(),
+        superposition_org_id: app_config.superposition_org_id.clone(),
+        enable_google_signin: app_config.enable_google_signin,
+        organisation_creation_disabled: app_config.organisation_creation_disabled,
+        google_spreadsheet_id: spreadsheet_id.clone().unwrap_or_default(),
+        cloudfront_distribution_id: app_config.cloudfront_distribution_id.clone(),
         default_configs: get_default_configs_from_file()
             .await
             .expect("Failed to load superposition default configs from file"),
     };
 
-    // This is required for localStack
-    // Create an S3 client with path-style enforced
+    // Create an S3 client with path-style enforced (for localstack)
     let s3_config = Builder::from(&shared_config)
         .force_path_style(force_path_style)
         .build();
@@ -234,14 +202,37 @@ async fn main() -> std::io::Result<()> {
         hub = Some(Sheets::new(client, gcp_auth));
     }
 
-    // Create a shared state for the application
-    let superposition_client = superposition_sdk::Client::from_conf(
-        SrsConfig::builder()
-            .endpoint_url(cac_url.clone())
-            .behavior_version_latest()
-            .bearer_token(superposition_token.into())
-            .build(),
-    );
+    let superposition_client = if app_config.enable_authenticated_superposition {
+        let superposition_user_token = app_config.superposition_user_token.clone().expect(
+            "SUPERPOSITION_USER_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
+        );
+        let superposition_org_token = app_config.superposition_org_token.clone().expect(
+            "SUPERPOSITION_ORG_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
+        );
+
+        // Inject Auth cookie for Superposition SDK calls
+        let cookie_interceptor = CookieIntercept::new(format!(
+            "user={}; org_{}={}",
+            superposition_user_token, superposition_org_id_env, superposition_org_token,
+        ));
+
+        superposition_sdk::Client::from_conf(
+            SrsConfig::builder()
+                .endpoint_url(cac_url.clone())
+                .behavior_version_latest()
+                .bearer_token(superposition_token.into())
+                .interceptor(cookie_interceptor)
+                .build(),
+        )
+    } else {
+        superposition_sdk::Client::from_conf(
+            SrsConfig::builder()
+                .endpoint_url(cac_url.clone())
+                .behavior_version_latest()
+                .bearer_token(superposition_token.into())
+                .build(),
+        )
+    };
 
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
@@ -256,7 +247,6 @@ async fn main() -> std::io::Result<()> {
     let app_state_data = web::Data::from(app_state.clone());
     let _cleanup_handle = start_cleanup_job(app_state_data.clone());
     info!("Started transaction cleanup background job");
-    info!("Using server prefix {}", server_path_prefix);
 
     if migrations_to_run_on_boot.contains(&"superposition".to_string()) {
         let superposition_migration =
@@ -271,6 +261,11 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    let num_workers = app_config.num_workers;
+    let keep_alive = app_config.keep_alive;
+    let backlog = app_config.backlog;
+    let port = app_config.port;
+
     HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::<WithRequestId>::new())
@@ -282,15 +277,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())
             .service(docs::add_routes())
-            .service(
-                web::scope("/release").service(release::add_public_routes()),
-                // Decide if this needs auth; Ideally this only needs signature verfication
-            )
-            .service(
-                web::scope("/build").service(build::add_routes()),
-                // Decide if this needs auth; Ideally this only needs signature verfication
-                // Same as release routes
-            )
+            .service(web::scope("/release").service(release::add_public_routes()))
+            .service(web::scope("/build").service(build::add_routes()))
             .service(
                 web::scope(&server_path_prefix)
                     .service(
@@ -327,7 +315,7 @@ async fn main() -> std::io::Result<()> {
     .workers(num_workers)
     .keep_alive(std::time::Duration::from_secs(keep_alive))
     .backlog(backlog)
-    .bind(("0.0.0.0", port))? // Listen on all interfaces
+    .bind(("0.0.0.0", port))?
     .run()
     .await
 }

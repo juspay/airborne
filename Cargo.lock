@@ -350,6 +350,7 @@ dependencies = [
  "aws-sdk-cloudfront",
  "aws-sdk-kms",
  "aws-sdk-s3",
+ "aws-smithy-runtime-api",
  "aws-smithy-types",
  "base64 0.22.1",
  "bytes",

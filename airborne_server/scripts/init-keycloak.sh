@@ -15,11 +15,19 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_DEPS_DIR="${SCRIPT_DIR}/.python-tools"
+PYTHON_BIN=""
+
 if [ -f .env ]; then
     set -a
     . .env
     set +a
 fi
+
+# Check if encryption is enabled
+USE_ENCRYPTION="${USE_ENCRYPTED_SECRETS:-true}"
+MASTERKEY_FILE=".masterkey.local"
 
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin
@@ -85,22 +93,113 @@ portable_sed_inplace() {
     fi
 }
 
+ensure_python_crypto() {
+    if [ -z "$PYTHON_BIN" ]; then
+        for candidate in python3 /usr/bin/python3 /usr/local/bin/python3; do
+            if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import ssl' >/dev/null 2>&1; then
+                PYTHON_BIN=$(command -v "$candidate")
+                break
+            fi
+        done
+    fi
+
+    if [ -z "$PYTHON_BIN" ]; then
+        echo "${RED}❌ ERROR: No Python interpreter with SSL support was found${NC}" >&2
+        exit 1
+    fi
+
+    if "$PYTHON_BIN" -c 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM' >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if PYTHONPATH="$PYTHON_DEPS_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" -c 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM' >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo "${YELLOW}📦 Installing Python cryptography dependency...${NC}"
+    mkdir -p "$PYTHON_DEPS_DIR"
+    "$PYTHON_BIN" -m pip install --quiet --target "$PYTHON_DEPS_DIR" cryptography
+}
+
+shell_quote() {
+    local value="$1"
+    printf "'%s'" "$(printf '%s' "$value" | sed "s/'/'\\\\''/g")"
+}
+
+upsert_env_var() {
+    local file="$1"
+    local key="$2"
+    local raw_value="$3"
+    local tmp_file
+    local quoted_value
+
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/airborne-env.XXXXXX")
+    quoted_value=$(shell_quote "$raw_value")
+
+    if [ -f "$file" ]; then
+        awk -v key="$key" -v value="$quoted_value" '
+            BEGIN { updated = 0 }
+            index($0, key "=") == 1 { print key "=" value; updated = 1; next }
+            { print }
+            END { if (!updated) print key "=" value }
+        ' "$file" > "$tmp_file"
+    else
+        printf "%s=%s\n" "$key" "$quoted_value" > "$tmp_file"
+    fi
+
+    mv "$tmp_file" "$file"
+}
+
+# Update KEYCLOAK_PUBLIC_KEY (never encrypted)
 if grep -q "^KEYCLOAK_PUBLIC_KEY=" ".env"; then
     portable_sed_inplace "s|^KEYCLOAK_PUBLIC_KEY=.*|KEYCLOAK_PUBLIC_KEY=$PUBLIC_KEY|" ".env"
 else
     echo "KEYCLOAK_PUBLIC_KEY=$PUBLIC_KEY" >> ".env"
 fi
 
-if [ ! -f .env.generated ]; then
-    touch .env.generated
-fi
-
-if grep -q "^KEYCLOAK_SECRET=" ".env.generated"; then
-    portable_sed_inplace "s|^KEYCLOAK_SECRET=.*|KEYCLOAK_SECRET=$CLIENT_SECRET|" ".env.generated"
+# Handle KEYCLOAK_SECRET based on encryption mode
+if [ "$USE_ENCRYPTION" = "true" ]; then
+    echo "${YELLOW}🔐 Encryption enabled - encrypting KEYCLOAK_SECRET...${NC}"
+    ensure_python_crypto
+    
+    # Check if master key exists
+    if [ ! -f "$MASTERKEY_FILE" ]; then
+        echo "${YELLOW}Generating new master key...${NC}"
+        MASTER_KEY=$(openssl rand -hex 32)
+        echo "$MASTER_KEY" > "$MASTERKEY_FILE"
+        chmod 600 "$MASTERKEY_FILE"
+        echo "${GREEN}✅ Master key saved to $MASTERKEY_FILE${NC}"
+    else
+        MASTER_KEY=$(cat "$MASTERKEY_FILE")
+        echo "${GREEN}✅ Using existing master key${NC}"
+    fi
+    
+    ENCRYPTED_VALUE=$(printf '%s' "$CLIENT_SECRET" | PYTHONPATH="$PYTHON_DEPS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+        "$PYTHON_BIN" "$SCRIPT_DIR/aes_gcm_encrypt.py" "$MASTER_KEY")
+    
+    # Update .env with encrypted value
+    upsert_env_var ".env" "KEYCLOAK_SECRET" "$ENCRYPTED_VALUE"
+    
+    # Also save to .env.generated for reference
+    if [ ! -f .env.generated ]; then
+        touch .env.generated
+    fi
+    upsert_env_var ".env.generated" "KEYCLOAK_SECRET" "$CLIENT_SECRET"
+    
+    echo "${GREEN}✅ KEYCLOAK_SECRET encrypted and added to .env${NC}"
 else
-    echo "KEYCLOAK_SECRET=$CLIENT_SECRET" >> ".env.generated"
+    echo "${YELLOW}📝 Encryption disabled - saving plaintext KEYCLOAK_SECRET...${NC}"
+    
+    # Save plaintext to .env
+    upsert_env_var ".env" "KEYCLOAK_SECRET" "$CLIENT_SECRET"
+    
+    # Also save to .env.generated
+    if [ ! -f .env.generated ]; then
+        touch .env.generated
+    fi
+    upsert_env_var ".env.generated" "KEYCLOAK_SECRET" "$CLIENT_SECRET"
+    
+    echo "${GREEN}✅ KEYCLOAK_SECRET saved as plaintext${NC}"
 fi
-
-source ".env.generated"
 
 echo "${GREEN}✅ Successfully added the ENVs to .env and .env.generated file!${NC}"

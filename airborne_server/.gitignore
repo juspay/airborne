@@ -11,3 +11,6 @@ superposition/
 .direnv
 
 airborne-gcp.json
+
+.masterkey*
+/**/.python-*
