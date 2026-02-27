@@ -54,8 +54,11 @@ use crate::{
         auth::Auth,
         request::{req_id_header_mw, WithRequestId},
     },
-    utils::migrations::{
-        get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+    utils::{
+        interceptor::CookieIntercept,
+        migrations::{
+            get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
+        },
     },
 };
 
@@ -81,6 +84,12 @@ async fn main() -> std::io::Result<()> {
     let client_id = std::env::var("KEYCLOAK_CLIENT_ID").expect("KEYCLOAK_CLIENT_ID must be set");
     let enc_sec = std::env::var("KEYCLOAK_SECRET").expect("KEYCLOAK_SECRET must be set");
     let enc_superposition_token = std::env::var("SUPERPOSITION_TOKEN");
+    let enc_superposition_user_token = std::env::var("SUPERPOSITION_USER_TOKEN");
+    let enc_superposition_org_token = std::env::var("SUPERPOSITION_ORG_TOKEN");
+    let enable_authenticated_superposition = std::env::var("ENABLE_AUTHENTICATED_SUPERPOSITION")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_default();
     let realm = std::env::var("KEYCLOAK_REALM").expect("KEYCLOAK_REALM must be set");
     let publickey = std::env::var("KEYCLOAK_PUBLIC_KEY").expect("KEYCLOAK_PUBLIC_KEY must be set");
     let cac_url = std::env::var("SUPERPOSITION_URL").expect("SUPERPOSITION_URL must be set");
@@ -191,7 +200,7 @@ async fn main() -> std::io::Result<()> {
         secret: secret.clone(),
         realm,
         bucket_name,
-        superposition_org_id: superposition_org_id_env,
+        superposition_org_id: superposition_org_id_env.clone(),
         enable_google_signin,
         organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone(),
@@ -235,13 +244,40 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Create a shared state for the application
-    let superposition_client = superposition_sdk::Client::from_conf(
-        SrsConfig::builder()
-            .endpoint_url(cac_url.clone())
-            .behavior_version_latest()
-            .bearer_token(superposition_token.into())
-            .build(),
-    );
+    let superposition_client = if enable_authenticated_superposition {
+        let superposition_user_token = if let Ok(enc_token) = enc_superposition_user_token {
+            decrypt_kms(&aws_kms_client, enc_token).await
+        } else {
+            panic!("SUPERPOSITION_USER_TOKEN must be set to a valid KMS encrypted string if ENABLE_AUTHENTICATED_SUPERPOSITION=true");
+        };
+        let superposition_org_token = if let Ok(enc_token) = enc_superposition_org_token {
+            decrypt_kms(&aws_kms_client, enc_token).await
+        } else {
+            panic!("SUPERPOSITION_ORG_TOKEN must be set to a valid KMS encrypted string if ENABLE_AUTHENTICATED_SUPERPOSITION=true");
+        };
+        // Inject Auth cookie for Superposition SDK calls
+        let cookie_interceptor = CookieIntercept::new(format!(
+            "user={}; org_{}={}",
+            superposition_user_token, superposition_org_id_env, superposition_org_token,
+        ));
+
+        superposition_sdk::Client::from_conf(
+            SrsConfig::builder()
+                .endpoint_url(cac_url.clone())
+                .behavior_version_latest()
+                .bearer_token(superposition_token.into())
+                .interceptor(cookie_interceptor)
+                .build(),
+        )
+    } else {
+        superposition_sdk::Client::from_conf(
+            SrsConfig::builder()
+                .endpoint_url(cac_url.clone())
+                .behavior_version_latest()
+                .bearer_token(superposition_token.into())
+                .build(),
+        )
+    };
 
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
