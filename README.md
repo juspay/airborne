@@ -203,7 +203,22 @@ If you choose to use the self-hosted Airborne Server:
     git clone <repository-url> # Replace <repository-url> with the actual URL
     cd airborne
     ```
-2.  **Start the Server**:
+2.  **Set up Environment**:
+    ```bash
+    make setup                          # With encryption (default)
+    make setup USE_ENCRYPTED_SECRETS=false   # Without encryption
+    ```
+    
+    The `make setup` command will:
+    - Set up environment (encrypted or plaintext based on flag)
+    - Start all infrastructure services (PostgreSQL, Keycloak, LocalStack, Superposition)
+    - Install Node.js dependencies
+    
+    **Options:**
+    - `USE_ENCRYPTED_SECRETS=true` (default): Encrypts secrets using KMS + AES-GCM
+    - `USE_ENCRYPTED_SECRETS=false`: Uses plaintext secrets for local development
+
+3.  **Start the Server**:
     - **Airborne server** development mode (with hot-reloading):
       ```bash
       make run
@@ -217,6 +232,164 @@ If you choose to use the self-hosted Airborne Server:
       make help
       ```
     - For detailed setup options, see the [Airborne Server README](airborne_server/README.md).
+
+### Environment Variables Reference
+
+The Airborne server uses the following environment variables. All secrets can be encrypted using the KMS + Envelope Encryption pattern.
+
+#### Encryption Settings
+
+| Variable | Required | Encrypted | Description |
+|----------|----------|-----------|-------------|
+| `USE_ENCRYPTED_SECRETS` | No | No | Enable/disable encryption. Default: `true`. Set to `false` for plaintext mode. |
+| `MASTER_KEY` | Yes* | Yes | KMS-encrypted Data Encryption Key (DEK). Required when `USE_ENCRYPTED_SECRETS=true`. |
+
+*Required only when encryption is enabled.
+
+#### Server Settings
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `PORT` | No | No | `8081` | HTTP server port |
+| `KEEP_ALIVE` | No | No | `30` | Keep-alive timeout in seconds |
+| `BACKLOG` | No | No | `1024` | TCP listen backlog |
+| `ACTIX_WORKERS` | No | No | `4` | Number of Actix worker threads |
+| `SERVER_PATH_PREFIX` | No | No | `api` | API route prefix |
+| `LOG_FORMAT` | No | No | (empty) | Custom log format |
+| `RUST_LOG` | No | No | `info` | Rust logging level |
+
+#### Database Settings
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `DB_USER` | Yes | No | - | PostgreSQL username |
+| `DB_PASSWORD` | Yes | **Yes** | - | PostgreSQL password |
+| `DB_MIGRATION_USER` | Yes | No | - | Migration database username |
+| `DB_MIGRATION_PASSWORD` | Yes | **Yes** | - | Migration database password |
+| `DB_HOST` | Yes | No | - | PostgreSQL host |
+| `DB_PORT` | Yes | No | - | PostgreSQL port |
+| `DB_NAME` | Yes | No | - | PostgreSQL database name |
+| `DB_URL` | No | No | - | Full database URL (overrides individual settings) |
+| `DB_MIGRATION_URL` | No | No | - | Migration database URL |
+| `DATABASE_POOL_SIZE` | No | No | `4` | Connection pool size |
+
+#### AWS / S3 Settings
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `AWS_BUCKET` | Yes | No | - | S3 bucket name for package storage |
+| `AWS_REGION` | No | No | - | AWS region (e.g., `us-east-1`) |
+| `AWS_ENDPOINT_URL` | No | No | - | Custom S3 endpoint (for LocalStack) |
+| `AWS_ACCESS_KEY_ID` | No* | No | - | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | No* | **Yes** | - | AWS secret key |
+| `AWS_SESSION_TOKEN` | No* | No | - | AWS session token |
+| `CLOUDFRONT_DISTRIBUTION_ID` | No | No | - | CloudFront distribution ID for CDN |
+
+*Required when using real AWS. Not needed for LocalStack.
+
+#### Keycloak Settings
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `KEYCLOAK_URL` | Yes | No | - | Keycloak internal URL |
+| `KEYCLOAK_EXTERNAL_URL` | No | No | `localhost:8180` | Keycloak external URL |
+| `KEYCLOAK_REALM` | Yes | No | - | Keycloak realm name |
+| `KEYCLOAK_CLIENT_ID` | Yes | No | - | Keycloak client ID |
+| `KEYCLOAK_SECRET` | Yes | **Yes** | - | Keycloak client secret |
+| `KEYCLOAK_PUBLIC_KEY` | Yes | No | - | Keycloak realm public key (for JWT verification) |
+
+#### Superposition Settings
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `SUPERPOSITION_URL` | Yes | No | - | Superposition service URL |
+| `SUPERPOSITION_ORG_ID` | Yes | No | - | Organization ID in Superposition |
+| `SUPERPOSITION_TOKEN` | No | **Yes** | - | Superposition API token |
+| `SUPERPOSITION_USER_TOKEN` | No | **Yes** | - | Superposition user token (for authenticated mode) |
+| `SUPERPOSITION_ORG_TOKEN` | No | **Yes** | - | Superposition organization token (for authenticated mode) |
+| `ENABLE_AUTHENTICATED_SUPERPOSITION` | No | No | `false` | Enable authenticated Superposition calls |
+| `SUPERPOSITION_MIGRATION_STRATEGY` | No | No | `PATCH` | Migration strategy: `PATCH` or `OVERRIDE` |
+| `MIGRATIONS_TO_RUN_ON_BOOT` | No | No | (empty) | Comma-separated list: `db`, `superposition` |
+
+#### Feature Flags
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `ENABLE_GOOGLE_SIGNIN` | No | No | `false` | Enable Google Sign-In for organisation creation |
+| `ORGANISATION_CREATION_DISABLED` | No | No | `false` | Disable organisation creation via API |
+
+*When `ORGANISATION_CREATION_DISABLED=true`, the following are required:*
+- `GOOGLE_SPREADSHEET_ID` - Google Sheets ID for org requests
+- `GCP_SERVICE_ACCOUNT_PATH` OR `GOOGLE_SERVICE_ACCOUNT_KEY` - GCP credentials
+
+Note: the environment variable is spelled `ORGANISATION_CREATION_DISABLED`.
+
+#### Google Integration (Optional)
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `GOOGLE_SPREADSHEET_ID` | Conditional | No | - | Google Sheets ID for org requests |
+| `GCP_SERVICE_ACCOUNT_PATH` | Conditional | No | - | Path to GCP service account JSON file |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Conditional | **Yes** | - | GCP service account key JSON content |
+
+*Required when `ORGANISATION_CREATION_DISABLED=true` and `ENABLE_GOOGLE_SIGNIN=true`*
+
+#### Public Endpoint
+
+| Variable | Required | Encrypted | Default | Description |
+|----------|----------|-----------|---------|-------------|
+| `PUBLIC_ENDPOINT` | Yes | No | - | Public URL for the server (used in generated links) |
+
+### Running Locally
+
+#### With Encrypted Secrets (Production-like)
+
+```bash
+# 1. Set up encrypted environment (one-time)
+make setup-encrypted
+
+# 2. Run the server
+make run
+```
+
+The `setup-encrypted` command:
+1. Generates a Data Encryption Key (DEK) → saves to `.masterkey.local`
+2. Encrypts the DEK with AWS KMS → stores in `.env` as `MASTER_KEY`
+3. Encrypts all secrets using AES-256-GCM with the DEK
+4. Creates an `.env` file with encrypted values
+
+#### Without Encryption (Local Development)
+
+```bash
+# 1. Set up plaintext environment (one-time)
+make setup-plaintext
+
+# 2. Run with encryption disabled
+USE_ENCRYPTED_SECRETS=false make run
+```
+
+Or manually edit `.env`:
+```bash
+USE_ENCRYPTED_SECRETS=false
+# ... other plaintext env vars
+```
+
+#### Creating Encrypted Secrets
+
+To encrypt new secrets or re-encrypt existing ones:
+
+```bash
+# From project root
+cd airborne_server && ./scripts/encrypt-envs.sh
+```
+
+This script will:
+- Use existing `.masterkey.local` if present (won't regenerate)
+- Generate new DEK only if `.masterkey.local` doesn't exist
+- Encrypt all secrets in `.env`
+- Output KMS-encrypted master key
+
+**Important:** Keep `.masterkey.local` secure and never commit it to version control!
 
 **Services Started by `make run`:**
 
