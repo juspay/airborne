@@ -9,6 +9,7 @@ import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./com
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
+import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "./commands/ListFileGroupsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "./commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
@@ -82,6 +83,12 @@ export interface Airborne {
     listDimensions(args: ListDimensionsCommandInput, options?: __HttpHandlerOptions): Promise<ListDimensionsCommandOutput>;
     listDimensions(args: ListDimensionsCommandInput, cb: (err: any, data?: ListDimensionsCommandOutput) => void): void;
     listDimensions(args: ListDimensionsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListDimensionsCommandOutput) => void): void;
+    /**
+     * @see {@link ListFileGroupsCommand}
+     */
+    listFileGroups(args: ListFileGroupsCommandInput, options?: __HttpHandlerOptions): Promise<ListFileGroupsCommandOutput>;
+    listFileGroups(args: ListFileGroupsCommandInput, cb: (err: any, data?: ListFileGroupsCommandOutput) => void): void;
+    listFileGroups(args: ListFileGroupsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListFileGroupsCommandOutput) => void): void;
     /**
      * @see {@link ListFilesCommand}
      */

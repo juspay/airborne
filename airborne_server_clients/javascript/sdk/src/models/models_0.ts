@@ -771,6 +771,162 @@ export interface ListDimensionsResponse {
 }
 
 /**
+ * List file groups request
+ * @public
+ */
+export interface ListFileGroupsRequest {
+  /**
+   * Page number for pagination
+   * @public
+   */
+  page?: number | undefined;
+
+  /**
+   * Number of groups per page
+   * @public
+   */
+  count?: number | undefined;
+
+  /**
+   * Search query to filter files by path
+   * @public
+   */
+  search?: string | undefined;
+
+  /**
+   * Tags to filter files by (comma-separated for multiple values)
+   * @public
+   */
+  tags?: string | undefined;
+
+  /**
+   * Name of the organisation
+   * @public
+   */
+  organisation: string | undefined;
+
+  /**
+   * Name of the application
+   * @public
+   */
+  application: string | undefined;
+}
+
+/**
+ * Represents a tag associated with a specific version
+ * @public
+ */
+export interface FileGroupTag {
+  /**
+   * The tag value
+   * @public
+   */
+  tag: string | undefined;
+
+  /**
+   * The version this tag is associated with
+   * @public
+   */
+  version: number | undefined;
+}
+
+/**
+ * Represents a version within a file group
+ * @public
+ */
+export interface FileGroupVersion {
+  /**
+   * The version number
+   * @public
+   */
+  version: number | undefined;
+
+  /**
+   * URL from where the file can be downloaded
+   * @public
+   */
+  url: string | undefined;
+
+  /**
+   * Size of the file in bytes
+   * @public
+   */
+  size: number | undefined;
+
+  /**
+   * Date when this version was created
+   * @public
+   */
+  created_at: string | undefined;
+}
+
+/**
+ * Represents a group of file versions
+ * @public
+ */
+export interface FileGroup {
+  /**
+   * The file path (unique identifier for the group)
+   * @public
+   */
+  file_path: string | undefined;
+
+  /**
+   * Total number of versions for this file
+   * @public
+   */
+  total_versions: number | undefined;
+
+  /**
+   * List of all versions
+   * @public
+   */
+  versions: (FileGroupVersion)[] | undefined;
+
+  /**
+   * List of tags associated with versions
+   * @public
+   */
+  tags: (FileGroupTag)[] | undefined;
+}
+
+/**
+ * List file groups response
+ * @public
+ */
+export interface ListFileGroupsResponse {
+  /**
+   * List of file groups
+   * @public
+   */
+  groups: (FileGroup)[] | undefined;
+
+  /**
+   * Total number of groups matching the query
+   * @public
+   */
+  total_items: number | undefined;
+
+  /**
+   * Total number of pages
+   * @public
+   */
+  total_pages: number | undefined;
+
+  /**
+   * Current page number
+   * @public
+   */
+  page: number | undefined;
+
+  /**
+   * Number of groups per page
+   * @public
+   */
+  count: number | undefined;
+}
+
+/**
  * List files request
  * @public
  */
@@ -792,6 +948,12 @@ export interface ListFilesRequest {
    * @public
    */
   search?: string | undefined;
+
+  /**
+   * Tags to filter files by (comma-separated for multiple values, e.g., "prod,dev,staging")
+   * @public
+   */
+  tags?: string | undefined;
 
   /**
    * Name of the organisation

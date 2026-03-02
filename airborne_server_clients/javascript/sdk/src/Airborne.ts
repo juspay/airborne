@@ -54,6 +54,11 @@ import {
   ListDimensionsCommandOutput,
 } from "./commands/ListDimensionsCommand";
 import {
+  ListFileGroupsCommand,
+  ListFileGroupsCommandInput,
+  ListFileGroupsCommandOutput,
+} from "./commands/ListFileGroupsCommand";
+import {
   ListFilesCommand,
   ListFilesCommandInput,
   ListFilesCommandOutput,
@@ -117,6 +122,7 @@ const commands = {
   GetReleaseCommand,
   GetUserCommand,
   ListDimensionsCommand,
+  ListFileGroupsCommand,
   ListFilesCommand,
   ListOrganisationsCommand,
   ListPackagesCommand,
@@ -299,6 +305,23 @@ export interface Airborne {
     args: ListDimensionsCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: ListDimensionsCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link ListFileGroupsCommand}
+   */
+  listFileGroups(
+    args: ListFileGroupsCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<ListFileGroupsCommandOutput>;
+  listFileGroups(
+    args: ListFileGroupsCommandInput,
+    cb: (err: any, data?: ListFileGroupsCommandOutput) => void
+  ): void;
+  listFileGroups(
+    args: ListFileGroupsCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: ListFileGroupsCommandOutput) => void
   ): void;
 
   /**

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -864,6 +864,95 @@ JSON file format (params.json):
 
 
 program
+  .command("ListFileGroups")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--page <page>", "page parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--page must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--count <count>", "count parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--count must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--search <search>", "search parameter")
+ .option("--tags <tags>", "tags parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List file groups operation:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListFileGroups \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ListFileGroups @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListFileGroups @params.json --page <value> --count <value> --token <value>
+
+Parameters:
+    --page <integer> (optional) : Page number for pagination
+    --count <integer> (optional) : Number of groups per page
+    --search <string> (optional) : Search query to filter files by path
+    --tags <string> (optional) : Tags to filter files by (comma-separated for multiple values)
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListFileGroups \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+2. Using JSON file:
+   $ airborne-core-cli ListFileGroups @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListFileGroups @params.json --page <value> --count <value> --token <value>
+
+JSON file format (params.json):
+{
+  "page": 123,
+  "count": 123,
+  "search": "example_search",
+  "tags": "example_tags",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListFileGroupsAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("ListFiles")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--page <page>", "page parameter", (value) => {
@@ -881,6 +970,7 @@ program
   return parsed;
 })
  .option("--search <search>", "search parameter")
+ .option("--tags <tags>", "tags parameter")
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
@@ -904,6 +994,7 @@ Parameters:
     --page <integer> (optional) : Page number for pagination
     --per_page <integer> (optional) : Number of files per page
     --search <string> (optional) : Search query to filter files
+    --tags <string> (optional) : Tags to filter files by (comma-separated for multiple values, e.g., "prod,dev,staging")
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
@@ -931,6 +1022,7 @@ JSON file format (params.json):
   "page": 123,
   "per_page": 123,
   "search": "example_search",
+  "tags": "example_tags",
   "organisation": "example_organisation",
   "application": "example_application",
   "token": "your_bearer_token_here"

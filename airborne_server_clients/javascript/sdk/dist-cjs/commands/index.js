@@ -11,6 +11,7 @@ tslib_1.__exportStar(require("./DeleteDimensionCommand"), exports);
 tslib_1.__exportStar(require("./GetReleaseCommand"), exports);
 tslib_1.__exportStar(require("./GetUserCommand"), exports);
 tslib_1.__exportStar(require("./ListDimensionsCommand"), exports);
+tslib_1.__exportStar(require("./ListFileGroupsCommand"), exports);
 tslib_1.__exportStar(require("./ListFilesCommand"), exports);
 tslib_1.__exportStar(require("./ListOrganisationsCommand"), exports);
 tslib_1.__exportStar(require("./ListPackagesCommand"), exports);
