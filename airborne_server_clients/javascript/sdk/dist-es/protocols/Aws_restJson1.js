@@ -170,6 +170,26 @@ export const se_ListDimensionsCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_ListFileGroupsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file/groups");
+    const query = map({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_t]: [, input[_t]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
 export const se_ListFilesCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -181,6 +201,7 @@ export const se_ListFilesCommand = async (input, context) => {
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
         [_s]: [, input[_s]],
+        [_t]: [, input[_t]],
     });
     let body;
     b.m("GET")
@@ -330,7 +351,7 @@ export const se_UploadFileCommand = async (input, context) => {
     b.bp("/api/file/upload");
     const query = map({
         [_fp]: [, __expectNonNull(input[_fp], `file_path`)],
-        [_t]: [, input[_t]],
+        [_ta]: [, input[_ta]],
     });
     let body;
     if (input.file !== undefined) {
@@ -507,6 +528,24 @@ export const de_ListDimensionsCommand = async (output, context) => {
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
         'data': _ => de_DimensionList(_, context),
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_ListFileGroupsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'count': __expectInt32,
+        'groups': _json,
+        'page': __expectInt32,
         'total_items': __expectInt32,
         'total_pages': __expectInt32,
     });
@@ -914,7 +953,8 @@ const _p = "page";
 const _pp = "per_page";
 const _s = "search";
 const _st = "status";
-const _t = "tag";
+const _t = "tags";
+const _ta = "tag";
 const _xa = "x-application";
 const _xc = "x-checksum";
 const _xd = "x-dimension";

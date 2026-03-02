@@ -38,6 +38,7 @@ declare const ListFilesCommand_base: {
  *   page: Number("int"),
  *   per_page: Number("int"),
  *   search: "STRING_VALUE",
+ *   tags: "STRING_VALUE",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };

@@ -46,6 +46,10 @@ import {
   ListDimensionsCommandOutput,
 } from "./commands/ListDimensionsCommand";
 import {
+  ListFileGroupsCommandInput,
+  ListFileGroupsCommandOutput,
+} from "./commands/ListFileGroupsCommand";
+import {
   ListFilesCommandInput,
   ListFilesCommandOutput,
 } from "./commands/ListFilesCommand";
@@ -161,6 +165,7 @@ export type ServiceInputTypes =
   | GetReleaseCommandInput
   | GetUserCommandInput
   | ListDimensionsCommandInput
+  | ListFileGroupsCommandInput
   | ListFilesCommandInput
   | ListOrganisationsCommandInput
   | ListPackagesCommandInput
@@ -186,6 +191,7 @@ export type ServiceOutputTypes =
   | GetReleaseCommandOutput
   | GetUserCommandOutput
   | ListDimensionsCommandOutput
+  | ListFileGroupsCommandOutput
   | ListFilesCommandOutput
   | ListOrganisationsCommandOutput
   | ListPackagesCommandOutput

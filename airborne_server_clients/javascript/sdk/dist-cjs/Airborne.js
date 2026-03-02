@@ -12,6 +12,7 @@ const DeleteDimensionCommand_1 = require("./commands/DeleteDimensionCommand");
 const GetReleaseCommand_1 = require("./commands/GetReleaseCommand");
 const GetUserCommand_1 = require("./commands/GetUserCommand");
 const ListDimensionsCommand_1 = require("./commands/ListDimensionsCommand");
+const ListFileGroupsCommand_1 = require("./commands/ListFileGroupsCommand");
 const ListFilesCommand_1 = require("./commands/ListFilesCommand");
 const ListOrganisationsCommand_1 = require("./commands/ListOrganisationsCommand");
 const ListPackagesCommand_1 = require("./commands/ListPackagesCommand");
@@ -34,6 +35,7 @@ const commands = {
     GetReleaseCommand: GetReleaseCommand_1.GetReleaseCommand,
     GetUserCommand: GetUserCommand_1.GetUserCommand,
     ListDimensionsCommand: ListDimensionsCommand_1.ListDimensionsCommand,
+    ListFileGroupsCommand: ListFileGroupsCommand_1.ListFileGroupsCommand,
     ListFilesCommand: ListFilesCommand_1.ListFilesCommand,
     ListOrganisationsCommand: ListOrganisationsCommand_1.ListOrganisationsCommand,
     ListPackagesCommand: ListPackagesCommand_1.ListPackagesCommand,

@@ -8,6 +8,7 @@ import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "../co
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "../commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "../commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "../commands/ListDimensionsCommand";
+import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "../commands/ListFileGroupsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "../commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "../commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "../commands/ListPackagesCommand";
@@ -60,6 +61,10 @@ export declare const se_GetUserCommand: (input: GetUserCommandInput, context: __
  * serializeAws_restJson1ListDimensionsCommand
  */
 export declare const se_ListDimensionsCommand: (input: ListDimensionsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1ListFileGroupsCommand
+ */
+export declare const se_ListFileGroupsCommand: (input: ListFileGroupsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1ListFilesCommand
  */
@@ -140,6 +145,10 @@ export declare const de_GetUserCommand: (output: __HttpResponse, context: __Serd
  * deserializeAws_restJson1ListDimensionsCommand
  */
 export declare const de_ListDimensionsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListDimensionsCommandOutput>;
+/**
+ * deserializeAws_restJson1ListFileGroupsCommand
+ */
+export declare const de_ListFileGroupsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListFileGroupsCommandOutput>;
 /**
  * deserializeAws_restJson1ListFilesCommand
  */

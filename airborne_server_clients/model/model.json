@@ -1880,6 +1880,9 @@
                     "target": "io.airborne.server#ListDimensions"
                 },
                 {
+                    "target": "io.airborne.server#ListFileGroups"
+                },
+                {
                     "target": "io.airborne.server#ListFiles"
                 },
                 {
@@ -2781,6 +2784,136 @@
                 "smithy.api#documentation": "Common File representation with version metadata"
             }
         },
+        "io.airborne.server#FileGroup": {
+            "type": "structure",
+            "members": {
+                "file_path": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "The file path (unique identifier for the group)",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_versions": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of versions for this file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "versions": {
+                    "target": "io.airborne.server#FileGroupVersionList",
+                    "traits": {
+                        "smithy.api#documentation": "List of all versions",
+                        "smithy.api#required": {}
+                    }
+                },
+                "tags": {
+                    "target": "io.airborne.server#FileGroupTagList",
+                    "traits": {
+                        "smithy.api#documentation": "List of tags associated with versions",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Represents a group of file versions"
+            }
+        },
+        "io.airborne.server#FileGroupList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileGroup",
+                "traits": {
+                    "smithy.api#documentation": "A file group"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file groups"
+            }
+        },
+        "io.airborne.server#FileGroupTag": {
+            "type": "structure",
+            "members": {
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "The tag value",
+                        "smithy.api#required": {}
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "The version this tag is associated with",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Represents a tag associated with a specific version"
+            }
+        },
+        "io.airborne.server#FileGroupTagList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileGroupTag",
+                "traits": {
+                    "smithy.api#documentation": "A file group tag"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file group tags"
+            }
+        },
+        "io.airborne.server#FileGroupVersion": {
+            "type": "structure",
+            "members": {
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "The version number",
+                        "smithy.api#required": {}
+                    }
+                },
+                "url": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "URL from where the file can be downloaded",
+                        "smithy.api#required": {}
+                    }
+                },
+                "size": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Size of the file in bytes",
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Date when this version was created",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Represents a version within a file group"
+            }
+        },
+        "io.airborne.server#FileGroupVersionList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileGroupVersion",
+                "traits": {
+                    "smithy.api#documentation": "A file group version"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file group versions"
+            }
+        },
         "io.airborne.server#FileResponseList": {
             "type": "list",
             "member": {
@@ -2791,6 +2924,40 @@
             },
             "traits": {
                 "smithy.api#documentation": "List of file responses"
+            }
+        },
+        "io.airborne.server#FileTagResponse": {
+            "type": "structure",
+            "members": {
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "The tag value",
+                        "smithy.api#required": {}
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of files with this tag",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "File tag response"
+            }
+        },
+        "io.airborne.server#FileTagResponseList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileTagResponse",
+                "traits": {
+                    "smithy.api#documentation": "A file tag response"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file tag responses"
             }
         },
         "io.airborne.server#ForbiddenError": {
@@ -3061,6 +3228,234 @@
                 }
             }
         },
+        "io.airborne.server#ListFileGroups": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListFileGroupsRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ListFileGroupsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List file groups operation",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/file/groups"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#ListFileGroupsRequest": {
+            "type": "structure",
+            "members": {
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Page number for pagination",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of groups per page",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search query to filter files by path",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "tags": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tags to filter files by (comma-separated for multiple values)",
+                        "smithy.api#httpQuery": "tags"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List file groups request"
+            }
+        },
+        "io.airborne.server#ListFileGroupsResponse": {
+            "type": "structure",
+            "members": {
+                "groups": {
+                    "target": "io.airborne.server#FileGroupList",
+                    "traits": {
+                        "smithy.api#documentation": "List of file groups",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of groups matching the query",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                },
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Current page number",
+                        "smithy.api#required": {}
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of groups per page",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List file groups response"
+            }
+        },
+        "io.airborne.server#ListFileTags": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListFileTagsRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ListFileTagsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List file tags operation",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/file/tags"
+                },
+                "smithy.api#readonly": {}
+            }
+        },
+        "io.airborne.server#ListFileTagsRequest": {
+            "type": "structure",
+            "members": {
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Page number for pagination",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "per_page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of tags per page",
+                        "smithy.api#httpQuery": "per_page"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search query to filter tags",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List file tags request"
+            }
+        },
+        "io.airborne.server#ListFileTagsResponse": {
+            "type": "structure",
+            "members": {
+                "tags": {
+                    "target": "io.airborne.server#FileTagResponseList",
+                    "traits": {
+                        "smithy.api#documentation": "List of tags",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of unique tags",
+                        "smithy.api#required": {}
+                    }
+                },
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Current page number",
+                        "smithy.api#required": {}
+                    }
+                },
+                "per_page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of tags per page",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List file tags response"
+            }
+        },
         "io.airborne.server#ListFiles": {
             "type": "operation",
             "input": {
@@ -3109,6 +3504,13 @@
                     "traits": {
                         "smithy.api#documentation": "Search query to filter files",
                         "smithy.api#httpQuery": "search"
+                    }
+                },
+                "tags": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tags to filter files by (comma-separated for multiple values, e.g., \"prod,dev,staging\")",
+                        "smithy.api#httpQuery": "tags"
                     }
                 },
                 "organisation": {

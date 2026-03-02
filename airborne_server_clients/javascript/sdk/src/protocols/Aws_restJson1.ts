@@ -40,6 +40,10 @@ import {
   ListDimensionsCommandOutput,
 } from "../commands/ListDimensionsCommand";
 import {
+  ListFileGroupsCommandInput,
+  ListFileGroupsCommandOutput,
+} from "../commands/ListFileGroupsCommand";
+import {
   ListFilesCommandInput,
   ListFilesCommandOutput,
 } from "../commands/ListFilesCommand";
@@ -368,6 +372,33 @@ export const se_ListDimensionsCommand = async(
 }
 
 /**
+ * serializeAws_restJson1ListFileGroupsCommand
+ */
+export const se_ListFileGroupsCommand = async(
+  input: ListFileGroupsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file/groups");
+  const query: any = map({
+    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
+    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_s]: [,input[_s]!],
+    [_t]: [,input[_t]!],
+  });
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .q(query)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1ListFilesCommand
  */
 export const se_ListFilesCommand = async(
@@ -384,6 +415,7 @@ export const se_ListFilesCommand = async(
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
     [_s]: [,input[_s]!],
+    [_t]: [,input[_t]!],
   });
   let body: any;
   b.m("GET")
@@ -599,7 +631,7 @@ export const se_UploadFileCommand = async(
   b.bp("/api/file/upload");
   const query: any = map({
     [_fp]: [,__expectNonNull(input[_fp]!, `file_path`)],
-    [_t]: [,input[_t]!],
+    [_ta]: [,input[_ta]!],
   });
   let body: any;
   if (input.file !== undefined) {
@@ -846,6 +878,31 @@ export const de_ListDimensionsCommand = async(
   const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
   const doc = take(data, {
     'data': _ => de_DimensionList(_, context),
+    'total_items': __expectInt32,
+    'total_pages': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1ListFileGroupsCommand
+ */
+export const de_ListFileGroupsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ListFileGroupsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'count': __expectInt32,
+    'groups': _json,
+    'page': __expectInt32,
     'total_items': __expectInt32,
     'total_pages': __expectInt32,
   });
@@ -1378,6 +1435,18 @@ const de_CommandError = async(
 
     }, {} as Record<string, __DocumentType>);}
 
+  // de_FileGroup omitted.
+
+  // de_FileGroupList omitted.
+
+  // de_FileGroupTag omitted.
+
+  // de_FileGroupTagList omitted.
+
+  // de_FileGroupVersion omitted.
+
+  // de_FileGroupVersionList omitted.
+
   /**
    * deserializeAws_restJson1FileResponseList
    */
@@ -1503,7 +1572,8 @@ const de_CommandError = async(
   const _pp = "per_page";
   const _s = "search";
   const _st = "status";
-  const _t = "tag";
+  const _t = "tags";
+  const _ta = "tag";
   const _xa = "x-application";
   const _xc = "x-checksum";
   const _xd = "x-dimension";

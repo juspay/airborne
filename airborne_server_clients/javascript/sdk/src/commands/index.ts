@@ -9,6 +9,7 @@ export * from "./DeleteDimensionCommand";
 export * from "./GetReleaseCommand";
 export * from "./GetUserCommand";
 export * from "./ListDimensionsCommand";
+export * from "./ListFileGroupsCommand";
 export * from "./ListFilesCommand";
 export * from "./ListOrganisationsCommand";
 export * from "./ListPackagesCommand";

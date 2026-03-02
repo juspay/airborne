@@ -9,6 +9,7 @@ import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./com
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
+import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "./commands/ListFileGroupsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "./commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
@@ -31,11 +32,11 @@ export { __Client };
 /**
  * @public
  */
-export type ServiceInputTypes = CreateApplicationCommandInput | CreateDimensionCommandInput | CreateFileCommandInput | CreateOrganisationCommandInput | CreatePackageCommandInput | CreateReleaseCommandInput | DeleteDimensionCommandInput | GetReleaseCommandInput | GetUserCommandInput | ListDimensionsCommandInput | ListFilesCommandInput | ListOrganisationsCommandInput | ListPackagesCommandInput | ListReleasesCommandInput | PostLoginCommandInput | RequestOrganisationCommandInput | ServeReleaseCommandInput | ServeReleaseV2CommandInput | UpdateDimensionCommandInput | UploadFileCommandInput;
+export type ServiceInputTypes = CreateApplicationCommandInput | CreateDimensionCommandInput | CreateFileCommandInput | CreateOrganisationCommandInput | CreatePackageCommandInput | CreateReleaseCommandInput | DeleteDimensionCommandInput | GetReleaseCommandInput | GetUserCommandInput | ListDimensionsCommandInput | ListFileGroupsCommandInput | ListFilesCommandInput | ListOrganisationsCommandInput | ListPackagesCommandInput | ListReleasesCommandInput | PostLoginCommandInput | RequestOrganisationCommandInput | ServeReleaseCommandInput | ServeReleaseV2CommandInput | UpdateDimensionCommandInput | UploadFileCommandInput;
 /**
  * @public
  */
-export type ServiceOutputTypes = CreateApplicationCommandOutput | CreateDimensionCommandOutput | CreateFileCommandOutput | CreateOrganisationCommandOutput | CreatePackageCommandOutput | CreateReleaseCommandOutput | DeleteDimensionCommandOutput | GetReleaseCommandOutput | GetUserCommandOutput | ListDimensionsCommandOutput | ListFilesCommandOutput | ListOrganisationsCommandOutput | ListPackagesCommandOutput | ListReleasesCommandOutput | PostLoginCommandOutput | RequestOrganisationCommandOutput | ServeReleaseCommandOutput | ServeReleaseV2CommandOutput | UpdateDimensionCommandOutput | UploadFileCommandOutput;
+export type ServiceOutputTypes = CreateApplicationCommandOutput | CreateDimensionCommandOutput | CreateFileCommandOutput | CreateOrganisationCommandOutput | CreatePackageCommandOutput | CreateReleaseCommandOutput | DeleteDimensionCommandOutput | GetReleaseCommandOutput | GetUserCommandOutput | ListDimensionsCommandOutput | ListFileGroupsCommandOutput | ListFilesCommandOutput | ListOrganisationsCommandOutput | ListPackagesCommandOutput | ListReleasesCommandOutput | PostLoginCommandOutput | RequestOrganisationCommandOutput | ServeReleaseCommandOutput | ServeReleaseV2CommandOutput | UpdateDimensionCommandOutput | UploadFileCommandOutput;
 /**
  * @public
  */

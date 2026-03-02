@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.de_UploadFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
@@ -183,6 +183,27 @@ const se_ListDimensionsCommand = async (input, context) => {
     return b.build();
 };
 exports.se_ListDimensionsCommand = se_ListDimensionsCommand;
+const se_ListFileGroupsCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file/groups");
+    const query = (0, smithy_client_1.map)({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_s]: [, input[_s]],
+        [_t]: [, input[_t]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_ListFileGroupsCommand = se_ListFileGroupsCommand;
 const se_ListFilesCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -194,6 +215,7 @@ const se_ListFilesCommand = async (input, context) => {
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
         [_s]: [, input[_s]],
+        [_t]: [, input[_t]],
     });
     let body;
     b.m("GET")
@@ -352,7 +374,7 @@ const se_UploadFileCommand = async (input, context) => {
     b.bp("/api/file/upload");
     const query = (0, smithy_client_1.map)({
         [_fp]: [, (0, smithy_client_1.expectNonNull)(input[_fp], `file_path`)],
-        [_t]: [, input[_t]],
+        [_ta]: [, input[_ta]],
     });
     let body;
     if (input.file !== undefined) {
@@ -546,6 +568,25 @@ const de_ListDimensionsCommand = async (output, context) => {
     return contents;
 };
 exports.de_ListDimensionsCommand = de_ListDimensionsCommand;
+const de_ListFileGroupsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'count': smithy_client_1.expectInt32,
+        'groups': smithy_client_1._json,
+        'page': smithy_client_1.expectInt32,
+        'total_items': smithy_client_1.expectInt32,
+        'total_pages': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ListFileGroupsCommand = de_ListFileGroupsCommand;
 const de_ListFilesCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -957,7 +998,8 @@ const _p = "page";
 const _pp = "per_page";
 const _s = "search";
 const _st = "status";
-const _t = "tag";
+const _t = "tags";
+const _ta = "tag";
 const _xa = "x-application";
 const _xc = "x-checksum";
 const _xd = "x-dimension";
