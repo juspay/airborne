@@ -279,12 +279,15 @@ impl HasLabel for ABErrorCodes {
 #[macro_export]
 macro_rules! run_blocking {
     ($body:block) => {{
-        actix_web::web::block(move || -> $crate::types::Result<_> { $body })
-            .await
-            .map_err(|e| {
-                $crate::types::ABError::InternalServerError(format!("Blocking error: {e}"))
-            })
-            .and_then(|inner| inner)
+        let span = tracing::Span::current();
+
+        actix_web::web::block(move || -> $crate::types::Result<_> {
+            let _entered = span.enter();
+            $body
+        })
+        .await
+        .map_err(|e| $crate::types::ABError::InternalServerError(format!("Blocking error: {e}")))
+        .and_then(|inner| inner)
     }};
 }
 

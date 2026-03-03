@@ -98,7 +98,9 @@ help:
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "cleanup" "Clean up containers and volumes"
 	@echo ""
 	@echo "$(YELLOW)Setup Commands:$(NC)"
-	@printf "  $(GREEN)%-20s$(NC) %s\n" "setup" "Set up all dependencies (db, services, etc.)"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "setup" "Set up all dependencies with encryption (default)"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "" "  make setup USE_ENCRYPTED_SECRETS=false"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "" "  make setup USE_ENCRYPTED_SECRETS=true (default)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "env-file" "Create .env file from .env.example"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "airborne-server" "Build the Airborne server"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "analytics-server" "Build the analytics server"
@@ -171,6 +173,18 @@ env-file:
 		cat airborne_server/.env.docker.extra >> airborne_server/.env; \
 	fi
 	@echo "$(GREEN)✅ Environment file ready$(NC)"
+
+setup-encrypted:
+	@echo "$(YELLOW)🔐 Setting up encrypted environment...$(NC)"
+	@chmod +x airborne_server/scripts/encrypt-envs.sh
+	@cd airborne_server && ./scripts/encrypt-envs.sh
+	@echo "$(GREEN)✅ Encrypted environment setup complete$(NC)"
+
+setup-plaintext:
+	@echo "$(YELLOW)📝 Setting up plaintext environment...$(NC)"
+	@chmod +x airborne_server/scripts/encrypt-envs.sh
+	@cd airborne_server && ./scripts/encrypt-envs.sh --plaintext
+	@echo "$(GREEN)✅ Plaintext environment setup complete$(NC)"
 
 analytics-env-file:
 	@echo "$(YELLOW)🔧 Checking analytics environment file...$(NC)"
@@ -401,11 +415,24 @@ dashboard:
 docs:
 	cd airborne_server/docs_react && npm run build:dev
 
+# Parse USE_ENCRYPTED_SECRETS from command line: make setup USE_ENCRYPTED_SECRETS=true/false
+USE_ENCRYPTED_SECRETS ?= true
+
 SETUP_DEPS = env-file db superposition keycloak-db keycloak localstack node-dependencies
 # ifdef CI
 # 	SETUP_DEPS += test-tenant
 # endif
-setup: $(SETUP_DEPS)
+
+setup:
+	@echo "$(YELLOW)🚀 Running setup...$(NC)"
+	@echo "$(YELLOW)Starting infrastructure services...$(NC)"
+	$(MAKE) $(SETUP_DEPS)
+	@echo "$(GREEN)✅ Setup complete!$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "  make run                    # Start the server with encryption (default)"
+	@echo "  make run USE_ENCRYPTED_SECRETS=false  # Start without encryption"
+	@echo "  make status                 # Check service status"
 
 airborne-server:
 	@echo "$(YELLOW)Building airborne_server...$(NC)"
@@ -448,11 +475,22 @@ kill:
 	-@pkill -f airborne_server/target/debug/airborne_server 2>/dev/null || true
 	@echo "$(GREEN)✅ Process cleanup completed$(NC)"
 
-run: kill db superposition superposition-init keycloak-db keycloak keycloak-init localstack localstack-init
-	@trap 'kill 0' INT TERM; \
+run: kill db superposition keycloak-db keycloak localstack
+	@echo "$(YELLOW)🚀 Starting Airborne server...$(NC)"
+	@ENCRYPTION_MODE=$$(grep -E '^USE_ENCRYPTED_SECRETS=' airborne_server/.env 2>/dev/null | cut -d'=' -f2 || echo "$(USE_ENCRYPTED_SECRETS)"); \
+	echo "$(YELLOW)Encryption mode: $$ENCRYPTION_MODE${NC}"; \
+	if [ "$$ENCRYPTION_MODE" = "true" ]; then \
+		echo "$(GREEN)🔐 Encryption enabled (KMS + AES-GCM)${NC}"; \
+	else \
+		echo "$(YELLOW)📝 Encryption disabled (plaintext mode)${NC}"; \
+	fi; \
+	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) superposition-init; \
+	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) keycloak-init; \
+	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) localstack-init; \
+	trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \
-	cargo watch -w airborne_server/src -w airborne_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd airborne_server && ../target/debug/airborne_server' & \
+	cargo watch -w airborne_server/src -w airborne_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd airborne_server && USE_ENCRYPTED_SECRETS='$$ENCRYPTION_MODE' ../target/debug/airborne_server' & \
 	wait
 
 stop:
