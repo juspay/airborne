@@ -16,10 +16,11 @@ struct EncryptedEnv {
 }
 
 /// Decrypt the master key using KMS (called once at startup)
+/// Returns the decrypted master key as a hex-encoded string
 pub async fn decrypt_master_key(
     kms_client: &Client,
     encrypted_master_key: &str,
-) -> Result<Vec<u8>, String> {
+) -> Result<String, String> {
     let encrypted_key = general_purpose::STANDARD
         .decode(encrypted_master_key)
         .map_err(|e| format!("Failed to decode master key: {}", e))?;
@@ -36,20 +37,14 @@ pub async fn decrypt_master_key(
         .ok_or("No plaintext returned from KMS")?
         .into_inner();
 
-    Ok(master_key)
+    // Convert to hex string for consistent handling
+    Ok(hex::encode(master_key))
 }
 
 /// Decrypt an env value using the master key using AES-GCM
 pub fn decrypt_env(master_key: &[u8], encrypted_value: &str) -> Result<String, String> {
-    let encrypted: EncryptedEnv = match serde_json::from_str(encrypted_value) {
-        Ok(e) => e,
-        Err(_) => {
-            panic!(
-                "Failed to parse encrypted value as JSON: {}",
-                encrypted_value
-            );
-        }
-    };
+    let encrypted: EncryptedEnv = serde_json::from_str(encrypted_value)
+        .map_err(|e| format!("Failed to parse encrypted value as JSON: {}", e))?;
 
     let nonce_bytes = general_purpose::STANDARD
         .decode(&encrypted.nonce)
@@ -71,10 +66,9 @@ pub fn decrypt_env(master_key: &[u8], encrypted_value: &str) -> Result<String, S
 
     let nonce = Nonce::from_slice(&nonce_bytes);
 
-    match cipher.decrypt(nonce, ciphertext.as_ref()) {
-        Ok(plaintext_bytes) => {
-            String::from_utf8(plaintext_bytes).map_err(|e| format!("UTF-8 decode error: {}", e))
-        }
-        Err(_) => Ok(encrypted_value.to_string()),
-    }
+    let plaintext_bytes = cipher
+        .decrypt(nonce, ciphertext.as_ref())
+        .map_err(|e| format!("Failed to decrypt value: {}", e))?;
+
+    String::from_utf8(plaintext_bytes).map_err(|e| format!("UTF-8 decode error: {}", e))
 }
