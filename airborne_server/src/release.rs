@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::{
+    file::utils::parse_file_key,
+    middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
+    release::types::*,
+    types as airborne_types,
+    types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
+    utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
+};
 use actix_web::{
     error, get, post, put,
     web::{self, Json, Path, Query},
@@ -26,18 +34,41 @@ use std::collections::{BTreeMap, HashMap};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
-
-use crate::{
-    file::utils::parse_file_key,
-    middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
-    release::types::*,
-    types as airborne_types,
-    types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
-    utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
-};
-
 mod types;
 pub mod utils;
+
+fn encode_url_path(raw_url: &str) -> String {
+    match url::Url::parse(raw_url) {
+        Ok(parsed) => {
+            let encoded_path = parsed
+                .path_segments()
+                .map(|segments| {
+                    segments
+                        .map(|s| urlencoding::encode(s).into_owned())
+                        .collect::<Vec<_>>()
+                        .join("/")
+                })
+                .unwrap_or_default();
+
+            let mut result = format!("{}://{}", parsed.scheme(), parsed.host_str().unwrap_or(""));
+            if let Some(port) = parsed.port() {
+                result.push_str(&format!(":{}", port));
+            }
+            result.push('/');
+            result.push_str(&encoded_path);
+            if let Some(query) = parsed.query() {
+                result.push('?');
+                result.push_str(query);
+            }
+            if let Some(fragment) = parsed.fragment() {
+                result.push('#');
+                result.push_str(fragment);
+            }
+            result
+        }
+        Err(_) => raw_url.to_string(),
+    }
+}
 
 pub fn add_routes(path: &str) -> Scope {
     Scope::new(path).service(serve_release).service(
@@ -182,7 +213,7 @@ async fn get_release(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -198,7 +229,7 @@ async fn get_release(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -215,7 +246,7 @@ async fn get_release(
                         .map(|file| Resource {
                             file_id: file_key_cloned,
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -228,7 +259,7 @@ async fn get_release(
                     .find(|file| file.file_path == file_path.clone())
                     .map(|file| ServeFile {
                         file_path: file.file_path.clone(),
-                        url: file.url.clone(),
+                        url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
                     })
                     .unwrap_or_else(|| ServeFile {
@@ -523,7 +554,7 @@ async fn create_release(
                     .find(|file| file.file_path == file_path.clone())
                     .map(|file| ServeFile {
                         file_path: file.file_path.clone(),
-                        url: file.url.clone(),
+                        url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
                     })
                     .unwrap_or_else(|| ServeFile {
@@ -542,7 +573,7 @@ async fn create_release(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -556,7 +587,7 @@ async fn create_release(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -571,7 +602,7 @@ async fn create_release(
                     .find(|file| file.file_path == file_path.clone())
                     .map(|file| ServeFile {
                         file_path: file.file_path.clone(),
-                        url: file.url.clone(),
+                        url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
                     })
             })
@@ -758,7 +789,7 @@ async fn list_releases(
                             .find(|file| file.file_path == file_path.clone())
                             .map(|file| ServeFile {
                                 file_path: file.file_path.clone(),
-                                url: file.url.clone(),
+                                url: encode_url_path(&file.url),
                                 checksum: file.checksum.clone(),
                             })
                     })
@@ -774,7 +805,7 @@ async fn list_releases(
                             .find(|file| file.file_path == file_path.clone())
                             .map(|file| ServeFile {
                                 file_path: file.file_path.clone(),
-                                url: file.url.clone(),
+                                url: encode_url_path(&file.url),
                                 checksum: file.checksum.clone(),
                             })
                     })
@@ -789,7 +820,7 @@ async fn list_releases(
                             .find(|file| file.file_path == file_path.clone())
                             .map(|file| ServeFile {
                                 file_path: file.file_path.clone(),
-                                url: file.url.clone(),
+                                url: encode_url_path(&file.url),
                                 checksum: file.checksum.clone(),
                             })
                     })
@@ -802,7 +833,7 @@ async fn list_releases(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                         .unwrap_or_else(|| ServeFile {
@@ -1369,7 +1400,7 @@ async fn serve_release_handler(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -1384,7 +1415,7 @@ async fn serve_release_handler(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -1399,7 +1430,7 @@ async fn serve_release_handler(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -1412,7 +1443,7 @@ async fn serve_release_handler(
                     .find(|file| file.file_path == file_path.clone())
                     .map(|file| ServeFile {
                         file_path: file.file_path.clone(),
-                        url: file.url.clone(),
+                        url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
                     })
                     .unwrap_or_else(|| ServeFile {
@@ -1658,7 +1689,7 @@ async fn update_release(
                     .find(|file| file.file_path == file_path.clone())
                     .map(|file| ServeFile {
                         file_path: file.file_path.clone(),
-                        url: file.url.clone(),
+                        url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
                     })
                     .unwrap_or_else(|| ServeFile {
@@ -1677,7 +1708,7 @@ async fn update_release(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -1691,7 +1722,7 @@ async fn update_release(
                         .find(|file| file.file_path == file_path.clone())
                         .map(|file| ServeFile {
                             file_path: file.file_path.clone(),
-                            url: file.url.clone(),
+                            url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
                         })
                 })
@@ -1706,7 +1737,7 @@ async fn update_release(
                     .find(|file| file.file_path == file_path.clone())
                     .map(|file| ServeFile {
                         file_path: file.file_path.clone(),
-                        url: file.url.clone(),
+                        url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
                     })
             })
