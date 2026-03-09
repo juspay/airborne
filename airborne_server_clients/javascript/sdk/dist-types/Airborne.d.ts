@@ -6,6 +6,7 @@ import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from 
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "./commands/CreatePackageCommand";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "./commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./commands/DeleteDimensionCommand";
+import { DeleteFileCommandInput, DeleteFileCommandOutput } from "./commands/DeleteFileCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
@@ -63,6 +64,12 @@ export interface Airborne {
     deleteDimension(args: DeleteDimensionCommandInput, options?: __HttpHandlerOptions): Promise<DeleteDimensionCommandOutput>;
     deleteDimension(args: DeleteDimensionCommandInput, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
     deleteDimension(args: DeleteDimensionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
+    /**
+     * @see {@link DeleteFileCommand}
+     */
+    deleteFile(args: DeleteFileCommandInput, options?: __HttpHandlerOptions): Promise<DeleteFileCommandOutput>;
+    deleteFile(args: DeleteFileCommandInput, cb: (err: any, data?: DeleteFileCommandOutput) => void): void;
+    deleteFile(args: DeleteFileCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: DeleteFileCommandOutput) => void): void;
     /**
      * @see {@link GetReleaseCommand}
      */

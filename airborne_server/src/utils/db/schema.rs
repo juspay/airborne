@@ -1,6 +1,32 @@
 // @generated automatically by Diesel CLI.
 
 pub mod hyperotaserver {
+    pub mod sql_types {
+        #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+        #[diesel(postgres_type(name = "file_status", schema = "hyperotaserver"))]
+        pub struct FileStatusType;
+    }
+
+    diesel::table! {
+        use diesel::sql_types::*;
+        use super::sql_types::FileStatusType;
+
+        hyperotaserver.files (id) {
+            id -> Uuid,
+            app_id -> Text,
+            org_id -> Text,
+            version -> Int4,
+            tag -> Nullable<Text>,
+            url -> Text,
+            file_path -> Text,
+            size -> Int8,
+            checksum -> Text,
+            metadata -> Jsonb,
+            created_at -> Timestamptz,
+            status -> FileStatusType,
+        }
+    }
+
     diesel::table! {
         hyperotaserver.cleanup_outbox (transaction_id) {
             transaction_id -> Text,
@@ -25,22 +51,6 @@ pub mod hyperotaserver {
             tenant_info -> Jsonb,
             properties -> Jsonb,
             created_at -> Timestamp,
-        }
-    }
-
-    diesel::table! {
-        hyperotaserver.files (id) {
-            id -> Uuid,
-            app_id -> Text,
-            org_id -> Text,
-            version -> Int4,
-            tag -> Nullable<Text>,
-            url -> Text,
-            file_path -> Text,
-            size -> Int8,
-            checksum -> Text,
-            metadata -> Jsonb,
-            created_at -> Timestamptz,
         }
     }
 

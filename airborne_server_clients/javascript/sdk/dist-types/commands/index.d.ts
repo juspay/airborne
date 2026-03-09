@@ -5,6 +5,7 @@ export * from "./CreateOrganisationCommand";
 export * from "./CreatePackageCommand";
 export * from "./CreateReleaseCommand";
 export * from "./DeleteDimensionCommand";
+export * from "./DeleteFileCommand";
 export * from "./GetReleaseCommand";
 export * from "./GetUserCommand";
 export * from "./ListDimensionsCommand";

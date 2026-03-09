@@ -6,6 +6,7 @@ import { CreateOrganisationCommand, } from "./commands/CreateOrganisationCommand
 import { CreatePackageCommand, } from "./commands/CreatePackageCommand";
 import { CreateReleaseCommand, } from "./commands/CreateReleaseCommand";
 import { DeleteDimensionCommand, } from "./commands/DeleteDimensionCommand";
+import { DeleteFileCommand, } from "./commands/DeleteFileCommand";
 import { GetReleaseCommand, } from "./commands/GetReleaseCommand";
 import { GetUserCommand, } from "./commands/GetUserCommand";
 import { ListDimensionsCommand, } from "./commands/ListDimensionsCommand";
@@ -28,6 +29,7 @@ const commands = {
     CreatePackageCommand,
     CreateReleaseCommand,
     DeleteDimensionCommand,
+    DeleteFileCommand,
     GetReleaseCommand,
     GetUserCommand,
     ListDimensionsCommand,

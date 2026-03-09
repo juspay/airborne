@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, MoreHorizontal, Edit, Filter } from "lucide-react";
+import { Search, MoreHorizontal, Edit, Filter, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Pagination,
@@ -25,6 +25,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { FileCreationModal } from "@/components/file-creation-modal";
+import { FileDeleteModal } from "@/components/file-delete-modal";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { hasAppAccess } from "@/lib/utils";
@@ -59,6 +60,8 @@ export default function FilesPage() {
   const [filterType, setFilterType] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<ApiFile | null>(null);
   const perPage = 10;
 
   // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
@@ -86,6 +89,11 @@ export default function FilesPage() {
       { token, org, app }
     );
     mutate();
+  }
+
+  function handleDeleteClick(f: ApiFile) {
+    setFileToDelete(f);
+    setIsDeleteModalOpen(true);
   }
 
   const handleSearchChange = (value: string) => {
@@ -302,6 +310,10 @@ export default function FilesPage() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Update Tag
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteClick(f)} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
@@ -347,6 +359,12 @@ export default function FilesPage() {
       </Card>
 
       <FileCreationModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} onCreated={() => mutate()} />
+      <FileDeleteModal
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
+        file={fileToDelete}
+        onDeleted={() => mutate()}
+      />
     </div>
   );
 }
