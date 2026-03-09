@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.26.0 - 2026-03-09
+### Package updates
+- airborne_server bumped to airborne_server-v0.17.0
+### Global changes
+#### Features
+- use master key for symmetric encryption/decryption of secrets - (5995d62) - yuvrajjsingh0
+
+- - -
+
 ## v0.25.0 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.16.0
