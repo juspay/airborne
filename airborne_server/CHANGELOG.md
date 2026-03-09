@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.16.0 - 2026-03-09
+#### Features
+- tags api and file filtering - (63c8a40) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.15.3 - 2026-03-09
 #### Bug Fixes
 - encode release file url paths - (311c338) - Yash Rajput

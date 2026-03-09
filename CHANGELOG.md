@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.25.0 - 1970-01-01
+### Package updates
+- airborne_server bumped to airborne_server-v0.16.0
+- airborne_core_cli bumped to airborne_core_cli-v0.2.5
+- smithy bumped to smithy-v0.3.0
+- airborne_server_clients bumped to airborne_server_clients-v0.2.4
+- airborne_dashboard bumped to airborne_dashboard-v0.13.0
+### Global changes
+
+- - -
+
 ## v0.24.4 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.15.3

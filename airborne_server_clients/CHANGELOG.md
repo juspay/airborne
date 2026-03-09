@@ -2,6 +2,120 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server_clients-v0.2.4 - 2026-03-09
+#### Bug Fixes
+- update cli - (7a9f6ff) - Yash Rajput
+
+- - -
+
+## v0.24.4 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.24.4 [skip ci] - (3398e93) - Airborne Bot
+
+- - -
+
+## v0.24.3 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.24.3 [skip ci] - (bd6d431) - Airborne Bot
+
+- - -
+
+## v0.24.2 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.24.2 [skip ci] - (3c27527) - Airborne Bot
+
+- - -
+
+## v0.24.1 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.24.1 [skip ci] - (c89ac50) - Airborne Bot
+
+- - -
+
+## v0.24.0 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.24.0 [skip ci] - (d127ca2) - Airborne Bot
+
+- - -
+
+## v0.23.3 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.23.3 [skip ci] - (fea39f7) - Airborne Bot
+
+- - -
+
+## v0.23.2 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.23.2 [skip ci] - (1a6ac61) - Airborne Bot
+
+- - -
+
+## v0.23.1 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.23.1 [skip ci] - (1644fd6) - Airborne Bot
+
+- - -
+
+## v0.23.0 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.23.0 [skip ci] - (0d2fcd5) - Airborne Bot
+
+- - -
+
+## v0.22.2 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.22.2 [skip ci] - (8a99832) - Airborne Bot
+
+- - -
+
+## v0.22.1 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.22.1 [skip ci] - (ad0c79b) - Airborne Bot
+
+- - -
+
+## v0.22.0 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.22.0 [skip ci] - (2caa013) - Airborne Bot
+
+- - -
+
+## v0.21.0 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.21.0 [skip ci] - (62d2ed4) - Airborne Bot
+
+- - -
+
+## v0.20.1 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.20.1 [skip ci] - (4c34176) - Airborne Bot
+
+- - -
+
+## v0.20.0 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.20.0 [skip ci] - (ea2c83e) - Airborne Bot
+
+- - -
+
+## v0.19.1 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.19.1 [skip ci] - (39ef9bf) - Airborne Bot
+
+- - -
+
+## v0.19.0 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.19.0 [skip ci] - (e5ade3a) - Airborne Bot
+
+- - -
+
+## v0.18.3 - 2026-03-09
+#### Miscellaneous Chores
+- **(version)** v0.18.3 [skip ci] - (9114fb9) - Airborne Bot
+
+- - -
+
 ## airborne_server_clients-v0.2.3 - 2026-01-06
 #### Bug Fixes
 - support Google OAuth in personal access token flow - (4737bd0) - Yash Rajput
