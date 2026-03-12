@@ -42,7 +42,7 @@ class TempWriter internal constructor(s: String, m: FileProviderService.Mode, pr
     fun write(fileName: String, content: ByteArray): Boolean {
         val f = File(tempDir, fileName)
         f.parentFile?.mkdirs()
-        return fileProviderService.writeToFile(f, content, false)
+        return fileProviderService.writeToFile(f, content, false, false)
     }
 
     val dirName: String
