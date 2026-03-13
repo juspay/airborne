@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.1.5 - 2026-03-13
+#### Bug Fixes
+- start app immediately after packages download instead of waiting for boot timeout - (90164b6) - Yash Rajput
+
+- - -
+
+## v0.26.0 - 2026-03-13
+#### Miscellaneous Chores
+- **(version)** v0.26.0 [skip ci] - (e987bfa) - Airborne Bot
+
+- - -
+
+## v0.25.0 - 2026-03-13
+#### Miscellaneous Chores
+- **(version)** v0.25.0 [skip ci] - (8a22156) - Airborne Bot
+
+- - -
+
+## v0.24.4 - 2026-03-13
+#### Miscellaneous Chores
+- **(version)** v0.24.4 [skip ci] - (3398e93) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.1.4 - 2026-02-27
 #### Bug Fixes
 - reuse shared NSURLSession to avoid per-request session creation - (10ab0a7) - Yash Rajput
