@@ -1143,7 +1143,6 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                        @"time_taken": @([[NSDate date] timeIntervalSince1970] * 1000 - startTime)} mutableCopy]];
 
                 [strongSelf moveAllPackagesFromTempToMain];
-                strongSelf.importantPackageDownloadStatus = COMPLETED;
                 [strongSelf updatePackage:newManifest didDownloadImportant:YES startTime:startTime];
                 [strongSelf.tracker trackInfo:@"important_package_update_result"
                               value:[@{@"result": @"SUCCESS",
