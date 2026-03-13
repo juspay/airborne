@@ -530,7 +530,8 @@ async fn get_properties_schema_api(
         ABError::InternalServerError(format!("Failed to get resolved config: {}", e))
     })?;
 
-    let opt_rc_config_properties = resolved_config.config.as_ref().and_then(|doc| {
+    let opt_rc_config_properties = {
+        let doc = &resolved_config.config;
         if let Document::Object(obj) = doc {
             Some(
                 obj.iter()
@@ -549,7 +550,7 @@ async fn get_properties_schema_api(
         } else {
             None
         }
-    });
+    };
 
     let rc_config_properties = opt_rc_config_properties.unwrap_or_default();
 
@@ -756,13 +757,12 @@ async fn list_properties_api(
             continue;
         }
 
-        let variant_overrides = variant.unwrap().overrides.as_object();
-        if variant_overrides.is_none() {
+        let variant_overrides = &variant.unwrap().overrides;
+        if variant_overrides.is_empty() {
             continue;
         }
 
         let variant_overrides = variant_overrides
-            .unwrap()
             .iter()
             .filter_map(|(k, v)| {
                 if k.starts_with("config.properties.") {

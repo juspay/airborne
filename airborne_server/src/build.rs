@@ -687,7 +687,7 @@ async fn generate(
         ABError::InternalServerError(format!("Failed to get resolved config: {}", e))
     })?;
 
-    let config_document = resolved_config.config;
+    let config_document = Some(resolved_config.config);
 
     // Extract release version from config (similar to serve_release)
     let release_id =
