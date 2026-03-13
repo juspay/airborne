@@ -180,6 +180,7 @@ internal class UpdateTask(
         if (fetched == null) {
             // Unable to fetch so exiting.
             currentResult = UpdateResult.Error.RCFetchError
+            shouldDownloadCurLazySplits = true
             onComplete(Stage.INSTALLING)
         } else {
             updateTimeouts(fetched)
