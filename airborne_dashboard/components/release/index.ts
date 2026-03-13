@@ -3,6 +3,7 @@ export { ReleaseBuilder } from "./ReleaseBuilder";
 export { StepIndicator } from "./StepIndicator";
 export { PaginationControls } from "./PaginationControls";
 export { ReleaseConfirmationDialog } from "./ReleaseConfirmationDialog";
+export { ReleasePackageGroupItem } from "./ReleasePackageGroupItem";
 
 export { ConfigurationStep } from "./steps/ConfigurationStep";
 export { TargetingStep } from "./steps/TargetingStep";

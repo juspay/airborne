@@ -35,7 +35,7 @@ export interface CreatePackageCommandInput extends CreatePackageRequest {}
 export interface CreatePackageCommandOutput extends Package, __MetadataBearer {}
 
 /**
- * Create package request operation
+ * Create package request operation (legacy - uses primary group)
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
