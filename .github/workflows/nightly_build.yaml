@@ -1,0 +1,291 @@
+name: Build nightly artifacts
+
+on:
+  schedule:
+    # 17:00 Asia/Kolkata (11:30 UTC)
+    - cron: '30 11 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-nightly-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      should_build: ${{ steps.version.outputs.should_build }}
+      version: ${{ steps.version.outputs.version }}
+      tracking_tag: ${{ steps.version.outputs.tracking_tag }}
+      build_sha: ${{ steps.version.outputs.build_sha }}
+      last_nightly_tag: ${{ steps.version.outputs.last_nightly_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY }}
+
+      - name: Compute nightly version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --tags --force
+
+          last_nightly_tag=$(git for-each-ref refs/tags --sort=-creatordate --format='%(refname:short)' \
+            | grep -E '^nightly-v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}\.[0-9a-f]+$' \
+            | head -n 1 || true)
+
+          if [ -n "${last_nightly_tag}" ]; then
+            last_nightly_commit=$(git rev-list -n 1 "${last_nightly_tag}")
+            new_commits=$(git rev-list --count "${last_nightly_commit}..origin/main")
+          else
+            new_commits=$(git rev-list --count origin/main)
+          fi
+
+          if [ "${new_commits}" -eq 0 ]; then
+            echo 'should_build=false' >> "$GITHUB_OUTPUT"
+            echo 'version=' >> "$GITHUB_OUTPUT"
+            echo 'tracking_tag=' >> "$GITHUB_OUTPUT"
+            echo 'build_sha=' >> "$GITHUB_OUTPUT"
+            echo "last_nightly_tag=${last_nightly_tag}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          stable_tag=$(git tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
+          if [ -z "${stable_tag}" ]; then
+            stable_tag='v0.0.0'
+          fi
+
+          stable_version=${stable_tag#v}
+          IFS='.' read -r major minor patch <<< "${stable_version}"
+          next_patch=$((patch + 1))
+          base_version="${major}.${minor}.${next_patch}"
+
+          build_sha=$(git rev-parse origin/main)
+          short_sha=$(git rev-parse --short=12 "${build_sha}")
+          nightly_date=$(TZ=Asia/Kolkata date +%Y%m%d)
+          version="${base_version}-nightly.${nightly_date}.${short_sha}"
+          tracking_tag="nightly-v${version}"
+
+          echo 'should_build=true' >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tracking_tag=${tracking_tag}" >> "$GITHUB_OUTPUT"
+          echo "build_sha=${build_sha}" >> "$GITHUB_OUTPUT"
+          echo "last_nightly_tag=${last_nightly_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Create nightly tracking tag
+        if: steps.version.outputs.should_build == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tracking_tag="${{ steps.version.outputs.tracking_tag }}"
+          build_sha="${{ steps.version.outputs.build_sha }}"
+
+          if git rev-parse "${tracking_tag}" >/dev/null 2>&1; then
+            echo "Tracking tag ${tracking_tag} already exists"
+            exit 0
+          fi
+
+          git config user.email 'airborne_bot@juspay.in'
+          git config user.name 'Airborne Bot'
+          git tag "${tracking_tag}" "${build_sha}"
+          git push origin "${tracking_tag}"
+
+  server-docker-build:
+    needs: prepare-nightly-version
+    permissions:
+      contents: read
+      packages: write
+    if: needs.prepare-nightly-version.outputs.should_build == 'true'
+    strategy:
+      max-parallel: 5
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag: linux-amd64
+            os: ubuntu-latest
+          - platform: linux/arm64
+            tag: linux-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-nightly-version.outputs.build_sha }}
+          fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: .
+          file: airborne_server/Dockerfile
+          tags: ghcr.io/${{ github.repository }}-server:${{ needs.prepare-nightly-version.outputs.version }}-${{ matrix.tag }}
+
+  server-create-manifest:
+    needs: [prepare-nightly-version, server-docker-build]
+    permissions:
+      contents: read
+      packages: write
+    if: needs.prepare-nightly-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create server manifest for multi-arch image
+        run: |
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-server:${{ needs.prepare-nightly-version.outputs.version }} \
+              ghcr.io/${{ github.repository }}-server:${{ needs.prepare-nightly-version.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-server:${{ needs.prepare-nightly-version.outputs.version }}-linux-arm64
+
+  analytics-docker-build:
+    needs: [prepare-nightly-version]
+    permissions:
+      contents: read
+      packages: write
+    if: needs.prepare-nightly-version.outputs.should_build == 'true'
+    strategy:
+      max-parallel: 5
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag: linux-amd64
+            os: ubuntu-latest
+          - platform: linux/arm64
+            tag: linux-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-nightly-version.outputs.build_sha }}
+          fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push analytics image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: .
+          file: airborne_analytics_server/Dockerfile
+          tags: ghcr.io/${{ github.repository }}-analytics-server:${{ needs.prepare-nightly-version.outputs.version }}-${{ matrix.tag }}
+
+  analytics-create-manifest:
+    needs: [prepare-nightly-version, analytics-docker-build]
+    permissions:
+      contents: read
+      packages: write
+    if: needs.prepare-nightly-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create analytics manifest for multi-arch image
+        run: |
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-analytics-server:${{ needs.prepare-nightly-version.outputs.version }} \
+              ghcr.io/${{ github.repository }}-analytics-server:${{ needs.prepare-nightly-version.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-analytics-server:${{ needs.prepare-nightly-version.outputs.version }}-linux-arm64
+
+  dashboard-docker-build:
+    needs: [prepare-nightly-version]
+    permissions:
+      contents: read
+      packages: write
+    if: needs.prepare-nightly-version.outputs.should_build == 'true'
+    strategy:
+      max-parallel: 5
+      matrix:
+        include:
+          - platform: linux/amd64
+            tag: linux-amd64
+            os: ubuntu-latest
+          - platform: linux/arm64
+            tag: linux-arm64
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-nightly-version.outputs.build_sha }}
+          fetch-depth: 0
+          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push dashboard image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: ./airborne_dashboard
+          file: ./airborne_dashboard/Dockerfile
+          tags: ghcr.io/${{ github.repository }}-dashboard:${{ needs.prepare-nightly-version.outputs.version }}-${{ matrix.tag }}
+
+  dashboard-create-manifest:
+    needs: [prepare-nightly-version, dashboard-docker-build]
+    permissions:
+      contents: read
+      packages: write
+    if: needs.prepare-nightly-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create dashboard manifest for multi-arch image
+        run: |
+          docker buildx imagetools create --tag ghcr.io/${{ github.repository }}-dashboard:${{ needs.prepare-nightly-version.outputs.version }} \
+              ghcr.io/${{ github.repository }}-dashboard:${{ needs.prepare-nightly-version.outputs.version }}-linux-amd64 \
+              ghcr.io/${{ github.repository }}-dashboard:${{ needs.prepare-nightly-version.outputs.version }}-linux-arm64
