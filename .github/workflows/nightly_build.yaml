@@ -5,6 +5,15 @@ on:
     # 17:00 Asia/Kolkata (11:30 UTC)
     - cron: '30 11 * * *'
   workflow_dispatch:
+    inputs:
+      test_mode:
+        description: Allow manual runs from non-main branches for workflow testing
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.test_mode == 'true')
     outputs:
       should_build: ${{ steps.version.outputs.should_build }}
       version: ${{ steps.version.outputs.version }}
@@ -37,15 +46,26 @@ jobs:
 
           git fetch origin main --tags --force
 
+          is_branch_test="false"
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            is_branch_test="true"
+          fi
+
           last_nightly_tag=$(git for-each-ref refs/tags --sort=-creatordate --format='%(refname:short)' \
             | grep -E '^nightly-v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}\.[0-9a-f]+$' \
             | head -n 1 || true)
 
-          if [ -n "${last_nightly_tag}" ]; then
-            last_nightly_commit=$(git rev-list -n 1 "${last_nightly_tag}")
-            new_commits=$(git rev-list --count "${last_nightly_commit}..origin/main")
+          if [ "${is_branch_test}" = "true" ]; then
+            new_commits=1
+            should_create_tracking_tag="false"
           else
-            new_commits=$(git rev-list --count origin/main)
+            should_create_tracking_tag="true"
+            if [ -n "${last_nightly_tag}" ]; then
+              last_nightly_commit=$(git rev-list -n 1 "${last_nightly_tag}")
+              new_commits=$(git rev-list --count "${last_nightly_commit}..origin/main")
+            else
+              new_commits=$(git rev-list --count origin/main)
+            fi
           fi
 
           if [ "${new_commits}" -eq 0 ]; then
@@ -54,6 +74,7 @@ jobs:
             echo 'tracking_tag=' >> "$GITHUB_OUTPUT"
             echo 'build_sha=' >> "$GITHUB_OUTPUT"
             echo "last_nightly_tag=${last_nightly_tag}" >> "$GITHUB_OUTPUT"
+            echo "should_create_tracking_tag=${should_create_tracking_tag}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -67,20 +88,30 @@ jobs:
           next_patch=$((patch + 1))
           base_version="${major}.${minor}.${next_patch}"
 
-          build_sha=$(git rev-parse origin/main)
+          if [ "${is_branch_test}" = "true" ]; then
+            build_sha="${{ github.sha }}"
+          else
+            build_sha=$(git rev-parse origin/main)
+          fi
           short_sha=$(git rev-parse --short=12 "${build_sha}")
           nightly_date=$(TZ=Asia/Kolkata date +%Y%m%d)
           version="${base_version}-nightly.${nightly_date}.${short_sha}"
           tracking_tag="nightly-v${version}"
+
+          if [ "${is_branch_test}" = "true" ]; then
+            version="${base_version}-nightly.${nightly_date}.${short_sha}.test"
+            tracking_tag="test-nightly-v${version}"
+          fi
 
           echo 'should_build=true' >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tracking_tag=${tracking_tag}" >> "$GITHUB_OUTPUT"
           echo "build_sha=${build_sha}" >> "$GITHUB_OUTPUT"
           echo "last_nightly_tag=${last_nightly_tag}" >> "$GITHUB_OUTPUT"
+          echo "should_create_tracking_tag=${should_create_tracking_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Create nightly tracking tag
-        if: steps.version.outputs.should_build == 'true'
+        if: steps.version.outputs.should_build == 'true' && steps.version.outputs.should_create_tracking_tag == 'true'
         shell: bash
         run: |
           set -euo pipefail

@@ -4,6 +4,16 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: Allow manual runs from non-main branches for workflow testing
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.merge_commit_sha || github.run_id }}
@@ -14,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    if: (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main') || (github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || github.event.inputs.test_mode == 'true'))
     outputs:
       version: ${{ steps.version.outputs.version }}
       tracking_tag: ${{ steps.version.outputs.tracking_tag }}
@@ -46,18 +56,27 @@ jobs:
 
           build_sha="${{ github.event.pull_request.merge_commit_sha }}"
           if [ -z "${build_sha}" ]; then
-            build_sha=$(git rev-parse origin/main)
+            build_sha="${{ github.sha }}"
           fi
 
           short_sha=$(git rev-parse --short=12 "${build_sha}")
           version="${base_version}-${short_sha}"
           tracking_tag="prerelease-v${version}"
+          should_create_tracking_tag="true"
+
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            version="${base_version}-${short_sha}.test"
+            tracking_tag="test-prerelease-v${version}"
+            should_create_tracking_tag="false"
+          fi
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "tracking_tag=${tracking_tag}" >> "$GITHUB_OUTPUT"
           echo "build_sha=${build_sha}" >> "$GITHUB_OUTPUT"
+          echo "should_create_tracking_tag=${should_create_tracking_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Create prerelease tracking tag
+        if: steps.version.outputs.should_create_tracking_tag == 'true'
         shell: bash
         run: |
           set -euo pipefail
