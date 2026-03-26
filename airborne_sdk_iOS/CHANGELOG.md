@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.3.0 - 2026-03-26
+#### Features
+- add downloaded Splits tracking and asset path lookup - (009be46) - yash.rajput.001
+
+- - -
+
+## v0.28.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.28.0 [skip ci] - (b0b89d5) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.2.0 - 2026-03-26
 #### Features
 - download remaining old lazy splits on new release failure or timeout - (555ff3e) - Yash Rajput
