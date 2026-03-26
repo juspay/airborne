@@ -104,6 +104,11 @@ import {
   UpdateDimensionCommandOutput,
 } from "./commands/UpdateDimensionCommand";
 import {
+  UpdateFileCommand,
+  UpdateFileCommandInput,
+  UpdateFileCommandOutput,
+} from "./commands/UpdateFileCommand";
+import {
   UploadFileCommand,
   UploadFileCommandInput,
   UploadFileCommandOutput,
@@ -132,6 +137,7 @@ const commands = {
   ServeReleaseCommand,
   ServeReleaseV2Command,
   UpdateDimensionCommand,
+  UpdateFileCommand,
   UploadFileCommand,
 }
 
@@ -476,6 +482,23 @@ export interface Airborne {
     args: UpdateDimensionCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: UpdateDimensionCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link UpdateFileCommand}
+   */
+  updateFile(
+    args: UpdateFileCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<UpdateFileCommandOutput>;
+  updateFile(
+    args: UpdateFileCommandInput,
+    cb: (err: any, data?: UpdateFileCommandOutput) => void
+  ): void;
+  updateFile(
+    args: UpdateFileCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: UpdateFileCommandOutput) => void
   ): void;
 
   /**

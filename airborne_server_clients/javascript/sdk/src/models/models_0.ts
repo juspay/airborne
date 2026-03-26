@@ -1296,6 +1296,36 @@ export interface UpdateDimensionRequest {
 }
 
 /**
+ * Update file request
+ * @public
+ */
+export interface UpdateFileRequest {
+  /**
+   * The file key in the path (e.g., "$file_path@version:$version_number" or "$file_path@tag:$tag")
+   * @public
+   */
+  file_key: string | undefined;
+
+  /**
+   * New tag to update the file with
+   * @public
+   */
+  tag: string | undefined;
+
+  /**
+   * Name of the organisation
+   * @public
+   */
+  organisation: string | undefined;
+
+  /**
+   * Name of the application
+   * @public
+   */
+  application: string | undefined;
+}
+
+/**
  * Upload file request
  * @public
  */
@@ -1324,7 +1354,12 @@ export interface UploadFileRequest {
    */
   checksum: string | undefined;
 
+  /**
+   * Name of the organisation
+   * @public
+   */
   organisation: string | undefined;
+
   /**
    * Name of the application
    * @public

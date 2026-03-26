@@ -22,6 +22,7 @@ const RequestOrganisationCommand_1 = require("./commands/RequestOrganisationComm
 const ServeReleaseCommand_1 = require("./commands/ServeReleaseCommand");
 const ServeReleaseV2Command_1 = require("./commands/ServeReleaseV2Command");
 const UpdateDimensionCommand_1 = require("./commands/UpdateDimensionCommand");
+const UpdateFileCommand_1 = require("./commands/UpdateFileCommand");
 const UploadFileCommand_1 = require("./commands/UploadFileCommand");
 const smithy_client_1 = require("@smithy/smithy-client");
 const commands = {
@@ -45,6 +46,7 @@ const commands = {
     ServeReleaseCommand: ServeReleaseCommand_1.ServeReleaseCommand,
     ServeReleaseV2Command: ServeReleaseV2Command_1.ServeReleaseV2Command,
     UpdateDimensionCommand: UpdateDimensionCommand_1.UpdateDimensionCommand,
+    UpdateFileCommand: UpdateFileCommand_1.UpdateFileCommand,
     UploadFileCommand: UploadFileCommand_1.UploadFileCommand,
 };
 class Airborne extends AirborneClient_1.AirborneClient {

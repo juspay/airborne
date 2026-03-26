@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UpdateFileAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -1635,6 +1635,79 @@ JSON file format (params.json):
 
 
 program
+  .command("UpdateFile")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--file_key <file_key>", "file_key parameter")
+ .option("--tag <tag>", "tag parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Update file operation:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli UpdateFile \\
+     --file_key <file_key> \\
+     --tag <tag> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli UpdateFile @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli UpdateFile @params.json --file_key <value> --tag <value> --token <value>
+
+Parameters:
+    --file_key <string> (required) : The file key in the path (e.g., "$file_path@version:$version_number" or "$file_path@tag:$tag")
+    --tag <string> (required) : New tag to update the file with
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli UpdateFile \\
+     --file_key <file_key> \\
+     --tag <tag> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli UpdateFile @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli UpdateFile @params.json --file_key <value> --tag <value> --token <value>
+
+JSON file format (params.json):
+{
+  "file_key": "example_file_key",
+  "tag": "example_tag",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await UpdateFileAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("UploadFile")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--file <file>", "file parameter (file path, supports streaming)", (value) => {
@@ -1677,7 +1750,7 @@ Parameters:
     --file_path <string> (required) : Path where the file will be stored on sdk
     --tag <string> (optional) : tag to identify the file
     --checksum <string> (required) : SHA-256 digest of the file, encoded in Base64, used by the server to verify the integrity of the uploaded file
-    --organisation <string> (required)
+    --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
 

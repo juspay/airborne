@@ -340,6 +340,24 @@ export const se_UpdateDimensionCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_UpdateFileCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file/{file_key}");
+    b.p('file_key', () => input.file_key, '{file_key}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'tag': [],
+    }));
+    b.m("PATCH")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_UploadFileCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -697,6 +715,29 @@ export const de_UpdateDimensionCommand = async (output, context) => {
         'mandatory': __expectBoolean,
         'position': __expectInt32,
         'schema': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_UpdateFileCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'checksum': __expectString,
+        'created_at': __expectString,
+        'file_path': __expectString,
+        'id': __expectString,
+        'metadata': _ => de_Document(_, context),
+        'size': __expectInt32,
+        'status': __expectString,
+        'tag': __expectString,
+        'url': __expectString,
+        'version': __expectInt32,
     });
     Object.assign(contents, doc);
     return contents;

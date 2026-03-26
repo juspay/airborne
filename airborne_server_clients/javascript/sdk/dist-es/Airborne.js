@@ -19,6 +19,7 @@ import { RequestOrganisationCommand, } from "./commands/RequestOrganisationComma
 import { ServeReleaseCommand, } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2Command, } from "./commands/ServeReleaseV2Command";
 import { UpdateDimensionCommand, } from "./commands/UpdateDimensionCommand";
+import { UpdateFileCommand, } from "./commands/UpdateFileCommand";
 import { UploadFileCommand, } from "./commands/UploadFileCommand";
 import { createAggregatedClient } from "@smithy/smithy-client";
 const commands = {
@@ -42,6 +43,7 @@ const commands = {
     ServeReleaseCommand,
     ServeReleaseV2Command,
     UpdateDimensionCommand,
+    UpdateFileCommand,
     UploadFileCommand,
 };
 export class Airborne extends AirborneClient {

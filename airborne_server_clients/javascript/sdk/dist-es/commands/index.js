@@ -18,4 +18,5 @@ export * from "./RequestOrganisationCommand";
 export * from "./ServeReleaseCommand";
 export * from "./ServeReleaseV2Command";
 export * from "./UpdateDimensionCommand";
+export * from "./UpdateFileCommand";
 export * from "./UploadFileCommand";

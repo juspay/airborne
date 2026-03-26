@@ -2,6 +2,42 @@ $version: "2.0"
 
 namespace io.airborne.server
 
+/// Update file request
+structure UpdateFileRequest {
+    /// The file key in the path (e.g., "$file_path@version:$version_number" or "$file_path@tag:$tag")
+    @required
+    @httpLabel
+    file_key: String
+
+    /// New tag to update the file with
+    @required
+    tag: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+
+/// Update file operation
+@http(method: "PATCH", uri: "/api/file/{file_key}")
+@requiresauth
+operation UpdateFile {
+    /// The file key in the path (e.g., "$file_path@version:$version_number" or "$file_path@tag:$tag")
+    input: UpdateFileRequest,
+    output: CreateFileResponse,
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
 /// Create file request
 structure CreateFileRequest {
     /// Path where the file will be stored on sdk
@@ -158,7 +194,7 @@ structure UploadFileRequest {
     @required
     checksum: String
 
-    // Name of the organisation
+    /// Name of the organisation
     @httpHeader("x-organisation")
     @required
     organisation: String

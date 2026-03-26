@@ -86,6 +86,10 @@ import {
   UpdateDimensionCommandOutput,
 } from "./commands/UpdateDimensionCommand";
 import {
+  UpdateFileCommandInput,
+  UpdateFileCommandOutput,
+} from "./commands/UpdateFileCommand";
+import {
   UploadFileCommandInput,
   UploadFileCommandOutput,
 } from "./commands/UploadFileCommand";
@@ -175,6 +179,7 @@ export type ServiceInputTypes =
   | ServeReleaseCommandInput
   | ServeReleaseV2CommandInput
   | UpdateDimensionCommandInput
+  | UpdateFileCommandInput
   | UploadFileCommandInput;
 
 /**
@@ -201,6 +206,7 @@ export type ServiceOutputTypes =
   | ServeReleaseCommandOutput
   | ServeReleaseV2CommandOutput
   | UpdateDimensionCommandOutput
+  | UpdateFileCommandOutput
   | UploadFileCommandOutput;
 
 /**

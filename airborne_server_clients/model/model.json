@@ -1910,6 +1910,9 @@
                     "target": "io.airborne.server#UpdateDimension"
                 },
                 {
+                    "target": "io.airborne.server#UpdateFile"
+                },
+                {
                     "target": "io.airborne.server#UploadFile"
                 }
             ],
@@ -4299,6 +4302,70 @@
                 }
             }
         },
+        "io.airborne.server#UpdateFile": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#UpdateFileRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#CreateFileResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Update file operation",
+                "smithy.api#http": {
+                    "method": "PATCH",
+                    "uri": "/api/file/{file_key}"
+                }
+            }
+        },
+        "io.airborne.server#UpdateFileRequest": {
+            "type": "structure",
+            "members": {
+                "file_key": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "The file key in the path (e.g., \"$file_path@version:$version_number\" or \"$file_path@tag:$tag\")",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "New tag to update the file with",
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Update file request"
+            }
+        },
         "io.airborne.server#UploadFile": {
             "type": "operation",
             "input": {
@@ -4361,6 +4428,7 @@
                 "organisation": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
                         "smithy.api#httpHeader": "x-organisation",
                         "smithy.api#required": {}
                     }
