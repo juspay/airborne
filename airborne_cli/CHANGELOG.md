@@ -2,6 +2,84 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.3.0 - 2026-03-26
+#### Features
+- add platform-specific configuration and improve file processing and update smithy-cli-generator submodule - (823cfe5) - Yash Rajput
+
+- - -
+
+## v0.27.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.27.0 [skip ci] - (75587e4) - Airborne Bot
+
+- - -
+
+## v0.26.1 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.26.1 [skip ci] - (7b0b420) - Airborne Bot
+
+- - -
+
+## v0.26.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.26.0 [skip ci] - (e987bfa) - Airborne Bot
+
+- - -
+
+## v0.25.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.25.0 [skip ci] - (8a22156) - Airborne Bot
+
+- - -
+
+## v0.24.4 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.24.4 [skip ci] - (3398e93) - Airborne Bot
+
+- - -
+
+## v0.24.3 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.24.3 [skip ci] - (bd6d431) - Airborne Bot
+
+- - -
+
+## v0.24.2 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.24.2 [skip ci] - (3c27527) - Airborne Bot
+
+- - -
+
+## v0.24.1 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.24.1 [skip ci] - (c89ac50) - Airborne Bot
+
+- - -
+
+## v0.24.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.24.0 [skip ci] - (d127ca2) - Airborne Bot
+
+- - -
+
+## v0.23.3 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.23.3 [skip ci] - (fea39f7) - Airborne Bot
+
+- - -
+
+## v0.23.2 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.23.2 [skip ci] - (1a6ac61) - Airborne Bot
+
+- - -
+
+## v0.23.1 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.23.1 [skip ci] - (1644fd6) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.2.0 - 2026-02-05
 #### Features
 - add Expo project support in cli - (751a4f5) - Yash Rajput

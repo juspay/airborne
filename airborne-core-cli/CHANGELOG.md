@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_core_cli-v0.3.0 - 2026-03-26
+#### Features
+- add platform-specific configuration and improve file processing and update smithy-cli-generator submodule - (823cfe5) - Yash Rajput
+
+- - -
+
+## v0.27.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.27.0 [skip ci] - (75587e4) - Airborne Bot
+
+- - -
+
+## v0.26.1 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.26.1 [skip ci] - (7b0b420) - Airborne Bot
+
+- - -
+
+## v0.26.0 - 2026-03-26
+#### Miscellaneous Chores
+- **(version)** v0.26.0 [skip ci] - (e987bfa) - Airborne Bot
+
+- - -
+
 ## airborne_core_cli-v0.2.5 - 2026-03-09
 #### Bug Fixes
 - update cli - (7a9f6ff) - Yash Rajput

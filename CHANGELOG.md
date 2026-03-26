@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.28.0 - 2026-03-26
+### Package updates
+- airborne_server_clients bumped to airborne_server_clients-v0.3.0
+- airborne_core_cli bumped to airborne_core_cli-v0.3.0
+- airborne_cli bumped to airborne_cli-v0.3.0
+### Global changes
+#### Features
+- add platform-specific configuration and improve file processing and update smithy-cli-generator submodule - (823cfe5) - Yash Rajput
+
+- - -
+
 ## v0.27.0 - 1970-01-01
 ### Package updates
 - airborne_sdk_android bumped to airborne_sdk_android-v0.1.0
