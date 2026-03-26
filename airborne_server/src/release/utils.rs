@@ -35,16 +35,35 @@ use crate::{
     release::types::*,
     run_blocking, types as airborne_types,
     types::{ABError, AppState},
+    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
     utils::db::{
-        models::FileEntry,
-        schema::hyperotaserver::files::{
-            app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id,
-            table as files_table, tag as file_dsl_tag, version as file_dsl_version,
+        models::{FileEntry, PackageGroupsEntry},
+        schema::hyperotaserver::{
+            files::{
+                app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id,
+                table as files_table, tag as file_dsl_tag, version as file_dsl_version,
+            },
+            package_groups::{
+                app_id as package_group_app_id, id as pkg_group_id,
+                is_primary as package_group_is_primary, org_id as package_group_org_id,
+                table as package_groups_table,
+            },
         },
         DbPool,
     },
-    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
 };
+
+/// Parses a sub-package key in the format "groupid@version"
+/// Returns (group_id, version) if valid, or None if parsing fails
+pub fn parse_sub_package_key(spec: &str) -> Option<(uuid::Uuid, i32)> {
+    if let Some((group_id_str, version_str)) = spec.split_once('@') {
+        let group_id = uuid::Uuid::parse_str(group_id_str).ok()?;
+        let version = version_str.parse::<i32>().ok()?;
+        Some((group_id, version))
+    } else {
+        None
+    }
+}
 
 pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<Vec<String>> {
     opt_obj.as_ref().and_then(|doc| {
@@ -79,6 +98,11 @@ pub fn extract_file_from_configs(opt_obj: &Option<Document>, key: &str) -> Optio
     extract_string_from_configs(opt_obj, key)
 }
 
+/// Extracts sub_packages from configs - returns array of "groupid@version" strings
+pub fn extract_sub_packages_from_configs(opt_obj: &Option<Document>) -> Option<Vec<String>> {
+    extract_files_from_configs(opt_obj, "sub_packages")
+}
+
 pub fn extract_integer_from_configs<T>(opt_obj: &Option<Document>, key: &str) -> T
 where
     T: Default + From<i64> + From<u32>,
@@ -97,7 +121,7 @@ where
         .unwrap_or_default()
 }
 
-pub fn extract_files_from_experiment(
+pub fn extract_vector_from_experiment(
     experimental_variant: &Option<&Variant>,
     key: &str,
 ) -> Vec<String> {
@@ -480,6 +504,7 @@ pub async fn build_overrides(
     let imp_from_configs = extract_files_from_configs(&config_document, "package.important");
     let lazy_from_configs = extract_files_from_configs(&config_document, "package.lazy");
     let resources_from_configs = extract_files_from_configs(&config_document, "resources");
+    let sub_packages_from_configs = extract_sub_packages_from_configs(&config_document);
 
     // If you give me package_id -> I'll expect you to provide me complete important and lazy splits
     // If you just want to PATCH the important or lazy blocks -> DO NOT provide me the package_id
@@ -518,11 +543,19 @@ pub async fn build_overrides(
 
             run_blocking!({
                 let mut conn = pool.get()?;
+                let primary_group: PackageGroupsEntry = package_groups_table
+                    .filter(package_group_org_id.eq(&org))
+                    .filter(package_group_app_id.eq(&app))
+                    .filter(package_group_is_primary.eq(true))
+                    .select(PackageGroupsEntry::as_select())
+                    .first::<PackageGroupsEntry>(&mut conn)?;
+
                 packages_dsl::packages_v2
                     .filter(
                         packages_dsl::org_id
                             .eq(&org)
-                            .and(packages_dsl::app_id.eq(&app)),
+                            .and(packages_dsl::app_id.eq(&app))
+                            .and(packages_dsl::package_group_id.eq(&primary_group.id)),
                     )
                     .order_by(packages_dsl::version.desc())
                     .select(packages_dsl::version)
@@ -565,20 +598,117 @@ pub async fn build_overrides(
         })?
     };
 
-    // check any resources don't overlap with important or lazy
+    // Determine final sub_packages - from request or fallback to config
+    // We need to fetch sub-packages BEFORE validating important/lazy files
+    // because those files can come from sub-packages too
+    let final_sub_packages: Option<Vec<String>> = if req.sub_packages.is_some() {
+        req.sub_packages.clone()
+    } else {
+        sub_packages_from_configs
+    };
+
+    // Fetch and validate sub-packages from non-primary groups
+    let sub_packages_data: Vec<PackageV2Entry> = if let Some(ref sub_pkgs) = final_sub_packages {
+        let pool = state.db_pool.clone();
+        let org = organisation.clone();
+        let app = application.clone();
+
+        // Parse all sub_package keys first
+        let parsed_sub_packages: Vec<(uuid::Uuid, i32)> = sub_pkgs
+            .iter()
+            .filter_map(|spec| parse_sub_package_key(spec))
+            .collect();
+
+        if parsed_sub_packages.len() != sub_pkgs.len() {
+            return Err(ABError::BadRequest(
+                "Invalid sub_package format. Expected format: 'groupid@version'".to_string(),
+            ));
+        }
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            let mut sub_packages_entries: Vec<PackageV2Entry> = Vec::new();
+
+            for (group_id, version) in &parsed_sub_packages {
+                // Fetch the package directly using package_group_id
+                let sub_pkg = packages_dsl::packages_v2
+                    .filter(
+                        packages_dsl::org_id
+                            .eq(&org)
+                            .and(packages_dsl::app_id.eq(&app))
+                            .and(packages_dsl::package_group_id.eq(group_id))
+                            .and(packages_dsl::version.eq(*version)),
+                    )
+                    .select(PackageV2Entry::as_select())
+                    .first::<PackageV2Entry>(&mut conn)
+                    .map_err(|_| {
+                        ABError::NotFound(format!(
+                            "Sub-package version {} not found in group {}",
+                            version, group_id
+                        ))
+                    })?;
+
+                // Verify the group is non-primary
+                let group: PackageGroupsEntry = package_groups_table
+                    .filter(pkg_group_id.eq(group_id))
+                    .select(PackageGroupsEntry::as_select())
+                    .first::<PackageGroupsEntry>(&mut conn)
+                    .map_err(|_| {
+                        ABError::NotFound(format!("Package group {} not found", group_id))
+                    })?;
+
+                if group.is_primary {
+                    return Err(ABError::BadRequest(format!(
+                        "Sub-package group {} is a primary group. Sub-packages must come from non-primary groups.",
+                        group_id
+                    )));
+                }
+
+                // Ensure the sub-package doesn't have an index (sub-packages from non-primary groups shouldn't have index)
+                if sub_pkg.index.is_some() {
+                    return Err(ABError::BadRequest(format!(
+                        "Sub-package {}@{} has an index file. Sub-packages should not have index files.",
+                        group_id, version
+                    )));
+                }
+
+                sub_packages_entries.push(sub_pkg);
+            }
+
+            Ok(sub_packages_entries)
+        })?
+    } else {
+        vec![]
+    };
+
+    // Collect all files from sub-packages
+    let sub_package_file_keys: Vec<String> = sub_packages_data
+        .iter()
+        .flat_map(|pkg| pkg.files.iter().filter_map(|f| f.clone()))
+        .collect();
+
+    // Build a combined set of all valid files (primary package + sub-packages)
+    let all_package_files: HashSet<String> = package_data
+        .files
+        .iter()
+        .filter_map(|f| f.clone())
+        .chain(sub_package_file_keys.iter().cloned())
+        .collect();
+
+    // check any resources don't overlap with important or lazy (checks against all package files)
     let check_resource_duplicacy = |resources: &Vec<String>| -> bool {
         for resource in resources {
-            if package_data.files.contains(&Some(resource.clone())) {
+            if all_package_files.contains(resource) {
                 return true;
             }
         }
         false
     };
 
-    // check if a file group exists in package  -> returns (exists, file_that_does_not_exist)
-    let check_file_group_exists_in_package = |file_paths: &Vec<String>| -> (bool, Option<String>) {
+    // check if a file group exists in package (primary or sub-packages) -> returns (exists, file_that_does_not_exist)
+    let check_file_group_exists_in_packages = |file_paths: &Vec<String>| -> (bool, Option<String>) {
         for file_path in file_paths {
-            if !package_data.files.contains(&Some(file_path.clone())) {
+            if !all_package_files.contains(file_path) {
                 return (false, Some(file_path.clone()));
             }
         }
@@ -602,12 +732,11 @@ pub async fn build_overrides(
 
             if let Some(req_imp) = &package_req.important {
                 let (exists, file_that_does_not_exist) =
-                    check_file_group_exists_in_package(req_imp);
+                    check_file_group_exists_in_packages(req_imp);
                 if !exists {
                     return Err(ABError::BadRequest(format!(
-                        "Important file '{}' not found in package {}",
+                        "Important file '{}' not found in package or sub-packages",
                         file_that_does_not_exist.unwrap_or_default(),
-                        pkg_version
                     )));
                 }
                 f_imp = Some(req_imp.clone());
@@ -615,12 +744,11 @@ pub async fn build_overrides(
 
             if let Some(req_lazy) = &package_req.lazy {
                 let (exists, file_that_does_not_exist) =
-                    check_file_group_exists_in_package(req_lazy);
+                    check_file_group_exists_in_packages(req_lazy);
                 if !exists {
                     return Err(ABError::BadRequest(format!(
-                        "Lazy file '{}' not found in package {}",
+                        "Lazy file '{}' not found in package or sub-packages",
                         file_that_does_not_exist.unwrap_or_default(),
-                        pkg_version
                     )));
                 }
                 f_lazy = Some(req_lazy.clone());
@@ -684,12 +812,18 @@ pub async fn build_overrides(
         )
     );
 
+    // Primary package must have an index
+    let primary_index = package_data.index.clone().ok_or_else(|| {
+        ABError::InternalServerError("Primary package must have an index file".to_string())
+    })?;
+
     let combined_files = package_data
         .files
         .iter()
         .filter_map(|f| f.as_ref().cloned())
         .chain(final_resources.clone().unwrap_or_default())
-        .chain(vec![package_data.index.clone()])
+        .chain(vec![primary_index.clone()])
+        .chain(sub_package_file_keys.clone())
         .collect::<Vec<String>>();
 
     let files = get_files_by_file_keys_async(
@@ -713,6 +847,10 @@ pub async fn build_overrides(
     control_overrides.insert(
         "package.version".to_string(),
         Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
+    );
+    control_overrides.insert(
+        "package.group_id".to_string(),
+        Document::String(package_data.package_group_id.to_string()),
     );
 
     let put_config_props_in_experiment = |properties: &BTreeMap<String, Document>,
@@ -796,7 +934,11 @@ pub async fn build_overrides(
     );
     experimental_overrides.insert(
         "package.index".to_string(),
-        Document::String(package_data.index.clone()),
+        Document::String(primary_index.clone()),
+    );
+    experimental_overrides.insert(
+        "package.group_id".to_string(),
+        Document::String(package_data.package_group_id.to_string()),
     );
 
     if let Some(ref properties) = final_properties {
@@ -822,6 +964,13 @@ pub async fn build_overrides(
         let res_docs: Vec<Document> = resources.iter().cloned().map(Document::String).collect();
         experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
     }
+    if let Some(ref sub_pkgs) = final_sub_packages {
+        let sub_pkg_docs: Vec<Document> = sub_pkgs.iter().cloned().map(Document::String).collect();
+        experimental_overrides.insert("sub_packages".to_string(), Document::Array(sub_pkg_docs));
+    } else {
+        // Always include sub_packages key even if empty
+        experimental_overrides.insert("sub_packages".to_string(), Document::Array(vec![]));
+    }
 
     info!("Control overrides: {:?}", control_overrides);
     info!("Experimental overrides: {:?}", experimental_overrides);
@@ -839,6 +988,7 @@ pub async fn build_overrides(
         final_properties,
         control_overrides,
         experimental_overrides,
+        sub_packages: final_sub_packages.unwrap_or_default(),
     })
 }
 
