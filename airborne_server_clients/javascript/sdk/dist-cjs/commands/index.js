@@ -21,4 +21,5 @@ tslib_1.__exportStar(require("./RequestOrganisationCommand"), exports);
 tslib_1.__exportStar(require("./ServeReleaseCommand"), exports);
 tslib_1.__exportStar(require("./ServeReleaseV2Command"), exports);
 tslib_1.__exportStar(require("./UpdateDimensionCommand"), exports);
+tslib_1.__exportStar(require("./UpdateFileCommand"), exports);
 tslib_1.__exportStar(require("./UploadFileCommand"), exports);

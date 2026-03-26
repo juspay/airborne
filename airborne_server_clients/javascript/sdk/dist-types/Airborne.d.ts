@@ -19,6 +19,7 @@ import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } fro
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "./commands/ServeReleaseV2Command";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "./commands/UpdateDimensionCommand";
+import { UpdateFileCommandInput, UpdateFileCommandOutput } from "./commands/UpdateFileCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "./commands/UploadFileCommand";
 import { HttpHandlerOptions as __HttpHandlerOptions } from "@smithy/types";
 export interface Airborne {
@@ -144,6 +145,12 @@ export interface Airborne {
     updateDimension(args: UpdateDimensionCommandInput, options?: __HttpHandlerOptions): Promise<UpdateDimensionCommandOutput>;
     updateDimension(args: UpdateDimensionCommandInput, cb: (err: any, data?: UpdateDimensionCommandOutput) => void): void;
     updateDimension(args: UpdateDimensionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdateDimensionCommandOutput) => void): void;
+    /**
+     * @see {@link UpdateFileCommand}
+     */
+    updateFile(args: UpdateFileCommandInput, options?: __HttpHandlerOptions): Promise<UpdateFileCommandOutput>;
+    updateFile(args: UpdateFileCommandInput, cb: (err: any, data?: UpdateFileCommandOutput) => void): void;
+    updateFile(args: UpdateFileCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdateFileCommandOutput) => void): void;
     /**
      * @see {@link UploadFileCommand}
      */

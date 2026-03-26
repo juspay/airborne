@@ -80,6 +80,10 @@ import {
   UpdateDimensionCommandOutput,
 } from "../commands/UpdateDimensionCommand";
 import {
+  UpdateFileCommandInput,
+  UpdateFileCommandOutput,
+} from "../commands/UpdateFileCommand";
+import {
   UploadFileCommandInput,
   UploadFileCommandOutput,
 } from "../commands/UploadFileCommand";
@@ -615,6 +619,31 @@ export const se_UpdateDimensionCommand = async(
 }
 
 /**
+ * serializeAws_restJson1UpdateFileCommand
+ */
+export const se_UpdateFileCommand = async(
+  input: UpdateFileCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file/{file_key}");
+  b.p('file_key', () => input.file_key!, '{file_key}', false)
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'tag': [],
+  }));
+  b.m("PATCH")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1UploadFileCommand
  */
 export const se_UploadFileCommand = async(
@@ -1117,6 +1146,36 @@ export const de_UpdateDimensionCommand = async(
     'mandatory': __expectBoolean,
     'position': __expectInt32,
     'schema': _ => de_Document(_, context),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1UpdateFileCommand
+ */
+export const de_UpdateFileCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<UpdateFileCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'checksum': __expectString,
+    'created_at': __expectString,
+    'file_path': __expectString,
+    'id': __expectString,
+    'metadata': _ => de_Document(_, context),
+    'size': __expectInt32,
+    'status': __expectString,
+    'tag': __expectString,
+    'url': __expectString,
+    'version': __expectInt32,
   });
   Object.assign(contents, doc);
   return contents;

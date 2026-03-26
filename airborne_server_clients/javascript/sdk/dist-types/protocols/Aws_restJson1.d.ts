@@ -18,6 +18,7 @@ import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } fro
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "../commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "../commands/ServeReleaseV2Command";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "../commands/UpdateDimensionCommand";
+import { UpdateFileCommandInput, UpdateFileCommandOutput } from "../commands/UpdateFileCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "../commands/UploadFileCommand";
 import { HttpRequest as __HttpRequest, HttpResponse as __HttpResponse } from "@smithy/protocol-http";
 import { SerdeContext as __SerdeContext } from "@smithy/types";
@@ -102,6 +103,10 @@ export declare const se_ServeReleaseV2Command: (input: ServeReleaseV2CommandInpu
  */
 export declare const se_UpdateDimensionCommand: (input: UpdateDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1UpdateFileCommand
+ */
+export declare const se_UpdateFileCommand: (input: UpdateFileCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1UploadFileCommand
  */
 export declare const se_UploadFileCommand: (input: UploadFileCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -185,6 +190,10 @@ export declare const de_ServeReleaseV2Command: (output: __HttpResponse, context:
  * deserializeAws_restJson1UpdateDimensionCommand
  */
 export declare const de_UpdateDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateDimensionCommandOutput>;
+/**
+ * deserializeAws_restJson1UpdateFileCommand
+ */
+export declare const de_UpdateFileCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateFileCommandOutput>;
 /**
  * deserializeAws_restJson1UploadFileCommand
  */
