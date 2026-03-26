@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.2.0 - 2026-03-26
+#### Features
+- download remaining old lazy splits on new release failure or timeout - (555ff3e) - Yash Rajput
+
+- - -
+
 ## airborne_sdk_ios-v0.1.5 - 2026-03-13
 #### Bug Fixes
 - start app immediately after packages download instead of waiting for boot timeout - (90164b6) - Yash Rajput
