@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.17.1 - 2026-03-27
+#### Bug Fixes
+- update ios sdk version - (9805945) - Yash Rajput
+
+- - -
+
 ## airborne_server-v0.17.0 - 2026-03-09
 #### Features
 - use master key for symmetric encryption/decryption of secrets - (5995d62) - yuvrajjsingh0
