@@ -2,15 +2,15 @@
 
 extension AppDelegate: AirborneDelegate {
     
-    func getNamespace() -> String {
+    func namespace() -> String {
         return "<application/namespace-name>"
     }
     
-    func getBundle() -> Bundle {
+    func bundle() -> Bundle {
         return Bundle.main
     }
     
-    func getDimensions() -> [String : String] {
+    func dimensions() -> [String : String] {
         // Add custom dimensions for targeting, e.g.:
         // return ["app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""]
         return [:]
