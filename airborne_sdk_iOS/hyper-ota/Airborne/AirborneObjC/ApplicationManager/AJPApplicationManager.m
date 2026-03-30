@@ -43,6 +43,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 @interface AJPApplicationManager() {
     BOOL _bootTimeoutOccurred;
+    BOOL _releaseConfigTimeoutOccurred;
     DownloadStatus _importantPackageDownloadStatus;
     DownloadStatus _lazyPackageDownloadStatus;
     DownloadStatus _resourceDownloadStatus;
@@ -461,6 +462,19 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     [self.stateLock unlock];
 }
 
+- (BOOL)isReleaseConfigTimeoutOccurred {
+    [self.stateLock lock];
+    BOOL occurred = _releaseConfigTimeoutOccurred;
+    [self.stateLock unlock];
+    return occurred;
+}
+
+- (void)setReleaseConfigTimeoutOccurred{
+    [self.stateLock lock];
+    _releaseConfigTimeoutOccurred = YES;
+    [self.stateLock unlock];
+}
+
 - (DownloadStatus)importantPackageDownloadStatus {
     [self.stateLock lock];
     DownloadStatus status = _importantPackageDownloadStatus;
@@ -609,7 +623,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (AJPDownloadResult*) getCurrentResult {
     AJPApplicationManifest* manifest = [self getCurrentApplicationManifest];
-    if(self.releaseConfigDownloadStatus == DOWNLOADING) {
+     if(self.releaseConfigDownloadStatus == DOWNLOADING) {
         return [[AJPDownloadResult alloc] initWithManifest:manifest result:@"RELEASE_CONFIG_TIMEDOUT" error:nil];
     } else if(self.releaseConfigDownloadStatus == FAILED) {
         return [[AJPDownloadResult alloc] initWithManifest:manifest result:@"ERROR" error:[self sanitizedError:self.releaseConfigError]];
@@ -729,7 +743,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             [self updateConfig:manifest.config];
             [self tryDownloadingUpdate];
         } else {
-            self.releaseConfigDownloadStatus = FAILED;
+            if(![error.domain isEqualToString:@"release_config_timeout"]){
+                self.releaseConfigDownloadStatus = FAILED;
+            }
             self.releaseConfigError = [self sanitizedError:error.localizedDescription];
             self.resourceDownloadStatus = COMPLETED;
             self.importantPackageDownloadStatus = COMPLETED;
@@ -913,6 +929,30 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     });
 }
 
+- (void)startReleaseConfigTimeoutTimer {
+    __weak AJPApplicationManager* weakSelf = self;
+    NSNumber *releaseConfigTimeout = [self getReleaseConfigTimeout];
+    if (releaseConfigTimeout == nil) {
+        return;
+    }
+    
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)([releaseConfigTimeout intValue] * NSEC_PER_MSEC)),
+                   dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        AJPApplicationManager *strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+        
+        [strongSelf setReleaseConfigTimeoutOccurred];
+        [strongSelf.tracker trackInfo:@"release_config_timeout"
+                                value:[@{@"timeout": releaseConfigTimeout} mutableCopy]];
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_TIMEOUT_NOTIFICATION
+                                                            object:nil
+                                                            userInfo:@{}];
+    });
+}
+
 - (void)cleanUpUnwantedFiles {
     if(isFirstRunAfterAppLaunch) {
         isFirstRunAfterAppLaunch = NO;
@@ -987,9 +1027,35 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 # pragma mark - Manifest
 
 - (void)fetchReleaseConfigWithCompletionHandler:(AJPReleaseConfigCompletionHandler)completionHandler {
-        
+
+    __weak AJPApplicationManager* weakSelf = self;
+    __block id timeoutObserver = nil;
+    __block NSURLSessionDataTask *manifestDataTask = nil;
+
+    timeoutObserver = [NSNotificationCenter.defaultCenter addObserverForName:RELEASE_CONFIG_TIMEOUT_NOTIFICATION
+                                                                            object:nil
+                                                                            queue:[NSOperationQueue new]
+                                                                            usingBlock:^(NSNotification * _Nonnull note) {
+
+        __strong AJPApplicationManager *strongSelf = weakSelf;
+        if (!strongSelf) return;
+
+        if (manifestDataTask) {
+            [manifestDataTask cancel];
+        }
+
+        NSError *timeoutError = [NSError errorWithDomain:@"release_config_timeout"
+                                                   code:408
+                                               userInfo:@{NSLocalizedDescriptionKey: @"Release config timeout"}];
+
+        [[NSNotificationCenter defaultCenter] removeObserver:timeoutObserver];
+
+        completionHandler(nil, timeoutError);
+    }];
+
+    [self startReleaseConfigTimeoutTimer];
+
     NSURL *manifestUrl = [NSURL URLWithString:self.releaseConfigURL];
-    
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:manifestUrl];
     [request setHTTPMethod:@"GET"];
     // Add headers
@@ -1012,7 +1078,13 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
     NSURLSession *session = [NSURLSession sharedSession];
     NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970] * 1000;
-    NSURLSessionDataTask* manifestDataTask = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+    manifestDataTask = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+        
+        [[NSNotificationCenter defaultCenter] removeObserver:timeoutObserver];
+
+        if ([self isReleaseConfigTimeoutOccurred]) {
+            return;
+        }
 
         NSInteger statusCode = [self getResponseCodeFromNSURLResponse:response];
         NSMutableDictionary<NSString*,id>* logData = [NSMutableDictionary dictionary];

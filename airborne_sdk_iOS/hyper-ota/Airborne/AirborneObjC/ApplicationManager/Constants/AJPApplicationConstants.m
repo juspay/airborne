@@ -29,6 +29,7 @@ NSString *const APP_TEMP_RESOURCES_DATA_FILE_NAME = @"app-resources-temp.dat";
 NSString *const BOOT_TIMEOUT_NOTIFICATION = @"AJPBootTimeoutNotification";
 NSString *const PACKAGE_RESOURCE_NOTIFICATION = @"AJPPackageResourceNotification";
 NSString *const RELEASE_CONFIG_NOTIFICATION = @"AJPReleaseConfigNotification";
+NSString *const RELEASE_CONFIG_TIMEOUT_NOTIFICATION = @"AJPReleaseConfigTimeoutNotification";
 NSString *const LAZY_PACKAGE_NOTIFICATION = @"AJPLazyPackageNotification";
 
 NSString *const APPL_MANAGER_SUB_CAT = @"hyperota";
