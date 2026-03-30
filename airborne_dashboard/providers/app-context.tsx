@@ -37,7 +37,12 @@ type AppContextType = {
 
 interface Configuration {
   google_signin_enabled: boolean;
+  enabled_oidc_idps?: string[];
   organisation_creation_disabled: boolean;
+  authn_provider?: "keycloak" | "oidc" | "okta" | "auth0";
+  oidc_login_enabled?: boolean;
+  password_login_enabled?: boolean;
+  registration_enabled?: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);

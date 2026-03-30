@@ -21,6 +21,7 @@ mod file;
 mod middleware;
 mod organisation;
 mod package;
+mod provider;
 mod release;
 mod token;
 mod types;
@@ -44,10 +45,12 @@ use log::info;
 use serde_json::json;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
+    str::FromStr,
     sync::Arc,
 };
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
+use url::Url;
 use utils::{db, transaction_manager::start_cleanup_job};
 
 use crate::{
@@ -56,6 +59,7 @@ use crate::{
         auth::Auth,
         request::{req_id_header_mw, WithRequestId},
     },
+    provider::authn::build_authn_provider,
     utils::{
         interceptor::CookieIntercept,
         migrations::{
@@ -142,26 +146,110 @@ async fn main() -> std::io::Result<()> {
     info!("Creating db pool");
     let pool = db::establish_pool(&app_config).await;
 
-    let secret = app_config.keycloak_secret.clone();
     let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
 
     let cac_url = app_config.superposition_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
 
+    let trim_trailing_slash = |value: &str| value.trim_end_matches('/').to_string();
+    let normalize_external_base_url = |value: &str| {
+        let trimmed = trim_trailing_slash(value);
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            trimmed
+        } else {
+            format!("http://{trimmed}")
+        }
+    };
+    let authn_provider_kind = types::AuthnProviderKind::from_str(&app_config.authn_provider)
+        .expect("AUTHN_PROVIDER must be one of: keycloak, oidc, okta, auth0");
+    let issuer = app_config
+        .oidc_issuer_url
+        .clone()
+        .expect("OIDC_ISSUER_URL must be set");
+    let external_issuer = app_config
+        .oidc_external_issuer_url
+        .clone()
+        .unwrap_or_else(|| issuer.clone());
+    let authn_issuer_url = trim_trailing_slash(&issuer);
+    let authn_external_issuer_url = normalize_external_base_url(&external_issuer);
+    let authn_client_id = app_config
+        .oidc_client_id
+        .clone()
+        .expect("OIDC_CLIENT_ID must be set");
+    let authn_client_secret = app_config
+        .oidc_client_secret
+        .clone()
+        .expect("OIDC_CLIENT_SECRET must be set");
+    let auth_admin_client_id = app_config
+        .auth_admin_client_id
+        .clone()
+        .expect("AUTH_ADMIN_CLIENT_ID must be set");
+    let auth_admin_client_secret = app_config
+        .auth_admin_client_secret
+        .clone()
+        .expect("AUTH_ADMIN_CLIENT_SECRET must be set");
+    let auth_admin_token_url = app_config
+        .auth_admin_token_url
+        .clone()
+        .expect("AUTH_ADMIN_TOKEN_URL must be set");
+    let auth_admin_audience = app_config.auth_admin_audience.clone();
+    let auth_admin_scopes = app_config.auth_admin_scopes.clone();
+    let auth_admin_issuer = app_config
+        .auth_admin_issuer
+        .clone()
+        .expect("AUTH_ADMIN_ISSUER must be set");
+
+    // AuthZ continues to use Keycloak admin APIs. Derive Keycloak base URL + realm from
+    // AUTH_ADMIN_ISSUER, which must point to a Keycloak realm issuer URL.
+    let auth_admin_issuer = trim_trailing_slash(&auth_admin_issuer);
+    let parsed_issuer =
+        Url::parse(&auth_admin_issuer).expect("AUTH_ADMIN_ISSUER must be a valid absolute URL");
+    let path_segments: Vec<&str> = parsed_issuer
+        .path_segments()
+        .map(|segments| segments.filter(|segment| !segment.is_empty()).collect())
+        .unwrap_or_default();
+    let realms_index = path_segments
+        .iter()
+        .position(|segment| *segment == "realms")
+        .expect(
+            "AUTH_ADMIN_ISSUER must contain '/realms/{realm}' for Keycloak-backed authorization",
+        );
+    let realm = path_segments
+        .get(realms_index + 1)
+        .expect("AUTH_ADMIN_ISSUER must include a realm segment after '/realms'")
+        .to_string();
+    let mut keycloak_base = format!(
+        "{}://{}",
+        parsed_issuer.scheme(),
+        parsed_issuer
+            .host_str()
+            .expect("AUTH_ADMIN_ISSUER must include a host")
+    );
+    if let Some(port) = parsed_issuer.port() {
+        keycloak_base.push_str(&format!(":{port}"));
+    }
+    if realms_index > 0 {
+        keycloak_base.push('/');
+        keycloak_base.push_str(&path_segments[..realms_index].join("/"));
+    }
+    let keycloak_url = trim_trailing_slash(&keycloak_base);
+
     let env = types::Environment {
         public_url: app_config.public_endpoint.clone(),
-        keycloak_url: app_config.keycloak_url.clone(),
-        keycloak_external_url: app_config.keycloak_external_url.clone(),
-        keycloak_public_key: format!(
-            "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
-            app_config.keycloak_public_key
-        ),
-        client_id: app_config.keycloak_client_id.clone(),
-        secret: secret.clone(),
-        realm: app_config.keycloak_realm.clone(),
+        authn_issuer_url,
+        authn_external_issuer_url,
+        authn_client_id: authn_client_id.clone(),
+        authn_client_secret: authn_client_secret.clone(),
+        auth_admin_client_id,
+        auth_admin_client_secret,
+        auth_admin_token_url,
+        auth_admin_audience,
+        auth_admin_scopes,
+        keycloak_url,
+        realm,
         bucket_name: app_config.aws_bucket.clone(),
         superposition_org_id: app_config.superposition_org_id.clone(),
-        enable_google_signin: app_config.enable_google_signin,
+        enabled_oidc_idps: app_config.enabled_oidc_idps.clone(),
         organisation_creation_disabled: app_config.organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone().unwrap_or_default(),
         cloudfront_distribution_id: app_config.cloudfront_distribution_id.clone(),
@@ -236,6 +324,7 @@ async fn main() -> std::io::Result<()> {
 
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
+        authn_provider: build_authn_provider(authn_provider_kind),
         db_pool: pool,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,

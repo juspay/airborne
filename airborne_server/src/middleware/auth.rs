@@ -26,10 +26,7 @@ use futures::future::LocalBoxFuture;
 use keycloak::{KeycloakAdmin, KeycloakAdminToken};
 use reqwest::Client;
 
-use crate::{
-    types::AppState,
-    utils::keycloak::{decode_jwt_token, get_token},
-};
+use crate::{types::AppState, utils::keycloak::get_token};
 
 use crate::types::{ABError, Result as ABResult};
 
@@ -73,7 +70,13 @@ pub struct AccessLevel {
 
 #[derive(Clone, Debug)]
 pub struct AuthResponse {
-    pub sub: String,
+    pub sub: String, // Keycloak user id used for AuthZ checks
+    #[allow(dead_code)]
+    pub authn_sub: String,
+    #[allow(dead_code)]
+    pub authn_iss: Option<String>,
+    #[allow(dead_code)]
+    pub authn_email: Option<String>,
     pub admin_token: KeycloakAdminToken, // This is holding token and not admin since admin deos not have clone
     pub organisation: Option<AccessLevel>,
     pub application: Option<AccessLevel>,
@@ -132,13 +135,14 @@ where
         let service = self.service.clone();
 
         Box::pin(async move {
-            let env = match req.app_data::<Data<AppState>>() {
-                Some(val) => val.env.clone(),
+            let app_state = match req.app_data::<Data<AppState>>() {
+                Some(val) => val.clone(),
                 None => {
                     log::error!("app state not set");
                     Err(ABError::InternalServerError("Env not found".to_string()))?
                 }
             };
+            let env = app_state.env.clone();
             let header_value = req.headers().clone();
             let auth_header = header_value.get("Authorization");
             if auth_header.is_none() {
@@ -155,11 +159,10 @@ where
             match token {
                 Ok(token) => match auth {
                     Some(auth) => {
-                        let token_data = decode_jwt_token(
-                            auth,
-                            &env.keycloak_public_key.clone(),
-                            &env.client_id.clone(),
-                        );
+                        let token_data = app_state
+                            .authn_provider
+                            .verify_access_token(app_state.get_ref(), auth)
+                            .await;
                         match token_data {
                             Ok(token_data) => {
                                 let mut organisation = None;
@@ -172,10 +175,24 @@ where
                                     token.clone(),
                                     client,
                                 );
+                                let authn_sub = token_data.claims.sub.clone();
+                                let authn_email = token_data.claims.email.clone();
+
+                                let resolved_user = app_state
+                                    .authn_provider
+                                    .resolve_keycloak_user(
+                                        app_state.get_ref(),
+                                        &token_data.claims,
+                                        &token,
+                                    )
+                                    .await?;
+                                let keycloak_user_id = resolved_user.user_id;
+                                let resolved_username = resolved_user.username;
+
                                 let user_groups: Vec<keycloak::types::GroupRepresentation> = admin
                                     .realm_users_with_user_id_groups_get(
                                         &env.realm.clone(),
-                                        &token_data.claims.sub,
+                                        &keycloak_user_id,
                                         None,
                                         None,
                                         None,
@@ -233,20 +250,15 @@ where
                                 }
 
                                 req.extensions_mut().insert(AuthResponse {
-                                    sub: token_data.claims.sub,
+                                    sub: keycloak_user_id,
+                                    authn_sub,
+                                    authn_iss: token_data.claims.iss.clone(),
+                                    authn_email,
                                     admin_token: token,
                                     organisation,
                                     application,
                                     is_super_admin,
-                                    username: token_data
-                                        .claims
-                                        .preferred_username
-                                        .clone()
-                                        .ok_or_else(|| {
-                                            ABError::Unauthorized(
-                                                "No username in token".to_string(),
-                                            )
-                                        })?,
+                                    username: resolved_username,
                                 });
                                 service.call(req).await
                             }

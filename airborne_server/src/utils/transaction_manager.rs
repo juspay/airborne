@@ -26,6 +26,7 @@ use crate::types as airborne_types;
 use crate::types::{ABError, AppState};
 use crate::utils::db::models::CleanupOutboxEntry;
 use crate::utils::db::schema::hyperotaserver::cleanup_outbox::dsl::cleanup_outbox;
+use crate::utils::keycloak::get_token;
 
 /// Represents a resource in Keycloak that needs to be tracked for transaction management
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,21 +362,9 @@ async fn process_organization_cleanup(
     app_state: &web::Data<AppState>,
     tx_state: &TransactionState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Get an admin client for Keycloak using the token retriever
+    // Get an admin client for Keycloak
     let client = reqwest::Client::new();
-
-    // Create a token retriever
-    let token_retriever =
-        keycloak::KeycloakServiceAccountAdminTokenRetriever::create_with_custom_realm(
-            &app_state.env.client_id,
-            &app_state.env.secret,
-            &app_state.env.realm,
-            client.clone(),
-        );
-
-    // Fetch client level admin token
-    let admin_token = token_retriever
-        .acquire(&app_state.env.keycloak_url)
+    let admin_token = get_token(app_state.env.clone(), client.clone())
         .await
         .map_err(|e| format!("Failed to acquire Keycloak admin token: {}", e))?;
 

@@ -15,20 +15,18 @@
 use crate::{
     middleware::auth::{Auth, AuthResponse},
     organisation::{application::types::Application, Organisation},
+    provider::authn::AuthnTokenClaims,
     types as airborne_types,
     types::{ABError, AppState},
     user::types::*,
-    utils::keycloak::{decode_jwt_token, get_token},
+    utils::keycloak::get_token,
 };
 use actix_web::{
     get, post,
     web::{self, Json, Query},
     HttpRequest, Scope,
 };
-use keycloak::{
-    types::{CredentialRepresentation, UserRepresentation},
-    KeycloakAdmin,
-};
+use keycloak::KeycloakAdmin;
 use log::info;
 use serde_json::json;
 use std::collections::HashMap;
@@ -43,6 +41,56 @@ pub fn add_routes(path: &str) -> Scope {
         .service(get_oauth_url)
         .service(oauth_signup)
         .service(Scope::new("").wrap(Auth).service(get_user))
+}
+
+fn ensure_oidc_login_supported(state: &AppState) -> airborne_types::Result<()> {
+    state.authn_provider.ensure_oidc_login_enabled(state)
+}
+
+fn ensure_password_login_supported(state: &AppState) -> airborne_types::Result<()> {
+    state.authn_provider.ensure_password_login_supported()
+}
+
+fn ensure_signup_supported(state: &AppState) -> airborne_types::Result<()> {
+    state.authn_provider.ensure_signup_supported()
+}
+
+async fn auth_response_from_claims(
+    claims: &AuthnTokenClaims,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<AuthResponse> {
+    let client = reqwest::Client::new();
+    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to get keycloak admin token: {}", e))
+    })?;
+
+    let resolved_user = state
+        .authn_provider
+        .resolve_keycloak_user(state.get_ref(), claims, &admin_token)
+        .await?;
+
+    Ok(AuthResponse {
+        sub: resolved_user.user_id,
+        authn_sub: claims.sub.clone(),
+        authn_iss: claims.iss.clone(),
+        authn_email: claims.email.clone(),
+        admin_token,
+        organisation: None,
+        application: None,
+        is_super_admin: false,
+        username: resolved_user.username,
+    })
+}
+
+async fn auth_response_from_access_token(
+    access_token: &str,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<AuthResponse> {
+    let token_data = state
+        .authn_provider
+        .verify_access_token(state.get_ref(), access_token)
+        .await?;
+    auth_response_from_claims(&token_data.claims, state).await
 }
 
 /*
@@ -67,68 +115,19 @@ async fn create_user(
     req: Json<UserCredentials>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<User>> {
+    ensure_signup_supported(state.get_ref())?;
+    let req = req.into_inner();
     info!("[CREATE_USER] Attempting to create user: {}", req.name);
 
-    // Get Keycloak Admin Token
-    let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client)
-        .await
-        .map_err(|_| ABError::InternalServerError("Failed to get admin token".to_string()))?;
-    info!("[CREATE_USER] Got admin token successfully");
+    let token = state
+        .authn_provider
+        .signup_with_password(state.get_ref(), &req)
+        .await?;
+    let auth_response = auth_response_from_access_token(&token.access_token, state.clone()).await?;
+    let mut user_resp = get_user_impl(auth_response, state).await?;
+    user_resp.user_token = Some(token);
 
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
-
-    //Extract the user name and password
-    let req = req.into_inner();
-
-    // See if there is an API to directly check, rather than getting all users
-    let users = admin
-        .realm_users_get(
-            &realm.clone(),
-            None,
-            None,
-            None,
-            Some(true),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(req.name.clone()),
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch users: {}", e)))?;
-
-    info!("[CREATE_USER] Checking if user already exists");
-    // Reject if user is present in db
-    let exists = users.iter().any(|user| user.id == Some(req.name.clone()));
-    if exists {
-        info!("[CREATE_USER] User {} already exists", req.name);
-        return Err(ABError::BadRequest("User already Exists".to_string()));
-    }
-
-    info!("[CREATE_USER] Creating new user in Keycloak: {}", req.name);
-    // If not present in keycloak create a new user in keycloak
-    let user = UserRepresentation {
-        username: Some(req.name.clone()),
-        credentials: Some(vec![CredentialRepresentation {
-            value: Some(req.password.clone()),
-            temporary: Some(false),
-            type_: Some("password".to_string()),
-            ..Default::default()
-        }]),
-        enabled: Some(true),
-        ..Default::default()
-    };
-    admin.realm_users_post(&realm, user).await?;
-
-    login_implementation(req, state).await
+    Ok(user_resp)
 }
 
 #[post("login")]
@@ -143,71 +142,16 @@ pub async fn login_implementation(
     req: UserCredentials,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<User>> {
-    // Move ENVs to App State
-    let url = state.env.keycloak_url.clone();
-    let client_id = state.env.client_id.clone();
-    let secret = state.env.secret.clone();
-    let realm = state.env.realm.clone();
-
-    let url = format!("{}/realms/{}/protocol/openid-connect/token", url, realm);
-    info!("[LOGIN] Attempting Keycloak login at URL: {}", url);
-
-    // Keycloak login API
-    let client = reqwest::Client::new();
-    let params = [
-        ("client_id", client_id),
-        ("client_secret", secret),
-        ("grant_type", "password".to_string()),
-        ("username", req.name.clone()),
-        ("password", req.password.clone()),
-    ];
-
-    let response = client.post(&url).form(&params).send().await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to send login request: {}", e))
-    })?;
-
-    if response.status().is_success() {
-        let token: UserToken = response
-            .json()
-            .await
-            .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-        let token_data = decode_jwt_token(
-            &token.access_token,
-            &state.env.keycloak_public_key,
-            &state.env.client_id,
-        )?;
-        let admin_token = get_token(state.env.clone(), client).await?;
-        let mut user_resp = get_user_impl(
-            AuthResponse {
-                is_super_admin: false,
-                sub: token_data.claims.sub,
-                admin_token,
-                organisation: None,
-                application: None,
-                username: req.name.clone(),
-            },
-            state,
-        )
+    ensure_password_login_supported(state.get_ref())?;
+    let token = state
+        .authn_provider
+        .login_with_password(state.get_ref(), &req)
         .await?;
+    let auth_response = auth_response_from_access_token(&token.access_token, state.clone()).await?;
+    let mut user_resp = get_user_impl(auth_response, state).await?;
+    user_resp.user_token = Some(token);
 
-        user_resp.user_token = Some(token);
-        return Ok(user_resp);
-    }
-
-    // If response is not successful, extract error message
-    let error_text = response
-        .text()
-        .await
-        .unwrap_or_else(|_| "Unknown error".to_string());
-
-    let login_err: LoginFailure = serde_json::from_str(&error_text).unwrap_or(LoginFailure {
-        error: "Unknown error".to_string(),
-        error_description: error_text.clone(),
-    });
-
-    log::error!("Login failure: {:?}", login_err);
-
-    Err(ABError::Unauthorized(login_err.error_description))
+    Ok(user_resp)
 }
 
 #[get("")]
@@ -335,101 +279,33 @@ async fn get_oauth_url(
     query: Query<OAuthQuery>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<serde_json::Value>> {
-    // Use external URL directly from config
-    if !state.env.enable_google_signin {
-        return Err(ABError::BadRequest(
-            "Google Sign-in is disabled".to_string(),
-        ));
-    }
-    let keycloak_url = &state.env.keycloak_external_url;
-    let realm = &state.env.realm;
-    let client_id = &state.env.client_id;
-
-    let base_url = state.env.public_url.clone();
-    let redirect_uri = format!("{}/oauth/callback", base_url);
-
-    let offline = query.offline.unwrap_or(false);
-    let scope = if offline {
-        "openid offline_access"
-    } else {
-        "openid"
-    };
-
-    let oauth_state = "oauth_login_state".to_string();
-
-    let auth_url = format!(
-        "{}/realms/{}/protocol/openid-connect/auth?client_id={}&response_type=code&scope={}&redirect_uri={}&kc_idp_hint=google&state={}",
-        keycloak_url,
-        realm,
-        client_id,
-        urlencoding::encode(scope),
-        urlencoding::encode(&redirect_uri),
-        oauth_state
-    );
-
-    info!("[OAUTH_URL] Generated OAuth URL: {}", auth_url);
-    info!("[OAUTH_URL] Base URL from request: {}", base_url);
-    info!("[OAUTH_URL] Redirect URI: {}", redirect_uri);
+    ensure_oidc_login_supported(state.get_ref())?;
+    let oauth_url = state
+        .authn_provider
+        .get_oauth_url(
+            state.get_ref(),
+            query.offline.unwrap_or(false),
+            query.idp.as_deref(),
+        )
+        .await?;
+    info!("[OAUTH_URL] Generated OAuth URL: {}", oauth_url.auth_url);
 
     Ok(Json(json!({
-        "auth_url": auth_url,
-        "state": oauth_state
+        "auth_url": oauth_url.auth_url,
+        "state": oauth_url.state
     })))
 }
 
 pub async fn exchange_code_for_token(
     code: &str,
+    oauth_state: Option<&str>,
     _req: &HttpRequest,
     state: &web::Data<AppState>,
 ) -> airborne_types::Result<TokenResponse> {
-    // Use internal URL for backend-to-backend communication
-    let url = format!(
-        "{}/realms/{}/protocol/openid-connect/token",
-        state.env.keycloak_url, // Use internal URL for token exchange
-        state.env.realm
-    );
-
-    // Get redirect URI from request
-    let base_url = state.env.public_url.clone();
-    let redirect_uri = format!("{}/oauth/callback", base_url);
-
-    let params = [
-        ("client_id", state.env.client_id.clone()),
-        ("client_secret", state.env.secret.clone()),
-        ("grant_type", "authorization_code".to_string()),
-        ("code", code.to_string()),
-        ("redirect_uri", redirect_uri.to_string()),
-    ];
-
-    info!("[EXCHANGE_CODE] Exchanging code for token");
-    info!("[EXCHANGE_CODE] URL: {}", url);
-    info!("[EXCHANGE_CODE] Redirect URI: {}", redirect_uri);
-
-    let client = reqwest::Client::new();
-    let response = client
-        .post(&url)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .form(&params)
-        .send()
+    state
+        .authn_provider
+        .exchange_code_for_token(state.get_ref(), code, oauth_state)
         .await
-        .map_err(|e| {
-            info!("[EXCHANGE_CODE] Request failed: {}", e);
-            ABError::InternalServerError(e.to_string())
-        })?;
-
-    if response.status().is_success() {
-        response.json::<TokenResponse>().await.map_err(|e| {
-            info!("[EXCHANGE_CODE] Failed to parse token response: {}", e);
-            ABError::InternalServerError(format!("Failed to parse token response: {}", e))
-        })
-    } else {
-        let error_text = response.text().await.unwrap_or_default();
-        info!("[EXCHANGE_CODE] Token exchange failed: {}", error_text);
-        Err(ABError::Unauthorized(format!(
-            "Token exchange failed: {}",
-            error_text
-        )))
-    }
 }
 
 #[post("oauth/login")]
@@ -438,57 +314,33 @@ async fn oauth_login(
     json_req: Json<OAuthLoginRequest>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<User>> {
-    if !state.env.enable_google_signin {
-        return Err(ABError::BadRequest(
-            "Google Sign-in is disabled".to_string(),
-        ));
-    }
+    ensure_oidc_login_supported(state.get_ref())?;
     info!("[OAUTH_LOGIN] Processing OAuth login with code");
 
     let oauth_req = json_req.into_inner();
 
-    let token_response = match exchange_code_for_token(&oauth_req.code, &req, &state).await {
-        Ok(response) => response,
-        Err(e) => {
-            info!("[OAUTH_LOGIN] Token exchange failed: {:?}", e);
-            return Err(e);
-        }
-    };
+    let token_response =
+        match exchange_code_for_token(&oauth_req.code, oauth_req.state.as_deref(), &req, &state)
+            .await
+        {
+            Ok(response) => response,
+            Err(e) => {
+                info!("[OAUTH_LOGIN] Token exchange failed: {:?}", e);
+                return Err(e);
+            }
+        };
 
     // Decode the access token to get user info
-    let token_data = decode_jwt_token(
-        &token_response.access_token,
-        &state.env.keycloak_public_key,
-        &state.env.client_id,
-    )
-    .map_err(|e| {
-        info!("[OAUTH_LOGIN] Token decode failed: {:?}", e);
-        ABError::BadRequest("Invalid token".to_string())
-    })?;
-
-    // Get admin token for user operations
-    let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
-        info!("[OAUTH_LOGIN] Failed to get admin token: {}", e);
-        ABError::InternalServerError(format!("Failed to get admin token: {}", e))
-    })?;
-
-    let mut user_resp = get_user_impl(
-        AuthResponse {
-            sub: token_data.claims.sub.clone(),
-            is_super_admin: false,
-            admin_token,
-            organisation: None,
-            application: None,
-            username: token_data
-                .claims
-                .preferred_username
-                .clone()
-                .ok_or_else(|| ABError::Unauthorized("No email in token".to_string()))?,
-        },
-        state,
-    )
-    .await?;
+    let token_data = state
+        .authn_provider
+        .verify_access_token(state.get_ref(), &token_response.access_token)
+        .await
+        .map_err(|e| {
+            info!("[OAUTH_LOGIN] Token decode failed: {:?}", e);
+            ABError::BadRequest("Invalid token".to_string())
+        })?;
+    let auth_response = auth_response_from_claims(&token_data.claims, state.clone()).await?;
+    let mut user_resp = get_user_impl(auth_response, state).await?;
 
     user_resp.user_token = Some(UserToken {
         access_token: token_response.access_token,
@@ -507,56 +359,32 @@ async fn oauth_signup(
     json_req: Json<OAuthRequest>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<User>> {
-    if !state.env.enable_google_signin {
-        return Err(ABError::BadRequest(
-            "Google Sign-in is disabled".to_string(),
-        ));
-    }
+    ensure_oidc_login_supported(state.get_ref())?;
+    ensure_signup_supported(state.get_ref())?;
     info!("[OAUTH_SIGNUP] Processing OAuth signup with code");
 
     let oauth_req = json_req.into_inner();
 
     // Exchange authorization code for tokens (same as login)
-    let token_response = exchange_code_for_token(&oauth_req.code, &req, &state).await?;
+    let token_response =
+        exchange_code_for_token(&oauth_req.code, oauth_req.state.as_deref(), &req, &state).await?;
 
     // Decode the access token to get user info
-    let token_data = decode_jwt_token(
-        &token_response.access_token,
-        &state.env.keycloak_public_key,
-        &state.env.client_id,
-    )
-    .map_err(|_| ABError::Unauthorized("Invalid token".to_string()))?;
+    let token_data = state
+        .authn_provider
+        .verify_access_token(state.get_ref(), &token_response.access_token)
+        .await
+        .map_err(|_| ABError::Unauthorized("Invalid token".to_string()))?;
 
     info!(
-        "[OAUTH_SIGNUP] Successfully authenticated user via Google OAuth: {}",
+        "[OAUTH_SIGNUP] Successfully authenticated user via OIDC OAuth: {}",
         token_data.claims.sub
     );
 
-    // Get admin token for user operations
-    let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
-        info!("[OAUTH_SIGNUP] Failed to get admin token: {}", e);
-        ABError::InternalServerError(format!("Failed to get admin token: {}", e))
-    })?;
-
-    // For signup, we process it the same way as login since Keycloak handles user creation
-    // The user account is automatically created in Keycloak when they sign in with Google
-    let mut user_resp = get_user_impl(
-        AuthResponse {
-            is_super_admin: false,
-            sub: token_data.claims.sub,
-            admin_token,
-            organisation: None,
-            application: None,
-            username: token_data
-                .claims
-                .preferred_username
-                .clone()
-                .ok_or_else(|| ABError::Unauthorized("No email in token".to_string()))?,
-        },
-        state,
-    )
-    .await?;
+    // For signup, v1 keeps provider-specific behavior and this endpoint is enabled only on
+    // providers that support signup.
+    let auth_response = auth_response_from_claims(&token_data.claims, state.clone()).await?;
+    let mut user_resp = get_user_impl(auth_response, state).await?;
 
     user_resp.user_token = Some(UserToken {
         access_token: token_response.access_token,

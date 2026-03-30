@@ -321,8 +321,8 @@ npm run build
 #### Environment Configuration
 ```env
 VITE_API_URL=http://localhost:8000
-VITE_KEYCLOAK_URL=http://localhost:8080
-VITE_CLIENT_ID=your-client-id
+VITE_OIDC_ISSUER_URL=http://localhost:8180/realms/hyperOTA
+VITE_OIDC_CLIENT_ID=your-client-id
 ```
 
 This frontend architecture complements the backend system by providing:

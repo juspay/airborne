@@ -64,4 +64,5 @@ pub struct LoginFailure {
 #[derive(Deserialize)]
 pub struct OAuthQuery {
     pub offline: Option<bool>,
+    pub idp: Option<String>,
 }
