@@ -48,21 +48,25 @@ The Airborne Server acts as the central nervous system for delivering updates to
 
 ## API Reference
 
-All API endpoints are versioned and adhere to RESTful principles. Authentication is primarily handled through JWT Bearer tokens issued by Keycloak. Specific permissions are required for various operations, as detailed below.
+All API endpoints are versioned and adhere to RESTful principles. Authentication is handled through OIDC-compatible JWT Bearer tokens (with Keycloak as default). Specific permissions are required for various operations, as detailed below.
 The base path for all API routes is implicitly defined by the Actix web server configuration in `main.rs`.
 
 ### Authentication
 
-Authentication is managed via Keycloak. Most endpoints require a valid JWT Bearer token.
+Authentication is OIDC-based and provider-configurable (`AUTHN_PROVIDER=keycloak|oidc|okta|auth0`).
+Authorization remains Keycloak-backed through group/role membership checks.
+Most endpoints require a valid JWT Bearer token.
 
 ### User Management
 
 Base Path: `/users` (for creation/login), `/user` (for fetching authenticated user details)
 
 - **`POST /users/create`**: Registers a new user.
+  - Available only when `AUTHN_PROVIDER=keycloak`.
   - **Request Body**: `application/json` - `{ "name": "username", "password": "userpassword" }`
   - **Response**: `application/json` - User details including a JWT token.
 - **`POST /users/login`**: Authenticates an existing user.
+  - Available only when the configured provider supports password login (Keycloak in v1).
   - **Request Body**: `application/json` - `{ "name": "username", "password": "userpassword" }`
   - **Response**: `application/json` - User details including a JWT token.
 - **`GET /user`**: Retrieves details for the currently authenticated user, including their organizational affiliations.
@@ -290,11 +294,17 @@ To set up the development environment for the Airborne Server, you will need the
 
 The server relies on a set of environment variables for its configuration. These are typically managed in a `.env` file at the root of the `airborne_server/` directory. Critical variables include:
 
-- `KEYCLOAK_URL`: URL of the Keycloak instance.
-- `KEYCLOAK_CLIENT_ID`: Client ID for the Airborne Server in Keycloak.
-- `KEYCLOAK_SECRET`: Client secret (typically KMS encrypted for production).
-- `KEYCLOAK_REALM`: Keycloak realm name.
-- `KEYCLOAK_PUBLIC_KEY`: Public key for validating JWTs issued by Keycloak.
+- `AUTHN_PROVIDER`: Authentication provider (`keycloak` by default, or `oidc`/`okta`/`auth0`).
+- `OIDC_ISSUER_URL`: OIDC issuer URL.
+- `OIDC_EXTERNAL_ISSUER_URL`: External issuer URL for browser redirects (optional, defaults to `OIDC_ISSUER_URL`).
+- `OIDC_CLIENT_ID`: OIDC client ID.
+- `OIDC_CLIENT_SECRET`: OIDC client secret.
+- `AUTH_ADMIN_CLIENT_ID`: Client ID used for AuthZ/admin API token acquisition.
+- `AUTH_ADMIN_CLIENT_SECRET`: Client secret used for AuthZ/admin API token acquisition.
+- `AUTH_ADMIN_TOKEN_URL`: OAuth token endpoint for admin API access tokens.
+- `AUTH_ADMIN_AUDIENCE`: Optional audience parameter (commonly used for Auth0).
+- `AUTH_ADMIN_SCOPES`: Optional space-separated scopes (commonly used for Okta/Auth0).
+- `AUTH_ADMIN_ISSUER`: Issuer URL used to derive Keycloak AuthZ realm/base URL (`.../realms/<realm>`).
 - `SUPERPOSITION_URL`: URL of the Superposition service.
 - `SUPERPOSITION_ORG_ID`: The organization ID within Superposition used by the server.
 - `AWS_BUCKET`: Name of the S3 bucket for storing package assets.
