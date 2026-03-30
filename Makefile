@@ -485,8 +485,8 @@ run: kill db superposition keycloak-db keycloak localstack
 		echo "$(YELLOW)📝 Encryption disabled (plaintext mode)$(NC)"; \
 	fi; \
 	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) superposition-init; \
-	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) keycloak-init; \
 	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) localstack-init; \
+	USE_ENCRYPTED_SECRETS=$$ENCRYPTION_MODE $(MAKE) keycloak-init; \
 	trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \

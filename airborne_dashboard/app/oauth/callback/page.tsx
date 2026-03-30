@@ -31,13 +31,16 @@ type OAuthPatResponse = {
 export default function OAuthCallback() {
   const params = useSearchParams();
   const router = useRouter();
-  const { setToken, setUser, token, org, app, setOrg, setApp, loading } = useApp();
+  const { setToken, setUser, token, org, app, setOrg, setApp, loading, config } = useApp();
   const processedCode = useRef(false);
 
   useEffect(() => {
     const code = params.get("code");
     const state = params.get("state") || undefined;
-    const oauthAction = localStorage.getItem("oauthAction") || "login";
+    const requestedAction = localStorage.getItem("oauthAction") || "login";
+    if (requestedAction === "signup" && !config) return;
+    const oauthAction =
+      requestedAction === "signup" && config?.registration_enabled === false ? "login" : requestedAction;
 
     // Wait for org/app to be loaded only for generate_pat
     if (oauthAction === "generate_pat") {
@@ -88,7 +91,7 @@ export default function OAuthCallback() {
         router.replace("/login");
       }
     })();
-  }, [loading, token, org, app]); // Include all dependencies to re-run when session loads
+  }, [loading, token, org, app, config]); // Include all dependencies to re-run when session loads
 
   return <div className="p-6">Completing sign-in...</div>;
 }

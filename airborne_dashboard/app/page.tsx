@@ -6,8 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Target, Zap, Shield, BarChart3, Users, Globe, ArrowRight, Star, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAppContext } from "@/providers/app-context";
 
 export default function LandingPage() {
+  const { config } = useAppContext();
+  const registrationEnabled = config?.registration_enabled ?? false;
   const features = [
     {
       icon: Target,
@@ -111,9 +114,11 @@ export default function LandingPage() {
             <Button variant="ghost" asChild>
               <Link href="/login">Sign in</Link>
             </Button>
-            <Button asChild>
-              <Link href="/register">Get started</Link>
-            </Button>
+            {registrationEnabled && (
+              <Button asChild>
+                <Link href="/register">Get started</Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -136,12 +141,14 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <Button size="lg" className="h-12 px-8" asChild>
-              <Link href="/register">
-                Start for free
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            {registrationEnabled && (
+              <Button size="lg" className="h-12 px-8" asChild>
+                <Link href="/register">
+                  Start for free
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </section>
@@ -258,12 +265,14 @@ export default function LandingPage() {
             today.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" variant="secondary" className="h-12 px-8" asChild>
-              <Link href="/register">
-                Start free trial
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            {registrationEnabled && (
+              <Button size="lg" variant="secondary" className="h-12 px-8" asChild>
+                <Link href="/register">
+                  Start free trial
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            )}
             <Button
               onClick={() => (window.location.href = "mailto:superposition@juspay.in")}
               size="lg"
