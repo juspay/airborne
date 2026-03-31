@@ -116,7 +116,7 @@ function printColoredJSON(obj, indent = 2) {
 const program = new Command()
   .name("airborne-core-cli")
   .description("Command-line interface for Airborne OTA operations")
-  .version("0.29.1");
+  .version("0.29.2");
 
 program
   .command("CreateApplication")

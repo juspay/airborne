@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.3.1 - 2026-03-31
+#### Bug Fixes
+- release config timeout - (45a164d) - Yash Rajput
+
+- - -
+
+## v0.29.1 - 2026-03-31
+#### Miscellaneous Chores
+- **(version)** v0.29.1 [skip ci] - (e9670ef) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.3.0 - 2026-03-26
 #### Features
 - add downloaded Splits tracking and asset path lookup - (009be46) - yash.rajput.001
