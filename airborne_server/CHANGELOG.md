@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.18.0 - 2026-03-31
+#### Features
+- upgrade superposition sdk to 0.99.2 - (00a4fe9) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.17.1 - 2026-03-27
 #### Bug Fixes
 - update ios sdk version - (9805945) - Yash Rajput
