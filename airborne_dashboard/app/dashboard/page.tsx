@@ -11,14 +11,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 export interface OrganisationsList {
   organisations: { name: string; applications: { application: string; organisation: string }[] }[];
 }
 
+const PAGE_AUTHZ = definePagePermissions({
+  create_application: permission("application", "create", "org"),
+});
+
 export default function DashboardHome() {
   const router = useRouter();
   const { org, app, setOrg, setApp, token, logout, config, user } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
+  const canCreateApplication = permissions.can("create_application");
   const [reqOrgName, setReqOrgName] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -96,8 +104,7 @@ export default function DashboardHome() {
   };
 
   const onCreateApp = async () => {
-    if (isCreatingApp || createAppNameError) return;
-
+    if (createAppNameError || isCreatingApp || !canCreateApplication) return;
     setIsCreatingApp(true);
     try {
       await apiFetch(
@@ -105,11 +112,11 @@ export default function DashboardHome() {
         { method: "POST", body: { application: appName } },
         { token, org, logout }
       );
-      setAppName("");
-      await refreshOrgs();
     } finally {
       setIsCreatingApp(false);
     }
+    setAppName("");
+    await refreshOrgs();
   };
 
   const onRequestOrg = async () => {
@@ -283,20 +290,9 @@ export default function DashboardHome() {
         <h2 className="text-xl font-semibold mb-2">Create your first Application</h2>
         <p className="text-muted-foreground mb-4">Applications group files, packages, and releases.</p>
         <Label htmlFor="appname">Application name</Label>
-        <Input
-          id="appname"
-          value={appName}
-          maxLength={ORG_APP_NAME_MAX_LENGTH}
-          onChange={(e) => setAppName(e.target.value)}
-          className="mb-3"
-        />
-        {appName.length > 0 && createAppNameError ? (
-          <p className="mb-3 text-xs text-destructive">{createAppNameError}</p>
-        ) : (
-          <p className="mb-3 text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
-        )}
-        <Button onClick={onCreateApp} disabled={Boolean(createAppNameError) || isCreatingApp}>
-          {isCreatingApp ? "Creating..." : "Create Application"}
+        <Input id="appname" value={appName} onChange={(e) => setAppName(e.target.value)} className="mb-3" />
+        <Button onClick={onCreateApp} disabled={!appName.trim() || !canCreateApplication}>
+          Create Application
         </Button>
       </div>
     );

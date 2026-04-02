@@ -20,11 +20,18 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Target, ArrowUp, ArrowDown, Users, Settings, ExternalLink } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
-import { hasAppAccess } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_dimensions: permission("dimension", "read", "app"),
+  create_dimension: permission("dimension", "create", "app"),
+  update_dimension: permission("dimension", "update", "app"),
+});
 
 export type Dimension = {
   dimension: string;
@@ -45,7 +52,8 @@ type DimensionFormData = {
 };
 
 export default function DimensionsPage() {
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const { toast } = useToast();
   const params = useParams();
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,6 +67,8 @@ export default function DimensionsPage() {
   });
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [creating, setCreating] = useState(false);
+  const canCreateDimensions = permissions.can("create_dimension");
+  const canUpdateDimensions = permissions.can("update_dimension");
 
   const load = () =>
     apiFetch<any>("/organisations/applications/dimension/list", {}, { token, org, app })
@@ -156,7 +166,7 @@ export default function DimensionsPage() {
           <p className="text-muted-foreground mt-2">Manage targeting dimensions for precise release control</p>
         </div>
 
-        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        {canCreateDimensions && (
           <Dialog
             open={isCreateModalOpen}
             onOpenChange={(open) => {
@@ -326,7 +336,7 @@ export default function DimensionsPage() {
                           size="sm"
                           className="h-4 w-4 p-0"
                           onClick={() => movePriority(d.dimension, Math.max(1, d.position - 1))}
-                          disabled={d.position === 1 || !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))}
+                          disabled={d.position === 1 || !canUpdateDimensions}
                         >
                           <ArrowUp className="h-3 w-3" />
                         </Button>
@@ -335,10 +345,7 @@ export default function DimensionsPage() {
                           size="sm"
                           className="h-4 w-4 p-0"
                           onClick={() => movePriority(d.dimension, d.position + 1)}
-                          disabled={
-                            d.position === dimensions.length - 1 ||
-                            !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))
-                          }
+                          disabled={d.position === dimensions.length - 1 || !canUpdateDimensions}
                         >
                           <ArrowDown className="h-3 w-3" />
                         </Button>

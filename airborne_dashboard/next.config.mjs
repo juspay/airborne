@@ -15,7 +15,7 @@ const nextConfig = {
         destination: `https://airborne.juspay.in/analytics/:path*`,
       },
       {
-        source: "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token)/:path*",
+        source: "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz)/:path*",
         destination: `${backend}/api/:api/:path*`,
       },
       {

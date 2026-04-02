@@ -20,8 +20,9 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { GENERIC_OIDC_PROVIDER, resolveOidcProviders } from "@/lib/oidc-providers";
 import { notFound, useRouter, useSearchParams } from "next/navigation";
-import { hasAppAccess } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 interface PAT {
   client_id: string;
@@ -37,8 +38,15 @@ interface ListResponse {
   data: PAT[];
 }
 
+const PAGE_AUTHZ = definePagePermissions({
+  read_tokens: permission("token", "read", "app"),
+  create_token: permission("token", "create", "app"),
+  delete_token: permission("token", "delete", "app"),
+});
+
 const TokensPage = () => {
-  const { token, org, app, loadingAccess, getAppAccess, getOrgAccess, user, config } = useAppContext();
+  const { token, org, app, user, config } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const router = useRouter();
   const searchParams = useSearchParams();
   const configuredOidcProviders = resolveOidcProviders(config?.enabled_oidc_idps);
@@ -61,12 +69,14 @@ const TokensPage = () => {
   const [tokenToDelete, setTokenToDelete] = useState<string | null>(null);
   const [isOauthLoading, setIsOauthLoading] = useState(false);
   const { toast } = useToast();
+  const canCreateToken = permissions.can("create_token");
+  const canDeleteToken = permissions.can("delete_token");
 
   useEffect(() => {
-    if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app), "admin")) {
+    if (permissions.isReady && !permissions.can("read_tokens")) {
       notFound();
     }
-  }, [loadingAccess]);
+  }, [permissions.isReady, permissions.checks]);
 
   // Handle OAuth callback with client_id and client_secret in URL params
   useEffect(() => {
@@ -266,10 +276,12 @@ const TokensPage = () => {
           <h1 className="text-3xl font-bold text-foreground">Personal Access Tokens</h1>
           <p className="text-muted-foreground mt-2">Manage your personal access tokens for API authentication</p>
         </div>
-        <Button onClick={handleCreateToken} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create New Token
-        </Button>
+        {canCreateToken && (
+          <Button onClick={handleCreateToken} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create New Token
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -301,15 +313,17 @@ const TokensPage = () => {
                       <p>Created: {formatDate(token.created_at)}</p>
                     </div>
                   </div>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDeleteToken(token.client_id)}
-                    className="flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </Button>
+                  {canDeleteToken && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteToken(token.client_id)}
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

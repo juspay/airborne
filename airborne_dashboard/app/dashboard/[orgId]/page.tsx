@@ -22,9 +22,17 @@ import { ORG_APP_NAME_MAX_LENGTH, ORG_APP_NAME_RULE_TEXT, validateOrgAppName } f
 import { useAppContext } from "@/providers/app-context";
 import { OrganisationsList } from "../page";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  create_application: permission("application", "create", "org"),
+});
 
 export default function ApplicationsPage() {
-  const { token, org, logout, getOrgAccess } = useAppContext();
+  const { token, org, logout } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
+  const canCreateApplication = permissions.can("create_application");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -46,8 +54,8 @@ export default function ApplicationsPage() {
   }, [apps, debouncedSearchQuery]);
 
   const handleCreate = async () => {
+    if (!canCreateApplication) return;
     if (isCreatingApp || appNameError) return;
-
     setIsCreatingApp(true);
     try {
       await apiFetch(
@@ -55,12 +63,12 @@ export default function ApplicationsPage() {
         { method: "POST", body: { application: formData.name } },
         { token, org, logout }
       );
-      setIsCreateModalOpen(false);
-      setFormData({ name: "", description: "" });
-      mutate("/organisations");
     } finally {
       setIsCreatingApp(false);
     }
+    setIsCreateModalOpen(false);
+    setFormData({ name: "", description: "" });
+    mutate("/organisations");
   };
 
   return (
@@ -72,7 +80,7 @@ export default function ApplicationsPage() {
           </h1>
           <p className="text-muted-foreground mt-2">Manage your organization, applications, and team members</p>
         </div>
-        {getOrgAccess(org).includes("admin") && (
+        {canCreateApplication && (
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
             <DialogTrigger asChild>
               <Button>

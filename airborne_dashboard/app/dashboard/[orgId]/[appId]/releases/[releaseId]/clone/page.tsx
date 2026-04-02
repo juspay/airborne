@@ -4,12 +4,19 @@ import { notFound, useParams } from "next/navigation";
 import useSWR from "swr";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
-import { hasAppAccess } from "@/lib/utils";
 import { ReleaseBuilder } from "@/components/release";
 import { ApiReleaseData } from "@/types/release";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_release: permission("release", "read", "app"),
+  create_release: permission("release", "create", "app"),
+});
 
 export default function CloneReleasePage() {
-  const { token, org, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
+  const { token, org } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const params = useParams<{ appId: string; releaseId: string }>();
   const releaseId = params.releaseId;
 
@@ -23,7 +30,7 @@ export default function CloneReleasePage() {
     apiFetch<ApiReleaseData>(`/releases/${encodeURIComponent(id)}`, {}, { token: t, org: o, app: a })
   );
 
-  if (loadingAccess) {
+  if (!permissions.isReady) {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
         <p className="text-muted-foreground">Checking access...</p>
@@ -31,7 +38,7 @@ export default function CloneReleasePage() {
     );
   }
 
-  const hasAccess = hasAppAccess(getOrgAccess(org), getAppAccess(org, params.appId), "write");
+  const hasAccess = permissions.can("read_release") && permissions.can("create_release");
 
   if (!hasAccess) {
     notFound();

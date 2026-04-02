@@ -4,7 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ::keycloak::KeycloakAdminToken;
 use async_trait::async_trait;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, TokenData, Validation};
 use log::{debug, warn};
@@ -22,7 +21,6 @@ use crate::{
     types as airborne_types,
     types::{ABError, AppState, AuthnProviderKind, Environment},
     user::types::{LoginFailure, TokenResponse, UserCredentials, UserToken},
-    utils::keycloak::ResolvedKeycloakUser,
 };
 
 pub mod auth0;
@@ -107,8 +105,8 @@ fn rewrite_to_external_endpoint(
 ) -> String {
     let internal = internal_issuer.trim_end_matches('/');
     let external = external_issuer.trim_end_matches('/');
-    if endpoint.starts_with(internal) {
-        format!("{}{}", external, &endpoint[internal.len()..])
+    if let Some(stripped_endpoint) = endpoint.strip_prefix(internal) {
+        format!("{}{}", external, stripped_endpoint)
     } else {
         endpoint.to_string()
     }
@@ -226,6 +224,7 @@ fn build_validation(
     validation.set_audience(&[env.authn_client_id.as_str()]);
     validation.set_issuer(&[metadata.issuer.as_str()]);
     validation.validate_exp = true;
+    validation.leeway = env.authn_clock_skew_secs;
     validation
 }
 
@@ -446,13 +445,6 @@ pub trait AuthNProvider: Send + Sync {
     ) -> airborne_types::Result<TokenData<AuthnTokenClaims>> {
         verify_authn_token(access_token, &state.env).await
     }
-
-    async fn resolve_keycloak_user(
-        &self,
-        state: &AppState,
-        claims: &AuthnTokenClaims,
-        admin_token: &KeycloakAdminToken,
-    ) -> airborne_types::Result<ResolvedKeycloakUser>;
 }
 
 pub fn build_authn_provider(kind: AuthnProviderKind) -> Arc<dyn AuthNProvider> {
