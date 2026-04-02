@@ -36,7 +36,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { notFound, useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import json from "highlight.js/lib/languages/json";
@@ -45,7 +45,16 @@ import { toastWarning } from "@/hooks/use-toast";
 import "highlight.js/styles/vs2015.css";
 import Analytics from "@/components/analytics/Analytics";
 import { Input } from "@/components/ui/input";
-import { hasAppAccess } from "@/lib/utils";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_release: permission("release", "read", "app"),
+  update_release: permission("release", "update", "app"),
+  ramp_release: permission("release", "ramp", "app"),
+  conclude_release: permission("release", "conclude", "app"),
+  discard_release: permission("release", "discard", "app"),
+});
 
 hljs.registerLanguage("json", json);
 
@@ -117,7 +126,8 @@ export default function ReleaseDetailPage() {
   const appId = params.appId;
   const orgId = params.orgId;
 
-  const { token, org, app, setOrg, setApp, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
+  const { token, org, app, setOrg, setApp } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
 
   // Keep context in sync (avoids blank org/app in provider)
   useEffect(() => {
@@ -147,6 +157,9 @@ export default function ReleaseDetailPage() {
   const [isCloning, setIsCloning] = useState(false);
 
   if (isLoading) return <div>Loading...</div>;
+  if (permissions.isReady && !permissions.can("read_release")) {
+    notFound();
+  }
 
   const serveRC: ServeReleaseConfig = toServeReleaseConfig(data);
 
@@ -287,11 +300,16 @@ export default function ReleaseDetailPage() {
     setTimeout(() => setIsCloning(false), 1000);
   };
 
-  const currentTrafficPercentage = release.experiment.traffic_percentage || 0;
+  const currentTrafficPercentage =
+    release.experiment.status != "CONCLUDED" ? release.experiment.traffic_percentage : 100;
   const targetPercentage = 50;
   const affectedUsers = 0;
   const totalDownloads = 0;
   const errorCount = 0;
+  const canUpdateRelease = permissions.can("update_release");
+  const canRampRelease = permissions.can("ramp_release");
+  const canConcludeRelease = permissions.can("conclude_release");
+  const canDiscardRelease = permissions.can("discard_release");
 
   const highlightedCode = hljs.highlight(JSON.stringify(serveRC, null, 2), { language: "json" }).value;
 
@@ -320,143 +338,142 @@ export default function ReleaseDetailPage() {
               <p className="text-muted-foreground">{`Package version ${release.package?.version || "N/A"}`}</p>
             </div>
             <div className="flex gap-2">
-              {!loadingAccess && hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
-                <>
-                  {release.experiment.status === "CREATED" && (
-                    <>
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/${encodeURIComponent(org ?? "")}/${encodeURIComponent(app ?? "")}/releases/${releaseId}/edit`
-                          )
-                        }
-                        size="sm"
-                      >
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit
+              {release.experiment.status === "CREATED" && canUpdateRelease && (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/${encodeURIComponent(org ?? "")}/${encodeURIComponent(app ?? "")}/releases/${releaseId}/edit`
+                    )
+                  }
+                  size="sm"
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+
+              {release.experiment.status === "CREATED" && canDiscardRelease && (
+                <Dialog open={isDiscardDialogOpen} onOpenChange={setIsDiscardDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" disabled={isDiscarding}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Discard
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Discard Release</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to discard this release? This action cannot be undone.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="justify-end gap-2">
+                      <Button variant="outline" onClick={() => setIsDiscardDialogOpen(false)}>
+                        Cancel
                       </Button>
+                      <Button variant="destructive" onClick={handleDiscardRelease} disabled={isDiscarding}>
+                        {isDiscarding ? "Discarding..." : "Discard"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
 
-                      <Dialog open={isDiscardDialogOpen} onOpenChange={setIsDiscardDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" disabled={isDiscarding}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Discard
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Discard Release</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to discard this release? This action cannot be undone.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter className="justify-end gap-2">
-                            <Button variant="outline" onClick={() => setIsDiscardDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={handleDiscardRelease} disabled={isDiscarding}>
-                              {isDiscarding ? "Discarding..." : "Discard"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </>
-                  )}
+              {canUpdateRelease && (
+                <Button variant="outline" onClick={handleCloneRelease} disabled={isCloning} size="sm">
+                  <Copy className="h-4 w-4 mr-2" />
+                  {isCloning ? "Cloning..." : "Clone Release"}
+                </Button>
+              )}
 
-                  <Button variant="outline" onClick={handleCloneRelease} disabled={isCloning} size="sm">
-                    <Copy className="h-4 w-4 mr-2" />
-                    {isCloning ? "Cloning..." : "Clone Release"}
-                  </Button>
-
-                  {(release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") && (
-                    <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" disabled={isRamping}>
-                          <TrendingUp className="h-4 w-4 mr-2" />
+              {(release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") &&
+                canRampRelease && (
+                  <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" disabled={isRamping}>
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        {isRamping ? "Ramping..." : "Ramp"}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Ramp Release</DialogTitle>
+                        <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
+                      </DialogHeader>
+                      <Input
+                        type="number"
+                        value={trafficPct}
+                        min={0}
+                        max={50}
+                        onChange={(e) => setTrafficPct(Number(e.target.value))}
+                        className="mb-4"
+                      />
+                      <DialogFooter className="justify-end gap-2">
+                        <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
                           {isRamping ? "Ramping..." : "Ramp"}
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Ramp Release</DialogTitle>
-                          <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
-                        </DialogHeader>
-                        <Input
-                          type="number"
-                          value={trafficPct}
-                          min={0}
-                          max={50}
-                          onChange={(e) => setTrafficPct(Number(e.target.value))}
-                          className="mb-4"
-                        />
-                        <DialogFooter className="justify-end gap-2">
-                          <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
-                            {isRamping ? "Ramping..." : "Ramp"}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
 
-                  {release.experiment.status === "INPROGRESS" && (
-                    <>
-                      <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button disabled={isConcluding}>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            {isConcluding ? "Concluding..." : "Conclude"}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Conclude Release</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to conclude this release? This will roll out to 100% and finalize
-                              the deployment.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter className="justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
-                              {isConcluding ? "Concluding..." : "Conclude"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button disabled={isReverting}>
-                            <RotateCw className="h-4 w-4 mr-2" />
-                            Revert Release
-                          </Button>
-                        </DialogTrigger>
+              {release.experiment.status === "INPROGRESS" && canConcludeRelease && (
+                <>
+                  <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button disabled={isConcluding}>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        {isConcluding ? "Concluding..." : "Conclude"}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Conclude Release</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to conclude this release? This will roll out to 100% and finalize the
+                          deployment.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter className="justify-end gap-2">
+                        <Button variant="outline" onClick={() => setConcludeDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleConcludeRelease} disabled={isConcluding}>
+                          {isConcluding ? "Concluding..." : "Conclude"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button disabled={isReverting}>
+                        <RotateCw className="h-4 w-4 mr-2" />
+                        Revert Release
+                      </Button>
+                    </DialogTrigger>
 
-                        {/* Dialog content */}
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Confirm Revert</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to revert this release? This action cannot be undone.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsRevertDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={revertRelease} disabled={isReverting}>
-                              {isReverting ? "Reverting..." : "Revert Release"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </>
-                  )}
+                    {/* Dialog content */}
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Confirm Revert</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to revert this release? This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsRevertDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={revertRelease} disabled={isReverting}>
+                          {isReverting ? "Reverting..." : "Revert Release"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </>
               )}
             </div>

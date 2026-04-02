@@ -17,16 +17,13 @@ use std::{
     rc::Rc,
 };
 
+use crate::types::AppState;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     web::Data,
     Error, HttpMessage,
 };
 use futures::future::LocalBoxFuture;
-use keycloak::{KeycloakAdmin, KeycloakAdminToken};
-use reqwest::Client;
-
-use crate::{types::AppState, utils::keycloak::get_token};
 
 use crate::types::{ABError, Result as ABResult};
 
@@ -70,14 +67,13 @@ pub struct AccessLevel {
 
 #[derive(Clone, Debug)]
 pub struct AuthResponse {
-    pub sub: String, // Keycloak user id used for AuthZ checks
+    pub sub: String, // Canonical AuthZ subject (email)
     #[allow(dead_code)]
     pub authn_sub: String,
     #[allow(dead_code)]
     pub authn_iss: Option<String>,
     #[allow(dead_code)]
     pub authn_email: Option<String>,
-    pub admin_token: KeycloakAdminToken, // This is holding token and not admin since admin deos not have clone
     pub organisation: Option<AccessLevel>,
     pub application: Option<AccessLevel>,
     pub is_super_admin: bool,
@@ -93,30 +89,20 @@ pub const OWNER: Access = Access { access: 4 };
 pub const ADMIN: Access = Access { access: 3 };
 pub const WRITE: Access = Access { access: 2 };
 pub const READ: Access = Access { access: 1 };
-pub const ROLES: [&str; 4] = ["owner", "admin", "write", "read"];
 
-pub fn validate_user(access_level: Option<AccessLevel>, access: Access) -> ABResult<String> {
-    if let Some(access_level) = access_level {
-        if access_level.level >= access.access {
-            Ok(access_level.name)
-        } else {
-            Err(ABError::Forbidden("Access Level too low".to_string()))
-        }
-    } else {
-        Err(ABError::BadRequest("Missing header".to_string()))
-    }
+pub fn require_scope_name(access_level: Option<AccessLevel>, scope: &str) -> ABResult<String> {
+    access_level
+        .map(|value| value.name)
+        .ok_or_else(|| ABError::Forbidden(format!("No {} access", scope)))
 }
 
-fn get_access_level(user_groups: &[String], path: &str) -> Option<usize> {
-    static ACCESS_LIST: [&str; 4] = ["owner", "admin", "write", "read"];
-    ACCESS_LIST.iter().enumerate().find_map(|(i, role)| {
-        let full_path = format!("/{}/{}", path, role); // match format of a
-        if user_groups.contains(&full_path) {
-            Some(ACCESS_LIST.len() - i)
-        } else {
-            None
-        }
-    })
+pub fn require_org_and_app(
+    organisation: Option<AccessLevel>,
+    application: Option<AccessLevel>,
+) -> ABResult<(String, String)> {
+    let organisation = require_scope_name(organisation, "organisation")?;
+    let application = require_scope_name(application, "application")?;
+    Ok((organisation, application))
 }
 
 impl<S, B> Service<ServiceRequest> for AuthMiddleware<S>
@@ -142,7 +128,6 @@ where
                     Err(ABError::InternalServerError("Env not found".to_string()))?
                 }
             };
-            let env = app_state.env.clone();
             let header_value = req.headers().clone();
             let auth_header = header_value.get("Authorization");
             if auth_header.is_none() {
@@ -155,119 +140,47 @@ where
                 .and_then(|auth_str| auth_str.strip_prefix("Bearer "));
             let org = org_header.and_then(|org_header| org_header.to_str().ok());
             let app = app_header.and_then(|app_header| app_header.to_str().ok());
-            let token = get_token(env.clone(), Client::new()).await;
-            match token {
-                Ok(token) => match auth {
-                    Some(auth) => {
-                        let token_data = app_state
-                            .authn_provider
-                            .verify_access_token(app_state.get_ref(), auth)
-                            .await;
-                        match token_data {
-                            Ok(token_data) => {
-                                let mut organisation = None;
-                                let mut application = None;
+            match auth {
+                Some(access_token) => {
+                    let token_data = app_state
+                        .authn_provider
+                        .verify_access_token(app_state.get_ref(), access_token)
+                        .await?;
 
-                                // Fetch user groups from Keycloak
-                                let client = reqwest::Client::new();
-                                let admin = KeycloakAdmin::new(
-                                    &env.keycloak_url.clone(),
-                                    token.clone(),
-                                    client,
-                                );
-                                let authn_sub = token_data.claims.sub.clone();
-                                let authn_email = token_data.claims.email.clone();
+                    let authz_subject = app_state
+                        .authz_provider
+                        .subject_from_claims(&token_data.claims)?;
+                    let access_context = app_state
+                        .authz_provider
+                        .access_for_request(app_state.get_ref(), &authz_subject, org, app)
+                        .await?;
 
-                                let resolved_user = app_state
-                                    .authn_provider
-                                    .resolve_keycloak_user(
-                                        app_state.get_ref(),
-                                        &token_data.claims,
-                                        &token,
-                                    )
-                                    .await?;
-                                let keycloak_user_id = resolved_user.user_id;
-                                let resolved_username = resolved_user.username;
-
-                                let user_groups: Vec<keycloak::types::GroupRepresentation> = admin
-                                    .realm_users_with_user_id_groups_get(
-                                        &env.realm.clone(),
-                                        &keycloak_user_id,
-                                        None,
-                                        None,
-                                        None,
-                                        None,
-                                    )
-                                    .await
-                                    .map_err(|e| ABError::Unauthorized(e.to_string()))?;
-
-                                let user_groups: Vec<String> = user_groups
-                                    .iter()
-                                    .filter_map(|group| group.path.clone())
-                                    .collect();
-
-                                // Check super admin status
-                                let is_super_admin =
-                                    user_groups.contains(&"/super_admin".to_string());
-
-                                // Check organization and application access if org header is present
-                                if let Some(org) = org {
-                                    if let Some(app) = app {
-                                        let access = get_access_level(
-                                            &user_groups,
-                                            &format!("{}/{}", org, app),
-                                        );
-                                        match access {
-                                            Some(level) => {
-                                                application = Some(AccessLevel {
-                                                    name: app.to_string(),
-                                                    level: level as u8,
-                                                });
-                                            }
-                                            None => {
-                                                return Err(ABError::Forbidden(
-                                                    "No Access to Application".to_string(),
-                                                )
-                                                .into())
-                                            }
-                                        };
-                                    }
-                                    let access = get_access_level(&user_groups, org);
-                                    match access {
-                                        Some(level) => {
-                                            organisation = Some(AccessLevel {
-                                                name: org.to_string(),
-                                                level: level as u8,
-                                            });
-                                        }
-                                        None => {
-                                            return Err(ABError::Forbidden(
-                                                "No Access to Organisation".to_string(),
-                                            )
-                                            .into());
-                                        }
-                                    };
-                                }
-
-                                req.extensions_mut().insert(AuthResponse {
-                                    sub: keycloak_user_id,
-                                    authn_sub,
-                                    authn_iss: token_data.claims.iss.clone(),
-                                    authn_email,
-                                    admin_token: token,
-                                    organisation,
-                                    application,
-                                    is_super_admin,
-                                    username: resolved_username,
-                                });
-                                service.call(req).await
-                            }
-                            Err(e) => Err(e.into()),
-                        }
+                    if org.is_some() && access_context.organisation.is_none() {
+                        return Err(
+                            ABError::Forbidden("No Access to Organisation".to_string()).into()
+                        );
                     }
-                    None => Err(ABError::Unauthorized("No AdminToken".to_string()).into()),
-                },
-                Err(e) => Err(ABError::Unauthorized(format!("{:?}", e)).into()),
+                    if app.is_some() && access_context.application.is_none() {
+                        return Err(
+                            ABError::Forbidden("No Access to Application".to_string()).into()
+                        );
+                    }
+
+                    req.extensions_mut().insert(AuthResponse {
+                        sub: authz_subject,
+                        authn_sub: token_data.claims.sub.clone(),
+                        authn_iss: token_data.claims.iss.clone(),
+                        authn_email: token_data.claims.email.clone(),
+                        organisation: access_context.organisation,
+                        application: access_context.application,
+                        is_super_admin: access_context.is_super_admin,
+                        username: app_state
+                            .authz_provider
+                            .display_name_from_claims(&token_data.claims),
+                    });
+                    service.call(req).await
+                }
+                None => Err(ABError::Unauthorized("No Authorization token".to_string()).into()),
             }
         })
     }
@@ -276,24 +189,5 @@ where
 impl AccessLevel {
     pub fn is_admin_or_higher(&self) -> bool {
         self.level >= ADMIN.access
-    }
-}
-
-pub async fn validate_required_access(
-    auth: &AuthResponse,
-    required_level: u8,
-    operation: &str,
-) -> ABResult<()> {
-    if let Some(access) = &auth.organisation {
-        if access.level >= required_level {
-            Ok(())
-        } else {
-            Err(ABError::Forbidden(format!(
-                "Insufficient permissions for {}",
-                operation
-            )))
-        }
-    } else {
-        Err(ABError::Forbidden("No organisation access".to_string()))
     }
 }

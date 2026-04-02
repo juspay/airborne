@@ -54,10 +54,16 @@ export default function RegisterPage() {
     }
     setIsLoading(true);
     try {
-      // API expects {name,password}; use email as username
+      // For Keycloak signup, send profile fields and use email as username.
       const res = await apiFetch<any>("/users/create", {
         method: "POST",
-        body: { name: formData.email, password: formData.password },
+        body: {
+          name: formData.email,
+          password: formData.password,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+        },
       });
       const token = res?.user_token?.access_token || "";
       setToken(token);

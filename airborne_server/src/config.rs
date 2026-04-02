@@ -45,10 +45,14 @@ pub struct AppConfig {
 
     // Authentication provider settings
     pub authn_provider: String,
+    pub authz_provider: String,
     pub oidc_issuer_url: Option<String>,
     pub oidc_external_issuer_url: Option<String>,
     pub oidc_client_id: Option<String>,
     pub oidc_client_secret: Option<String>,
+    pub oidc_clock_skew_secs: u64,
+    pub authz_bootstrap_super_admins: Option<String>,
+    pub authz_casbin_auto_load_secs: Option<u64>,
     pub auth_admin_client_id: Option<String>,
     pub auth_admin_client_secret: Option<String>,
     pub auth_admin_token_url: Option<String>,
@@ -178,10 +182,16 @@ impl AppConfig {
 
             // Authentication provider settings
             authn_provider: get_env("AUTHN_PROVIDER", Some("keycloak"))?,
+            authz_provider: get_env("AUTHZ_PROVIDER", Some("casbin"))?,
             oidc_issuer_url: get_optional("OIDC_ISSUER_URL"),
             oidc_external_issuer_url: get_optional("OIDC_EXTERNAL_ISSUER_URL"),
             oidc_client_id: get_optional("OIDC_CLIENT_ID"),
             oidc_client_secret: get_optional_secret("OIDC_CLIENT_SECRET")?,
+            oidc_clock_skew_secs: parse_env("OIDC_CLOCK_SKEW_SECS", 60),
+            authz_bootstrap_super_admins: get_optional("AUTHZ_BOOTSTRAP_SUPER_ADMINS"),
+            authz_casbin_auto_load_secs: env::var("AUTHZ_CASBIN_AUTOLOAD_SECS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok()),
             auth_admin_client_id: get_optional("AUTH_ADMIN_CLIENT_ID"),
             auth_admin_client_secret: get_optional_secret("AUTH_ADMIN_CLIENT_SECRET")?,
             auth_admin_token_url: get_optional("AUTH_ADMIN_TOKEN_URL"),

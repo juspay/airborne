@@ -28,8 +28,7 @@ use superposition_sdk::Client;
 use thiserror::Error;
 
 use crate::{
-    organisation::{application::types::OrgAppError, types::OrgError},
-    provider::authn::AuthNProvider,
+    provider::{authn::AuthNProvider, authz::AuthZProvider},
     utils::{db, migrations::SuperpositionDefaultConfig},
 };
 
@@ -37,6 +36,7 @@ use crate::{
 pub struct AppState {
     pub env: Environment,
     pub authn_provider: Arc<dyn AuthNProvider>,
+    pub authz_provider: Arc<dyn AuthZProvider>,
     pub db_pool: db::DbPool,
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
@@ -53,6 +53,7 @@ pub struct Environment {
     pub authn_external_issuer_url: String,
     pub authn_client_id: String,
     pub authn_client_secret: String,
+    pub authn_clock_skew_secs: u64,
     pub auth_admin_client_id: String,
     pub auth_admin_client_secret: String,
     pub auth_admin_token_url: String,
@@ -89,6 +90,34 @@ impl AuthnProviderKind {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthzProviderKind {
+    Casbin,
+}
+
+impl AuthzProviderKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthzProviderKind::Casbin => "casbin",
+        }
+    }
+}
+
+impl std::str::FromStr for AuthzProviderKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value.to_ascii_lowercase().as_str() {
+            "casbin" => Ok(AuthzProviderKind::Casbin),
+            _ => Err(format!(
+                "Unsupported AUTHZ_PROVIDER '{}'. Expected one of: casbin",
+                value
+            )),
+        }
+    }
+}
+
 impl std::str::FromStr for AuthnProviderKind {
     type Err = String;
 
@@ -108,7 +137,7 @@ impl std::str::FromStr for AuthnProviderKind {
 
 #[cfg(test)]
 mod authn_provider_tests {
-    use super::AuthnProviderKind;
+    use super::{AuthnProviderKind, AuthzProviderKind};
     use std::str::FromStr;
 
     #[test]
@@ -129,6 +158,10 @@ mod authn_provider_tests {
             AuthnProviderKind::from_str("AUTH0").expect("auth0 should parse"),
             AuthnProviderKind::Auth0
         );
+        assert_eq!(
+            AuthzProviderKind::from_str("CASBIN").expect("casbin should parse"),
+            AuthzProviderKind::Casbin
+        );
     }
 }
 pub trait AppError: std::error::Error + Send + Sync + 'static {
@@ -147,12 +180,6 @@ pub struct ErrorBody {
 
 #[derive(Debug, Error)]
 pub enum ABError {
-    #[error(transparent)]
-    OrgAppError(#[from] OrgAppError),
-
-    #[error(transparent)]
-    OrgError(#[from] OrgError),
-
     #[error("{0}")]
     NotFound(String),
 
@@ -261,8 +288,6 @@ impl AppError for ABError {
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
             ABError::R2D2Error(_) => ABErrorCodes::InternalServerError.label(),
-            ABError::OrgAppError(org_app_error) => org_app_error.code(),
-            ABError::OrgError(org_error) => org_error.code(),
         }
     }
 
@@ -274,8 +299,6 @@ impl AppError for ABError {
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
             ABError::R2D2Error(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ABError::OrgAppError(org_app_error) => org_app_error.status_code(),
-            ABError::OrgError(org_error) => org_error.status_code(),
         }
     }
 

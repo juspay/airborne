@@ -1,15 +1,18 @@
 "use client";
 
-import { notFound, useParams } from "next/navigation";
-import { useAppContext } from "@/providers/app-context";
-import { hasAppAccess } from "@/lib/utils";
+import { notFound } from "next/navigation";
 import { ReleaseBuilder } from "@/components/release";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  create_release: permission("release", "create", "app"),
+});
 
 export default function CreateReleasePage() {
-  const { org, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
-  const params = useParams<{ appId: string }>();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
 
-  if (loadingAccess) {
+  if (!permissions.isReady) {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
         <p className="text-muted-foreground">Checking access...</p>
@@ -17,7 +20,7 @@ export default function CreateReleasePage() {
     );
   }
 
-  const hasAccess = hasAppAccess(getOrgAccess(org), getAppAccess(org, params.appId), "write");
+  const hasAccess = permissions.can("create_release");
 
   if (!hasAccess) {
     notFound();

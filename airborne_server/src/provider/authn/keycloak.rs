@@ -1,22 +1,33 @@
 use ::keycloak::{
     types::{CredentialRepresentation, UserRepresentation},
-    KeycloakAdmin, KeycloakAdminToken,
+    KeycloakAdmin,
 };
 use async_trait::async_trait;
 use reqwest::Client;
 
 use crate::{
     provider::authn::{
-        build_oauth_url_common, password_login_common, AuthNProvider, AuthnTokenClaims,
-        OAuthUrlResponse,
+        build_oauth_url_common, password_login_common, AuthNProvider, OAuthUrlResponse,
     },
     types as airborne_types,
     types::{ABError, AppState, AuthnProviderKind},
     user::types::{UserCredentials, UserToken},
-    utils::keycloak::{find_user_by_username, get_token, ResolvedKeycloakUser},
+    utils::keycloak::{find_user_by_username, get_token},
 };
 
 pub struct KeycloakAuthNProvider;
+
+fn required_signup_field(
+    value: &Option<String>,
+    field_name: &str,
+) -> airborne_types::Result<String> {
+    let trimmed = value
+        .as_ref()
+        .map(|item| item.trim())
+        .filter(|item| !item.is_empty())
+        .ok_or_else(|| ABError::BadRequest(format!("`{field_name}` is required for signup")))?;
+    Ok(trimmed.to_string())
+}
 
 #[async_trait]
 impl AuthNProvider for KeycloakAuthNProvider {
@@ -109,6 +120,20 @@ impl AuthNProvider for KeycloakAuthNProvider {
         credentials: &UserCredentials,
     ) -> airborne_types::Result<UserToken> {
         self.ensure_signup_supported()?;
+        let first_name = required_signup_field(&credentials.first_name, "first_name")?;
+        let last_name = required_signup_field(&credentials.last_name, "last_name")?;
+        let email = required_signup_field(&credentials.email, "email")?;
+
+        if state.env.keycloak_url.trim().is_empty() {
+            return Err(ABError::InternalServerError(
+                "AUTH_ADMIN_ISSUER must be configured for Keycloak signup".to_string(),
+            ));
+        }
+        if state.env.realm.trim().is_empty() {
+            return Err(ABError::InternalServerError(
+                "Unable to derive Keycloak realm from AUTH_ADMIN_ISSUER".to_string(),
+            ));
+        }
 
         let admin_token = get_token(state.env.clone(), Client::new())
             .await
@@ -124,6 +149,10 @@ impl AuthNProvider for KeycloakAuthNProvider {
 
         let user = UserRepresentation {
             username: Some(credentials.name.clone()),
+            first_name: Some(first_name),
+            last_name: Some(last_name),
+            email: Some(email),
+            email_verified: Some(false),
             credentials: Some(vec![CredentialRepresentation {
                 value: Some(credentials.password.clone()),
                 temporary: Some(false),
@@ -136,23 +165,5 @@ impl AuthNProvider for KeycloakAuthNProvider {
         admin.realm_users_post(&state.env.realm, user).await?;
 
         self.login_with_password(state, credentials).await
-    }
-
-    async fn resolve_keycloak_user(
-        &self,
-        _state: &AppState,
-        claims: &AuthnTokenClaims,
-        _admin_token: &KeycloakAdminToken,
-    ) -> airborne_types::Result<ResolvedKeycloakUser> {
-        let username = claims
-            .preferred_username
-            .clone()
-            .or_else(|| claims.email.clone())
-            .ok_or_else(|| ABError::Unauthorized("No username present in token".to_string()))?;
-
-        Ok(ResolvedKeycloakUser {
-            user_id: claims.sub.clone(),
-            username,
-        })
     }
 }

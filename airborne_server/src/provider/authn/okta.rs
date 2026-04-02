@@ -1,12 +1,6 @@
-use ::keycloak::KeycloakAdminToken;
 use async_trait::async_trait;
 
-use crate::{
-    provider::authn::{oidc::resolve_external_oidc_user, AuthNProvider, AuthnTokenClaims},
-    types as airborne_types,
-    types::{AppState, AuthnProviderKind},
-    utils::keycloak::ResolvedKeycloakUser,
-};
+use crate::{provider::authn::AuthNProvider, types::AuthnProviderKind};
 
 pub struct OktaAuthNProvider;
 
@@ -22,14 +16,5 @@ impl AuthNProvider for OktaAuthNProvider {
 
     fn supports_signup(&self) -> bool {
         false
-    }
-
-    async fn resolve_keycloak_user(
-        &self,
-        state: &AppState,
-        claims: &AuthnTokenClaims,
-        admin_token: &KeycloakAdminToken,
-    ) -> airborne_types::Result<ResolvedKeycloakUser> {
-        resolve_external_oidc_user(state, claims, admin_token).await
     }
 }

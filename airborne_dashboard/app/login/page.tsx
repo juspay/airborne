@@ -27,8 +27,11 @@ export default function LoginPage() {
   const configuredOidcProviders = resolveOidcProviders(config?.enabled_oidc_idps);
   const oidcLoginEnabled =
     config?.oidc_login_enabled ?? config?.google_signin_enabled ?? configuredOidcProviders.length > 0;
-  const oidcProviders =
-    configuredOidcProviders.length > 0 ? configuredOidcProviders : oidcLoginEnabled ? [GENERIC_OIDC_PROVIDER] : [];
+  const oidcProviders = oidcLoginEnabled
+    ? configuredOidcProviders.length > 0
+      ? configuredOidcProviders
+      : [GENERIC_OIDC_PROVIDER]
+    : [];
   const passwordLoginEnabled = config?.password_login_enabled ?? true;
   const registrationEnabled = config?.registration_enabled ?? false;
 

@@ -2,6 +2,28 @@
 
 pub mod hyperotaserver {
     diesel::table! {
+        hyperotaserver.authz_memberships (subject, scope, organisation, application) {
+            subject -> Text,
+            scope -> Text,
+            organisation -> Text,
+            application -> Text,
+            role_key -> Text,
+            role_level -> Int4,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.authz_role_bindings (scope, role_key, resource, action) {
+            scope -> Text,
+            role_key -> Text,
+            resource -> Text,
+            action -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.cleanup_outbox (transaction_id) {
             transaction_id -> Text,
             entity_name -> Text,
@@ -127,6 +149,8 @@ pub mod hyperotaserver {
     }
 
     diesel::allow_tables_to_appear_in_same_query!(
+        authz_memberships,
+        authz_role_bindings,
         cleanup_outbox,
         builds,
         configs,

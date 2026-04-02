@@ -8,19 +8,32 @@ import { ConfigSchemaBuilder } from "@/components/remote-config/config-schema-bu
 import { ConfigPreview } from "@/components/remote-config/config-preview";
 import { Plus, Settings } from "lucide-react";
 import { BackendPropertiesResponse, SchemaField } from "@/types/remote-configs";
-import { hasAppAccess } from "@/lib/utils";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { convertBackendDataToFields } from "@/components/remote-config/utils/helpers";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_schema: permission("property_schema", "read", "app"),
+  update_schema: permission("property_schema", "update", "app"),
+  read_properties: permission("property", "read", "app"),
+});
 
 export default function RemoteConfigsPage() {
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const params = useParams();
   const orgId = params.orgId as string;
   const appId = params.appId as string;
   const [activeTab, setActiveTab] = useState("schema");
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
+  const canEditSchema = permissions.can("update_schema");
+  const canReadSchema = permissions.can("read_schema");
+  const canReadProperties = permissions.can("read_properties");
+  const canView = canReadSchema || canReadProperties;
   const fetchSchema = async () => {
+    if (!canReadSchema) return;
     try {
       console.log(`Fetching schema for org: ${orgId}, app: ${appId}`);
       const data = await apiFetch<BackendPropertiesResponse>(
@@ -42,10 +55,10 @@ export default function RemoteConfigsPage() {
   };
 
   useEffect(() => {
-    if (token && orgId && appId) {
+    if (token && orgId && appId && permissions.isReady && canReadSchema) {
       fetchSchema();
     }
-  }, [token, orgId, appId]);
+  }, [token, orgId, appId, permissions.isReady, canReadSchema]);
 
   const handleSchemaSave = (schemaFields: SchemaField[]) => {
     // Handle successful save if needed
@@ -83,7 +96,7 @@ export default function RemoteConfigsPage() {
         </div>
       </div>
 
-      {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+      {canEditSchema && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="schema" className="flex items-center gap-2">
@@ -114,7 +127,7 @@ export default function RemoteConfigsPage() {
           <TabsContent value="preview">{configSnapshots()}</TabsContent>
         </Tabs>
       )}
-      {!hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && configSnapshots()}
+      {!canEditSchema && canView && configSnapshots()}
     </div>
   );
 }

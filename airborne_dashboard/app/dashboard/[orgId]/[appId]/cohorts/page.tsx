@@ -14,7 +14,18 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { hasAppAccess } from "@/lib/utils";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_dimensions: permission("dimension", "read", "app"),
+  read_cohort: permission("cohort", "read", "app"),
+  update_cohort: permission("cohort", "update", "app"),
+  create_cohort_group: permission("cohort_group", "create", "app"),
+  read_cohort_group: permission("cohort_group", "read", "app"),
+  update_cohort_group: permission("cohort_group", "update", "app"),
+  read_releases: permission("release", "read", "app"),
+});
 
 interface CohortSchema {
   type: string;
@@ -57,8 +68,13 @@ type GroupForm = {
 };
 
 export default function CohortsPage() {
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const { toast } = useToast();
+  const canManageCohorts =
+    permissions.can("update_cohort") ||
+    permissions.can("create_cohort_group") ||
+    permissions.can("update_cohort_group");
 
   // State
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
@@ -415,7 +431,7 @@ export default function CohortsPage() {
                     <CardTitle>Version Checkpoints</CardTitle>
                     <CardDescription>Segment users based on version comparisons</CardDescription>
                   </div>
-                  {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                  {canManageCohorts && (
                     <Button onClick={() => setShowCheckpointForm(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Checkpoint
@@ -433,6 +449,9 @@ export default function CohortsPage() {
                     checkpoints={getCheckpointCohorts()}
                     releases={releases}
                     onAddCheckpoint={() => setShowCheckpointForm(true)}
+                    canManageCohorts={canManageCohorts}
+                    org={org}
+                    app={app}
                   />
                 )}
               </CardContent>
@@ -447,7 +466,7 @@ export default function CohortsPage() {
                     <CardTitle>User Groups</CardTitle>
                     <CardDescription>Segment users based on explicit membership lists</CardDescription>
                   </div>
-                  {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                  {canManageCohorts && (
                     <Button onClick={() => setShowGroupForm(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Group
@@ -468,6 +487,9 @@ export default function CohortsPage() {
                     setPriorityMap={setPriorityMap}
                     onUpdatePriority={handleUpdatePriority}
                     updating={creating === "priority"}
+                    canManageCohorts={canManageCohorts}
+                    org={org}
+                    app={app}
                   />
                 )}
               </CardContent>
@@ -619,17 +641,26 @@ interface CheckpointTimelineProps {
   checkpoints: string[];
   releases: Record<string, Release[]>;
   onAddCheckpoint: () => void;
+  canManageCohorts: boolean;
+  org: string | null;
+  app: string | null;
 }
 
-function CheckpointTimeline({ checkpoints, releases, onAddCheckpoint }: CheckpointTimelineProps) {
-  const { org, app, getAppAccess, getOrgAccess } = useAppContext();
+function CheckpointTimeline({
+  checkpoints,
+  releases,
+  onAddCheckpoint,
+  canManageCohorts,
+  org,
+  app,
+}: CheckpointTimelineProps) {
   if (checkpoints.length === 0) {
     return (
       <div className="text-center py-8">
         <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
         <p className="text-muted-foreground mb-4">No checkpoints created yet</p>
         <p className="text-xs text-muted-foreground mb-4">Checkpoints segment users based on version comparisons</p>
-        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        {canManageCohorts && (
           <Button onClick={onAddCheckpoint} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
             Create First Checkpoint
@@ -650,7 +681,7 @@ function CheckpointTimeline({ checkpoints, releases, onAddCheckpoint }: Checkpoi
       </div>
 
       {/* Add button at the top */}
-      {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+      {canManageCohorts && (
         <div className="relative flex items-start mb-6">
           <Button
             variant="ghost"
@@ -726,6 +757,9 @@ interface GroupAccordionProps {
   setPriorityMap: (map: Record<string, number>) => void;
   onUpdatePriority: () => void;
   updating: boolean;
+  canManageCohorts: boolean;
+  org: string | null;
+  app: string | null;
 }
 
 function GroupAccordion({
@@ -735,11 +769,12 @@ function GroupAccordion({
   setPriorityMap,
   onUpdatePriority,
   updating,
+  canManageCohorts,
+  org,
+  app,
 }: GroupAccordionProps) {
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-
-  const { org, app, getAppAccess, getOrgAccess } = useAppContext();
 
   if (groups.length === 0) {
     return (
@@ -804,7 +839,7 @@ function GroupAccordion({
   return (
     <div className="space-y-4">
       {/* Header with priority info */}
-      {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+      {canManageCohorts && (
         <div className="flex items-center justify-between p-4 bg-muted/50 border rounded-lg">
           <div>
             <h4 className="font-semibold">Group Priority Management</h4>
@@ -830,7 +865,7 @@ function GroupAccordion({
               className={`border rounded-lg transition-all duration-200 ${
                 isDragging ? "opacity-50 scale-98 border-primary" : "hover:border-primary/50"
               }`}
-              draggable
+              draggable={canManageCohorts}
               onDragStart={(e) => handleDragStart(e, group)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, group)}

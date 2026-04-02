@@ -5,10 +5,11 @@ use actix_web::{
     web::{self, Json, Path, ReqData},
     Scope,
 };
+use airborne_authz_macros::authz;
 use log::info;
 
 use crate::{
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{require_org_and_app, AuthResponse},
     organisation::application::dimension::cohort::types::CohortDimensionSchema,
     types as airborne_types,
     types::{ABError, AppState},
@@ -26,6 +27,12 @@ pub fn add_routes() -> Scope {
         .service(update_cohort_priority_api)
 }
 
+#[authz(
+    resource = "cohort",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("")]
 async fn list_cohorts_api(
     cohort_dimension: Path<String>,
@@ -35,17 +42,10 @@ async fn list_cohorts_api(
     let cohort_dimension_id = cohort_dimension.into_inner();
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -79,6 +79,12 @@ async fn list_cohorts_api(
     Ok(Json(cohort_dimension))
 }
 
+#[authz(
+    resource = "cohort",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/checkpoint")]
 async fn create_cohort_checkpoint_api(
     cohort_dimension: Path<String>,
@@ -88,17 +94,10 @@ async fn create_cohort_checkpoint_api(
 ) -> airborne_types::Result<Json<types::CreateCohortDimensionCheckpointOutput>> {
     let cohort_dimension_id = cohort_dimension.into_inner();
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Unauthorized("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -254,6 +253,12 @@ async fn create_cohort_checkpoint_api(
     }))
 }
 
+#[authz(
+    resource = "cohort_group",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/group")]
 async fn create_cohort_group_api(
     cohort_dimension: Path<String>,
@@ -264,17 +269,10 @@ async fn create_cohort_group_api(
     let cohort_dimension_id = cohort_dimension.into_inner();
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -355,6 +353,12 @@ async fn create_cohort_group_api(
     }))
 }
 
+#[authz(
+    resource = "cohort_group",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("/group/priority")]
 async fn get_cohort_priority_api(
     cohort_dimension: Path<String>,
@@ -363,17 +367,10 @@ async fn get_cohort_priority_api(
 ) -> airborne_types::Result<Json<types::GetPriorityOutput>> {
     let cohort_dimension = cohort_dimension.into_inner();
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -428,6 +425,12 @@ async fn get_cohort_priority_api(
     Ok(Json(types::GetPriorityOutput { priority_map }))
 }
 
+#[authz(
+    resource = "cohort_group",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[put("/group/priority")]
 async fn update_cohort_priority_api(
     cohort_dimension: Path<String>,
@@ -438,17 +441,10 @@ async fn update_cohort_priority_api(
     let cohort_dimension_id = cohort_dimension.into_inner();
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
