@@ -1,7 +1,7 @@
 pub mod types;
 
 use crate::{
-    middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ},
+    middleware::auth::{require_org_and_app, Auth, AuthResponse},
     run_blocking,
     token::types::*,
     types as airborne_types,
@@ -18,6 +18,7 @@ use crate::{
         encryption::{decrypt_string, encrypt_string, generate_random_key},
     },
 };
+use airborne_authz_macros::authz;
 
 use actix_web::{
     delete, get, post,
@@ -38,6 +39,12 @@ pub fn add_scopes(path: &str) -> Scope {
     )
 }
 
+#[authz(
+    resource = "token",
+    action = "create",
+    org_roles = ["owner", "admin"],
+    app_roles = ["admin"]
+)]
 #[post("")]
 async fn create_token(
     req: Json<UserCredentials>,
@@ -55,20 +62,17 @@ async fn create_token(
         return Err(ABError::Unauthorized("Username mismatch".to_string()));
     }
 
-    let (org_name, app_name) = match validate_user(auth_response.organisation.clone(), ADMIN) {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), ADMIN)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (org_name, app_name) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let login_credentials = crate::user::types::UserCredentials {
         name: req.name.clone(),
         password: req.password.clone(),
+        first_name: None,
+        last_name: None,
+        email: None,
     };
     let token = state
         .authn_provider
@@ -105,6 +109,12 @@ async fn create_token(
     }))
 }
 
+#[authz(
+    resource = "token",
+    action = "create",
+    org_roles = ["owner", "admin"],
+    app_roles = ["admin"]
+)]
 #[post("/oauth")]
 async fn create_token_oauth(
     req: HttpRequest,
@@ -120,19 +130,10 @@ async fn create_token_oauth(
 
     let auth_response = auth_response.into_inner();
 
-    let (org_name, app_name) = match validate_user(auth_response.organisation.clone(), ADMIN) {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| {
-                log::error!("[CREATE TOKEN OAUTH] Access denied: no application access");
-                ABError::Unauthorized("No Access".to_string())
-            })
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), ADMIN)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (org_name, app_name) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let token_response =
         match exchange_code_for_token(&oauth_req.code, oauth_req.state.as_deref(), &req, &state)
@@ -154,17 +155,11 @@ async fn create_token_oauth(
             ABError::BadRequest("Invalid token".to_string())
         })?;
 
-    let oauth_subject_keycloak = state
-        .authn_provider
-        .resolve_keycloak_user(
-            state.get_ref(),
-            &token_data.claims,
-            &auth_response.admin_token,
-        )
-        .await?
-        .user_id;
+    let oauth_subject = state
+        .authz_provider
+        .subject_from_claims(&token_data.claims)?;
 
-    if oauth_subject_keycloak != auth_response.sub {
+    if oauth_subject != auth_response.sub {
         log::error!("[CREATE TOKEN OAUTH] Subject mismatch");
         return Err(ABError::Unauthorized(
             "OAuth account does not match your logged-in account".to_string(),
@@ -208,6 +203,12 @@ async fn create_token_oauth(
     }))
 }
 
+#[authz(
+    resource = "token",
+    action = "delete",
+    org_roles = ["owner", "admin"],
+    app_roles = ["admin"]
+)]
 #[delete("{client_id}")]
 async fn delete_token(
     client_id: web::Path<uuid::Uuid>,
@@ -215,19 +216,10 @@ async fn delete_token(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<DeleteTokenResponse>> {
     let auth_response = auth_response.into_inner();
-    let (_organisation, _application) =
-        match validate_user(auth_response.organisation.clone(), ADMIN) {
-            Ok(org_name) => auth_response
-                .application
-                .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-                .map(|access| (org_name, access.name)),
-            Err(_) => {
-                validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-                    validate_user(auth_response.application.clone(), ADMIN)
-                        .map(|app_name| (org_name, app_name))
-                })
-            }
-        }?;
+    let (_organisation, _application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
     let pool = state.db_pool.clone();
     run_blocking!({
         let mut conn = pool.get()?;
@@ -243,34 +235,30 @@ async fn delete_token(
     Ok(Json(DeleteTokenResponse { success: true }))
 }
 
+#[authz(
+    resource = "token",
+    action = "read",
+    org_roles = ["owner", "admin"],
+    app_roles = ["admin"]
+)]
 #[get("list")]
 async fn list_tokens(
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ListResponse<Vec<TokenListEntry>>>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), ADMIN)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let result = run_blocking!({
         let mut conn = pool.get()?;
         let results = user_credentials_table
-            .filter(
-                username
-                    .eq(&auth_response.username)
-                    .and(cred_org.eq(&organisation))
-                    .and(cred_app.eq(&application)),
-            )
+            .filter(username.eq(&auth_response.username))
+            .filter(cred_org.eq(&organisation))
+            .filter(cred_app.eq(&application))
             .select((uid, created_at))
             .load::<(uuid::Uuid, DateTime<Utc>)>(&mut conn)
             .map_err(|e| {

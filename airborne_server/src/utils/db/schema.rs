@@ -12,19 +12,6 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
-        hyperotaserver.application_settings (id) {
-            id -> Uuid,
-            version -> Int4,
-            org_id -> Text,
-            app_id -> Text,
-            maven_namespace -> Text,
-            maven_artifact_id -> Text,
-            maven_group_id -> Text,
-            created_at -> Timestamptz,
-        }
-    }
-
-    diesel::table! {
         hyperotaserver.builds (id) {
             id -> Uuid,
             build_version -> Text,
@@ -36,6 +23,28 @@ pub mod hyperotaserver {
             minor_version -> Int4,
             patch_version -> Int4,
             status -> Text,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.authz_memberships (subject, scope, organisation, application) {
+            subject -> Text,
+            scope -> Text,
+            organisation -> Text,
+            application -> Text,
+            role_key -> Text,
+            role_level -> Int4,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.authz_role_bindings (scope, role_key, resource, action) {
+            scope -> Text,
+            role_key -> Text,
+            resource -> Text,
+            action -> Text,
+            created_at -> Timestamptz,
         }
     }
 
@@ -171,9 +180,10 @@ pub mod hyperotaserver {
     }
 
     diesel::allow_tables_to_appear_in_same_query!(
-        application_settings,
-        builds,
+        authz_memberships,
+        authz_role_bindings,
         cleanup_outbox,
+        builds,
         configs,
         files,
         organisation_invites,

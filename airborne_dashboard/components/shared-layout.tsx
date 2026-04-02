@@ -38,7 +38,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Label } from "./ui/label";
 import { OrganisationsList } from "@/app/dashboard/page";
-import { hasAppAccess } from "@/lib/utils";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 interface SharedLayoutProps {
   children: React.ReactNode;
@@ -47,8 +48,16 @@ interface SharedLayoutProps {
 
 type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
 
+const LAYOUT_AUTHZ = definePagePermissions({
+  create_file: permission("file", "create", "app"),
+  create_package: permission("package", "create", "app"),
+  create_release: permission("release", "create", "app"),
+  read_tokens: permission("token", "read", "app"),
+});
+
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, logout, getOrgAccess, getAppAccess, config } = useAppContext();
+  const { org, app, user, token, logout, config } = useAppContext();
+  const permissions = usePagePermissions(LAYOUT_AUTHZ);
   const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
   const router = useRouter();
@@ -67,6 +76,11 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   const pathname = usePathname();
 
   const appIdPath = useParams().appId as string;
+  const canReadTokens = permissions.can("read_tokens");
+  const canCreateFile = permissions.can("create_file");
+  const canCreatePackage = permissions.can("create_package");
+  const canCreateRelease = permissions.can("create_release");
+  const canShowCreateMenu = canCreateFile || canCreatePackage || canCreateRelease;
 
   const { data: orgsData } = useSWR(token ? "/organisations" : null, (url) =>
     apiFetch<OrganisationsList>(url, {}, { token })
@@ -164,7 +178,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           icon: Users2,
           label: "Users",
         },
-        ...(hasAppAccess(getOrgAccess(org), getAppAccess(org, app), "admin")
+        ...(canReadTokens
           ? [
               {
                 href: `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/token`,
@@ -287,7 +301,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
               {user?.name || user?.user_id || "GUEST"}
             </Badge>
             <ThemeToggle />
-            {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+            {canShowCreateMenu && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" className="gap-2" disabled={!org || !app}>
@@ -297,11 +311,11 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem disabled={!org || !app} onClick={() => setCreateFileOpen(true)}>
+                  <DropdownMenuItem disabled={!org || !app || !canCreateFile} onClick={() => setCreateFileOpen(true)}>
                     <FileText className="mr-2 h-4 w-4" />
                     Create File
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild disabled={!org || !app}>
+                  <DropdownMenuItem asChild disabled={!org || !app || !canCreatePackage}>
                     <Link
                       href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
                     >
@@ -309,7 +323,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                       Create Package
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild disabled={!org || !app}>
+                  <DropdownMenuItem asChild disabled={!org || !app || !canCreateRelease}>
                     <Link
                       href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
                     >

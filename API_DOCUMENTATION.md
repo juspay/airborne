@@ -17,6 +17,8 @@ x-organisation: <organisation_name>
 x-application: <application_name>
 ```
 
+AuthZ subject resolution is email-based. Tokens missing an email claim are rejected on protected routes.
+
 ---
 
 ## 1. Authentication Endpoints
@@ -147,9 +149,21 @@ Registration is supported only when `AUTHN_PROVIDER=keycloak`; otherwise this en
     "password": {
       "type": "string",
       "description": "User password"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "User first name (required for Keycloak signup)"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "User last name (required for Keycloak signup)"
+    },
+    "email": {
+      "type": "string",
+      "description": "User email (required for Keycloak signup)"
     }
   },
-  "required": ["name", "password"]
+  "required": ["name", "password", "first_name", "last_name", "email"]
 }
 ```
 
@@ -547,7 +561,7 @@ Signup is provider-capability gated and in v1 is supported only for `AUTHN_PROVI
   "properties": {
     "user": {
       "type": "string",
-      "description": "Username to add"
+      "description": "User email to add"
     },
     "access": {
       "type": "string",
@@ -595,7 +609,7 @@ Signup is provider-capability gated and in v1 is supported only for `AUTHN_PROVI
   "properties": {
     "user": {
       "type": "string",
-      "description": "Username to update"
+      "description": "User email to update"
     },
     "access": {
       "type": "string",
@@ -643,7 +657,7 @@ Signup is provider-capability gated and in v1 is supported only for `AUTHN_PROVI
   "properties": {
     "user": {
       "type": "string",
-      "description": "Username to remove"
+      "description": "User email to remove"
     }
   },
   "required": ["user"]
@@ -666,7 +680,7 @@ Signup is provider-capability gated and in v1 is supported only for `AUTHN_PROVI
 ```
 
 ### 4.4 List Organisation Users
-**Endpoint:** `GET /organisation/user`
+**Endpoint:** `GET /organisation/user/list`
 
 **Description:** Lists all users in an organisation with their access levels.
 
@@ -689,11 +703,17 @@ Signup is provider-capability gated and in v1 is supported only for `AUTHN_PROVI
       "items": {
         "type": "object",
         "properties": {
-          "user": {
+          "username": {
             "type": "string"
           },
-          "access": {
-            "type": "string"
+          "email": {
+            "type": ["string", "null"]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

@@ -19,17 +19,14 @@ use crate::{
     types as airborne_types,
     types::{ABError, AppState},
     user::types::*,
-    utils::keycloak::get_token,
 };
 use actix_web::{
     get, post,
     web::{self, Json, Query},
     HttpRequest, Scope,
 };
-use keycloak::KeycloakAdmin;
 use log::info;
 use serde_json::json;
-use std::collections::HashMap;
 
 pub mod types;
 
@@ -59,26 +56,17 @@ async fn auth_response_from_claims(
     claims: &AuthnTokenClaims,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<AuthResponse> {
-    let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
-        ABError::InternalServerError(format!("Failed to get keycloak admin token: {}", e))
-    })?;
-
-    let resolved_user = state
-        .authn_provider
-        .resolve_keycloak_user(state.get_ref(), claims, &admin_token)
-        .await?;
+    let subject = state.authz_provider.subject_from_claims(claims)?;
 
     Ok(AuthResponse {
-        sub: resolved_user.user_id,
+        sub: subject,
         authn_sub: claims.sub.clone(),
         authn_iss: claims.iss.clone(),
         authn_email: claims.email.clone(),
-        admin_token,
         organisation: None,
         application: None,
         is_super_admin: false,
-        username: resolved_user.username,
+        username: state.authz_provider.display_name_from_claims(claims),
     })
 }
 
@@ -168,109 +156,42 @@ async fn get_user_impl(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<User>> {
     info!(
-        "[GET_USER] Fetching user details for ID: {}",
+        "[GET_USER] Fetching user details for subject: {}",
         authresponse.sub
     );
 
-    // Get list of organisations and application in orginisation for each user
-    let user_id: String = authresponse.sub;
+    let summary = state
+        .authz_provider
+        .get_user_access_summary(state.get_ref(), &authresponse.sub)
+        .await?;
 
-    // Get Keycloak Admin Token
-    let admin_token = authresponse.admin_token;
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
-
-    let groups = admin
-        .realm_users_with_user_id_groups_get(&realm, &user_id, None, None, None, None)
-        .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-    info!("[GET_USER] Retrieved {} groups for user", groups.len());
-
-    // Reject if organisation is present in db
-    // If not present in db create entry in db and return success
-    Ok(Json(parse_groups(
-        user_id,
-        authresponse.username,
-        groups
-            .iter()
-            .filter_map(|g| g.path.clone()) // Filters out None values
-            .collect(),
-    )))
-}
-
-fn parse_groups(user_id: String, username: String, groups: Vec<String>) -> User {
-    let mut organisations: HashMap<String, Organisation> = HashMap::new();
-
-    for group in groups.iter() {
-        info!("[PARSE_GROUPS] Processing group: {}", group);
-        let path = group.trim_matches('/'); // Remove leading/trailing slashes
-        let parts: Vec<&str> = path.split('/').collect();
-
-        if path == "super_admin" {
-            continue;
-        }
-
-        let access = parts.last().unwrap().to_string();
-
-        let organisation_name = parts[0].to_string();
-        let application_name = if parts.len() == 3 {
-            Some(parts[1].to_string())
-        } else {
-            None
-        };
-
-        if let Some(app_name) = application_name {
-            // Handle application-level access
-            let organisation =
-                organisations
-                    .entry(organisation_name.clone())
-                    .or_insert(Organisation {
-                        name: organisation_name.clone(),
-                        applications: vec![],
-                        access: vec![],
-                    });
-
-            let app = organisation
+    let mut organisations = summary
+        .organisations
+        .into_iter()
+        .map(|org| Organisation {
+            name: org.name,
+            applications: org
                 .applications
-                .iter_mut()
-                .find(|app| app.application == app_name);
+                .into_iter()
+                .map(|app| Application {
+                    application: app.application,
+                    organisation: app.organisation,
+                    access: app.access,
+                })
+                .collect(),
+            access: org.access,
+        })
+        .collect::<Vec<_>>();
 
-            if let Some(app) = app {
-                app.access.push(access);
-            } else {
-                organisation.applications.push(Application {
-                    application: app_name,
-                    organisation: organisation_name.clone(),
-                    access: vec![access],
-                });
-            }
-        } else {
-            // Handle organisation-level access
-            let organisation =
-                organisations
-                    .entry(organisation_name.clone())
-                    .or_insert(Organisation {
-                        name: organisation_name.clone(),
-                        applications: vec![],
-                        access: vec![],
-                    });
+    organisations.sort_by(|left, right| left.name.cmp(&right.name));
 
-            organisation.access.push(access);
-        }
-    }
-    let is_super_admin = groups.contains(&"/super_admin".to_string());
-    info!(
-        "[PARSE_GROUPS] Finished parsing. Found {} organisations",
-        organisations.len()
-    );
-    User {
-        user_id,
-        username,
-        is_super_admin,
-        organisations: organisations.into_values().collect(),
+    Ok(Json(User {
+        user_id: summary.subject,
+        username: authresponse.username,
+        is_super_admin: summary.is_super_admin,
+        organisations,
         user_token: None,
-    }
+    }))
 }
 
 #[get("oauth/url")]
@@ -288,7 +209,7 @@ async fn get_oauth_url(
             query.idp.as_deref(),
         )
         .await?;
-    info!("[OAUTH_URL] Generated OAuth URL: {}", oauth_url.auth_url);
+    info!("[OAUTH_URL] Generated OAuth URL");
 
     Ok(Json(json!({
         "auth_url": oauth_url.auth_url,

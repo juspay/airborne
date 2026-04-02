@@ -1,22 +1,10 @@
 use crate::{
-    middleware::auth::AuthResponse,
     types as airborne_types,
-    types::{ABError, AppState, Environment},
+    types::{ABError, Environment},
 };
-use actix_web::{web, HttpMessage, HttpRequest};
-use keycloak::{
-    self,
-    types::{GroupRepresentation, UserRepresentation},
-    KeycloakAdmin, KeycloakAdminToken,
-};
+use keycloak::{self, types::UserRepresentation, KeycloakAdmin, KeycloakAdminToken};
 use reqwest::Client;
 use serde::Deserialize;
-
-#[derive(Clone, Debug)]
-pub struct ResolvedKeycloakUser {
-    pub user_id: String,
-    pub username: String,
-}
 
 #[derive(Debug, Deserialize)]
 struct OAuthErrorResponse {
@@ -28,6 +16,22 @@ pub async fn get_token(
     env: Environment,
     client: Client,
 ) -> airborne_types::Result<KeycloakAdminToken> {
+    if env.auth_admin_client_id.trim().is_empty() {
+        return Err(ABError::InternalServerError(
+            "AUTH_ADMIN_CLIENT_ID must be configured for admin API calls".to_string(),
+        ));
+    }
+    if env.auth_admin_client_secret.trim().is_empty() {
+        return Err(ABError::InternalServerError(
+            "AUTH_ADMIN_CLIENT_SECRET must be configured for admin API calls".to_string(),
+        ));
+    }
+    if env.auth_admin_token_url.trim().is_empty() {
+        return Err(ABError::InternalServerError(
+            "AUTH_ADMIN_TOKEN_URL must be configured for admin API calls".to_string(),
+        ));
+    }
+
     let mut params: Vec<(&str, String)> = vec![
         ("grant_type", "client_credentials".to_string()),
         ("client_id", env.auth_admin_client_id.clone()),
@@ -115,119 +119,4 @@ pub async fn find_user_by_username(
             .map(|candidate| candidate.eq_ignore_ascii_case(username))
             .unwrap_or(false)
     }))
-}
-
-pub async fn find_user_by_email(
-    admin: &KeycloakAdmin,
-    realm: &str,
-    email: &str,
-) -> airborne_types::Result<Option<UserRepresentation>> {
-    let users = search_users(admin, realm, email).await?;
-    Ok(users.into_iter().find(|user| {
-        user.email
-            .as_ref()
-            .map(|candidate| candidate.eq_ignore_ascii_case(email))
-            .unwrap_or(false)
-    }))
-}
-
-pub async fn resolve_user_by_email_or_username(
-    admin: &KeycloakAdmin,
-    realm: &str,
-    email: Option<&str>,
-    username: Option<&str>,
-) -> airborne_types::Result<ResolvedKeycloakUser> {
-    let mut user = if let Some(email) = email {
-        find_user_by_email(admin, realm, email).await?
-    } else {
-        None
-    };
-
-    if user.is_none() {
-        if let Some(preferred_username) = username {
-            user = find_user_by_username(admin, realm, preferred_username).await?;
-        }
-    }
-
-    let user = user.ok_or_else(|| {
-        ABError::Unauthorized("Unable to map authenticated user to Keycloak user".to_string())
-    })?;
-
-    let user_id = user.id.clone().ok_or_else(|| {
-        ABError::InternalServerError("Mapped Keycloak user has no user ID".to_string())
-    })?;
-    let resolved_username = user
-        .username
-        .clone()
-        .or_else(|| user.email.clone())
-        .ok_or_else(|| ABError::Unauthorized("Mapped Keycloak user has no username".to_string()))?;
-
-    Ok(ResolvedKeycloakUser {
-        user_id,
-        username: resolved_username,
-    })
-}
-
-pub async fn prepare_user_action(
-    req: &HttpRequest,
-    state: web::Data<AppState>,
-) -> airborne_types::Result<(KeycloakAdmin, String)> {
-    let auth_response = req
-        .extensions()
-        .get::<AuthResponse>()
-        .cloned()
-        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
-
-    let admin_token = auth_response.admin_token.clone();
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
-
-    Ok((admin, realm))
-}
-
-pub async fn find_org_group(
-    admin: &KeycloakAdmin,
-    realm: &str,
-    org_name: &str,
-) -> airborne_types::Result<Option<GroupRepresentation>> {
-    let groups = admin
-        .realm_groups_get(
-            realm,
-            None,
-            Some(true),
-            None,
-            None,
-            None,
-            None,
-            Some(org_name.to_string()),
-        )
-        .await?;
-
-    if groups.is_empty() {
-        return Ok(None);
-    }
-
-    Ok(Some(groups[0].clone()))
-}
-
-pub async fn find_role_subgroup(
-    admin: &KeycloakAdmin,
-    realm: &str,
-    group_id: &str,
-    role: &str,
-) -> airborne_types::Result<Option<GroupRepresentation>> {
-    let subgroups = admin
-        .realm_groups_with_group_id_children_get(realm, group_id, None, None, None, None, None)
-        .await?;
-
-    for group in subgroups {
-        if let Some(name) = &group.name {
-            if name == role {
-                return Ok(Some(group));
-            }
-        }
-    }
-
-    Ok(None)
 }

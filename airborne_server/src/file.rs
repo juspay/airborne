@@ -11,6 +11,7 @@ use actix_web::{
     web::{self, Json, Path, Payload, Query, ReqData},
     Scope,
 };
+use airborne_authz_macros::authz;
 use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
 use diesel::prelude::*;
@@ -26,7 +27,7 @@ use zip::ZipArchive;
 
 use crate::{
     file::types::*,
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{require_org_and_app, AuthResponse},
     run_blocking, types as airborne_types,
     types::{ABError, AppState, WithHeaders},
     utils::{
@@ -70,6 +71,12 @@ fn db_file_to_response(file: &DbFile) -> FileResponse {
     }
 }
 
+#[authz(
+    resource = "file",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("")]
 async fn create_file(
     req: Json<FileRequest>,
@@ -78,17 +85,10 @@ async fn create_file(
 ) -> airborne_types::Result<Json<FileResponse>> {
     let auth_response = auth_response.into_inner();
 
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let (file_size, file_checksum) = match (&req.size, &req.checksum) {
         (Some(provided_size), Some(provided_checksum)) => {
@@ -202,6 +202,12 @@ async fn create_file(
     Ok(Json(db_file_to_response(&created_file)))
 }
 
+#[authz(
+    resource = "file",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/bulk")]
 async fn bulk_create_files(
     req: Json<BulkFileRequest>,
@@ -209,17 +215,10 @@ async fn bulk_create_files(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<BulkFileResponse>>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -334,6 +333,12 @@ async fn bulk_create_files(
 
 /// Retrieves a file by its Key.
 /// The Key is expected to be in the format "$file_path@version:$version_number" or "$file_path@tag:$tag".
+#[authz(
+    resource = "file",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("")]
 async fn get_file(
     query: Query<GetFileQuery>,
@@ -356,17 +361,10 @@ async fn get_file(
     }
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
 
@@ -413,6 +411,12 @@ fn parse_tags(tags: Option<&str>) -> Vec<String> {
     .unwrap_or_default()
 }
 
+#[authz(
+    resource = "file",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("/list")]
 async fn list_files(
     query: Query<FileListQuery>,
@@ -420,17 +424,10 @@ async fn list_files(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<FileListResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let search_term = query.search.clone();
@@ -516,6 +513,12 @@ pub struct ListFileTagsQuery {
     pub search: Option<String>,
 }
 
+#[authz(
+    resource = "file",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("/tags")]
 async fn list_file_tags(
     query: Query<ListFileTagsQuery>,
@@ -523,17 +526,10 @@ async fn list_file_tags(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<crate::types::PaginatedResponse<FileTagInfo>>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let query = query.into_inner();
@@ -611,6 +607,12 @@ async fn list_file_tags(
 
 /// Updates a file's tag
 /// File Key is expected to be in the format "$file_path@version:$version_number" or "$file_path@tag:$tag".
+#[authz(
+    resource = "file",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[patch("/{file_key}")]
 async fn update_file(
     path: Path<String>,
@@ -626,17 +628,10 @@ async fn update_file(
     }
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -681,6 +676,12 @@ async fn update_file(
     Ok(Json(db_file_to_response(&file)))
 }
 
+#[authz(
+    resource = "file",
+    action = "upload",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/upload")]
 async fn upload_file(
     req: actix_web::HttpRequest,
@@ -691,17 +692,10 @@ async fn upload_file(
 ) -> airborne_types::Result<Json<FileResponse>> {
     let auth_response = auth_response.into_inner();
 
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let file_path_str = query.file_path.clone();
     let tag_str = query.tag.clone();
@@ -949,6 +943,12 @@ async fn upload_file(
     }
 }
 
+#[authz(
+    resource = "file",
+    action = "upload",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/bulk_upload")]
 async fn upload_bulk_files(
     MultipartForm(req): MultipartForm<UploadBulkFilesRequest>,
@@ -956,17 +956,10 @@ async fn upload_bulk_files(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<BulkFileUploadResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let tmp_path = std::env::temp_dir().join(format!("bulk-{}.zip", Uuid::new_v4()));
     tokio::fs::copy(req.file.file.path(), &tmp_path)
