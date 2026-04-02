@@ -43,7 +43,8 @@ fn escape_like_pattern(input: &str) -> String {
     resource = "file_group",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("")]
 async fn list_file_groups(

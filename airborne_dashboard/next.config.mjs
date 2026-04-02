@@ -16,6 +16,8 @@ const nextConfig = {
       },
       {
         source: "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz)/:path*",
+        source:
+          "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz|webhook)/:path*",
         destination: `${backend}/api/:api/:path*`,
       },
       {

@@ -140,6 +140,19 @@ async fn create_dimension_api(
                         e
                     ))
                 })?;
+            crate::webhook::fire(
+                state.get_ref(),
+                organisation.clone(),
+                application.clone(),
+                true,
+                "dimension.create",
+                "dimension",
+                Some(dimension.dimension.clone()),
+                Some(serde_json::json!({
+                    "position": dimension.position,
+                    "description": dimension.description.clone(),
+                })),
+            );
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
                 position: dimension.position,
@@ -164,6 +177,19 @@ async fn create_dimension_api(
                 .map_err(|e| {
                     ABError::InternalServerError(format!("Failed to create dimension: {}", e))
                 })?;
+            crate::webhook::fire(
+                state.get_ref(),
+                organisation.clone(),
+                application.clone(),
+                true,
+                "dimension.create",
+                "dimension",
+                Some(dimension.dimension.clone()),
+                Some(serde_json::json!({
+                    "position": dimension.position,
+                    "description": dimension.description.clone(),
+                })),
+            );
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
                 position: dimension.position,
@@ -179,7 +205,8 @@ async fn create_dimension_api(
     resource = "dimension",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn list_dimensions_api(
@@ -308,6 +335,20 @@ async fn update_dimension_api(
             ABError::InternalServerError(format!("Failed to trigger weight recompute: {}", e))
         })?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "dimension.update",
+        "dimension",
+        Some(update_dimension.dimension.clone()),
+        Some(serde_json::json!({
+            "position": update_dimension.position,
+            "change_reason": update_dimension.change_reason.clone(),
+        })),
+    );
+
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
         position: update_dimension.position,
@@ -353,15 +394,28 @@ async fn delete_dimension_api(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
+    let dimension_name = path.into_inner();
+
     state
         .superposition_client
         .delete_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
-        .dimension(path.into_inner())
+        .dimension(dimension_name.clone())
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "dimension.delete",
+        "dimension",
+        Some(dimension_name.clone()),
+        None,
+    );
 
     Ok(Json(()))
 }
@@ -442,14 +496,16 @@ async fn create_release_view_api(
     let pool = state.db_pool.clone();
     let req_name = req.name.clone();
     let req_dimensions = req.dimensions.clone();
+    let db_app = application.clone();
+    let db_org = organisation.clone();
 
     let created_view = run_blocking!({
         let mut conn = pool.get()?;
         let result = diesel::insert_into(release_views::table)
             .values((
                 id.eq(view_id),
-                app_id.eq(application),
-                org_id.eq(organisation),
+                app_id.eq(db_app),
+                org_id.eq(db_org),
                 name.eq(req_name),
                 dimensions_col.eq(req_dimensions),
             ))
@@ -457,6 +513,19 @@ async fn create_release_view_api(
             .map_err(|e| ABError::InternalServerError(format!("DB insert failed: {}", e)))?;
         Ok(result)
     })?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release_view.create",
+        "release_view",
+        Some(created_view.id.to_string()),
+        Some(serde_json::json!({
+            "name": created_view.name.clone(),
+        })),
+    );
 
     Ok(Json(ReleaseView {
         id: created_view.id,
@@ -470,7 +539,8 @@ async fn create_release_view_api(
     resource = "release_view",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/release-view/list")]
 async fn list_release_views_api(
@@ -530,7 +600,8 @@ async fn list_release_views_api(
     resource = "release_view",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/release-view/{view_id}")]
 async fn get_release_view_api(
@@ -652,14 +723,16 @@ async fn update_release_view_api(
     let pool = state.db_pool.clone();
     let req_dimensions = req.dimensions.clone();
     let req_name = req.name.clone();
+    let db_app = application.clone();
+    let db_org = organisation.clone();
 
     let updated_view = run_blocking!({
         let mut conn = pool.get()?;
         let result = diesel::update(
             release_views::table.filter(
                 app_id
-                    .eq(&application)
-                    .and(org_id.eq(&organisation))
+                    .eq(&db_app)
+                    .and(org_id.eq(&db_org))
                     .and(id.eq(&view_id)),
             ),
         )
@@ -674,6 +747,19 @@ async fn update_release_view_api(
         })?;
         Ok(result)
     })?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release_view.update",
+        "release_view",
+        Some(updated_view.id.to_string()),
+        Some(serde_json::json!({
+            "name": updated_view.name.clone(),
+        })),
+    );
 
     Ok(Json(ReleaseView {
         id: updated_view.id,
@@ -706,13 +792,15 @@ async fn delete_release_view_api(
         .map_err(|_| ABError::BadRequest("Invalid view_id format".to_string()))?;
 
     let pool = state.db_pool.clone();
+    let db_app = application.clone();
+    let db_org = organisation.clone();
 
     let deleted_rows = run_blocking!({
         let mut conn = pool.get()?;
         let rows = diesel::delete(
             release_views::table
-                .filter(app_id.eq(&application))
-                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&db_app))
+                .filter(org_id.eq(&db_org))
                 .filter(id.eq(&view_id)),
         )
         .execute(&mut conn)
@@ -723,6 +811,17 @@ async fn delete_release_view_api(
     if deleted_rows == 0 {
         return Err(ABError::NotFound("View not found".to_string()));
     }
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release_view.delete",
+        "release_view",
+        Some(view_id.to_string()),
+        None,
+    );
 
     Ok(Json(DeleteReleaseViewResponse { success: true }))
 }

@@ -30,6 +30,7 @@ mod token;
 mod types;
 mod user;
 mod utils;
+mod webhook;
 
 use actix_web::{
     web::{self, PathConfig, QueryConfig},
@@ -430,7 +431,7 @@ async fn main() -> std::io::Result<()> {
                 superposition_migration.err()
             );
         } else {
-            println!("Superposition migration completed successfully");
+            info!("Superposition migration completed successfully");
         }
     }
 
@@ -483,7 +484,12 @@ async fn main() -> std::io::Result<()> {
                             .wrap(Auth)
                             .service(package::add_routes()),
                     )
-                    .service(release::add_routes("releases")),
+                    .service(release::add_routes("releases"))
+                    .service(
+                        web::scope("/webhook")
+                            .wrap(Auth)
+                            .service(webhook::add_routes()),
+                    ),
             )
     })
     .workers(num_workers)

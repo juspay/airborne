@@ -11,6 +11,7 @@ struct AuthzArgs {
     action: Option<LitStr>,
     allow_org: bool,
     allow_app: bool,
+    webhook_allowed: bool,
     org_roles: Vec<LitStr>,
     app_roles: Vec<LitStr>,
 }
@@ -39,6 +40,7 @@ impl AuthzArgs {
         let mut args = AuthzArgs {
             allow_org: true,
             allow_app: true,
+            webhook_allowed: true,
             ..Default::default()
         };
 
@@ -59,6 +61,11 @@ impl AuthzArgs {
             if meta.path.is_ident("allow_app") {
                 let value: LitBool = meta.value()?.parse()?;
                 args.allow_app = value.value;
+                return Ok(());
+            }
+            if meta.path.is_ident("webhook_allowed") {
+                let value: LitBool = meta.value()?.parse()?;
+                args.webhook_allowed = value.value;
                 return Ok(());
             }
             if meta.path.is_ident("org_roles") {
@@ -141,6 +148,7 @@ pub fn authz(args: TokenStream, item: TokenStream) -> TokenStream {
     let action = args.action.expect("validated above");
     let allow_org = args.allow_org;
     let allow_app = args.allow_app;
+    let webhook_allowed = args.webhook_allowed;
     let org_roles = args.org_roles;
     let app_roles = args.app_roles;
 
@@ -172,6 +180,7 @@ pub fn authz(args: TokenStream, item: TokenStream) -> TokenStream {
                 &[#(#app_roles),*],
                 #allow_org,
                 #allow_app,
+                #webhook_allowed,
             )
         }
 

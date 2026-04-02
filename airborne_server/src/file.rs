@@ -134,6 +134,8 @@ async fn create_file(
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
+    let org_for_hook = organisation.clone();
+    let app_for_hook = application.clone();
 
     let created_file = run_blocking!({
         let mut conn = pool.get()?;
@@ -198,6 +200,23 @@ async fn create_file(
         })?;
         Ok(result)
     })?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        org_for_hook,
+        app_for_hook,
+        true,
+        "file.create",
+        "file",
+        Some(created_file.id.to_string()),
+        Some(serde_json::json!({
+            "file_path": created_file.file_path,
+            "version": created_file.version,
+            "tag": created_file.tag,
+            "size": created_file.size,
+            "checksum": created_file.checksum,
+        })),
+    );
 
     Ok(Json(db_file_to_response(&created_file)))
 }
@@ -337,7 +356,8 @@ async fn bulk_create_files(
     resource = "file",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("")]
 async fn get_file(
@@ -415,7 +435,8 @@ fn parse_tags(tags: Option<&str>) -> Vec<String> {
     resource = "file",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn list_files(
@@ -517,7 +538,8 @@ pub struct ListFileTagsQuery {
     resource = "file",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/tags")]
 async fn list_file_tags(
@@ -635,6 +657,8 @@ async fn update_file(
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
+    let org_for_query = organisation.clone();
+    let app_for_query = application.clone();
 
     let file = run_blocking!({
         let mut conn = pool.get()?;
@@ -643,16 +667,16 @@ async fn update_file(
             let file_in_db = if let Some(f_version) = file_version {
                 files
                     .filter(file_path.eq(&input_file_path))
-                    .filter(org_id.eq(&organisation))
-                    .filter(app_id.eq(&application))
+                    .filter(org_id.eq(&org_for_query))
+                    .filter(app_id.eq(&app_for_query))
                     .filter(version.eq(f_version))
                     .select(DbFile::as_select())
                     .first::<DbFile>(conn)?
             } else if let Some(f_tag) = file_tag {
                 files
                     .filter(file_path.eq(&input_file_path))
-                    .filter(org_id.eq(&organisation))
-                    .filter(app_id.eq(&application))
+                    .filter(org_id.eq(&org_for_query))
+                    .filter(app_id.eq(&app_for_query))
                     .filter(tag.eq(f_tag))
                     .select(DbFile::as_select())
                     .first::<DbFile>(conn)?
@@ -672,6 +696,21 @@ async fn update_file(
 
         Ok(result)
     })?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "file.update",
+        "file",
+        Some(file.id.to_string()),
+        Some(serde_json::json!({
+            "file_path": file.file_path,
+            "version": file.version,
+            "tag": file.tag,
+        })),
+    );
 
     Ok(Json(db_file_to_response(&file)))
 }
@@ -910,6 +949,22 @@ async fn upload_file(
                     Ok(updated_file)
                 })?;
 
+                crate::webhook::fire(
+                    state.get_ref(),
+                    organisation.clone(),
+                    application.clone(),
+                    true,
+                    "file.upload",
+                    "file",
+                    Some(updated_file.id.to_string()),
+                    Some(serde_json::json!({
+                        "file_path": updated_file.file_path,
+                        "version": updated_file.version,
+                        "tag": updated_file.tag,
+                        "size": updated_file.size,
+                    })),
+                );
+
                 Ok(Json(db_file_to_response(&updated_file)))
             }
             Err(e) => {
@@ -1125,6 +1180,21 @@ async fn upload_bulk_files(
             }
         }
     }
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "file.upload",
+        "file",
+        None,
+        Some(serde_json::json!({
+            "uploaded_count": uploaded.len(),
+            "skipped_count": skipped.len(),
+            "bulk": true,
+        })),
+    );
 
     Ok(Json(BulkFileUploadResponse { uploaded, skipped }))
 }

@@ -56,7 +56,8 @@ async fn get_org_context(req: &HttpRequest) -> airborne_types::Result<(String, A
     resource = "organisation_user",
     action = "create",
     org_roles = ["owner", "admin", "write"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[post("/create")]
 async fn organisation_add_user(
@@ -95,7 +96,8 @@ async fn organisation_add_user(
     resource = "organisation_user",
     action = "update",
     org_roles = ["owner", "admin"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[post("/update")]
 async fn organisation_update_user(
@@ -134,7 +136,8 @@ async fn organisation_update_user(
     resource = "organisation_user",
     action = "delete",
     org_roles = ["owner", "admin"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[post("/remove")]
 async fn organisation_remove_user(
@@ -163,7 +166,8 @@ async fn organisation_remove_user(
     resource = "organisation_user",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn organisation_list_users(
@@ -193,7 +197,8 @@ async fn organisation_list_users(
     resource = "organisation_user",
     action = "transfer",
     org_roles = ["owner"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[post("/transfer-ownership")]
 async fn organisation_transfer_ownership(
@@ -221,7 +226,8 @@ async fn organisation_transfer_ownership(
     resource = "organisation_role",
     action = "read",
     org_roles = ["owner", "admin"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[get("/roles/list")]
 async fn list_organisation_roles(
@@ -259,7 +265,8 @@ async fn list_organisation_roles(
     resource = "organisation_role",
     action = "read",
     org_roles = ["owner", "admin"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[get("/permissions/list")]
 async fn list_organisation_permissions(
@@ -289,7 +296,8 @@ async fn list_organisation_permissions(
     resource = "organisation_role",
     action = "create",
     org_roles = ["owner", "admin"],
-    app_roles = []
+    app_roles = [],
+    webhook_allowed = false
 )]
 #[post("/roles/upsert")]
 async fn upsert_organisation_role(

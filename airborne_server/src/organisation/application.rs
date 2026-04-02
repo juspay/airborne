@@ -141,7 +141,8 @@ where
     org_roles = ["owner", "admin"],
     app_roles = [],
     allow_org = true,
-    allow_app = false
+    allow_app = false,
+    webhook_allowed = false
 )]
 #[post("/create")]
 async fn add_application(

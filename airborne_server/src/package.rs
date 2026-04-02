@@ -67,6 +67,8 @@ async fn create_package(
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
+    let org_for_hook = organisation.clone();
+    let app_for_hook = application.clone();
 
     let package = run_blocking!({
         let mut conn = pool.get()?;
@@ -144,6 +146,20 @@ async fn create_package(
         Ok(result)
     })?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        org_for_hook,
+        app_for_hook,
+        true,
+        "package.create",
+        "package",
+        Some(package.id.to_string()),
+        Some(serde_json::json!({
+            "version": package.version,
+            "tag": package.tag,
+        })),
+    );
+
     Ok(
         WithHeaders::new(Json(utils::db_response_to_package(package)))
             .status(actix_web::http::StatusCode::CREATED),
@@ -154,7 +170,8 @@ async fn create_package(
     resource = "package",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("")]
 async fn get_package(
@@ -208,7 +225,8 @@ async fn get_package(
     resource = "package",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn list_packages(

@@ -59,7 +59,8 @@ pub fn add_routes() -> Scope {
     resource = "property_schema",
     action = "update",
     org_roles = ["owner", "admin", "write"],
-    app_roles = ["admin", "write"]
+    app_roles = ["admin", "write"],
+    webhook_allowed = false
 )]
 #[put("/schema")]
 async fn put_properties_schema_api(
@@ -440,7 +441,8 @@ async fn rollback_config_update(
     resource = "property_schema",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/schema")]
 async fn get_properties_schema_api(
@@ -602,7 +604,8 @@ async fn get_properties_schema_api(
     resource = "property",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn list_properties_api(

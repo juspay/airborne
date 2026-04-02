@@ -88,6 +88,17 @@ async fn application_add_user(
         request.user, org_name, app_name, role_name
     );
 
+    crate::webhook::fire(
+        state.get_ref(),
+        org_name.clone(),
+        app_name.clone(),
+        true,
+        "application_user.create",
+        "application_user",
+        Some(request.user.clone()),
+        Some(serde_json::json!({ "role": role_name })),
+    );
+
     Ok(Json(UserOperationResponse {
         user: request.user,
         success: true,
@@ -129,6 +140,17 @@ async fn application_update_user(
         request.user, org_name, app_name, role_name
     );
 
+    crate::webhook::fire(
+        state.get_ref(),
+        org_name.clone(),
+        app_name.clone(),
+        true,
+        "application_user.update",
+        "application_user",
+        Some(request.user.clone()),
+        Some(serde_json::json!({ "role": role_name })),
+    );
+
     Ok(Json(UserOperationResponse {
         user: request.user,
         success: true,
@@ -168,6 +190,17 @@ async fn application_remove_user(
         request.user, org_name, app_name
     );
 
+    crate::webhook::fire(
+        state.get_ref(),
+        org_name.clone(),
+        app_name.clone(),
+        true,
+        "application_user.delete",
+        "application_user",
+        Some(request.user.clone()),
+        None,
+    );
+
     Ok(Json(UserOperationResponse {
         user: request.user,
         success: true,
@@ -179,7 +212,8 @@ async fn application_remove_user(
     resource = "application_user",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn application_list_users(
@@ -209,7 +243,8 @@ async fn application_list_users(
     resource = "application_role",
     action = "read",
     org_roles = ["owner", "admin"],
-    app_roles = ["admin"]
+    app_roles = ["admin"],
+    webhook_allowed = false
 )]
 #[get("/roles/list")]
 async fn list_application_roles(
@@ -247,7 +282,8 @@ async fn list_application_roles(
     resource = "application_role",
     action = "read",
     org_roles = ["owner", "admin"],
-    app_roles = ["admin"]
+    app_roles = ["admin"],
+    webhook_allowed = false
 )]
 #[get("/permissions/list")]
 async fn list_application_permissions(
@@ -300,8 +336,20 @@ async fn upsert_application_role(
         )
         .await?;
 
+    let role_name = payload.role.trim().to_ascii_lowercase();
+    crate::webhook::fire(
+        state.get_ref(),
+        org_name.clone(),
+        app_name.clone(),
+        true,
+        "application_role.create",
+        "application_role",
+        Some(role_name.clone()),
+        Some(serde_json::json!({ "permissions": payload.permissions.clone() })),
+    );
+
     Ok(Json(serde_json::json!({
         "success": true,
-        "role": payload.role.trim().to_ascii_lowercase(),
+        "role": role_name,
     })))
 }

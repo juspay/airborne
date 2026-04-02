@@ -95,7 +95,8 @@ pub fn add_public_routes() -> Scope {
     resource = "release",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/{release_id}")]
 async fn get_release(
@@ -534,6 +535,21 @@ async fn create_release(
         Value::Object(serde_json::Map::new())
     });
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release.create",
+        "release",
+        Some(experiment_id_for_ramping.clone()),
+        Some(serde_json::json!({
+            "package_version": pkg_version,
+            "config_version": config_version.clone(),
+            "dimensions": dimensions.clone(),
+        })),
+    );
+
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
         created_at: now,
@@ -626,7 +642,8 @@ async fn create_release(
     resource = "release",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/list")]
 async fn list_releases(
@@ -975,6 +992,20 @@ async fn ramp_release(
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release.ramp",
+        "release",
+        Some(experiment_id.clone()),
+        Some(serde_json::json!({
+            "traffic_percentage": req.traffic_percentage,
+            "change_reason": req.change_reason.clone(),
+        })),
+    );
+
     Ok(Json(RampReleaseResponse {
         success: true,
         message: format!(
@@ -1122,6 +1153,20 @@ async fn conclude_release(
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release.conclude",
+        "release",
+        Some(experiment_id.clone()),
+        Some(serde_json::json!({
+            "chosen_variant": req.chosen_variant.clone(),
+            "change_reason": req.change_reason.clone(),
+        })),
+    );
+
     Ok(Json(ConcludeReleaseResponse {
         success: true,
         message: format!(
@@ -1206,6 +1251,19 @@ async fn discard_release(
         })?;
 
     info!("Successfully discarded experiment {}", experiment_id);
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release.discard",
+        "release",
+        Some(experiment_id.clone()),
+        Some(serde_json::json!({
+            "change_reason": req.change_reason.clone(),
+        })),
+    );
 
     Ok(Json(DiscardReleaseResponse {
         success: true,
@@ -1663,6 +1721,21 @@ async fn update_release(
         );
         Value::Object(serde_json::Map::new())
     });
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release.update",
+        "release",
+        Some(release_id.clone()),
+        Some(serde_json::json!({
+            "package_version": pkg_version,
+            "config_version": config_version.clone(),
+            "dimensions": dimensions.clone(),
+        })),
+    );
 
     Ok(Json(CreateReleaseResponse {
         id: release_id.clone(),

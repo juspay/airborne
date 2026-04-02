@@ -239,7 +239,8 @@ async fn delete_token(
     resource = "token",
     action = "read",
     org_roles = ["owner", "admin"],
-    app_roles = ["admin"]
+    app_roles = ["admin"],
+    webhook_allowed = false
 )]
 #[get("list")]
 async fn list_tokens(

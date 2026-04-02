@@ -458,7 +458,7 @@ impl<T> PaginatedResponse<T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PaginatedQuery {
     All,
     Paginated { page: u32, count: u32 },

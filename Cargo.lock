@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "airborne_authz_macros"
-version = "0.31.1"
+version = "0.33.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -389,6 +389,7 @@ dependencies = [
  "futures-util",
  "google-sheets4",
  "hex",
+ "hmac",
  "http 0.2.12",
  "http-body 1.0.1",
  "inventory",

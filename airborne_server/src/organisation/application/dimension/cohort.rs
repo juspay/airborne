@@ -31,7 +31,8 @@ pub fn add_routes() -> Scope {
     resource = "cohort",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("")]
 async fn list_cohorts_api(
@@ -246,6 +247,20 @@ async fn create_cohort_checkpoint_api(
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "cohort.update",
+        "cohort",
+        Some(cohort_dimension_id.clone()),
+        Some(serde_json::json!({
+            "checkpoint_name": req.name.clone(),
+            "value": req.value.clone(),
+        })),
+    );
+
     Ok(Json(types::CreateCohortDimensionCheckpointOutput {
         name: req.name.clone(),
         value: req.value.clone(),
@@ -347,6 +362,19 @@ async fn create_cohort_group_api(
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "cohort_group.create",
+        "cohort_group",
+        Some(cohort_dimension_id.clone()),
+        Some(serde_json::json!({
+            "name": req.name.clone(),
+        })),
+    );
+
     Ok(Json(types::CreateCohortGroupOutput {
         name: req.name.clone(),
         members: req.members.clone(),
@@ -357,7 +385,8 @@ async fn create_cohort_group_api(
     resource = "cohort_group",
     action = "read",
     org_roles = ["owner", "admin", "write", "read"],
-    app_roles = ["admin", "write", "read"]
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
 )]
 #[get("/group/priority")]
 async fn get_cohort_priority_api(
@@ -532,6 +561,19 @@ async fn update_cohort_priority_api(
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "cohort_group.update",
+        "cohort_group",
+        Some(cohort_dimension_id.clone()),
+        Some(serde_json::json!({
+            "priority_map": req.priority_map.clone(),
+        })),
+    );
 
     Ok(Json(types::UpdatePriorityOutput {
         priority_map: req.priority_map.clone(),

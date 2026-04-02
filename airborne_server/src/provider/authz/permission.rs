@@ -16,6 +16,7 @@ pub struct EndpointPermissionBinding {
     pub app_roles: &'static [&'static str],
     pub allow_org: bool,
     pub allow_app: bool,
+    pub webhook_allowed: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -29,6 +30,7 @@ impl EndpointPermissionBinding {
         app_roles: &'static [&'static str],
         allow_org: bool,
         allow_app: bool,
+        webhook_allowed: bool,
     ) -> Self {
         Self {
             method,
@@ -39,6 +41,7 @@ impl EndpointPermissionBinding {
             app_roles,
             allow_org,
             allow_app,
+            webhook_allowed,
         }
     }
 }
