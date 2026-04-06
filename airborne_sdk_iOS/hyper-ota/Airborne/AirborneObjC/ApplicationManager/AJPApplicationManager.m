@@ -19,7 +19,8 @@
 typedef NS_ENUM(NSInteger, DownloadStatus) {
     DOWNLOADING,
     COMPLETED,
-    FAILED
+    FAILED,
+    TIMEOUT
 };
 
 @implementation AJPDownloadResult
@@ -623,7 +624,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (AJPDownloadResult*) getCurrentResult {
     AJPApplicationManifest* manifest = [self getCurrentApplicationManifest];
-     if(self.releaseConfigDownloadStatus == DOWNLOADING) {
+    if (self.releaseConfigDownloadStatus == TIMEOUT) {
         return [[AJPDownloadResult alloc] initWithManifest:manifest result:@"RELEASE_CONFIG_TIMEDOUT" error:nil];
     } else if(self.releaseConfigDownloadStatus == FAILED) {
         return [[AJPDownloadResult alloc] initWithManifest:manifest result:@"ERROR" error:[self sanitizedError:self.releaseConfigError]];
@@ -735,24 +736,34 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     self.importantPackageDownloadStatus = DOWNLOADING;
     self.lazyPackageDownloadStatus = DOWNLOADING;
     self.resourceDownloadStatus = DOWNLOADING;
-    [self fetchReleaseConfigWithCompletionHandler:^(AJPApplicationManifest* manifest,NSError* error) {
-        if (error==nil && manifest != nil) {
+    [self fetchReleaseConfigWithCompletionHandler:^(AJPApplicationManifest* manifest, NSError* error, BOOL didTimeout) {
+        if (!didTimeout && error == nil && manifest != nil) {
+            // Success: Manifest downloaded successfully
             self.downloadedApplicationManifest = manifest;
             self.releaseConfigDownloadStatus = COMPLETED;
             [self cleanUpUnwantedFiles];
             [self updateConfig:manifest.config];
             [self tryDownloadingUpdate];
         } else {
-            if(![error.domain isEqualToString:@"release_config_timeout"]){
-                self.releaseConfigDownloadStatus = FAILED;
+            // Failure: Timeout or error occurred
+            self.releaseConfigDownloadStatus = didTimeout ? TIMEOUT : FAILED;
+            self.releaseConfigError = error ? [self sanitizedError:error.localizedDescription] : nil;
+            
+            if (manifest != nil) {
+                // Have manifest despite timeout/error
+                self.downloadedApplicationManifest = manifest;
+                [self cleanUpUnwantedFiles];
+                [self updateConfig:manifest.config];
+                [self tryDownloadingUpdate];
+            } else {
+                // No manifest available - mark all as completed
+                self.resourceDownloadStatus = COMPLETED;
+                self.importantPackageDownloadStatus = COMPLETED;
+                self.lazyPackageDownloadStatus = COMPLETED;
+                [self cleanUpUnwantedFiles];
+                [self fireCallbacks];
+                [self retryFailedLazyDownloads];
             }
-            self.releaseConfigError = [self sanitizedError:error.localizedDescription];
-            self.resourceDownloadStatus = COMPLETED;
-            self.importantPackageDownloadStatus = COMPLETED;
-            self.lazyPackageDownloadStatus = COMPLETED;
-            [self cleanUpUnwantedFiles];
-            [self fireCallbacks];
-            [self retryFailedLazyDownloads];
         }
         [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_NOTIFICATION
                                                             object:nil
@@ -872,7 +883,6 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                             if (!weakSelf) {
                                 return;
                             }
-                            __strong AJPApplicationManager* strongSelf = weakSelf;
                             
                             [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @YES}];
                         }];
@@ -1039,18 +1049,18 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
         __strong AJPApplicationManager *strongSelf = weakSelf;
         if (!strongSelf) return;
-
-        if (manifestDataTask) {
-            [manifestDataTask cancel];
-        }
-
-        NSError *timeoutError = [NSError errorWithDomain:@"release_config_timeout"
-                                                   code:408
-                                               userInfo:@{NSLocalizedDescriptionKey: @"Release config timeout"}];
-
+        
         [[NSNotificationCenter defaultCenter] removeObserver:timeoutObserver];
 
-        completionHandler(nil, timeoutError);
+        AJPApplicationManifest *tempManifest = [strongSelf readTempManifest];
+        NSDictionary *value;
+        if (tempManifest) {
+            value = @{@"status": @"true", @"config_version": tempManifest.config.version, @"package_version": tempManifest.package.version};
+        } else {
+            value = @{@"status": @"false"};
+        }
+        [self.tracker trackInfo:@"manifest_read_from_temp" value:[value mutableCopy]];
+        completionHandler(tempManifest, nil, YES);
     }];
 
     [self startReleaseConfigTimeoutTimer];
@@ -1081,10 +1091,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     manifestDataTask = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
         
         [[NSNotificationCenter defaultCenter] removeObserver:timeoutObserver];
-
-        if ([self isReleaseConfigTimeoutOccurred]) {
-            return;
-        }
+        
+        BOOL didReleaseConfigTimeoutOccur = [self isReleaseConfigTimeoutOccurred];
 
         NSInteger statusCode = [self getResponseCodeFromNSURLResponse:response];
         NSMutableDictionary<NSString*,id>* logData = [NSMutableDictionary dictionary];
@@ -1096,7 +1104,10 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             logData[@"error"] = [error localizedDescription];
             logData[@"is_success"] = @NO;
             [self.tracker trackInfo:@"release_config_fetch" value:logData];
-            completionHandler(nil,error);
+
+            if (!didReleaseConfigTimeoutOccur) {
+                completionHandler(nil, error, NO);
+            }
             return;
         }
 
@@ -1112,12 +1123,26 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                 logData[@"new_rc_version"] = manifest.config.version;
             }
             [self.tracker trackInfo:@"release_config_fetch" value:logData];
-            completionHandler(manifest,error);
+
+            if (!didReleaseConfigTimeoutOccur) {
+                [self deleteTempManifest];
+                completionHandler(manifest, error, NO);
+            } else {
+                // Fetch completed after timeout - save manifest to temp for next timeout
+                if (manifest != nil && error == nil) {
+                    [self.tracker trackInfo:@"release_config_fetch_after_timeout"
+                                      value:[@{@"version": manifest.config.version} mutableCopy]];
+                    [self saveManifestToTemp:manifest];
+                }
+            }
         } else {
             logData[@"is_success"] = @NO;
             logData[@"error"] = @"no data found";
             [self.tracker trackInfo:@"release_config_fetch" value:logData];
-            completionHandler(nil,nil);
+
+            if (!didReleaseConfigTimeoutOccur) {
+                completionHandler(nil, nil, NO);
+            }
         }
     }];
 
@@ -1149,6 +1174,47 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             logVal[@"error"] = error == nil ?  @"Reason unknown": [error localizedDescription];
             [self.tracker trackError:@"release_config_write_failed" value:logVal];
         }
+    }
+}
+
+- (void)saveManifestToTemp:(AJPApplicationManifest *)manifest {
+    NSError *error = nil;
+    BOOL didSave = [self.fileUtil writeInstance:manifest
+                                       fileName:APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                       inFolder:JUSPAY_MANIFEST_DIR
+                                          error:&error];
+    if (didSave) {
+        [self.tracker trackInfo:@"manifest_saved_to_temp" value:[@{@"config_version": manifest.config.version, @"package_version": manifest.package.version} mutableCopy]];
+    } else {
+        [self.tracker trackError:@"manifest_temp_save_failed"
+                           value:[@{@"error": error ? [error localizedDescription] : @"Unknown error"} mutableCopy]];
+    }
+}
+
+- (AJPApplicationManifest *)readTempManifest {
+    NSString *tempManifestPath = [self.fileUtil fullPathInStorageForFilePath:APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                                                    inFolder:JUSPAY_MANIFEST_DIR];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:tempManifestPath]) {
+        return nil;
+    }
+    
+    NSError *error = nil;
+    AJPApplicationManifest *manifest = (AJPApplicationManifest *)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationManifest class]
+                                                                                     withContentOfFileName:APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                                                                                 inFolder:JUSPAY_MANIFEST_DIR
+                                                                                                    error:&error];
+    if (manifest == nil) {
+        [self.tracker trackError:@"temp_manifest_read_failed"
+                           value:[@{@"error": error ? [error localizedDescription] : @"unknown error"} mutableCopy]];
+    }
+    return manifest;
+}
+
+- (void)deleteTempManifest {
+    NSString *tempManifestPath = [self.fileUtil fullPathInStorageForFilePath:APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                                                    inFolder:JUSPAY_MANIFEST_DIR];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:tempManifestPath]) {
+        [self.fileUtil deleteFile:APP_MANIFEST_DATA_TEMP_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:nil];
     }
 }
 

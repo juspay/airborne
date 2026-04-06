@@ -20,6 +20,7 @@ extern NSString *const JUSPAY_MAIN_DIR;
 extern NSString *const JUSPAY_TEMP_DIR;
 
 extern NSString *const APP_CONFIG_DATA_FILE_NAME;
+extern NSString *const APP_MANIFEST_DATA_TEMP_FILE_NAME;
 
 extern NSString *const APP_PACKAGE_DATA_FILE_NAME;
 extern NSString *const APP_PACKAGE_DATA_TEMP_FILE_NAME;

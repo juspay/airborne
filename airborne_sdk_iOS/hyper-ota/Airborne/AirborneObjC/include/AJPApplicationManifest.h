@@ -38,8 +38,9 @@ NS_ASSUME_NONNULL_BEGIN
  *
  * @param manifest The successfully fetched and parsed application manifest/release config, or nil if an error occurred
  * @param error An error object describing what went wrong, or nil if the operation succeeded
+ * @param didTimeout YES if the release config timeout occured before release config fetched
  */
-typedef void (^AJPReleaseConfigCompletionHandler)(AJPApplicationManifest * _Nullable manifest, NSError * _Nullable error);
+typedef void (^AJPReleaseConfigCompletionHandler)(AJPApplicationManifest * _Nullable manifest, NSError * _Nullable error, BOOL didTimeout);
 
 
 typedef NSDictionary<NSString*, AJPResource*> AppResources;

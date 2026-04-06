@@ -18,6 +18,7 @@ NSString *const JUSPAY_MAIN_DIR = @"main";
 NSString *const JUSPAY_TEMP_DIR = @"temp";
 
 NSString *const APP_CONFIG_DATA_FILE_NAME = @"app-config.dat";
+NSString *const APP_MANIFEST_DATA_TEMP_FILE_NAME = @"app-manifest-temp.dat";
 
 NSString *const APP_PACKAGE_DATA_FILE_NAME = @"app-pkg.dat";
 NSString *const APP_PACKAGE_DATA_TEMP_FILE_NAME = @"app-pkg-temp.dat";
