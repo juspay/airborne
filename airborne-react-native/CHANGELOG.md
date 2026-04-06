@@ -2,6 +2,24 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.3.4 - 2026-04-06
+#### Bug Fixes
+- use temp manifest strategy for release config timeout - (0883767) - Yash Rajput
+
+- - -
+
+## v0.30.0 - 2026-04-06
+#### Miscellaneous Chores
+- **(version)** v0.30.0 [skip ci] - (e345581) - Airborne Bot
+
+- - -
+
+## v0.29.2 - 2026-04-06
+#### Miscellaneous Chores
+- **(version)** v0.29.2 [skip ci] - (8cd1d49) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.3.3 - 2026-03-27
 #### Bug Fixes
 - update ios sdk version - (9805945) - Yash Rajput

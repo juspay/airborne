@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.3.2 - 2026-04-06
+#### Bug Fixes
+- use temp manifest strategy for release config timeout - (0883767) - Yash Rajput
+
+- - -
+
+## v0.30.0 - 2026-04-06
+#### Miscellaneous Chores
+- **(version)** v0.30.0 [skip ci] - (e345581) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.3.1 - 2026-03-31
 #### Bug Fixes
 - release config timeout - (45a164d) - Yash Rajput
