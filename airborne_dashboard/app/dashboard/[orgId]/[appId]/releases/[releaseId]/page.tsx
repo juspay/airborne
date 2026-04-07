@@ -618,29 +618,39 @@ export default function ReleaseDetailPage() {
                   <CardDescription>Files included in this release package</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Table>
+                  <Table className="table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Path</TableHead>
-                        <TableHead>URL</TableHead>
-                        <TableHead>Checksum</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="w-[28%]">Path</TableHead>
+                        <TableHead className="w-[36%]">URL</TableHead>
+                        <TableHead className="w-[22%]">Checksum</TableHead>
+                        <TableHead className="w-[8%]">Priority</TableHead>
+                        <TableHead className="w-[6%]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {[...release.package.important, ...release.package.lazy].map((file, index) => (
                         <TableRow key={index}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
+                          <TableCell className="max-w-[20rem]">
+                            <div className="flex items-center gap-2 min-w-0">
                               <FileText className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">{file.file_path}</span>
+                              <span className="font-medium truncate" title={file.file_path}>
+                                {file.file_path}
+                              </span>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{file.url || "Unknown"}</Badge>
+                          <TableCell className="max-w-[24rem]">
+                            <Badge variant="outline" className="w-full max-w-full min-w-0 shrink justify-start">
+                              <span className="block truncate" title={file.url || "Unknown"}>
+                                {file.url || "Unknown"}
+                              </span>
+                            </Badge>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-[16rem]">
+                            <span className="block truncate" title={file.checksum}>
+                              {file.checksum}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">
                             {release.package.important.findIndex((f) => f.file_path == file.file_path) == -1
                               ? "lazy"
@@ -669,28 +679,38 @@ export default function ReleaseDetailPage() {
                   <CardDescription>Files included in this release resources</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Table>
+                  <Table className="table-fixed">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Path</TableHead>
-                        <TableHead>URL</TableHead>
-                        <TableHead>Checksum</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="w-[32%]">Path</TableHead>
+                        <TableHead className="w-[38%]">URL</TableHead>
+                        <TableHead className="w-[24%]">Checksum</TableHead>
+                        <TableHead className="w-[6%]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {release.resources.map((file, index) => (
                         <TableRow key={index}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
+                          <TableCell className="max-w-[20rem]">
+                            <div className="flex items-center gap-2 min-w-0">
                               <FileText className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">{file.file_path}</span>
+                              <span className="font-medium truncate" title={file.file_path}>
+                                {file.file_path}
+                              </span>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{file.url || "Unknown"}</Badge>
+                          <TableCell className="max-w-[24rem]">
+                            <Badge variant="outline" className="w-full max-w-full min-w-0 shrink justify-start">
+                              <span className="block truncate" title={file.url || "Unknown"}>
+                                {file.url || "Unknown"}
+                              </span>
+                            </Badge>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{file.checksum}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-[16rem]">
+                            <span className="block truncate" title={file.checksum}>
+                              {file.checksum}
+                            </span>
+                          </TableCell>
                           <TableCell>
                             {file.url && (
                               <Button variant="ghost" size="sm" asChild>

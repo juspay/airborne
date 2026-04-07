@@ -11,15 +11,6 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationEllipsis,
-} from "@/components/ui/pagination";
 
 import type {
   FileGroup,
@@ -45,7 +36,6 @@ export interface FileChooserProps {
 
 const GROUPS_PER_PAGE = 15;
 const TAGS_PER_PAGE = 20;
-const VIRTUAL_PAGE_SIZE = 15;
 
 export function FileChooser({
   mode,
@@ -69,10 +59,8 @@ export function FileChooser({
   const [tagPage, setTagPage] = useState(1);
   const [accumulatedTags, setAccumulatedTags] = useState<TagInfo[]>([]);
 
-  // Virtual pagination state
-  const [virtualPage, setVirtualPage] = useState(1);
+  // Infinite scroll data state
   const [accumulatedGroups, setAccumulatedGroups] = useState<FileGroup[]>([]);
-  const [backendTotalItems, setBackendTotalItems] = useState(0);
   const [initialLoading, setInitialLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMorePages, setHasMorePages] = useState(true);
@@ -83,15 +71,24 @@ export function FileChooser({
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const tagDropdownRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Stable references
   const excludeFilesSet = useMemo(() => new Set(excludeFiles), [excludeFiles]);
   const tagsFilterKey = useMemo(() => selectedTagFilters.join(","), [selectedTagFilters]);
 
+  const computeHasMorePages = useCallback((result: FileGroupsResponse, page: number) => {
+    if (typeof result.total_items === "number" && result.total_items >= 0) {
+      return page * GROUPS_PER_PAGE < result.total_items;
+    }
+
+    return result.groups.length === GROUPS_PER_PAGE;
+  }, []);
+
   // Stable SWR key - only changes when filters/search change
   const swrKey = useMemo(() => {
     if (!token || !org || !app) return null;
-    return ["/file/groups", app, debouncedSearch, tagsFilterKey];
+    return ["/file/groups", org, app, debouncedSearch, tagsFilterKey];
   }, [token, org, app, debouncedSearch, tagsFilterKey]);
 
   // Fetch file groups - initial fetch only
@@ -99,11 +96,9 @@ export function FileChooser({
     swrKey,
     async () => {
       setInitialLoading(true);
-      apiPageRef.current = 1;
-      setHasMorePages(true);
 
       try {
-        const result = await apiFetch<FileGroupsResponse>(
+        return await apiFetch<FileGroupsResponse>(
           "/file/groups",
           {
             method: "GET",
@@ -116,7 +111,6 @@ export function FileChooser({
           },
           { token, org, app }
         );
-        return result;
       } finally {
         setInitialLoading(false);
       }
@@ -124,18 +118,27 @@ export function FileChooser({
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 5000, // Prevent duplicate requests
+      dedupingInterval: 5000,
     }
   );
 
+  // Reset data when search/tags/context change
+  useEffect(() => {
+    setAccumulatedGroups([]);
+    apiPageRef.current = 1;
+    isFetchingRef.current = false;
+    setHasMorePages(true);
+    setExpandedGroup(null);
+  }, [debouncedSearch, tagsFilterKey, token, org, app]);
+
   // Initialize from first fetch
   useEffect(() => {
-    if (groupsData?.groups) {
-      setAccumulatedGroups(groupsData.groups);
-      setBackendTotalItems(groupsData.total_items);
-      setHasMorePages(groupsData.groups.length === GROUPS_PER_PAGE);
-    }
-  }, [groupsData]);
+    if (!groupsData) return;
+
+    apiPageRef.current = 1;
+    setAccumulatedGroups(groupsData.groups);
+    setHasMorePages(computeHasMorePages(groupsData, 1));
+  }, [groupsData, computeHasMorePages]);
 
   const fetchApiPage = useCallback(
     async (page: number) => {
@@ -158,98 +161,75 @@ export function FileChooser({
     [token, org, app, debouncedSearch, selectedTagFilters]
   );
 
-  // Fetch enough backend pages to populate the current virtual page after exclusions.
-  const ensureGroupsForPage = useCallback(
-    async (targetPage: number) => {
-      if (!hasMorePages || isFetchingRef.current) return;
+  const fetchNextPage = useCallback(async () => {
+    if (!hasMorePages || isFetchingRef.current) return;
 
-      const requiredVisibleCount = targetPage * VIRTUAL_PAGE_SIZE;
-      let visibleCount = accumulatedGroups.filter((g) => !excludeFilesSet.has(g.file_path)).length;
-      let nextGroups = accumulatedGroups;
-      let morePagesAvailable: boolean = hasMorePages;
+    isFetchingRef.current = true;
+    setIsFetchingMore(true);
 
-      if (visibleCount >= requiredVisibleCount) return;
+    try {
+      const nextPage = apiPageRef.current + 1;
+      const result = await fetchApiPage(nextPage);
 
-      isFetchingRef.current = true;
-      setIsFetchingMore(true);
-      try {
-        while (visibleCount < requiredVisibleCount && morePagesAvailable) {
-          const nextPage = apiPageRef.current + 1;
-          const result = await fetchApiPage(nextPage);
-
-          if (!result) break;
-
-          apiPageRef.current = nextPage;
-          setBackendTotalItems(result.total_items);
-
-          if (result.groups.length === 0) {
-            morePagesAvailable = false;
-            setHasMorePages(false);
-            break;
-          }
-
-          const existingPaths = new Set(nextGroups.map((g) => g.file_path));
-          const newGroups = result.groups.filter((g) => !existingPaths.has(g.file_path));
-
-          if (newGroups.length > 0) {
-            visibleCount += newGroups.filter((g) => !excludeFilesSet.has(g.file_path)).length;
-            nextGroups = [...nextGroups, ...newGroups];
-            setAccumulatedGroups(nextGroups);
-          }
-
-          if (result.groups.length < GROUPS_PER_PAGE) {
-            morePagesAvailable = false;
-            setHasMorePages(false);
-            break;
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch more groups:", error);
-      } finally {
-        isFetchingRef.current = false;
-        setIsFetchingMore(false);
+      if (!result || result.groups.length === 0) {
+        setHasMorePages(false);
+        return;
       }
-    },
-    [accumulatedGroups, excludeFilesSet, fetchApiPage, hasMorePages]
-  );
+
+      apiPageRef.current = nextPage;
+
+      setAccumulatedGroups((prev) => {
+        const existing = new Set(prev.map((g) => g.file_path));
+        const newGroups = result.groups.filter((g) => !existing.has(g.file_path));
+
+        if (newGroups.length === 0) {
+          return prev;
+        }
+
+        return [...prev, ...newGroups];
+      });
+
+      setHasMorePages(computeHasMorePages(result, nextPage));
+    } catch (error) {
+      console.error("Failed to fetch more groups:", error);
+    } finally {
+      isFetchingRef.current = false;
+      setIsFetchingMore(false);
+    }
+  }, [computeHasMorePages, fetchApiPage, hasMorePages]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMorePages) return;
+
+    if (typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          void fetchNextPage();
+        }
+      },
+      {
+        root: null,
+        rootMargin: "300px 0px",
+        threshold: 0,
+      }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasMorePages]);
 
   // Filter accumulated groups - memoized
   const filteredGroups = useMemo(() => {
     return accumulatedGroups.filter((g) => !excludeFilesSet.has(g.file_path));
   }, [accumulatedGroups, excludeFilesSet]);
 
-  // Calculate virtual pagination - memoized
-  const totalVirtualPages = useMemo(() => {
-    return Math.max(1, Math.ceil(filteredGroups.length / VIRTUAL_PAGE_SIZE));
-  }, [filteredGroups.length]);
-
-  const estimatedVisibleTotal = useMemo(() => {
-    if (!hasMorePages) return filteredGroups.length;
-    if (accumulatedGroups.length === 0 || backendTotalItems === 0) return filteredGroups.length;
-
-    const visibleRatio = filteredGroups.length / accumulatedGroups.length;
-    return Math.max(filteredGroups.length, Math.ceil(backendTotalItems * visibleRatio));
-  }, [accumulatedGroups.length, backendTotalItems, filteredGroups.length, hasMorePages]);
-
-  // Get groups for current virtual page - memoized
-  const groups = useMemo(() => {
-    const start = (virtualPage - 1) * VIRTUAL_PAGE_SIZE;
-    const end = start + VIRTUAL_PAGE_SIZE;
-    return filteredGroups.slice(start, end);
-  }, [filteredGroups, virtualPage]);
-
-  // Auto-fetch more data when needed - stable effect
-  useEffect(() => {
-    const requiredCount = virtualPage * VIRTUAL_PAGE_SIZE;
-    if (filteredGroups.length < requiredCount && hasMorePages && !isFetchingRef.current) {
-      ensureGroupsForPage(virtualPage);
-    }
-  }, [virtualPage, filteredGroups.length, hasMorePages, ensureGroupsForPage]);
-
-  // Reset when filters change
-  useEffect(() => {
-    setVirtualPage(1);
-  }, [debouncedSearch, tagsFilterKey, excludeFiles.length]);
+  // Render all filtered groups (no virtual slicing)
+  const groups = filteredGroups;
 
   // Fetch tags
   const { data: tagsData, isLoading: tagsLoading } = useSWR(
@@ -376,12 +356,7 @@ export function FileChooser({
     return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
-  const totalPages = hasMorePages
-    ? Math.max(totalVirtualPages, Math.ceil(estimatedVisibleTotal / VIRTUAL_PAGE_SIZE), virtualPage + 1)
-    : totalVirtualPages;
   const isLoading = initialLoading || isFetchingMore;
-  const canGoNext = hasMorePages || virtualPage < totalPages;
-  const isVirtualPaginationActive = excludeFiles.length > 0;
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -509,14 +484,14 @@ export function FileChooser({
                   });
                   onChange([...selected, ...newFiles]);
                 } else {
-                  const currentPagePaths = new Set(groups.map((g) => g.file_path));
-                  onChange(selected.filter((s) => !currentPagePaths.has(s.file_path)));
+                  const currentPaths = new Set(groups.map((g) => g.file_path));
+                  onChange(selected.filter((s) => !currentPaths.has(s.file_path)));
                 }
               }}
               disabled={disabled}
             />
             <label htmlFor="select-all" className="text-xs text-muted-foreground cursor-pointer">
-              Select all on this page
+              Select all loaded files
             </label>
           </div>
           <span className="text-xs text-muted-foreground">
@@ -677,121 +652,34 @@ export function FileChooser({
           </div>
         )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+        {/* Infinite scroll footer */}
+        {(groups.length > 0 || hasMorePages || isFetchingMore) && (
           <div className="p-2 border-t bg-background">
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-              <Pagination className="mx-0 w-auto justify-start">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (virtualPage > 1) setVirtualPage((p) => p - 1);
-                      }}
-                      className={virtualPage <= 1 ? "pointer-events-none opacity-50" : undefined}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-
-              {!isVirtualPaginationActive && (
-                <Pagination className="mx-0">
-                  <PaginationContent className="flex-wrap gap-1 justify-center">
-                    {totalPages <= 5 ? (
-                      Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setVirtualPage(page);
-                            }}
-                            isActive={virtualPage === page}
-                            className="h-7 w-7 p-0 text-xs"
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))
-                    ) : (
-                      <>
-                        <PaginationItem key={1}>
-                          <PaginationLink
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setVirtualPage(1);
-                            }}
-                            isActive={virtualPage === 1}
-                            className="h-7 w-7 p-0 text-xs"
-                          >
-                            1
-                          </PaginationLink>
-                        </PaginationItem>
-                        {virtualPage > 3 && (
-                          <PaginationItem key="e1">
-                            <PaginationEllipsis className="h-4 w-4" />
-                          </PaginationItem>
-                        )}
-                        {Array.from({ length: 3 }, (_, i) => {
-                          const page = Math.max(2, Math.min(totalPages - 1, virtualPage - 1 + i));
-                          if (page <= 1 || page >= totalPages) return null;
-                          return (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setVirtualPage(page);
-                                }}
-                                isActive={virtualPage === page}
-                                className="h-7 w-7 p-0 text-xs"
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          );
-                        })}
-                        {virtualPage < totalPages - 2 && (
-                          <PaginationItem key="e2">
-                            <PaginationEllipsis className="h-4 w-4" />
-                          </PaginationItem>
-                        )}
-                        <PaginationItem key={totalPages}>
-                          <PaginationLink
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setVirtualPage(totalPages);
-                            }}
-                            isActive={virtualPage === totalPages}
-                            className="h-7 w-7 p-0 text-xs"
-                          >
-                            {totalPages}
-                          </PaginationLink>
-                        </PaginationItem>
-                      </>
-                    )}
-                  </PaginationContent>
-                </Pagination>
+            <div className="flex flex-col items-center gap-2">
+              {isFetchingMore && (
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-2" />
+                  Loading more files...
+                </div>
               )}
 
-              <Pagination className="mx-0 w-auto justify-end">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (canGoNext) setVirtualPage((p) => p + 1);
-                      }}
-                      className={!canGoNext ? "pointer-events-none opacity-50" : undefined}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+              {!isFetchingMore && hasMorePages && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => void fetchNextPage()}
+                  disabled={disabled}
+                >
+                  Load more
+                </Button>
+              )}
+
+              {!hasMorePages && groups.length > 0 && (
+                <span className="text-xs text-muted-foreground">You&apos;ve reached the end</span>
+              )}
+
+              <div ref={loadMoreRef} className="h-1 w-full" aria-hidden="true" />
             </div>
           </div>
         )}
