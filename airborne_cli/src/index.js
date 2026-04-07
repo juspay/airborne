@@ -37,7 +37,7 @@ try{
 program
   .name("airborne-devkit")
   .description("Command-line interface for Airborne operations")
-  .version("0.30.1");
+  .version("0.31.0");
 
 coreCli.commands.forEach((cmd, i) => {
   if (cmd._name !== "PostLogin") {

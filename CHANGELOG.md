@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.31.0 - 1970-01-01
+### Package updates
+- airborne_core_cli bumped to airborne_core_cli-v0.4.0
+- airborne_server_clients bumped to airborne_server_clients-v0.4.0
+- smithy bumped to smithy-v0.4.0
+### Global changes
+
+- - -
+
 ## v0.30.1 - 1970-01-01
 ### Package updates
 - airborne_react_native bumped to airborne_react_native-v0.3.4

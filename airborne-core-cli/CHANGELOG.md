@@ -2,6 +2,42 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_core_cli-v0.4.0 - 2026-04-07
+#### Features
+- add update files route in smithy - (0e31956) - Yash Rajput
+
+- - -
+
+## v0.30.1 - 2026-04-07
+#### Miscellaneous Chores
+- **(version)** v0.30.1 [skip ci] - (4a81918) - Airborne Bot
+
+- - -
+
+## v0.30.0 - 2026-04-07
+#### Miscellaneous Chores
+- **(version)** v0.30.0 [skip ci] - (e345581) - Airborne Bot
+
+- - -
+
+## v0.29.2 - 2026-04-07
+#### Miscellaneous Chores
+- **(version)** v0.29.2 [skip ci] - (8cd1d49) - Airborne Bot
+
+- - -
+
+## v0.29.1 - 2026-04-07
+#### Miscellaneous Chores
+- **(version)** v0.29.1 [skip ci] - (e9670ef) - Airborne Bot
+
+- - -
+
+## v0.29.0 - 2026-04-07
+#### Miscellaneous Chores
+- **(version)** v0.29.0 [skip ci] - (4d13783) - Airborne Bot
+
+- - -
+
 ## airborne_core_cli-v0.3.0 - 2026-03-26
 #### Features
 - add platform-specific configuration and improve file processing and update smithy-cli-generator submodule - (823cfe5) - Yash Rajput
