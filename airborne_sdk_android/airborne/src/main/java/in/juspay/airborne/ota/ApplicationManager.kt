@@ -52,6 +52,7 @@ class ApplicationManager(
 ) {
     var shouldUpdate = true
     private lateinit var netUtils: NetUtils
+    @Volatile
     private var releaseConfig: ReleaseConfig? = null
     private var applicationContent = ""
     private val loadWaitTask = WaitTask()
@@ -61,6 +62,24 @@ class ApplicationManager(
     private var indexFolderPath = ""
     private var sessionId: String? = null
     private var rcCallback: ReleaseConfigCallback? = null
+
+    /**
+     * Register or refresh this client's context in the shared CONTEXT_MAP.
+     * @return Pair of (initialized: whether another context already existed, contextRef: the lock object)
+     */
+    private fun ensureContext(clientId: String): Pair<Boolean, Any> {
+        val newRef = WeakReference(ctx)
+        val currentRef = CONTEXT_MAP[clientId]
+        val initialized = if (currentRef == null) {
+            CONTEXT_MAP.putIfAbsent(clientId, newRef) != null
+        } else if (currentRef.get() == null) {
+            !CONTEXT_MAP.replace(clientId, currentRef, newRef)
+        } else {
+            true
+        }
+        val contextRef = CONTEXT_MAP[clientId] ?: newRef
+        return Pair(initialized, contextRef)
+    }
 
     fun loadApplication(
         unSanitizedClientId: String,
@@ -73,16 +92,7 @@ class ApplicationManager(
             val startTime = System.currentTimeMillis()
             try {
                 if (releaseConfig == null) {
-                    val newRef = WeakReference(ctx)
-                    val currentRef = CONTEXT_MAP[clientId]
-                    val initialized = if (currentRef == null) {
-                        CONTEXT_MAP.putIfAbsent(clientId, newRef) != null
-                    } else if (currentRef.get() == null) {
-                        !CONTEXT_MAP.replace(clientId, currentRef, newRef)
-                    } else {
-                        true
-                    }
-                    val contextRef = CONTEXT_MAP[clientId] ?: newRef
+                    val (initialized, contextRef) = ensureContext(clientId)
                     releaseConfig = readReleaseConfig(contextRef)
                     if (shouldUpdate) {
                         releaseConfig =
@@ -91,21 +101,25 @@ class ApplicationManager(
                         Log.d(TAG, "Updates disabled, running w/o updating.")
                     }
                 }
-                val rc = releaseConfig!!
-                indexFolderPath = getIndexFilePath(rc.pkg.index?.filePath ?: "")
-                indexPathWaitTask.complete()
-                val js = readSplit(rc.pkg.index?.filePath ?: "")
-                if (js.isEmpty()) {
-                    throw IllegalStateException("index split is empty.")
+                val rc = releaseConfig
+                if (rc == null) {
+                    Log.w(TAG, "No release config available (no disk cache, no bundled asset). Skipping load.")
+                } else {
+                    indexFolderPath = getIndexFilePath(rc.pkg.index?.filePath ?: "")
+                    indexPathWaitTask.complete()
+                    val js = readSplit(rc.pkg.index?.filePath ?: "")
+                    if (js.isEmpty()) {
+                        throw IllegalStateException("index split is empty.")
+                    }
+                    trackBoot(rc, startTime)
+                    Log.d(TAG, "Loading package version: ${rc.pkg.version}")
+                    val headerJs = """
+                    window.document.title="${rc.pkg.name}";
+                    window.RELEASE_CONFIG=${rc.serialize()};
+                    """.trimIndent()
+                    applicationContent = headerJs + js
+                    loadWaitTask.complete()
                 }
-                trackBoot(rc, startTime)
-                Log.d(TAG, "Loading package version: ${rc.pkg.version}")
-                val headerJs = """
-                window.document.title="${rc.pkg.name}";
-                window.RELEASE_CONFIG=${rc.serialize()};
-                """.trimIndent()
-                applicationContent = headerJs + js
-                loadWaitTask.complete()
             } catch (e: Exception) {
                 Log.e(TAG, "Critical exception while loading app! $e")
                 trackError(
@@ -150,7 +164,8 @@ class ApplicationManager(
         clientId: String,
         initialized: Boolean,
         fileLock: Any,
-        lazyDownloadCallback: LazyDownloadCallback? = null
+        lazyDownloadCallback: LazyDownloadCallback? = null,
+        packageTimeoutOverride: Long = 0L
     ): ReleaseConfig? {
         val startTime = System.currentTimeMillis()
         val url = if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
@@ -166,7 +181,8 @@ class ApplicationManager(
                 netUtils,
                 rcHeaders,
                 lazyDownloadCallback,
-                fromAirborne
+                fromAirborne,
+                packageTimeoutOverride
             )
         val runningTask = RUNNING_UPDATE_TASKS.putIfAbsent(clientId, newTask) ?: newTask
         if (runningTask == newTask) {
@@ -209,7 +225,7 @@ class ApplicationManager(
                     )
                     runningTask.awaitOnFinish()
                     releaseConfigTemplateUrl = rcCallback?.getReleaseConfig(true) ?: releaseConfigTemplateUrl
-                    tryUpdate(clientId, true, fileLock, lazyDownloadCallback)
+                    tryUpdate(clientId, true, fileLock, lazyDownloadCallback, packageTimeoutOverride)
                 } else {
                     releaseConfig
                 }
@@ -353,7 +369,11 @@ class ApplicationManager(
                     .map { readFromInternalStorage(it) }
 
                 val bundledRC = if (listOf(configString, pkgString, resString).any { it.isEmpty() }) {
-                    ReleaseConfig.deSerialize(otaServices.fileProviderService.readFromAssets("release_config.json")).getOrNull()
+                    val assetContent: String? = try {
+                        otaServices.fileProviderService.readFromAssets("release_config.json")
+                    } catch (_: Exception) { null }
+                    if (assetContent.isNullOrEmpty()) null
+                    else ReleaseConfig.deSerialize(assetContent).getOrNull()
                 } else {
                     null
                 }
@@ -421,6 +441,128 @@ class ApplicationManager(
 
     fun readReleaseConfig(): String {
         return releaseConfig?.serialize() ?: ""
+    }
+
+    fun getCurrentPackageVersion(): String {
+        return releaseConfig?.pkg?.version ?: ""
+    }
+
+    /**
+     * Check if an OTA update is available by comparing the local package version
+     * with the server's latest release config.
+     *
+     * @return JSON string: { available, currentVersion, serverVersion, mandatory, error? }
+     */
+    fun checkForUpdate(): String {
+        try {
+            val currentVersion = getCurrentPackageVersion()
+
+            val serverRCString = fetchLatestReleaseConfig()
+                ?: return updateCheckResult(currentVersion, error = "Failed to fetch server release config")
+
+            val serverRC = JSONObject(serverRCString)
+            val serverVersion = serverRC.getJSONObject("package").getString("version")
+            val mandatory = serverRC.getJSONObject("config")
+                .optJSONObject("properties")
+                ?.optBoolean("mandatory", false) ?: false
+
+            val currentVersionInt = currentVersion.toLongOrNull() ?: 0L
+            val serverVersionInt = serverVersion.toLongOrNull() ?: 0L
+            val updateAvailable = serverVersionInt > currentVersionInt
+
+            return JSONObject()
+                .put("available", updateAvailable)
+                .put("currentVersion", currentVersion)
+                .put("serverVersion", serverVersion)
+                .put("mandatory", mandatory)
+                .toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "checkForUpdate failed", e)
+            return updateCheckResult("", error = e.message ?: "Unknown error")
+        }
+    }
+
+    private fun updateCheckResult(currentVersion: String, error: String): String {
+        return JSONObject()
+            .put("available", false)
+            .put("currentVersion", currentVersion)
+            .put("serverVersion", "")
+            .put("mandatory", false)
+            .put("error", error)
+            .toString()
+    }
+
+    /**
+     * Fetch the latest release config from the server without triggering any download.
+     * Uses the SDK's existing network infrastructure (connection pooling, headers, caching).
+     * @return Serialized JSON of the server's release config, or null on failure.
+     */
+    fun fetchLatestReleaseConfig(): String? {
+        try {
+            val clientId = sanitizeClientId(otaServices.clientId ?: return null)
+            if (!::netUtils.isInitialized) {
+                netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
+            }
+            val headers = mutableMapOf<String, String>("cache-control" to "no-cache")
+            if (!rcHeaders.isNullOrEmpty()) {
+                val sortedHeaders = rcHeaders.toSortedMap()
+                headers["x-dimension"] = sortedHeaders.entries.joinToString(";") { "${it.key}=${it.value}" }
+            }
+            val url = if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
+            val resp = netUtils.doGet(url ?: releaseConfigTemplateUrl, headers, null, null, null)
+            val body = resp.body()
+            return if (resp.code() == 200 && body != null) {
+                body.string()
+            } else {
+                resp.close()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchLatestReleaseConfig failed", e)
+            return null
+        }
+    }
+
+    /**
+     * Download and install the latest OTA update on-demand.
+     * Reuses the same download/install infrastructure as boot-time updates.
+     *
+     * @param timeoutMs Maximum time to wait for the download (default 5 minutes).
+     * @param onComplete Called with true on success, false on failure.
+     */
+    fun downloadUpdate(
+        timeoutMs: Long = 600_000L,
+        onComplete: (success: Boolean) -> Unit
+    ) {
+        doAsync {
+            try {
+                val clientId = sanitizeClientId(otaServices.clientId ?: "")
+                val (initialized, contextRef) = ensureContext(clientId)
+
+                // Read local config if not already loaded (e.g., boot had shouldUpdate=false)
+                if (releaseConfig == null) {
+                    releaseConfig = readReleaseConfig(contextRef)
+                }
+
+                val versionBefore = releaseConfig?.pkg?.version
+
+                // Run the update with caller-specified timeout
+                val updatedRC = tryUpdate(clientId, initialized, contextRef, null, timeoutMs)
+
+                if (updatedRC != null) {
+                    releaseConfig = updatedRC
+                    indexFolderPath = getIndexFilePath(updatedRC.pkg.index?.filePath ?: "")
+                }
+
+                // Success only if version actually changed (not just a fallback to cached config)
+                val success = updatedRC != null && updatedRC.pkg.version != versionBefore
+                Log.d(TAG, "downloadUpdate: success=$success, versionBefore=$versionBefore, versionAfter=${updatedRC?.pkg?.version}")
+                onComplete(success)
+            } catch (e: Exception) {
+                Log.e(TAG, "downloadUpdate failed", e)
+                onComplete(false)
+            }
+        }
     }
 
     private fun trackUpdateResult(updateResult: UpdateResult) {

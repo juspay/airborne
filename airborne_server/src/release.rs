@@ -1310,6 +1310,12 @@ async fn serve_release_handler(
         .map(|v| Document::from(v.id.clone()))
         .collect::<Vec<_>>();
 
+    if !context.is_empty() && applicable_variants_ids.is_empty() {
+        return Err(ABError::NotFound(
+            "No release for the given dimensions".to_string(),
+        ));
+    }
+
     let resolved_config_builder = context.iter().fold(
         state
             .superposition_client
