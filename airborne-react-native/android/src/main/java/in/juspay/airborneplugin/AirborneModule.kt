@@ -31,6 +31,26 @@ class AirborneModule(reactContext: ReactApplicationContext) :
     implementation.getBundlePath(namespace, promise)
   }
 
+  @ReactMethod
+  fun checkForUpdate(namespace: String, promise: Promise) {
+    implementation.checkForUpdate(namespace, promise)
+  }
+
+  @ReactMethod
+  fun downloadUpdate(namespace: String, promise: Promise) {
+    implementation.downloadUpdate(namespace, promise)
+  }
+
+  @ReactMethod
+  fun startBackgroundDownload(namespace: String, promise: Promise) {
+    implementation.startBackgroundDownload(namespace, promise)
+  }
+
+  @ReactMethod
+  fun reloadApp(namespace: String, promise: Promise) {
+    implementation.reloadApp(namespace, promise)
+  }
+
   companion object {
     const val NAME = "Airborne"
   }

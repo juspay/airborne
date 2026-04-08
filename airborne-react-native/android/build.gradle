@@ -147,6 +147,7 @@ dependencies {
 
     // Airborne SDK dependency
     api "in.juspay:airborne:2.2.7-xota.02"
+
 }
 
 react {

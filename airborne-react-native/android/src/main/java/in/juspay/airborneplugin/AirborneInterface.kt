@@ -22,4 +22,6 @@ abstract class AirborneInterface {
     open fun getLazyDownloadCallback(): LazyDownloadCallback {
         return defaultLazyCallback
     }
+
+    open fun enableBootDownload(): Boolean = true
 }

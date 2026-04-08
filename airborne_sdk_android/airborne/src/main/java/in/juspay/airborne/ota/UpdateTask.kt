@@ -75,7 +75,8 @@ internal class UpdateTask(
     private val netUtils: NetUtils,
     rcHeaders: Map<String, String>? = null,
     private val lazyDownloadCallback: LazyDownloadCallback?,
-    private val fromAirborne: Boolean = true
+    private val fromAirborne: Boolean = true,
+    private val packageTimeoutOverride: Long = 0L
 ) {
     val updateUUID = UUID.randomUUID().toString()
 
@@ -96,7 +97,7 @@ internal class UpdateTask(
 
     @Volatile
     private var packageTimeout =
-        (localReleaseConfig?.config ?: DEFAULT_CONFIG).bootTimeout
+        if (packageTimeoutOverride > 0) packageTimeoutOverride else (localReleaseConfig?.config ?: DEFAULT_CONFIG).bootTimeout
 
     @Volatile
     private var currentResult: UpdateResult = UpdateResult.NA
@@ -136,7 +137,7 @@ internal class UpdateTask(
 
     private fun updateTimeouts(fetchedReleaseConfig: ReleaseConfig) {
         releaseConfigTimeout = fetchedReleaseConfig.config.releaseConfigTimeout
-        packageTimeout = fetchedReleaseConfig.config.bootTimeout
+        packageTimeout = if (packageTimeoutOverride > 0) packageTimeoutOverride else fetchedReleaseConfig.config.bootTimeout
     }
 
     fun run(onFinish: OnFinishCallback) {

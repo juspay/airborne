@@ -50,4 +50,20 @@ export function getBundlePath(nameSpace: string): Promise<string> {
   return Airborne.getBundlePath(nameSpace);
 }
 
+export function checkForUpdate(nameSpace: string): Promise<string> {
+  return Airborne.checkForUpdate(nameSpace);
+}
+
+export function downloadUpdate(nameSpace: string): Promise<boolean> {
+  return Airborne.downloadUpdate(nameSpace);
+}
+
+export function startBackgroundDownload(nameSpace: string): Promise<boolean> {
+  return Airborne.startBackgroundDownload(nameSpace);
+}
+
+export function reloadApp(nameSpace: string): Promise<void> {
+  return Airborne.reloadApp(nameSpace);
+}
+
 export default Airborne;

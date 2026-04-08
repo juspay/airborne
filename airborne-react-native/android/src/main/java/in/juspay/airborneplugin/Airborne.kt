@@ -7,6 +7,7 @@ import `in`.juspay.airborne.LazyDownloadCallback
 import `in`.juspay.airborne.TrackerCallback
 import `in`.juspay.hyperutil.constants.LogLevel
 import org.json.JSONObject
+import `in`.juspay.airborne.ota.OTADownloadWorker
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509TrustManager
 
@@ -58,8 +59,10 @@ class Airborne(
     private val applicationManager = hyperOTAServices.createApplicationManager(airborneInterface.getDimensions())
 
     init {
-        airborneObjectMap.put(airborneInterface.getNamespace(), this)
+        airborneObjectMap[airborneInterface.getNamespace()] = this
+        applicationManager.shouldUpdate = airborneInterface.enableBootDownload()
         applicationManager.loadApplication(airborneInterface.getNamespace(), airborneInterface.getLazyDownloadCallback())
+        OTADownloadWorker.managerMap[airborneInterface.getNamespace()] = applicationManager
     }
 
     private fun bootComplete(filePath: String) {
@@ -93,16 +96,36 @@ class Airborne(
         return applicationManager.readReleaseConfig()
     }
 
+    // TODO: Re-enable once setSslConfig is added back to ApplicationManager
+    // /**
+    //  * Set custom SSL configuration for mTLS support.
+    //  * Call this before network requests are made to enable client certificate authentication.
+    //  *
+    //  * @param sslSocketFactory SSL socket factory configured with client certificate
+    //  * @param trustManager Trust manager for server certificate validation
+    //  */
+    // @Keep
+    // fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
+    //     applicationManager.setSslConfig(sslSocketFactory, trustManager)
+    // }
+
     /**
-     * Set custom SSL configuration for mTLS support.
-     * Call this before network requests are made to enable client certificate authentication.
-     *
-     * @param sslSocketFactory SSL socket factory configured with client certificate
-     * @param trustManager Trust manager for server certificate validation
+     * Check if an OTA update is available.
+     * Delegates to ApplicationManager which handles the network call and version comparison.
      */
     @Keep
-    fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
-        applicationManager.setSslConfig(sslSocketFactory, trustManager)
+    fun checkForUpdate(): String {
+        return applicationManager.checkForUpdate()
+    }
+
+    /**
+     * Download and install the latest OTA bundle.
+     * Delegates to ApplicationManager.downloadUpdate() which reuses the same
+     * download/install infrastructure as boot-time updates.
+     */
+    @Keep
+    fun downloadUpdate(onComplete: (success: Boolean) -> Unit) {
+        applicationManager.downloadUpdate(onComplete = onComplete)
     }
 
     companion object {
@@ -145,7 +168,7 @@ class Airborne(
 //            }
 //        }
 
-        public val airborneObjectMap: MutableMap<String, Airborne> = mutableMapOf()
+        val airborneObjectMap: MutableMap<String, Airborne> = java.util.concurrent.ConcurrentHashMap()
 
         /**
          * Default LazyDownloadCallback implementation.
@@ -168,6 +191,15 @@ class Airborne(
                     println("AirborneReact: Lazy splits installation failed")
                 }
             }
+        }
+
+        /**
+         * Trigger a background OTA download via WorkManager.
+         * Call from FCM service or any context — does not require RN.
+         */
+        @JvmStatic
+        fun triggerBackgroundDownload(context: Context, namespace: String) {
+            OTADownloadWorker.enqueue(context, namespace)
         }
     }
 }

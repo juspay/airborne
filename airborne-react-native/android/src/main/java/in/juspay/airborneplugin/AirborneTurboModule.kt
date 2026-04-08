@@ -26,6 +26,22 @@ class AirborneTurboModule(reactContext: ReactApplicationContext) :
     implementation.getBundlePath(nameSpace, promise)
   }
 
+  override fun checkForUpdate(nameSpace: String, promise: Promise) {
+    implementation.checkForUpdate(nameSpace, promise)
+  }
+
+  override fun downloadUpdate(nameSpace: String, promise: Promise) {
+    implementation.downloadUpdate(nameSpace, promise)
+  }
+
+  override fun startBackgroundDownload(nameSpace: String, promise: Promise) {
+    implementation.startBackgroundDownload(nameSpace, promise)
+  }
+
+  override fun reloadApp(nameSpace: String, promise: Promise) {
+    implementation.reloadApp(nameSpace, promise)
+  }
+
   companion object {
     const val NAME = "AirborneReact"
   }
