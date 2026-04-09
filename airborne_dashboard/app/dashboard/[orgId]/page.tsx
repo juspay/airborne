@@ -18,6 +18,7 @@ import {
 import { Rocket, Search, Plus } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { ORG_APP_NAME_MAX_LENGTH, ORG_APP_NAME_RULE_TEXT, validateOrgAppName } from "@/lib/name-validation";
 import { useAppContext } from "@/providers/app-context";
 import { OrganisationsList } from "../page";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -27,7 +28,9 @@ export default function ApplicationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreatingApp, setIsCreatingApp] = useState(false);
   const [formData, setFormData] = useState({ name: "", description: "" });
+  const appNameError = useMemo(() => validateOrgAppName(formData.name, "Application"), [formData.name]);
 
   const { data, isLoading, error } = useSWR<OrganisationsList>(token ? "/organisations" : null, (url: string) =>
     apiFetch<OrganisationsList>(url, {}, { token, logout })
@@ -43,14 +46,21 @@ export default function ApplicationsPage() {
   }, [apps, debouncedSearchQuery]);
 
   const handleCreate = async () => {
-    await apiFetch(
-      "/organisations/applications/create",
-      { method: "POST", body: { application: formData.name } },
-      { token, org, logout }
-    );
-    setIsCreateModalOpen(false);
-    setFormData({ name: "", description: "" });
-    mutate("/organisations");
+    if (isCreatingApp || appNameError) return;
+
+    setIsCreatingApp(true);
+    try {
+      await apiFetch(
+        "/organisations/applications/create",
+        { method: "POST", body: { application: formData.name } },
+        { token, org, logout }
+      );
+      setIsCreateModalOpen(false);
+      setFormData({ name: "", description: "" });
+      mutate("/organisations");
+    } finally {
+      setIsCreatingApp(false);
+    }
   };
 
   return (
@@ -81,8 +91,14 @@ export default function ApplicationsPage() {
                   <Input
                     id="name"
                     value={formData.name}
+                    maxLength={ORG_APP_NAME_MAX_LENGTH}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
+                  {formData.name.length > 0 && appNameError ? (
+                    <p className="text-xs text-destructive">{appNameError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
@@ -97,8 +113,8 @@ export default function ApplicationsPage() {
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreate} disabled={!formData.name}>
-                    Create Application
+                  <Button onClick={handleCreate} disabled={Boolean(appNameError) || isCreatingApp}>
+                    {isCreatingApp ? "Creating..." : "Create Application"}
                   </Button>
                 </div>
               </div>
