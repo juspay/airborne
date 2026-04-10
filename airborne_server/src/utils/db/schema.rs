@@ -148,6 +148,18 @@ pub mod hyperotaserver {
         }
     }
 
+    diesel::table! {
+        hyperotaserver.service_accounts (client_id) {
+            client_id -> Uuid,
+            name -> Text,
+            email -> Text,
+            description -> Text,
+            organisation -> Text,
+            created_by -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
     diesel::allow_tables_to_appear_in_same_query!(
         authz_memberships,
         authz_role_bindings,
@@ -159,6 +171,7 @@ pub mod hyperotaserver {
         packages_v2,
         release_views,
         releases,
+        service_accounts,
         user_credentials,
         workspace_names,
     );

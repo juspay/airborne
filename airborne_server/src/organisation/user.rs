@@ -69,6 +69,14 @@ async fn organisation_add_user(
     let (organisation, auth) = get_org_context(&req).await?;
     let role_name = body.access.trim();
 
+    // Reject service account emails — they must be managed via the service accounts API
+    let user_lower = body.user.trim().to_ascii_lowercase();
+    if user_lower.ends_with("@service-account.airborne.juspay.in") {
+        return Err(ABError::BadRequest(
+            "Service account emails cannot be added as regular users. Use the service accounts API instead.".to_string(),
+        ));
+    }
+
     state
         .authz_provider
         .add_organisation_user(

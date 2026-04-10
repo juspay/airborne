@@ -26,6 +26,7 @@ mod organisation;
 mod package;
 mod provider;
 mod release;
+mod service_account;
 mod token;
 mod types;
 mod user;
@@ -477,6 +478,11 @@ async fn main() -> std::io::Result<()> {
                     )
                     .service(user::add_routes("users"))
                     .service(token::add_scopes("token"))
+                    .service(
+                        web::scope("/service-accounts")
+                            .wrap(Auth)
+                            .service(service_account::add_routes()),
+                    )
                     .service(web::scope("/file").wrap(Auth).service(file::add_routes()))
                     .service(
                         web::scope("/packages")

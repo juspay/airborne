@@ -445,6 +445,28 @@ pub trait AuthNProvider: Send + Sync {
     ) -> airborne_types::Result<TokenData<AuthnTokenClaims>> {
         verify_authn_token(access_token, &state.env).await
     }
+
+    fn supports_service_accounts(&self) -> bool {
+        false
+    }
+
+    async fn create_service_account_user(
+        &self,
+        _state: &AppState,
+        _username: &str,
+        _email: &str,
+        _password: &str,
+    ) -> airborne_types::Result<UserToken> {
+        Err(ABError::BadRequest(
+            "Service accounts are not supported for configured AuthN provider".to_string(),
+        ))
+    }
+
+    async fn delete_user(&self, _state: &AppState, _username: &str) -> airborne_types::Result<()> {
+        Err(ABError::BadRequest(
+            "User deletion is not supported for configured AuthN provider".to_string(),
+        ))
+    }
 }
 
 pub fn build_authn_provider(kind: AuthnProviderKind) -> Arc<dyn AuthNProvider> {

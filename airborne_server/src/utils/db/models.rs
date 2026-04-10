@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
     authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, files, packages,
-    packages_v2, release_views, releases, user_credentials, workspace_names,
+    packages_v2, release_views, releases, service_accounts, user_credentials, workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -235,4 +235,16 @@ pub struct NewAuthzRoleBindingEntry {
     pub role_key: String,
     pub resource: String,
     pub action: String,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable, Serialize)]
+#[diesel(table_name = service_accounts)]
+pub struct ServiceAccountEntry {
+    pub client_id: uuid::Uuid,
+    pub name: String,
+    pub email: String,
+    pub description: String,
+    pub organisation: String,
+    pub created_by: String,
+    pub created_at: DateTime<Utc>,
 }

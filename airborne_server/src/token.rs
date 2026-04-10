@@ -10,9 +10,12 @@ use crate::{
     utils::{
         db::{
             models::UserCredentialsEntry,
-            schema::hyperotaserver::user_credentials::{
-                application as cred_app, client_id as uid, created_at, organisation as cred_org,
-                table as user_credentials_table, username,
+            schema::hyperotaserver::{
+                service_accounts::{client_id as sa_uid, table as service_accounts_table},
+                user_credentials::{
+                    application as cred_app, client_id as uid, created_at,
+                    organisation as cred_org, table as user_credentials_table, username,
+                },
             },
         },
         encryption::{decrypt_string, encrypt_string, generate_random_key},
@@ -287,36 +290,62 @@ async fn issue_token(
 
     let pool = state.db_pool.clone();
     let client_id = req.client_id;
-    let user = run_blocking!({
-        let mut conn = pool.get()?;
-        let user = user_credentials_table
-            .filter(uid.eq(&client_id))
-            .first::<UserCredentialsEntry>(&mut conn)
-            .map_err(|e| {
-                log::error!("[ISSUE TOKEN] Failed to load user credentials: {}", e);
-                ABError::Unauthorized("Invalid credentials".to_string())
-            })?;
-        Ok(user)
-    })?;
 
-    log::info!("[ISSUE TOKEN] User credentials loaded successfully");
-
-    let decrypted_refresh_token = decrypt_string(&user.password, &req.client_secret)
-        .await
-        .map_err(|e| {
-            log::error!("[ISSUE TOKEN] Failed to decrypt refresh token: {:?}", e);
-            ABError::Unauthorized("Invalid credentials".to_string())
+    // Try user_credentials first (PAT — needs decryption),
+    // then fall back to service_accounts (client_secret IS the refresh token).
+    let refresh_token = {
+        let pat_result = run_blocking!({
+            let mut conn = pool.get()?;
+            user_credentials_table
+                .filter(uid.eq(&client_id))
+                .first::<UserCredentialsEntry>(&mut conn)
+                .optional()
+                .map_err(|e| {
+                    log::error!("[ISSUE TOKEN] DB error: {}", e);
+                    ABError::InternalServerError("Database error".to_string())
+                })
         })?;
 
-    log::info!(
-        "[ISSUE TOKEN] Refresh token decrypted successfully, length: {}, first 10 chars: {}",
-        decrypted_refresh_token.len(),
-        &decrypted_refresh_token.chars().take(10).collect::<String>()
-    );
+        if let Some(user) = pat_result {
+            // PAT: decrypt the stored refresh token using client_secret as key
+            decrypt_string(&user.password, &req.client_secret)
+                .await
+                .map_err(|e| {
+                    log::error!("[ISSUE TOKEN] Failed to decrypt refresh token: {:?}", e);
+                    ABError::Unauthorized("Invalid credentials".to_string())
+                })?
+        } else {
+            // Check if it's a service account — client_secret is the refresh token directly
+            let pool2 = state.db_pool.clone();
+            let sa_exists = run_blocking!({
+                let mut conn = pool2.get()?;
+                service_accounts_table
+                    .filter(sa_uid.eq(&client_id))
+                    .count()
+                    .get_result::<i64>(&mut conn)
+                    .map_err(|e| {
+                        log::error!("[ISSUE TOKEN] DB error: {}", e);
+                        ABError::InternalServerError("Database error".to_string())
+                    })
+            })?;
+
+            if sa_exists > 0 {
+                req.client_secret.clone()
+            } else {
+                log::error!(
+                    "[ISSUE TOKEN] No credentials found for client_id: {}",
+                    client_id
+                );
+                return Err(ABError::Unauthorized("Invalid credentials".to_string()));
+            }
+        }
+    };
+
+    log::info!("[ISSUE TOKEN] Credentials resolved successfully");
 
     let token = state
         .authn_provider
-        .refresh_access_token(state.get_ref(), &decrypted_refresh_token)
+        .refresh_access_token(state.get_ref(), &refresh_token)
         .await?;
     log::info!("[ISSUE TOKEN] Token issued successfully");
     Ok(Json(token))
