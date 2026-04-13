@@ -54,11 +54,11 @@ class MainApplication : Application(), ReactApplication {
         try {
             airborne = Airborne(
                 this.applicationContext,
-                "https://airborne.sandbox.juspay.in/release/airborne-react-example/android",
+                "https://airborne.juspay.in/release/yuvraj_org12/my_app23",
                 object : AirborneInterface() {
 
                     override fun getNamespace(): String {
-                        return "airborne-example" // Your app id
+                        return "my_app23" // Your app id
                     }
 
                     override fun getDimensions(): HashMap<String, String> {
@@ -82,7 +82,7 @@ class MainApplication : Application(), ReactApplication {
                         bundlePath = indexPath
                         bootCompleteListener?.invoke()
                     }
-                })
+                }, false)
             Log.i("Airborne", "Airborne initialized successfully")
         } catch (e: Exception) {
             Log.e("Airborne", "Failed to initialize Airborne", e)
