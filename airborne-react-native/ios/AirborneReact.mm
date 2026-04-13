@@ -58,6 +58,18 @@ static NSString * const defaultNamespace = @"default";
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
     }
 }
+
+- (void)checkForUpdate:(NSString *)nameSpace
+               resolve:(RCTPromiseResolveBlock)resolve
+                reject:(RCTPromiseRejectBlock)reject {
+    @try {
+        [[Airborne sharedInstanceWithNamespace:nameSpace] checkForUpdate:^(NSString * _Nonnull result) {
+            resolve(result);
+        }];
+    } @catch (NSException *exception) {
+        reject(@"AIRBORNE_ERROR", exception.reason, nil);
+    }
+}
 #else
 RCT_EXPORT_METHOD(readReleaseConfig:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
@@ -85,6 +97,18 @@ RCT_EXPORT_METHOD(getBundlePath:(RCTPromiseResolveBlock)resolve
     @try {
         NSString *bundlePath = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
         resolve(bundlePath);
+    } @catch (NSException *exception) {
+        reject(@"AIRBORNE_ERROR", exception.reason, nil);
+    }
+}
+
+RCT_EXPORT_METHOD(checkForUpdate:(NSString *)nameSpace
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    @try {
+        [[Airborne sharedInstanceWithNamespace:nameSpace] checkForUpdate:^(NSString * _Nonnull result) {
+            resolve(result);
+        }];
     } @catch (NSException *exception) {
         reject(@"AIRBORNE_ERROR", exception.reason, nil);
     }

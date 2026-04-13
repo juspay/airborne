@@ -5,7 +5,9 @@
 
 @property (nonatomic, strong) NSString* namespace;
 @property (nonatomic, strong) AirborneServices* airborne;
+@property (nonatomic, strong) NSString* releaseConfigURL;
 @property (nonatomic, weak) id <AirborneDelegate> delegate;
+@property (nonatomic, assign) BOOL shouldUpdateEnabled;
 
 @end
 
@@ -51,9 +53,16 @@
 }
 
 - (instancetype)initWithReleaseConfigURL:(NSString *)releaseConfigURL delegate:(id<AirborneDelegate>)delegate {
+    return [self initWithReleaseConfigURL:releaseConfigURL delegate:delegate shouldUpdate:YES];
+}
+
+- (instancetype)initWithReleaseConfigURL:(NSString *)releaseConfigURL delegate:(id<AirborneDelegate>)delegate shouldUpdate:(BOOL)shouldUpdate {
     self = [super init];
     if (self) {
-        self.airborne = [[AirborneServices alloc] initWithReleaseConfigURL:releaseConfigURL delegate:delegate ?: self];
+        self.releaseConfigURL = releaseConfigURL;
+        self.delegate = delegate;
+        self.shouldUpdateEnabled = shouldUpdate;
+        self.airborne = [[AirborneServices alloc] initWithReleaseConfigURL:releaseConfigURL delegate:delegate ?: self shouldUpdate:shouldUpdate];
     }
     return self;
 }
@@ -68,6 +77,90 @@
 
 - (NSString *)getReleaseConfig {
     return [self.airborne getReleaseConfig];
+}
+
+- (void)checkForUpdate:(void (^)(NSString * _Nonnull))completion {
+    if (!self.releaseConfigURL || self.releaseConfigURL.length == 0) {
+        completion(@"{\"updateAvailable\":false,\"error\":\"No release config URL\"}");
+        return;
+    }
+
+    NSURL *url = [NSURL URLWithString:self.releaseConfigURL];
+    if (!url) {
+        completion(@"{\"updateAvailable\":false,\"error\":\"Invalid release config URL\"}");
+        return;
+    }
+
+    // Get local manifest for version comparison
+    NSString *localRcJson = [self.airborne getReleaseConfig];
+    NSData *localData = [localRcJson dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *localDict = localData ? [NSJSONSerialization JSONObjectWithData:localData options:0 error:nil] : nil;
+    NSString *localVersion = localDict[@"config"][@"version"] ?: @"";
+    NSString *localPkgVersion = localDict[@"package"][@"version"] ?: @"";
+
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"GET"];
+    [request setValue:@"no-cache" forHTTPHeaderField:@"cache-control"];
+    [request setValue:localPkgVersion forHTTPHeaderField:@"x-package-version"];
+    [request setValue:localVersion forHTTPHeaderField:@"x-config-version"];
+
+#if TARGET_OS_IOS
+    [request setValue:[[UIDevice currentDevice] systemVersion] forHTTPHeaderField:@"x-os-version"];
+#endif
+
+    // Add dimensions from delegate
+    NSDictionary *dims = [(NSObject *)self.delegate respondsToSelector:@selector(dimensions)] ? [self.delegate dimensions] : nil;
+    if (dims && dims.count > 0) {
+        NSArray *sortedKeys = [[dims allKeys] sortedArrayUsingSelector:@selector(compare:)];
+        NSMutableString *dimensionString = [NSMutableString string];
+        for (NSString *key in sortedKeys) {
+            if (dimensionString.length > 0) [dimensionString appendString:@";"];
+            [dimensionString appendFormat:@"%@=%@", key, dims[key]];
+        }
+        [request setValue:dimensionString forHTTPHeaderField:@"x-dimension"];
+    }
+
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            NSDictionary *errResult = @{@"updateAvailable": @NO, @"error": error.localizedDescription ?: @""};
+            NSData *errData = [NSJSONSerialization dataWithJSONObject:errResult options:0 error:nil];
+            NSString *errJson = errData ? [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] : @"{\"updateAvailable\":false,\"error\":\"Unknown error\"}";
+            completion(errJson);
+            return;
+        }
+
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        if (httpResponse.statusCode != 200 || !data) {
+            NSDictionary *errResult = @{@"updateAvailable": @NO, @"error": [NSString stringWithFormat:@"HTTP %ld", (long)httpResponse.statusCode]};
+            NSData *errData = [NSJSONSerialization dataWithJSONObject:errResult options:0 error:nil];
+            NSString *errJson = errData ? [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding] : @"{\"updateAvailable\":false,\"error\":\"HTTP error\"}";
+            completion(errJson);
+            return;
+        }
+
+        NSDictionary *remoteDict = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        if (!remoteDict) {
+            completion(@"{\"updateAvailable\":false,\"error\":\"Failed to parse release config\"}");
+            return;
+        }
+
+        NSString *remoteVersion = remoteDict[@"config"][@"version"] ?: @"";
+        NSString *remotePkgVersion = remoteDict[@"package"][@"version"] ?: @"";
+        BOOL updateAvailable = ![remoteVersion isEqualToString:localVersion];
+
+        NSDictionary *result = @{
+            @"updateAvailable": @(updateAvailable),
+            @"currentVersion": localVersion ?: @"",
+            @"remoteVersion": remoteVersion,
+            @"currentPackageVersion": localPkgVersion ?: @"",
+            @"remotePackageVersion": remotePkgVersion
+        };
+
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:result options:0 error:nil];
+        NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+        completion(jsonString ?: @"{\"updateAvailable\":false,\"error\":\"Failed to serialize result\"}");
+    }];
+    [task resume];
 }
 
 #pragma mark - AirborneDelegate
