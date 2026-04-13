@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
   s.public_header_files = "ios/**/*.h"
   s.static_framework = false
   
-  s.dependency "Airborne", "0.30.1"
+  s.dependency "Airborne"
   
   install_modules_dependencies(s)
 end

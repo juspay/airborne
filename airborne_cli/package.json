@@ -4,9 +4,7 @@
   "description": "Cli for Airborne",
   "main": "src/index.js",
   "type": "module",
-  "bin": {
-    "airborne-devkit": "src/index.js"
-  },
+  "bin": "src/index.js",
   "scripts": {
     "cli": "node src/index.js",
     "release": "release-it --only-version"

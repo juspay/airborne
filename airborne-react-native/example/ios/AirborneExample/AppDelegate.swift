@@ -31,7 +31,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
     
     private func initializeHyperOTA() {
-        airborne = Airborne(releaseConfigURL: "https://airborne.sandbox.juspay.in/release/airborne-react-example/ios", delegate: self)
+        airborne = Airborne(releaseConfigURL: "https://airborne.juspay.in/release/yuvraj_org12/my_app23", delegate: self, shouldUpdate: false)
         print("HyperOTA: Initialized successfully")
     }
 }

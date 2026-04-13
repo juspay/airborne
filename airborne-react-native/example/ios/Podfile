@@ -20,6 +20,9 @@ end
 target 'AirborneExample' do
   config = use_native_modules!
 
+  # Use local Airborne SDK source instead of published pod
+  pod 'Airborne', :path => '../../../airborne_sdk_iOS/hyper-ota'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

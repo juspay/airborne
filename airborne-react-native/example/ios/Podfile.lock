@@ -1,7 +1,7 @@
 PODS:
-  - Airborne (0.3.2)
-  - AirborneReact (0.3.0):
-    - Airborne (= 0.3.2)
+  - Airborne (0.31.1)
+  - AirborneReact (0.31.1):
+    - Airborne
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1684,6 +1684,7 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
+  - Airborne (from `../../../airborne_sdk_iOS/hyper-ota`)
   - AirborneReact (from `../..`)
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
@@ -1760,10 +1761,11 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
-    - Airborne
     - SocketRocket
 
 EXTERNAL SOURCES:
+  Airborne:
+    :path: "../../../airborne_sdk_iOS/hyper-ota"
   AirborneReact:
     :path: "../.."
   boost:
@@ -1909,8 +1911,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  Airborne: 46578e56070672d064940d803c149007d747a6f8
-  AirborneReact: cf25bdffe669629d0fe2b1b5cb3df68b318409d0
+  Airborne: 524195fc437957d54b56974a5869b346ebd8b620
+  AirborneReact: f68ef6d9c4846a223517520feb4228930f0f2b6b
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
@@ -1983,6 +1985,6 @@ SPEC CHECKSUMS:
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 50518ade05048235d91a78b803336dbb5b159d5d
 
-PODFILE CHECKSUM: a276e8c93cf89c5b187cb3312148f548b87fe781
+PODFILE CHECKSUM: ed1013d4b095ba8e4ef5de631eed15847beaaa0b
 
 COCOAPODS: 1.16.2

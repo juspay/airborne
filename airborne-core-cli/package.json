@@ -2,9 +2,7 @@
   "name": "airborne-core-cli",
   "version": "0.31.1",
   "type": "module",
-  "bin": {
-    "airborne-core-cli": "bin.js"
-  },
+  "bin": "bin.js",
   "pkg": {
     "targets": [
       "node18-linux-x64",
