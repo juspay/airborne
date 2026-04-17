@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_android-v0.2.0 - 2026-04-17
+#### Features
+- **(android)** handle checksum in release config - (1458257) - yash.rajput.001
+
+- - -
+
 ## airborne_sdk_android-v0.1.0 - 2026-03-26
 #### Features
 - download remaining old lazy splits on new release failure or timeout - (555ff3e) - Yash Rajput
