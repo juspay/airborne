@@ -52,6 +52,8 @@ pub mod user;
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
 
+const MAX_APP_NAME_LENGTH: usize = 50;
+
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(add_application)
@@ -147,6 +149,7 @@ async fn add_application(
     // Get organisation and application names
     let body = body.into_inner();
     let application = body.application;
+    validate_application_name(&application)?;
 
     // Check if the user token is still valid
     let auth_response = auth_response.into_inner();
@@ -240,7 +243,6 @@ async fn add_application(
                 group_id
             }
             Err(e) => {
-                // No rollback needed yet - this is the first operation
                 return Err(ABError::InternalServerError(format!(
                     "Failed to create application group: {}",
                     e
@@ -330,29 +332,62 @@ async fn add_application(
             "Using Superposition Org ID from environment: {}",
             superposition_org_id_from_env
         );
-        // Insert and get the inserted row (to get the id)
-        let mut inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
-            .values(&new_workspace_name)
-            .get_result(&mut conn)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
-            })?;
+
+        let mut inserted_workspace: WorkspaceName =
+            match diesel::insert_into(workspace_names::table)
+                .values(&new_workspace_name)
+                .get_result(&mut conn)
+            {
+                Ok(workspace) => workspace,
+                Err(e) => {
+                    if let Err(rollback_err) = transaction
+                        .handle_rollback_if_needed(&admin, &realm, &state)
+                        .await
+                    {
+                        info!("Rollback failed: {}", rollback_err);
+                    }
+
+                    return Err(ABError::InternalServerError(format!(
+                        "Failed to store workspace name: {}",
+                        e
+                    )));
+                }
+            };
 
         let generated_id = inserted_workspace.id;
         let generated_workspace_name = format!("workspace{}", generated_id);
         inserted_workspace.workspace_name = generated_workspace_name.clone();
 
-        // Update the workspace_name to "workspace{id}"
-        diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
-            .set(workspace_names::workspace_name.eq(&generated_workspace_name))
-            .execute(&mut conn)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
-            })?;
+        if let Err(e) =
+            diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+                .set(workspace_names::workspace_name.eq(&generated_workspace_name))
+                .execute(&mut conn)
+        {
+            if let Err(delete_err) =
+                diesel::delete(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+                    .execute(&mut conn)
+            {
+                info!(
+                    "Failed to delete workspace row {} after update error: {}",
+                    generated_id, delete_err
+                );
+            }
+
+            if let Err(rollback_err) = transaction
+                .handle_rollback_if_needed(&admin, &realm, &state)
+                .await
+            {
+                info!("Rollback failed: {}", rollback_err);
+            }
+
+            return Err(ABError::InternalServerError(format!(
+                "Failed to update workspace name: {}",
+                e
+            )));
+        }
 
         // Step 4: Create workspace in Superposition
-
-        match state
+        if let Err(e) = state
             .superposition_client
             .create_workspace()
             .org_id(superposition_org_id_from_env.clone())
@@ -363,81 +398,60 @@ async fn add_application(
             .send()
             .await
         {
-            Ok(workspace) => {
-                // Record Superposition resource using workspace name as the ID
-                transaction.set_superposition_resource(&workspace.workspace_name);
-                info!("Created workspace in Superposition: {:?}", workspace);
-                workspace
+            if let Err(delete_err) =
+                diesel::delete(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+                    .execute(&mut conn)
+            {
+                info!(
+                    "Failed to delete workspace row {} after Superposition error: {}",
+                    generated_id, delete_err
+                );
             }
-            Err(e) => {
-                // Handle rollback and return error
-                if let Err(rollback_err) = transaction
-                    .handle_rollback_if_needed(&admin, &realm, &state)
-                    .await
-                {
-                    info!("Rollback failed: {}", rollback_err);
-                }
 
-                return Err(ABError::InternalServerError(format!(
-                    "Failed to create workspace in Superposition: {}",
-                    e
-                )));
-            }
-        };
-
-        // Helper function to create default config with error handling
-        async fn create_config_with_tx<E>(
-            create_fn: impl futures::Future<Output = Result<(), E>>,
-            key: &str,
-            transaction: &TransactionManager,
-            admin: &KeycloakAdmin,
-            realm: &str,
-            state: &web::Data<AppState>,
-        ) -> Result<(), ABError>
-        where
-            E: std::fmt::Display,
-        {
-            match create_fn.await {
-                Ok(result) => {
-                    info!("Created configuration for key: {}", key);
-                    Ok(result)
-                }
-                Err(e) => {
-                    // Handle rollback
-                    if let Err(rollback_err) = transaction
-                        .handle_rollback_if_needed(admin, realm, state)
-                        .await
-                    {
-                        info!("Rollback failed: {}", rollback_err);
-                    }
-
-                    Err(ABError::InternalServerError(format!(
-                        "Failed to create configuration for {}: {}",
-                        key, e
-                    )))
-                }
-            }
-        }
-
-        create_config_with_tx(
-            async {
-                migrate_superposition_workspace(
-                    &inserted_workspace,
-                    &state,
-                    &SuperpositionMigrationStrategy::Patch,
-                )
+            if let Err(rollback_err) = transaction
+                .handle_rollback_if_needed(&admin, &realm, &state)
                 .await
-                .map_err(|e| {
-                    ABError::InternalServerError(format!("Workspace migration error: {}", e))
-                })
-            },
-            "migrate_superposition_workspace",
-            &transaction,
-            &admin,
-            &realm,
+            {
+                info!("Rollback failed: {}", rollback_err);
+            }
+
+            return Err(ABError::InternalServerError(format!(
+                "Failed to create workspace in Superposition: {}",
+                e
+            )));
+        }
+        transaction.set_superposition_resource(&generated_workspace_name);
+
+        // Step 5: Apply Superposition defaults/migration
+        if let Err(e) = migrate_superposition_workspace(
+            &inserted_workspace,
             &state,
+            &SuperpositionMigrationStrategy::Patch,
         )
-        .await?;
+        .await
+        {
+            if let Err(delete_err) =
+                diesel::delete(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+                    .execute(&mut conn)
+            {
+                info!(
+                    "Failed to delete workspace row {} after migration error: {}",
+                    generated_id, delete_err
+                );
+            }
+
+            if let Err(rollback_err) = transaction
+                .handle_rollback_if_needed(&admin, &realm, &state)
+                .await
+            {
+                info!("Rollback failed: {}", rollback_err);
+            }
+
+            return Err(ABError::InternalServerError(format!(
+                "Workspace migration error: {}",
+                e
+            )));
+        }
 
         // Mark transaction as complete since all operations have succeeded
         transaction.set_database_inserted();
@@ -448,4 +462,29 @@ async fn add_application(
             access: roles.iter().map(|&s| s.to_string()).collect(),
         }))
     }
+}
+
+fn validate_application_name(name: &str) -> airborne_types::Result<()> {
+    if name.trim().is_empty() {
+        return Err(ABError::BadRequest(
+            "Application name cannot be empty".to_string(),
+        ));
+    }
+
+    if name.len() > MAX_APP_NAME_LENGTH {
+        return Err(ABError::BadRequest(
+            "Application name is too long".to_string(),
+        ));
+    }
+
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_' || c == '.')
+    {
+        return Err(ABError::BadRequest(
+            "Application name can only contain: a-z, 0-9, -, _, .".to_string(),
+        ));
+    }
+
+    Ok(())
 }

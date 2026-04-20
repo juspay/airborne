@@ -33,6 +33,7 @@ import Image from "next/image";
 import { useAppContext } from "@/providers/app-context";
 import { FileCreationModal } from "@/components/file-creation-modal";
 import { apiFetch } from "@/lib/api";
+import { ORG_APP_NAME_MAX_LENGTH, ORG_APP_NAME_RULE_TEXT, validateOrgAppName } from "@/lib/name-validation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Label } from "./ui/label";
@@ -58,6 +59,8 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   const [appStoreLink, setAppStoreLink] = useState("");
   const [playStoreLink, setPlayStoreLink] = useState("");
   const [orgRequestSuccess, setOrgRequestSuccess] = useState(false);
+  const requestOrgNameError = useMemo(() => validateOrgAppName(reqOrgName, "Organisation"), [reqOrgName]);
+  const createOrgNameError = useMemo(() => validateOrgAppName(orgName, "Organisation"), [orgName]);
 
   // pathname is used in the useIsActive function below
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -82,6 +85,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
     setPlayStoreLink("");
   };
   const onRequestOrg = async () => {
+    if (requestOrgNameError) return;
     try {
       await apiFetch(
         "/organisations/request",
@@ -204,6 +208,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
   const isActive = useIsActive(navigationItems);
   const onCreateOrg = async () => {
+    if (createOrgNameError) return;
     await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token, logout });
     const createdOrg = orgName;
     setOrgName("");
@@ -410,7 +415,17 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="orgName">Organisation name*</Label>
-                        <Input id="orgName" value={reqOrgName} onChange={(e) => setReqOrgName(e.target.value)} />
+                        <Input
+                          id="orgName"
+                          value={reqOrgName}
+                          maxLength={ORG_APP_NAME_MAX_LENGTH}
+                          onChange={(e) => setReqOrgName(e.target.value)}
+                        />
+                        {reqOrgName.length > 0 && requestOrgNameError ? (
+                          <p className="text-xs text-destructive">{requestOrgNameError}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -445,7 +460,10 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                       <Button variant="outline" onClick={() => setIsOrgCreateModelOpen(false)}>
                         Cancel
                       </Button>
-                      <Button onClick={onRequestOrg} disabled={!reqOrgName.trim() || !name.trim() || !email.trim()}>
+                      <Button
+                        onClick={onRequestOrg}
+                        disabled={Boolean(requestOrgNameError) || !name.trim() || !email.trim()}
+                      >
                         Request
                       </Button>
                     </DialogFooter>
@@ -464,10 +482,16 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                     <Label htmlFor="orgName">Organisation Name</Label>
                     <Input
                       id="orgName"
-                      placeholder="Acme Corp"
+                      placeholder="acme_corp"
                       value={orgName}
+                      maxLength={ORG_APP_NAME_MAX_LENGTH}
                       onChange={(e) => setOrgName(e.target.value)}
                     />
+                    {orgName.length > 0 && createOrgNameError ? (
+                      <p className="text-xs text-destructive">{createOrgNameError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
+                    )}
                   </div>
                 </div>
 
@@ -475,7 +499,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                   <Button variant="outline" onClick={() => setIsOrgCreateModelOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={onCreateOrg} disabled={!orgName.trim()}>
+                  <Button onClick={onCreateOrg} disabled={Boolean(createOrgNameError)}>
                     Create
                   </Button>
                 </DialogFooter>

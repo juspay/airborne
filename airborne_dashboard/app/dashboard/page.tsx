@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { ORG_APP_NAME_MAX_LENGTH, ORG_APP_NAME_RULE_TEXT, validateOrgAppName } from "@/lib/name-validation";
 import { useAppContext } from "@/providers/app-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,10 @@ export default function DashboardHome() {
 
   const [orgName, setOrgName] = useState("");
   const [appName, setAppName] = useState("");
+  const [isCreatingApp, setIsCreatingApp] = useState(false);
+  const requestOrgNameError = useMemo(() => validateOrgAppName(reqOrgName, "Organisation"), [reqOrgName]);
+  const createOrgNameError = useMemo(() => validateOrgAppName(orgName, "Organisation"), [orgName]);
+  const createAppNameError = useMemo(() => validateOrgAppName(appName, "Application"), [appName]);
 
   // Check for saved org request data on component mount
   useEffect(() => {
@@ -82,6 +87,7 @@ export default function DashboardHome() {
   }, [orgList, org, apps, app, router]);
 
   const onCreateOrg = async () => {
+    if (createOrgNameError) return;
     await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token, logout });
     const createdOrg = orgName;
     setOrgName("");
@@ -90,16 +96,24 @@ export default function DashboardHome() {
   };
 
   const onCreateApp = async () => {
-    await apiFetch(
-      "/organisations/applications/create",
-      { method: "POST", body: { application: appName } },
-      { token, org, logout }
-    );
-    setAppName("");
-    await refreshOrgs();
+    if (isCreatingApp || createAppNameError) return;
+
+    setIsCreatingApp(true);
+    try {
+      await apiFetch(
+        "/organisations/applications/create",
+        { method: "POST", body: { application: appName } },
+        { token, org, logout }
+      );
+      setAppName("");
+      await refreshOrgs();
+    } finally {
+      setIsCreatingApp(false);
+    }
   };
 
   const onRequestOrg = async () => {
+    if (requestOrgNameError) return;
     try {
       await apiFetch(
         "/organisations/request",
@@ -178,7 +192,17 @@ export default function DashboardHome() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="orgName">Organisation name</Label>
-                    <Input id="orgName" value={reqOrgName} onChange={(e) => setReqOrgName(e.target.value)} />
+                    <Input
+                      id="orgName"
+                      value={reqOrgName}
+                      maxLength={ORG_APP_NAME_MAX_LENGTH}
+                      onChange={(e) => setReqOrgName(e.target.value)}
+                    />
+                    {reqOrgName.length > 0 && requestOrgNameError ? (
+                      <p className="text-xs text-destructive">{requestOrgNameError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -210,7 +234,7 @@ export default function DashboardHome() {
                 <Button
                   className="w-full"
                   onClick={onRequestOrg}
-                  disabled={!reqOrgName.trim() || !name.trim() || !email.trim()}
+                  disabled={Boolean(requestOrgNameError) || !name.trim() || !email.trim()}
                 >
                   Request Organisation
                 </Button>
@@ -227,12 +251,22 @@ export default function DashboardHome() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="orgname">Organisation name</Label>
-                  <Input id="orgname" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+                  <Input
+                    id="orgname"
+                    value={orgName}
+                    maxLength={ORG_APP_NAME_MAX_LENGTH}
+                    onChange={(e) => setOrgName(e.target.value)}
+                  />
+                  {orgName.length > 0 && createOrgNameError ? (
+                    <p className="text-xs text-destructive">{createOrgNameError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
+                  )}
                 </div>
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" onClick={onCreateOrg} disabled={!orgName.trim()}>
+              <Button className="w-full" onClick={onCreateOrg} disabled={Boolean(createOrgNameError)}>
                 Create Organisation
               </Button>
             </CardFooter>
@@ -249,9 +283,20 @@ export default function DashboardHome() {
         <h2 className="text-xl font-semibold mb-2">Create your first Application</h2>
         <p className="text-muted-foreground mb-4">Applications group files, packages, and releases.</p>
         <Label htmlFor="appname">Application name</Label>
-        <Input id="appname" value={appName} onChange={(e) => setAppName(e.target.value)} className="mb-3" />
-        <Button onClick={onCreateApp} disabled={!appName.trim()}>
-          Create Application
+        <Input
+          id="appname"
+          value={appName}
+          maxLength={ORG_APP_NAME_MAX_LENGTH}
+          onChange={(e) => setAppName(e.target.value)}
+          className="mb-3"
+        />
+        {appName.length > 0 && createAppNameError ? (
+          <p className="mb-3 text-xs text-destructive">{createAppNameError}</p>
+        ) : (
+          <p className="mb-3 text-xs text-muted-foreground">{ORG_APP_NAME_RULE_TEXT}</p>
+        )}
+        <Button onClick={onCreateApp} disabled={Boolean(createAppNameError) || isCreatingApp}>
+          {isCreatingApp ? "Creating..." : "Create Application"}
         </Button>
       </div>
     );

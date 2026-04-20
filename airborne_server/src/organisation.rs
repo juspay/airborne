@@ -410,27 +410,24 @@ fn parse_user_organizations(groups: Vec<String>) -> Vec<Organisation> {
 
 /// Validate organization name for security and usability
 pub fn validate_organisation_name(name: &str) -> airborne_types::Result<()> {
-    let trimmed = name.trim();
-
-    if trimmed.is_empty() {
+    if name.trim().is_empty() {
         return Err(ABError::BadRequest(
             "Organisation name cannot be empty".to_string(),
         ));
     }
 
-    if trimmed.len() > MAX_ORG_NAME_LENGTH {
+    if name.len() > MAX_ORG_NAME_LENGTH {
         return Err(ABError::BadRequest(
             "Organisation name is too long".to_string(),
         ));
     }
 
-    // Basic pattern matching for valid organization name
-    if !trimmed
+    if !name
         .chars()
-        .all(|c| c.is_alphanumeric() || c == ' ' || c == '-' || c == '_')
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_' || c == '.')
     {
         return Err(ABError::BadRequest(
-            "Organisation name can only contain alphanumeric characters, spaces, hyphens, and underscores".to_string(),
+            "Organisation name can only contain: a-z, 0-9, -, _, .".to_string(),
         ));
     }
 
