@@ -1,6 +1,44 @@
 // @generated automatically by Diesel CLI.
 
 pub mod hyperotaserver {
+    pub mod sql_types {
+        #[derive(diesel::query_builder::QueryId, Clone, diesel::sql_types::SqlType)]
+        #[diesel(postgres_type(name = "invite_role", schema = "hyperotaserver"))]
+        pub struct InviteRole;
+
+        #[derive(diesel::query_builder::QueryId, Clone, diesel::sql_types::SqlType)]
+        #[diesel(postgres_type(name = "invite_status", schema = "hyperotaserver"))]
+        pub struct InviteStatus;
+    }
+
+    diesel::table! {
+        hyperotaserver.application_settings (id) {
+            id -> Uuid,
+            version -> Int4,
+            org_id -> Text,
+            app_id -> Text,
+            maven_namespace -> Text,
+            maven_artifact_id -> Text,
+            maven_group_id -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.builds (id) {
+            id -> Uuid,
+            build_version -> Text,
+            organisation -> Text,
+            application -> Text,
+            release_id -> Text,
+            created_at -> Timestamptz,
+            major_version -> Int4,
+            minor_version -> Int4,
+            patch_version -> Int4,
+            status -> Text,
+        }
+    }
+
     diesel::table! {
         hyperotaserver.cleanup_outbox (transaction_id) {
             transaction_id -> Text,
@@ -40,6 +78,23 @@ pub mod hyperotaserver {
             size -> Int8,
             checksum -> Text,
             metadata -> Jsonb,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        use diesel::sql_types::*;
+        use super::sql_types::InviteRole;
+        use super::sql_types::InviteStatus;
+
+        hyperotaserver.organisation_invites (id) {
+            id -> Uuid,
+            org_id -> Text,
+            applications -> Jsonb,
+            email -> Text,
+            role -> InviteRole,
+            token -> Text,
+            status -> InviteStatus,
             created_at -> Timestamptz,
         }
     }
@@ -115,22 +170,13 @@ pub mod hyperotaserver {
         }
     }
 
-    diesel::table! {
-        hyperotaserver.builds (id) {
-            id -> Uuid,
-            build_version -> Text,
-            organisation -> Text,
-            application -> Text,
-            release_id -> Text,
-            created_at -> Timestamptz,
-        }
-    }
-
     diesel::allow_tables_to_appear_in_same_query!(
-        cleanup_outbox,
+        application_settings,
         builds,
+        cleanup_outbox,
         configs,
         files,
+        organisation_invites,
         packages,
         packages_v2,
         release_views,

@@ -171,6 +171,10 @@ pub struct BuildEntry {
     pub application: String,
     pub release_id: String,
     pub created_at: DateTime<Utc>,
+    pub major_version: i32,
+    pub minor_version: i32,
+    pub patch_version: i32,
+    pub status: String,
 }
 
 #[derive(Insertable)]
@@ -180,6 +184,10 @@ pub struct NewBuildEntry {
     pub organisation: String,
     pub application: String,
     pub release_id: String,
+    pub major_version: i32,
+    pub minor_version: i32,
+    pub patch_version: i32,
+    pub status: String,
 }
 
 #[derive(Queryable, Insertable, Debug, Selectable, Serialize)]
