@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "Airborne",
     platforms: [
-        .iOS(.v12)
+        .iOS(.v13)
     ],
     products: [
         .library(
@@ -16,21 +16,25 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "AirborneObjC",
+            name: "AirborneSwiftCore",
             dependencies: [],
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwiftCore"
+        ),
+        .target(
+            name: "AirborneObjC",
+            dependencies: ["AirborneSwiftCore"],
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneObjC",
             publicHeadersPath: "include",
             cSettings: [
                 .headerSearchPath("include"),
                 .headerSearchPath("ApplicationManager/Constants"),
                 .headerSearchPath("ApplicationManager/Tracker"),
-                .headerSearchPath("Helper"),
-                .headerSearchPath("Network/NetworkDetector")
+                .headerSearchPath("Helper")
             ],
         ),
         .target(
             name: "Airborne",
-            dependencies: ["AirborneObjC"],
+            dependencies: ["AirborneObjC", "AirborneSwiftCore"],
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwift"
         ),
         .testTarget(

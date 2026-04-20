@@ -8,6 +8,7 @@
 import Foundation
 #if SWIFT_PACKAGE
 import AirborneObjC
+import AirborneSwiftCore
 #endif
 
 // MARK: - AirborneDelegate Protocol
@@ -63,7 +64,7 @@ import AirborneObjC
      *
      * This callback indicates that the application is ready to load the packages & resources
      *
-     * @param indexBundlePath The file system path to the index bundle file that should
+     * @param indexBundleURL The file system path to the index bundle file that should
      *                     be used as the entry point for the downloaded content.
      *
      * @note This method is called on a background queue. Dispatch UI updates
