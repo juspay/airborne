@@ -13,10 +13,7 @@
 #import "AJPApplicationPackage.h"
 #import "AJPApplicationResources.h"
 #import "AJPResource.h"
-#import "AJPFileUtil.h"
-#import "AJPRemoteFileUtil.h"
-#import "AJPNetworkClient.h"
-#import "AJPLoggerDelegate.h"
+#import "AJPHelpers.h"
 #else
 #import <Airborne/AJPApplicationManager.h>
 #import <Airborne/AJPApplicationManagerDelegate.h>
@@ -25,8 +22,5 @@
 #import <Airborne/AJPApplicationPackage.h>
 #import <Airborne/AJPApplicationResources.h>
 #import <Airborne/AJPResource.h>
-#import <Airborne/AJPFileUtil.h>
-#import <Airborne/AJPRemoteFileUtil.h>
-#import <Airborne/AJPNetworkClient.h>
-#import <Airborne/AJPLoggerDelegate.h>
+#import <Airborne/AJPHelpers.h>
 #endif

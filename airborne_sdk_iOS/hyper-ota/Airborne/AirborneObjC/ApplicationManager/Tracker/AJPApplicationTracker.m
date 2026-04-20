@@ -87,7 +87,7 @@
         if (logsManagerClass) {
             NSString *selectorString = @"trackEventWithLevel:label:value:category:subcategory:workspace:";
             
-            NSInvocation *invocation = [AJPHelpers getInvocatorForSelectorString:selectorString className:className isInstanceMethod:NO target:logsManagerClass arguments:@[level, label, finalValue, @"lifecycle", APPL_MANAGER_SUB_CAT, self.workspace]];
+            NSInvocation *invocation = [AJPHelpersObjc getInvocatorForSelectorString:selectorString className:className isInstanceMethod:NO target:logsManagerClass arguments:@[level, label, finalValue, @"lifecycle", APPL_MANAGER_SUB_CAT, self.workspace]];
             [invocation invoke];
         }
     }

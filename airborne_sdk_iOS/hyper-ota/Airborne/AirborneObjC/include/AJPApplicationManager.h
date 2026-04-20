@@ -13,11 +13,9 @@
 #if SWIFT_PACKAGE
 #import "AJPApplicationManifest.h"
 #import "AJPApplicationManagerDelegate.h"
-#import "AJPLoggerDelegate.h"
 #else
 #import <Airborne/AJPApplicationManifest.h>
 #import <Airborne/AJPApplicationManagerDelegate.h>
-#import <Airborne/AJPLoggerDelegate.h>
 #endif
 
 @interface AJPDownloadResult : NSObject
@@ -49,7 +47,7 @@ NS_ASSUME_NONNULL_BEGIN
  *       instance is returned with the logger added to its tracker
  * @note A new manager is created if none exists or if the existing manager has failed/completed states
  */
-+ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<AJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<AJPLoggerDelegate> _Nullable)logger;
++ (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<AJPApplicationManagerDelegate> _Nonnull)delegate logger:(id _Nullable)logger;
 
 
 /**
@@ -101,7 +99,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param fileName The name of the file to read
  * @return The content of the file as a string, or nil if the file couldn't be read
  */
-- (NSString *)readPackageFile:(NSString *)fileName;
+- (NSString * _Nullable)readPackageFile:(NSString *)fileName;
 
 
 /**
@@ -109,7 +107,7 @@ NS_ASSUME_NONNULL_BEGIN
  * @param resourceFileName The name of the resource file to read
  * @return The content of the file as a string, or nil if the file couldn't be read
  */
-- (NSString *)readResourceFile:(NSString *)resourceFileName;
+- (NSString * _Nullable)readResourceFile:(NSString *)resourceFileName;
 
 /**
  * Returns the value of the current release config timeout

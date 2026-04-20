@@ -11,11 +11,11 @@
 #import <WebKit/WebKit.h>
 #import "AJPApplicationConstants.h"
 #import "AJPApplicationTracker.h"
-#import "AJPNetworkTypeDetector.h"
-#import "AJPNetworkClient.h"
-#import "AJPFileUtil.h"
-#import "AJPRemoteFileUtil.h"
-
+#if SWIFT_PACKAGE
+@import AirborneSwiftCore;
+#else
+#import <Airborne/Airborne-Swift.h>
+#endif
 typedef NS_ENUM(NSInteger, DownloadStatus) {
     DOWNLOADING,
     COMPLETED,
@@ -2188,7 +2188,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     return -1;
 }
 
-- (NSString*) getStatusString:(DownloadStatus)status {
+- (NSString *)getStatusString:(DownloadStatus)status {
     switch (status) {
         case DOWNLOADING:
             return @"DOWNLOADING";
@@ -2198,6 +2198,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             break;
         case FAILED:
             return @"FAILED";
+            break;
+        case TIMEOUT:
+            return @"TIMEOUT";
             break;
     }
     return @"";
@@ -2217,7 +2220,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
     NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970] * 1000;
     __weak AJPApplicationManager* weakSelf = self;
-    [self.remoteFileUtil downloadFileFromURL:[resourceURL absoluteString] andSaveFileAtUrl:[self.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName] checksum:checksum callback:^(Boolean status, id  _Nullable data, NSString * _Nullable error, NSURLResponse* response) {
+    [self.remoteFileUtil downloadFileFromURL:[resourceURL absoluteString] andSaveFileAtUrl:[self.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName] checksum:checksum callback:^(BOOL status, id  _Nullable data, NSString * _Nullable error, NSURLResponse * _Nullable response) {
         if(weakSelf) {
             __strong AJPApplicationManager* strongSelf = weakSelf;
             if (status) {

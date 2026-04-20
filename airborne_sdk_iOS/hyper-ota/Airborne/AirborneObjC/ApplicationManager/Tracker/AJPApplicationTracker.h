@@ -6,7 +6,12 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "AJPLoggerDelegate.h"
+
+#if SWIFT_PACKAGE
+@import AirborneSwiftCore;
+#else
+#import <Airborne/Airborne-Swift.h>
+#endif
 
 NS_ASSUME_NONNULL_BEGIN
 
