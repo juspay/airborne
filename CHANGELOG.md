@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.33.0 - 2026-04-20
+### Package updates
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.4.0
+### Global changes
+#### Features
+- PICAF-31326 Migrating iOS core classes to Swift - (05067af) - Balaganesh S
+
+- - -
+
 ## v0.32.0 - 1970-01-01
 ### Package updates
 - airborne_sdk_android bumped to airborne_sdk_android-v0.2.0

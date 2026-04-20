@@ -1,6 +1,6 @@
 {
   "name": "ExampleOldArch",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "private": true,
   "scripts": {
     "android": "react-native run-android",

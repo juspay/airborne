@@ -2,6 +2,36 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.4.0 - 2026-04-20
+#### Features
+- PICAF-31326 Migrating iOS core classes to Swift - (05067af) - Balaganesh S
+
+- - -
+
+## v0.32.0 - 2026-04-20
+#### Miscellaneous Chores
+- **(version)** v0.32.0 [skip ci] - (6fcfb70) - Airborne Bot
+
+- - -
+
+## v0.31.2 - 2026-04-20
+#### Miscellaneous Chores
+- **(version)** v0.31.2 [skip ci] - (1776935) - Airborne Bot
+
+- - -
+
+## v0.31.1 - 2026-04-20
+#### Miscellaneous Chores
+- **(version)** v0.31.1 [skip ci] - (fd3e886) - Airborne Bot
+
+- - -
+
+## v0.31.0 - 2026-04-20
+#### Miscellaneous Chores
+- **(version)** v0.31.0 [skip ci] - (9f47c56) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.3.2 - 2026-04-06
 #### Bug Fixes
 - use temp manifest strategy for release config timeout - (0883767) - Yash Rajput
