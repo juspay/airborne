@@ -34,6 +34,10 @@ import {
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
 import {
+  DeleteFileCommandInput,
+  DeleteFileCommandOutput,
+} from "./commands/DeleteFileCommand";
+import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
 } from "./commands/GetReleaseCommand";
@@ -166,6 +170,7 @@ export type ServiceInputTypes =
   | CreatePackageCommandInput
   | CreateReleaseCommandInput
   | DeleteDimensionCommandInput
+  | DeleteFileCommandInput
   | GetReleaseCommandInput
   | GetUserCommandInput
   | ListDimensionsCommandInput
@@ -193,6 +198,7 @@ export type ServiceOutputTypes =
   | CreatePackageCommandOutput
   | CreateReleaseCommandOutput
   | DeleteDimensionCommandOutput
+  | DeleteFileCommandOutput
   | GetReleaseCommandOutput
   | GetUserCommandOutput
   | ListDimensionsCommandOutput

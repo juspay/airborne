@@ -267,6 +267,28 @@ structure ListFileTagsRequest {
     application: String
 }
 
+/// Delete file request
+structure DeleteFileRequest {
+    /// File key in the format "$file_path@version:$version_number" or "$file_path@tag:$tag"
+    @httpQuery("file_id")
+    @required
+    file_id: String
+
+    /// Whether to delete all versions of the file
+    @httpQuery("delete_all_versions")
+    delete_all_versions: Boolean
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
 /// File tag response
 structure FileTagResponse {
     /// The tag value
@@ -278,7 +300,6 @@ structure FileTagResponse {
     count: Integer
 }
 
-/// List of file tag responses
 list FileTagResponseList {
     /// A file tag response
     member: FileTagResponse
@@ -331,6 +352,54 @@ structure FileGroupVersion {
     size: Integer
 
     /// Date when this version was created
+    @required
+    created_at: String
+}
+
+/// List of deleted versions
+list DeletedVersionsList {
+    /// A deleted version number
+    member: Integer
+}
+
+/// Delete file response
+structure DeleteFileResponse {
+    /// id of the file
+    @required
+    id: String
+
+    /// Path where the file is stored on sdk
+    @required
+    file_path: String
+
+    /// URL from where the file can be downloaded
+    @required
+    url: String
+
+    /// List of deleted versions
+    @required
+    versions: DeletedVersionsList
+
+    /// Tag associated with the file
+    tag: String
+
+    /// Size of the file in bytes
+    @required
+    size: Integer
+
+    /// Checksum of the file
+    @required
+    checksum: String
+
+    /// Metadata associated with the file
+    @required
+    metadata: Document
+
+    /// Status of the file
+    @required
+    status: String
+
+    /// Date of creation of the file
     @required
     created_at: String
 }
@@ -445,5 +514,20 @@ operation ListFileGroups {
     errors: [
         Unauthorized
         BadRequestError
+        NotFoundError
+    ]
+}
+
+/// Delete file request operation
+@http(method: "DELETE", uri: "/api/file")
+@requiresauth
+@idempotent
+operation DeleteFile {
+    input: DeleteFileRequest
+    output: DeleteFileResponse
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
     ]
 }
