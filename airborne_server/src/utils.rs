@@ -22,7 +22,6 @@ pub mod kms;
 pub mod migrations;
 pub mod s3;
 pub mod semver;
-pub mod transaction_manager;
 pub mod workspace;
 
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};

@@ -14,7 +14,7 @@
 
 use crate::{
     file::utils::parse_file_key,
-    middleware::auth::{validate_user, Auth, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{require_org_and_app, Auth, AuthResponse},
     release::types::*,
     types as airborne_types,
     types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
@@ -25,6 +25,7 @@ use actix_web::{
     web::{self, Json, Path, Query},
     Scope,
 };
+use airborne_authz_macros::authz;
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use http::{HeaderValue, StatusCode};
@@ -90,6 +91,12 @@ pub fn add_public_routes() -> Scope {
         .service(serve_release_v2)
 }
 
+#[authz(
+    resource = "release",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("/{release_id}")]
 async fn get_release(
     release_id: Path<String>,
@@ -104,17 +111,10 @@ async fn get_release(
     }
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let workspace_name = get_workspace_name_for_application(
@@ -351,6 +351,12 @@ async fn get_release(
     Ok(Json(resp))
 }
 
+#[authz(
+    resource = "release",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("")]
 async fn create_release(
     req: Json<CreateReleaseRequest>,
@@ -358,17 +364,10 @@ async fn create_release(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<CreateReleaseResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
@@ -623,6 +622,12 @@ async fn create_release(
     }))
 }
 
+#[authz(
+    resource = "release",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("/list")]
 async fn list_releases(
     pagination_query: Query<PaginatedQuery>,
@@ -632,17 +637,10 @@ async fn list_releases(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<PaginatedResponse<CreateReleaseResponse>>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let workspace_name = get_workspace_name_for_application(
@@ -913,6 +911,12 @@ async fn list_releases(
     }))
 }
 
+#[authz(
+    resource = "release",
+    action = "ramp",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/{release_id}/ramp")]
 async fn ramp_release(
     release_id: Path<String>,
@@ -921,17 +925,10 @@ async fn ramp_release(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<RampReleaseResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let experiment_id = release_id.to_string();
 
@@ -1018,6 +1015,12 @@ async fn ramp_experiment(
     Ok(())
 }
 
+#[authz(
+    resource = "release",
+    action = "conclude",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/{release_id}/conclude")]
 async fn conclude_release(
     release_id: Path<String>,
@@ -1026,17 +1029,10 @@ async fn conclude_release(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ConcludeReleaseResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let experiment_id = release_id.to_string();
 
@@ -1137,6 +1133,12 @@ async fn conclude_release(
     }))
 }
 
+#[authz(
+    resource = "release",
+    action = "discard",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/{release_id}/discard")]
 async fn discard_release(
     release_id: Path<String>,
@@ -1145,17 +1147,10 @@ async fn discard_release(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<DiscardReleaseResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let experiment_id = release_id.to_string();
 
@@ -1523,6 +1518,12 @@ async fn serve_release_handler(
         .status(StatusCode::OK))
 }
 
+#[authz(
+    resource = "release",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[put("/{release_id}")]
 async fn update_release(
     path: Path<String>,
@@ -1531,17 +1532,10 @@ async fn update_release(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<CreateReleaseResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),

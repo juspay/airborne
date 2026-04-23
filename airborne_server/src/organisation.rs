@@ -22,14 +22,10 @@ use actix_web::{
     HttpMessage, HttpRequest, Scope,
 };
 use google_sheets4::api::ValueRange;
-use keycloak::KeycloakAdmin;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
 
 pub mod application;
-pub mod transaction;
-pub mod types;
 pub mod user;
 
 // Constants
@@ -81,7 +77,7 @@ pub struct OrganisationListResponse {
 
 #[post("/request")]
 async fn request_organisation(
-    req: HttpRequest,
+    _req: HttpRequest,
     body: Json<OrganisationRequest>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<OrganisationRequestResponse>> {
@@ -94,33 +90,12 @@ async fn request_organisation(
     // Validate organization name
     validate_organisation_name(&organisation_name)?;
 
-    // Get Keycloak Admin Token
-    let auth_response = req
-        .extensions()
-        .get::<AuthResponse>()
-        .cloned()
-        .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
-    let admin_token = auth_response.admin_token.clone();
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
-
     // Check if organization already exists
-    let groups = admin
-        .realm_groups_get(
-            &realm,
-            None,
-            Some(true),
-            None,
-            Some(2),
-            Some(false),
-            None,
-            Some(organisation_name.clone()),
-        )
-        .await
-        .map_err(|e| ABError::Unauthorized(format!("Failed to check existing groups: {}", e)))?;
-
-    if !groups.is_empty() {
+    if state
+        .authz_provider
+        .organisation_exists(state.get_ref(), &organisation_name)
+        .await?
+    {
         return Err(ABError::BadRequest(
             "Organisation name is taken".to_string(),
         ));
@@ -176,17 +151,12 @@ async fn create_organisation(
     // Validate organization name
     validate_organisation_name(&organisation)?;
 
-    // Get Keycloak Admin Token
     let auth_response = req
         .extensions()
         .get::<AuthResponse>()
         .cloned()
         .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
-    let admin_token = auth_response.admin_token.clone();
     let sub = &auth_response.sub;
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
 
     if state.env.organisation_creation_disabled && !auth_response.is_super_admin {
         return Err(ABError::BadRequest(
@@ -195,42 +165,31 @@ async fn create_organisation(
     }
 
     // Check if organization already exists
-    let groups = admin
-        .realm_groups_get(
-            &realm,
-            None,
-            Some(true),
-            None,
-            Some(2),
-            Some(false),
-            None,
-            Some(organisation.clone()),
-        )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to check existing groups: {}", e))
-        })?;
-
-    if !groups.is_empty() {
+    if state
+        .authz_provider
+        .organisation_exists(state.get_ref(), &organisation)
+        .await?
+    {
         return Err(ABError::BadRequest(
             "Organisation name is taken".to_string(),
         ));
     }
 
-    // Create the organization using the transaction manager
-    let org = transaction::create_organisation_with_transaction(
-        &organisation,
-        &admin,
-        &realm,
-        sub,
-        &state,
-    )
-    .await
-    .map_err(|e| {
-        ABError::InternalServerError(format!("Error occurred while creating org: {:?}", e))
-    })?;
+    state
+        .authz_provider
+        .create_organisation(state.get_ref(), &organisation, sub)
+        .await?;
 
-    Ok(Json(org))
+    Ok(Json(Organisation {
+        name: organisation,
+        applications: vec![],
+        access: vec![
+            "owner".to_string(),
+            "admin".to_string(),
+            "write".to_string(),
+            "read".to_string(),
+        ],
+    }))
 }
 
 #[delete("/{org_name}")]
@@ -244,35 +203,18 @@ async fn delete_organisation(
     // Validate organization name
     validate_organisation_name(&organisation)?;
 
-    // Get Keycloak Admin Token
     let auth_response = req
         .extensions()
         .get::<AuthResponse>()
         .cloned()
         .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
-    let admin_token = auth_response.admin_token.clone();
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
 
     // Check if organization exists
-    let groups = admin
-        .realm_groups_get(
-            &realm,
-            None,
-            Some(true),
-            None,
-            Some(2),
-            Some(false),
-            None,
-            Some(organisation.clone()),
-        )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to check existing groups: {}", e))
-        })?;
-
-    if groups.is_empty() {
+    if !state
+        .authz_provider
+        .organisation_exists(state.get_ref(), &organisation)
+        .await?
+    {
         return Err(ABError::BadRequest(
             "Organisation does not exist".to_string(),
         ));
@@ -284,12 +226,10 @@ async fn delete_organisation(
         .as_ref()
         .is_some_and(|org| org.name == organisation && org.is_admin_or_higher())
     {
-        // Delete the organization using the transaction manager
-        transaction::delete_organisation_with_transaction(&organisation, &admin, &realm, &state)
-            .await
-            .map_err(|_| {
-                ABError::InternalServerError("Could not delete organisation".to_string())
-            })?;
+        state
+            .authz_provider
+            .delete_organisation(state.get_ref(), &organisation)
+            .await?;
 
         Ok(Json(
             json!({"Success" : "Organisation deleted successfully"}),
@@ -306,106 +246,35 @@ async fn list_organisations(
     req: HttpRequest,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<OrganisationListResponse>> {
-    // Get Keycloak Admin Token
     let auth_response = req
         .extensions()
         .get::<AuthResponse>()
         .cloned()
         .ok_or(ABError::Unauthorized("Token Parse Failed".to_string()))?;
-    let admin_token = auth_response.admin_token.clone();
-    let sub = &auth_response.sub;
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
-
-    // Get user's groups
-    let groups = admin
-        .realm_users_with_user_id_groups_get(&realm, sub, None, None, None, None)
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch user groups: {}", e)))?;
-
-    // Extract group paths
-    let group_paths: Vec<String> = groups.iter().filter_map(|g| g.path.clone()).collect();
-
-    // Parse groups into organizations
-    let organizations = parse_user_organizations(group_paths);
-
-    Ok(Json(OrganisationListResponse {
-        organisations: organizations,
-    }))
-}
-
-// Helper function to parse Keycloak groups into organizations
-fn parse_user_organizations(groups: Vec<String>) -> Vec<Organisation> {
-    let mut organisations: HashMap<String, Organisation> = HashMap::new();
-
-    for group in groups {
-        let path = group.trim_matches('/'); // Remove leading/trailing slashes
-        let parts: Vec<&str> = path.split('/').collect();
-
-        if path == "super_admin" {
-            continue;
-        }
-
-        if parts.is_empty() {
-            continue;
-        }
-
-        let access = parts.last().unwrap_or(&"").to_string();
-
-        // Skip if no organization name found
-        if parts.is_empty() {
-            continue;
-        }
-
-        let organisation_name = parts[0].to_string();
-        let application_name = if parts.len() == 3 {
-            Some(parts[1].to_string())
-        } else {
-            None
-        };
-
-        if let Some(app_name) = application_name {
-            // Handle application-level access
-            let organisation =
-                organisations
-                    .entry(organisation_name.clone())
-                    .or_insert(Organisation {
-                        name: organisation_name.clone(),
-                        applications: vec![],
-                        access: vec![],
-                    });
-
-            let app = organisation
+    let summary = state
+        .authz_provider
+        .get_user_access_summary(state.get_ref(), &auth_response.sub)
+        .await?;
+    let mut organisations = summary
+        .organisations
+        .into_iter()
+        .map(|org| Organisation {
+            name: org.name,
+            applications: org
                 .applications
-                .iter_mut()
-                .find(|app| app.application == app_name);
+                .into_iter()
+                .map(|app| Application {
+                    application: app.application,
+                    organisation: app.organisation,
+                    access: app.access,
+                })
+                .collect(),
+            access: org.access,
+        })
+        .collect::<Vec<_>>();
+    organisations.sort_by(|left, right| left.name.cmp(&right.name));
 
-            if let Some(app) = app {
-                app.access.push(access);
-            } else {
-                organisation.applications.push(Application {
-                    application: app_name,
-                    organisation: organisation_name.clone(),
-                    access: vec![access],
-                });
-            }
-        } else {
-            // Handle organisation-level access
-            let organisation =
-                organisations
-                    .entry(organisation_name.clone())
-                    .or_insert(Organisation {
-                        name: organisation_name.clone(),
-                        applications: vec![],
-                        access: vec![],
-                    });
-
-            organisation.access.push(access);
-        }
-    }
-
-    organisations.into_values().collect()
+    Ok(Json(OrganisationListResponse { organisations }))
 }
 
 /// Validate organization name for security and usability
