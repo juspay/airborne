@@ -20,7 +20,6 @@ import { Search, ChevronDown, ChevronRight, File, Filter, Plus, Loader2, Pencil 
 import { FileCreationModal } from "@/components/file-creation-modal";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
-import { hasAppAccess } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,11 +33,21 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import type { FileGroup, FileGroupsResponse, TagInfo, TagsResponse } from "@/types/files";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 const FILES_PER_PAGE = 15;
+const PAGE_AUTHZ = definePagePermissions({
+  read_files: permission("file_group", "read", "app"),
+  create_file: permission("file", "create", "app"),
+  update_file: permission("file", "update", "app"),
+});
 
 export default function FilesPage() {
-  const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
+  const canCreateFiles = permissions.can("create_file");
+  const canUpdateFiles = permissions.can("update_file");
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -261,7 +270,7 @@ export default function FilesPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Files</h1>
           <p className="text-muted-foreground mt-2">Manage your application assets and resources</p>
         </div>
-        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        {canCreateFiles && (
           <Button className="gap-2" onClick={() => setIsCreateModalOpen(true)}>
             <Plus className="h-4 w-4" />
             Create File
@@ -326,14 +335,12 @@ export default function FilesPage() {
                   ? "No files match your filters."
                   : "You haven't created any files yet."}
               </p>
-              {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) &&
-                debouncedSearch === "" &&
-                selectedTag === "all" && (
-                  <Button className="gap-2" onClick={() => setIsCreateModalOpen(true)}>
-                    <Plus className="h-4 w-4" />
-                    Create your first file
-                  </Button>
-                )}
+              {canCreateFiles && debouncedSearch === "" && selectedTag === "all" && (
+                <Button className="gap-2" onClick={() => setIsCreateModalOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  Create your first file
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -423,7 +430,7 @@ export default function FilesPage() {
                                           {formatDate(version.created_at)}
                                         </TableCell>
                                         <TableCell>
-                                          {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+                                          {canUpdateFiles && (
                                             <Button
                                               variant="ghost"
                                               size="sm"

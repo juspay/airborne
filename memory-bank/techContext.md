@@ -37,13 +37,13 @@
     *   Refer to `server/.env.example` and `server/superposition/.env.example` for base variables.
     *   Key variables for Hyper OTA server (`server/scripts/.env` or `server/scripts/.env.encrypted` after KMS encryption):
         *   `DATABASE_URL`: Connection string for Hyper OTA's PostgreSQL.
-        *   `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_SECRET`, `KEYCLOAK_PUBLIC_KEY`.
+        *   `AUTHN_PROVIDER`, `OIDC_ISSUER_URL`, `OIDC_EXTERNAL_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`.
         *   `SUPERPOSITION_URL`: URL for the Superposition service (e.g., `http://superposition:8080` from within Docker network).
         *   `SUPERPOSITION_ORG_ID`: **(New)** ID of the Superposition organization. This will be *dynamically populated* by an initialization script (e.g., `init-superposition-org.sh`) that calls the Superposition API at startup.
         *   `SUPERPOSITION_DEFAULT_ORG_NAME`: (New - for init script) Name of the default organization to create in Superposition if it doesn't exist (e.g., "DefaultHyperOTAOrg").
         *   `AWS_BUCKET`, `AWS_ENDPOINT_URL` (for LocalStack), `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`.
         *   `PUBLIC_ENDPOINT`: Publicly accessible base URL for assets.
-    *   Secrets like `KEYCLOAK_SECRET` and `DB_PASSWORD` (within `DATABASE_URL`) are intended to be encrypted via AWS KMS and stored in `.env.encrypted`. The `server/scripts/encrypt_env.sh` script handles this.
+    *   Secrets like `OIDC_CLIENT_SECRET` and `DB_PASSWORD` (within `DATABASE_URL`) are intended to be encrypted via AWS KMS and stored in `.env.encrypted`. The `server/scripts/encrypt_env.sh` script handles this.
 *   **Setup Steps:**
     1.  Clone the repository.
     2.  Ensure the `server/superposition` submodule/directory is populated.

@@ -10,7 +10,6 @@ import { Filter, Plus, Package } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { hasAppAccess } from "@/lib/utils";
 import { useParams, useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -22,6 +21,13 @@ import {
   PaginationLink,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_releases: permission("release", "read", "app"),
+  create_release: permission("release", "create", "app"),
+});
 
 export type ApiRelease = {
   id: string;
@@ -47,7 +53,8 @@ export default function ReleasesPage() {
   const [filterStatus, setFilterStatus] = useState<StatusFilter>(StatusFilter.ALL);
   const [page, setPage] = useState(1);
   const [count] = useState(20); // items per page
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const params = useParams<{ appId: string }>();
   const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
 
@@ -64,6 +71,7 @@ export default function ReleasesPage() {
 
   const releases: ApiRelease[] = data?.data || [];
   const totalPages = data?.total_pages || 1;
+  const canCreateRelease = permissions.can("create_release");
 
   // helper to render page items
   const renderPaginationItems = (currentPage: number, totalPages: number, onPageChange: (page: number) => void) => {
@@ -173,7 +181,7 @@ export default function ReleasesPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Releases</h1>
           <p className="text-muted-foreground mt-2">Deploy packages to your users with controlled rollouts</p>
         </div>
-        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        {canCreateRelease && (
           <Button asChild className="gap-2">
             <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}>
               <Plus className="h-4 w-4" />
@@ -233,7 +241,7 @@ export default function ReleasesPage() {
                   ? `No releases with status "${filterStatus}" found.`
                   : "You haven't created any releases yet."}
               </p>
-              {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && filterStatus === StatusFilter.ALL && (
+              {canCreateRelease && filterStatus === StatusFilter.ALL && (
                 <Button asChild className="gap-2">
                   <Link
                     href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}

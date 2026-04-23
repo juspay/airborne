@@ -37,7 +37,12 @@ type AppContextType = {
 
 interface Configuration {
   google_signin_enabled: boolean;
+  enabled_oidc_idps?: string[];
   organisation_creation_disabled: boolean;
+  authn_provider?: "keycloak" | "oidc" | "okta" | "auth0";
+  oidc_login_enabled?: boolean;
+  password_login_enabled?: boolean;
+  registration_enabled?: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -54,9 +59,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<User>(null);
   const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState<Configuration | null>(null);
-  const fetchConfig = async () => {
-    const res: Configuration = await apiFetch("/dashboard/configuration");
-    setConfig(res);
+  const fetchConfig = async (): Promise<Configuration | null> => {
+    try {
+      const res: Configuration = await apiFetch("/dashboard/configuration");
+      return res;
+    } catch (error) {
+      console.error("Failed to fetch dashboard configuration:", error);
+      return null;
+    }
   };
 
   const fetchOrganisations = async () => {
@@ -69,13 +79,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const organisations = data?.organisations || [];
 
   useEffect(() => {
-    setTokenState(localStorage.getItem(LS_TOKEN));
-    setOrgState(localStorage.getItem(LS_ORG));
-    setAppState(localStorage.getItem(LS_APP));
-    const u = localStorage.getItem(LS_USER);
-    if (u) setUserState(JSON.parse(u));
-    fetchConfig();
-    setLoading(false);
+    let isMounted = true;
+    const initialize = async () => {
+      setTokenState(localStorage.getItem(LS_TOKEN));
+      setOrgState(localStorage.getItem(LS_ORG));
+      setAppState(localStorage.getItem(LS_APP));
+      const u = localStorage.getItem(LS_USER);
+      if (u) setUserState(JSON.parse(u));
+      const resolvedConfig = await fetchConfig();
+      if (!isMounted) return;
+      setConfig(resolvedConfig);
+      setLoading(false);
+    };
+    void initialize();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const setToken = (t: string | null) => {

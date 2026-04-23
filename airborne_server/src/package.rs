@@ -24,10 +24,11 @@ use actix_web::{
     web::{self, Json, Query},
     Scope,
 };
+use airborne_authz_macros::authz;
 
 use crate::{
     file::utils::parse_file_key,
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{require_org_and_app, AuthResponse},
     types as airborne_types,
     types::AppState,
 };
@@ -46,6 +47,12 @@ pub fn add_routes() -> Scope {
         .service(list_packages)
 }
 
+#[authz(
+    resource = "package",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("")]
 async fn create_package(
     req: web::Json<CreatePackageInput>,
@@ -53,17 +60,10 @@ async fn create_package(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<Package>>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -150,6 +150,12 @@ async fn create_package(
     )
 }
 
+#[authz(
+    resource = "package",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("")]
 async fn get_package(
     query: Query<GetPackageQuery>,
@@ -164,17 +170,10 @@ async fn get_package(
     }
 
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
 
@@ -205,6 +204,12 @@ async fn get_package(
     Ok(Json(utils::db_response_to_package(package)))
 }
 
+#[authz(
+    resource = "package",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
 #[get("/list")]
 async fn list_packages(
     pagination_query: Query<PaginatedQuery>,
@@ -214,17 +219,10 @@ async fn list_packages(
 ) -> airborne_types::Result<Json<PaginatedResponse<Package>>> {
     let search = package_query.search.clone();
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
 

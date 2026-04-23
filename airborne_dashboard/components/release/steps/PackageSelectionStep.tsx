@@ -13,11 +13,17 @@ import { PaginationControls } from "../PaginationControls";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { hasAppAccess } from "@/lib/utils";
 import { Pkg } from "@/types/release";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  create_package: permission("package", "create", "app"),
+});
 
 export function PackageSelectionStep() {
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const { mode, selectedPackage, setSelectedPackage } = useReleaseForm();
 
   const [packages, setPackages] = useState<Pkg[]>([]);
@@ -95,7 +101,7 @@ export function PackageSelectionStep() {
                   ? `No packages found matching "${pkgSearch}".`
                   : "You haven't created any packages yet."}
               </p>
-              {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && pkgSearch.trim() === "" && (
+              {permissions.can("create_package") && pkgSearch.trim() === "" && (
                 <Button asChild className="gap-2">
                   <Link
                     href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(

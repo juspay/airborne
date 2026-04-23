@@ -285,14 +285,14 @@ make db-init # in superposition
 
 ### 5. Project Structure
 ```
-dashboard_react/
-├── src/
-│   ├── api/           # API integration
-│   ├── components/    # React components
-│   ├── store/         # Redux store
-│   ├── utils/         # Utility functions
-│   ├── types.ts       # TypeScript definitions
-│   └── main.tsx       # Application entry
+airborne_dashboard/
+├── app/               # Next.js App Router pages
+├── components/        # Reusable UI components
+├── hooks/             # Shared React hooks
+├── lib/               # API/authz utilities
+├── providers/         # App context providers
+├── middleware.ts      # Next.js middleware
+└── next.config.mjs    # API rewrite/proxy configuration
 ```
 
 ### 6. Features
@@ -308,7 +308,7 @@ dashboard_react/
 
 #### Local Development
 ```bash
-cd dashboard_react
+cd airborne_dashboard
 npm install
 npm run dev
 ```
@@ -320,9 +320,11 @@ npm run build
 
 #### Environment Configuration
 ```env
-VITE_API_URL=http://localhost:8000
-VITE_KEYCLOAK_URL=http://localhost:8080
-VITE_CLIENT_ID=your-client-id
+BACKEND_URL=http://localhost:8081
+S3_URL=http://localhost:4566/hyper-ota-bucket
+# OIDC is configured on airborne_server and exposed to the UI via /dashboard/configuration
+OIDC_ISSUER_URL=http://localhost:8180/realms/hyperOTA
+OIDC_CLIENT_ID=your-client-id
 ```
 
 This frontend architecture complements the backend system by providing:
