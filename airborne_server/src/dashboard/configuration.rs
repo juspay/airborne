@@ -28,7 +28,13 @@ pub fn add_routes() -> Scope {
 #[derive(Serialize, Deserialize)]
 struct Configuration {
     google_signin_enabled: bool,
+    enabled_oidc_idps: Vec<String>,
     organisation_creation_disabled: bool,
+    authn_provider: String,
+    authz_provider: String,
+    oidc_login_enabled: bool,
+    password_login_enabled: bool,
+    registration_enabled: bool,
 }
 
 #[get("")]
@@ -37,8 +43,18 @@ async fn get_global_configurations(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<Configuration>> {
     let config = Configuration {
-        google_signin_enabled: state.env.enable_google_signin,
+        google_signin_enabled: state
+            .env
+            .enabled_oidc_idps
+            .iter()
+            .any(|idp| idp.eq_ignore_ascii_case("google")),
+        enabled_oidc_idps: state.env.enabled_oidc_idps.clone(),
         organisation_creation_disabled: state.env.organisation_creation_disabled,
+        authn_provider: state.authn_provider.kind().as_str().to_string(),
+        authz_provider: state.authz_provider.kind().as_str().to_string(),
+        oidc_login_enabled: state.authn_provider.is_oidc_login_enabled(state.get_ref()),
+        password_login_enabled: state.authn_provider.supports_password_login(),
+        registration_enabled: state.authn_provider.supports_signup(),
     };
 
     Ok(Json(config))

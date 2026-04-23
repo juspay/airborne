@@ -15,7 +15,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::{
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{require_org_and_app, AuthResponse},
     organisation::application::properties::types::ConfigProperty,
     release::utils::parse_kv_string,
     types as airborne_types,
@@ -32,6 +32,7 @@ use actix_web::{
     web::{Data, Json, ReqData},
     Scope,
 };
+use airborne_authz_macros::authz;
 use aws_smithy_types::Document;
 use http::{uri::PathAndQuery, Uri};
 use log::info;
@@ -54,6 +55,13 @@ pub fn add_routes() -> Scope {
         .service(list_properties_api)
 }
 
+#[authz(
+    resource = "property_schema",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"],
+    webhook_allowed = false
+)]
 #[put("/schema")]
 async fn put_properties_schema_api(
     req: Json<types::PutPropertiesSchemaRequest>,
@@ -61,17 +69,10 @@ async fn put_properties_schema_api(
     state: Data<AppState>,
 ) -> airborne_types::Result<Json<types::PutPropertiesSchemaResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let properties = req.properties.clone();
     let properties = properties
@@ -436,6 +437,13 @@ async fn rollback_config_update(
     }
 }
 
+#[authz(
+    resource = "property_schema",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
+)]
 #[get("/schema")]
 async fn get_properties_schema_api(
     req: actix_web::HttpRequest,
@@ -443,17 +451,10 @@ async fn get_properties_schema_api(
     state: Data<AppState>,
 ) -> airborne_types::Result<Json<types::GetPropertiesSchemaResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
@@ -599,6 +600,13 @@ async fn get_properties_schema_api(
     }))
 }
 
+#[authz(
+    resource = "property",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
+)]
 #[get("/list")]
 async fn list_properties_api(
     auth_response: ReqData<AuthResponse>,
@@ -606,17 +614,10 @@ async fn list_properties_api(
     state: Data<AppState>,
 ) -> airborne_types::Result<Json<types::ListPropertiesResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),

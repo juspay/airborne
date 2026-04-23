@@ -2,6 +2,28 @@
 
 pub mod hyperotaserver {
     diesel::table! {
+        hyperotaserver.authz_memberships (subject, scope, organisation, application) {
+            subject -> Text,
+            scope -> Text,
+            organisation -> Text,
+            application -> Text,
+            role_key -> Text,
+            role_level -> Int4,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.authz_role_bindings (scope, role_key, resource, action) {
+            scope -> Text,
+            role_key -> Text,
+            resource -> Text,
+            action -> Text,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.cleanup_outbox (transaction_id) {
             transaction_id -> Text,
             entity_name -> Text,
@@ -116,6 +138,45 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.webhooks (id) {
+            id -> Uuid,
+            url -> Text,
+            status -> Text,
+            secret -> Nullable<Text>,
+            organisation -> Text,
+            application -> Text,
+            description -> Nullable<Text>,
+            created_at -> Timestamptz,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.webhook_actions (webhook_id, action) {
+            webhook_id -> Uuid,
+            action -> Text,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.webhook_logs (id, created_at) {
+            id -> Uuid,
+            webhook_id -> Uuid,
+            action -> Text,
+            resource_type -> Text,
+            resource_id -> Nullable<Text>,
+            success -> Bool,
+            status_code -> Nullable<Int4>,
+            response -> Jsonb,
+            webhook_payload -> Jsonb,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::joinable!(webhook_actions -> webhooks (webhook_id));
+    diesel::joinable!(webhook_logs -> webhooks (webhook_id));
+
+    diesel::table! {
         hyperotaserver.builds (id) {
             id -> Uuid,
             build_version -> Text,
@@ -127,6 +188,8 @@ pub mod hyperotaserver {
     }
 
     diesel::allow_tables_to_appear_in_same_query!(
+        authz_memberships,
+        authz_role_bindings,
         cleanup_outbox,
         builds,
         configs,
@@ -137,5 +200,8 @@ pub mod hyperotaserver {
         releases,
         user_credentials,
         workspace_names,
+        webhooks,
+        webhook_actions,
+        webhook_logs,
     );
 }

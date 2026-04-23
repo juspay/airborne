@@ -11,10 +11,17 @@ import { useAppContext } from "@/providers/app-context";
 import useSWR from "swr";
 import { apiFetch, ErrorName } from "@/lib/api";
 import { ApiRelease } from "./releases/page";
-import { hasAppAccess } from "@/lib/utils";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_releases: permission("release", "read", "app"),
+  create_release: permission("release", "create", "app"),
+});
 
 export default function ApplicationDetailPage() {
-  const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const params = useParams<{ appId: string }>();
   const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
   // Use appId from URL params in SWR key to ensure we fetch for the correct app when navigating
@@ -23,6 +30,9 @@ export default function ApplicationDetailPage() {
   );
 
   if (error && error.name === ErrorName.Forbidden) {
+    notFound();
+  }
+  if (permissions.isReady && !permissions.can("read_releases")) {
     notFound();
   }
 
@@ -47,7 +57,7 @@ export default function ApplicationDetailPage() {
                 <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)]">{app}</h1>
               </div>
             </div>
-            {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+            {permissions.can("create_release") && (
               <div className="flex gap-2">
                 <Button asChild>
                   <Link

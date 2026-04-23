@@ -3,10 +3,11 @@ use actix_web::{
     web::{self, Json, Path, Query, ReqData},
     Scope,
 };
+use airborne_authz_macros::authz;
 use serde::Serialize;
 
 use crate::{
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ, WRITE},
+    middleware::auth::{require_org_and_app, AuthResponse},
     organisation::application::dimension::cohort::types::CohortDimensionSchema,
     run_blocking, types as airborne_types,
     types::{ABError, AppState},
@@ -47,6 +48,12 @@ struct CreateDimensionResponse {
     change_reason: String,
 }
 
+#[authz(
+    resource = "dimension",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/create")]
 async fn create_dimension_api(
     req: Json<CreateDimensionRequest>,
@@ -54,17 +61,10 @@ async fn create_dimension_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<CreateDimensionResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -140,6 +140,19 @@ async fn create_dimension_api(
                         e
                     ))
                 })?;
+            crate::webhook::fire(
+                state.get_ref(),
+                organisation.clone(),
+                application.clone(),
+                true,
+                "dimension.create",
+                "dimension",
+                Some(dimension.dimension.clone()),
+                Some(serde_json::json!({
+                    "position": dimension.position,
+                    "description": dimension.description.clone(),
+                })),
+            );
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
                 position: dimension.position,
@@ -164,6 +177,19 @@ async fn create_dimension_api(
                 .map_err(|e| {
                     ABError::InternalServerError(format!("Failed to create dimension: {}", e))
                 })?;
+            crate::webhook::fire(
+                state.get_ref(),
+                organisation.clone(),
+                application.clone(),
+                true,
+                "dimension.create",
+                "dimension",
+                Some(dimension.dimension.clone()),
+                Some(serde_json::json!({
+                    "position": dimension.position,
+                    "description": dimension.description.clone(),
+                })),
+            );
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
                 position: dimension.position,
@@ -175,6 +201,13 @@ async fn create_dimension_api(
     }
 }
 
+#[authz(
+    resource = "dimension",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
+)]
 #[get("/list")]
 async fn list_dimensions_api(
     auth_response: ReqData<AuthResponse>,
@@ -182,17 +215,10 @@ async fn list_dimensions_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ListDimensionsResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -253,6 +279,12 @@ async fn list_dimensions_api(
     }))
 }
 
+#[authz(
+    resource = "dimension",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[put("/{dimension_name}")]
 async fn update_dimension_api(
     path: Path<String>,
@@ -261,17 +293,10 @@ async fn update_dimension_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<Dimension>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -310,6 +335,20 @@ async fn update_dimension_api(
             ABError::InternalServerError(format!("Failed to trigger weight recompute: {}", e))
         })?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "dimension.update",
+        "dimension",
+        Some(update_dimension.dimension.clone()),
+        Some(serde_json::json!({
+            "position": update_dimension.position,
+            "change_reason": update_dimension.change_reason.clone(),
+        })),
+    );
+
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
         position: update_dimension.position,
@@ -328,6 +367,12 @@ async fn update_dimension_api(
     }))
 }
 
+#[authz(
+    resource = "dimension",
+    action = "delete",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[delete("/{dimension_name}")]
 async fn delete_dimension_api(
     path: Path<String>,
@@ -335,17 +380,10 @@ async fn delete_dimension_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<()>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -356,19 +394,38 @@ async fn delete_dimension_api(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
+    let dimension_name = path.into_inner();
+
     state
         .superposition_client
         .delete_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
-        .dimension(path.into_inner())
+        .dimension(dimension_name.clone())
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "dimension.delete",
+        "dimension",
+        Some(dimension_name.clone()),
+        None,
+    );
+
     Ok(Json(()))
 }
 
+#[authz(
+    resource = "release_view",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/release-view")]
 async fn create_release_view_api(
     req: Json<CreateReleaseViewRequest>,
@@ -376,17 +433,10 @@ async fn create_release_view_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ReleaseView>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
@@ -446,14 +496,16 @@ async fn create_release_view_api(
     let pool = state.db_pool.clone();
     let req_name = req.name.clone();
     let req_dimensions = req.dimensions.clone();
+    let db_app = application.clone();
+    let db_org = organisation.clone();
 
     let created_view = run_blocking!({
         let mut conn = pool.get()?;
         let result = diesel::insert_into(release_views::table)
             .values((
                 id.eq(view_id),
-                app_id.eq(application),
-                org_id.eq(organisation),
+                app_id.eq(db_app),
+                org_id.eq(db_org),
                 name.eq(req_name),
                 dimensions_col.eq(req_dimensions),
             ))
@@ -461,6 +513,19 @@ async fn create_release_view_api(
             .map_err(|e| ABError::InternalServerError(format!("DB insert failed: {}", e)))?;
         Ok(result)
     })?;
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release_view.create",
+        "release_view",
+        Some(created_view.id.to_string()),
+        Some(serde_json::json!({
+            "name": created_view.name.clone(),
+        })),
+    );
 
     Ok(Json(ReleaseView {
         id: created_view.id,
@@ -470,6 +535,13 @@ async fn create_release_view_api(
     }))
 }
 
+#[authz(
+    resource = "release_view",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
+)]
 #[get("/release-view/list")]
 async fn list_release_views_api(
     auth_response: ReqData<AuthResponse>,
@@ -477,17 +549,10 @@ async fn list_release_views_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ListReleaseViewsResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let page = query.page.unwrap_or(1).max(1);
     let count = query.count.unwrap_or(20);
@@ -531,6 +596,13 @@ async fn list_release_views_api(
     }))
 }
 
+#[authz(
+    resource = "release_view",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
+)]
 #[get("/release-view/{view_id}")]
 async fn get_release_view_api(
     path: Path<String>,
@@ -538,17 +610,10 @@ async fn get_release_view_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ReleaseView>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
     let view_id_str = path.into_inner();
 
     let view_id = Uuid::parse_str(&view_id_str)
@@ -580,6 +645,12 @@ async fn get_release_view_api(
     }))
 }
 
+#[authz(
+    resource = "release_view",
+    action = "update",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[put("/release-view/{view_id}")]
 async fn update_release_view_api(
     path: Path<String>,
@@ -588,17 +659,10 @@ async fn update_release_view_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ReleaseView>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
     let view_id_str = path.into_inner();
 
     let view_id = Uuid::parse_str(&view_id_str)
@@ -659,14 +723,16 @@ async fn update_release_view_api(
     let pool = state.db_pool.clone();
     let req_dimensions = req.dimensions.clone();
     let req_name = req.name.clone();
+    let db_app = application.clone();
+    let db_org = organisation.clone();
 
     let updated_view = run_blocking!({
         let mut conn = pool.get()?;
         let result = diesel::update(
             release_views::table.filter(
                 app_id
-                    .eq(&application)
-                    .and(org_id.eq(&organisation))
+                    .eq(&db_app)
+                    .and(org_id.eq(&db_org))
                     .and(id.eq(&view_id)),
             ),
         )
@@ -682,6 +748,19 @@ async fn update_release_view_api(
         Ok(result)
     })?;
 
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release_view.update",
+        "release_view",
+        Some(updated_view.id.to_string()),
+        Some(serde_json::json!({
+            "name": updated_view.name.clone(),
+        })),
+    );
+
     Ok(Json(ReleaseView {
         id: updated_view.id,
         name: updated_view.name,
@@ -690,6 +769,12 @@ async fn update_release_view_api(
     }))
 }
 
+#[authz(
+    resource = "release_view",
+    action = "delete",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[delete("/release-view/{view_id}")]
 async fn delete_release_view_api(
     path: Path<String>,
@@ -697,33 +782,26 @@ async fn delete_release_view_api(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<DeleteReleaseViewResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), WRITE)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
     let view_id_str = path.into_inner();
 
     let view_id = Uuid::parse_str(&view_id_str)
         .map_err(|_| ABError::BadRequest("Invalid view_id format".to_string()))?;
 
     let pool = state.db_pool.clone();
+    let db_app = application.clone();
+    let db_org = organisation.clone();
 
     let deleted_rows = run_blocking!({
         let mut conn = pool.get()?;
         let rows = diesel::delete(
-            release_views::table.filter(
-                app_id
-                    .eq(&application)
-                    .and(org_id.eq(&organisation))
-                    .and(id.eq(&view_id)),
-            ),
+            release_views::table
+                .filter(app_id.eq(&db_app))
+                .filter(org_id.eq(&db_org))
+                .filter(id.eq(&view_id)),
         )
         .execute(&mut conn)
         .map_err(|e| ABError::InternalServerError(format!("Failed to delete view: {}", e)))?;
@@ -733,6 +811,17 @@ async fn delete_release_view_api(
     if deleted_rows == 0 {
         return Err(ABError::NotFound("View not found".to_string()));
     }
+
+    crate::webhook::fire(
+        state.get_ref(),
+        organisation.clone(),
+        application.clone(),
+        true,
+        "release_view.delete",
+        "release_view",
+        Some(view_id.to_string()),
+        None,
+    );
 
     Ok(Json(DeleteReleaseViewResponse { success: true }))
 }

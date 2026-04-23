@@ -4,8 +4,9 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    builds, cleanup_outbox, configs, files, packages, packages_v2, release_views, releases,
-    user_credentials, workspace_names,
+    authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, files, packages,
+    packages_v2, release_views, releases, user_credentials, webhook_actions, webhook_logs,
+    webhooks, workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -191,4 +192,115 @@ pub struct UserCredentialsEntry {
     pub organisation: String,
     pub application: String,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable, Clone)]
+#[diesel(table_name = authz_memberships)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct AuthzMembershipEntry {
+    pub subject: String,
+    pub scope: String,
+    pub organisation: String,
+    pub application: String,
+    pub role_key: String,
+    pub role_level: i32,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = authz_memberships)]
+pub struct NewAuthzMembershipEntry {
+    pub subject: String,
+    pub scope: String,
+    pub organisation: String,
+    pub application: String,
+    pub role_key: String,
+    pub role_level: i32,
+}
+
+#[derive(Queryable, Insertable, Debug, Selectable, Clone)]
+#[diesel(table_name = authz_role_bindings)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct AuthzRoleBindingEntry {
+    pub scope: String,
+    pub role_key: String,
+    pub resource: String,
+    pub action: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = authz_role_bindings)]
+pub struct NewAuthzRoleBindingEntry {
+    pub scope: String,
+    pub role_key: String,
+    pub resource: String,
+    pub action: String,
+}
+
+#[derive(Queryable, Selectable, Debug, Serialize, Clone)]
+#[diesel(table_name = webhooks)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct WebhookEntry {
+    pub id: uuid::Uuid,
+    pub url: String,
+    pub status: String,
+    pub secret: Option<String>,
+    pub organisation: String,
+    pub application: String,
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = webhooks)]
+pub struct NewWebhookEntry {
+    pub url: String,
+    pub status: String,
+    pub secret: Option<String>,
+    pub organisation: String,
+    pub application: String,
+    pub description: Option<String>,
+}
+
+#[derive(Queryable, Selectable, Insertable, Debug, Serialize, Clone)]
+#[diesel(table_name = webhook_actions)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct WebhookActionEntry {
+    pub webhook_id: uuid::Uuid,
+    pub action: String,
+}
+
+#[derive(Queryable, Selectable, Debug, Serialize, Clone)]
+#[diesel(table_name = webhook_logs)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct WebhookLogEntry {
+    pub id: uuid::Uuid,
+    pub webhook_id: uuid::Uuid,
+    pub action: String,
+    pub resource_type: String,
+    pub resource_id: Option<String>,
+    pub success: bool,
+    pub status_code: Option<i32>,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub response: serde_json::Value,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub webhook_payload: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = webhook_logs)]
+pub struct NewWebhookLogEntry {
+    pub webhook_id: uuid::Uuid,
+    pub action: String,
+    pub resource_type: String,
+    pub resource_id: Option<String>,
+    pub success: bool,
+    pub status_code: Option<i32>,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub response: serde_json::Value,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub webhook_payload: serde_json::Value,
 }

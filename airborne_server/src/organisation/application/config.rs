@@ -18,6 +18,7 @@ use actix_web::{
     web::{self, Json, ReqData},
     Scope,
 };
+use airborne_authz_macros::authz;
 use diesel::prelude::*;
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -25,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    middleware::auth::{validate_user, AuthResponse, WRITE},
+    middleware::auth::{require_org_and_app, AuthResponse},
     run_blocking, types as airborne_types,
     types::{ABError, AppState},
     utils::db::{
@@ -67,6 +68,12 @@ struct Response {
     config_version: String,
 }
 
+#[authz(
+    resource = "config",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/create_json_v1")]
 async fn create_config_json_v1(
     req: Json<ConfigJsonV1Request>,
@@ -74,10 +81,8 @@ async fn create_config_json_v1(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<Response>> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Forbidden("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Forbidden("No access to application".to_string()))?;
+    let (organisation, application) =
+        require_org_and_app(auth_response.organisation, auth_response.application)?;
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
@@ -142,6 +147,12 @@ async fn create_config_json_v1(
     }))
 }
 
+#[authz(
+    resource = "config",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
 #[post("/create_json_v1/multipart")]
 async fn create_config_json_v1_multipart(
     MultipartForm(form): MultipartForm<ConfigJsonV1MultipartRequest>,
@@ -149,10 +160,8 @@ async fn create_config_json_v1_multipart(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<Response>> {
     let auth_response = auth_response.into_inner();
-    let organisation = validate_user(auth_response.organisation, WRITE)
-        .map_err(|_| ABError::Forbidden("No access to org".to_string()))?;
-    let application = validate_user(auth_response.application, WRITE)
-        .map_err(|_| ABError::Forbidden("No access to application".to_string()))?;
+    let (organisation, application) =
+        require_org_and_app(auth_response.organisation, auth_response.application)?;
 
     // Parse the JSON request
     let req: ConfigJsonV1Request = serde_json::from_str(&form.json.into_inner())

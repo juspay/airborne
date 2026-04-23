@@ -1,26 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum AccessLvl {
-    Admin,
-    Write,
-    Read,
-}
-
-impl AccessLvl {
-    pub fn as_str(&self) -> String {
-        match self {
-            Self::Admin => "admin".to_string(),
-            Self::Write => "write".to_string(),
-            Self::Read => "read".to_string(),
-        }
-    }
-}
 #[derive(Deserialize)]
 pub struct UserRequest {
     pub user: String,
-    pub access: AccessLvl,
+    pub access: String,
 }
 
 #[derive(Deserialize)]
@@ -47,14 +30,32 @@ pub struct UserInfo {
     pub roles: Vec<String>,
 }
 
-// Helper structs
-
-pub struct UserContext {
-    pub user_id: String,
-    pub username: String,
+#[derive(Serialize, Clone)]
+pub struct PermissionInfo {
+    pub key: String,
+    pub resource: String,
+    pub action: String,
 }
 
-pub struct OrgContext {
-    pub org_id: String,
-    pub group_id: String,
+#[derive(Serialize, Clone)]
+pub struct RoleInfo {
+    pub role: String,
+    pub is_system: bool,
+    pub permissions: Vec<PermissionInfo>,
+}
+
+#[derive(Serialize)]
+pub struct ListRolesResponse {
+    pub roles: Vec<RoleInfo>,
+}
+
+#[derive(Serialize)]
+pub struct ListPermissionsResponse {
+    pub permissions: Vec<PermissionInfo>,
+}
+
+#[derive(Deserialize)]
+pub struct UpsertRoleRequest {
+    pub role: String,
+    pub permissions: Vec<String>,
 }

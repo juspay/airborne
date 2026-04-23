@@ -11,7 +11,6 @@ import { Search, PlugIcon as PkgIcon, Rocket, Plus, Package } from "lucide-react
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
-import { hasAppAccess } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   Pagination,
@@ -23,6 +22,8 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { useParams } from "next/navigation";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
 
 type ApiPackage = {
   index: string;
@@ -31,12 +32,19 @@ type ApiPackage = {
   files: string[];
 };
 
+const PAGE_AUTHZ = definePagePermissions({
+  read_packages: permission("package", "read", "app"),
+  create_package: permission("package", "create", "app"),
+});
+
 export default function PackagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const count = 10;
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
+  const canCreatePackage = permissions.can("create_package");
   const params = useParams<{ appId: string }>();
   const appId = typeof params.appId === "string" ? params.appId : Array.isArray(params.appId) ? params.appId[0] : "";
 
@@ -159,7 +167,7 @@ export default function PackagesPage() {
           <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Packages</h1>
           <p className="text-muted-foreground mt-2">Bundle files together with properties and metadata</p>
         </div>
-        {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
+        {canCreatePackage && (
           <Button asChild className="gap-2">
             <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}>
               <Plus className="h-4 w-4" />
@@ -252,7 +260,7 @@ export default function PackagesPage() {
                   ? `No packages found matching "${searchQuery}".`
                   : "You haven't created any packages yet."}
               </p>
-              {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && searchQuery.trim() === "" && (
+              {canCreatePackage && searchQuery.trim() === "" && (
                 <Button asChild className="gap-2">
                   <Link
                     href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}

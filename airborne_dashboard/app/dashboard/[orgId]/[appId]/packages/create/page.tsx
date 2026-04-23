@@ -11,12 +11,19 @@ import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
-import { hasAppAccess } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { FileChooser, SelectedFile } from "@/components/file-chooser";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  create_package: permission("package", "create", "app"),
+  read_files: permission("file_group", "read", "app"),
+});
 
 export default function CreatePackagePage() {
-  const { token, org, app, getAppAccess, getOrgAccess, loadingAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
   const totalSteps = 2;
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -32,10 +39,10 @@ export default function CreatePackagePage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loadingAccess && !hasAppAccess(getOrgAccess(org), getAppAccess(org, app))) {
+    if (permissions.isReady && (!permissions.can("create_package") || !permissions.can("read_files"))) {
       notFound();
     }
-  }, [loadingAccess, org, app, getOrgAccess, getAppAccess, hasAppAccess]);
+  }, [permissions.isReady, permissions.checks]);
 
   // File selection handlers
   const handleIndexFileChange = useCallback((files: SelectedFile[]) => {

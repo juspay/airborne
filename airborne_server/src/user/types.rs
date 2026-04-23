@@ -44,6 +44,9 @@ pub struct OAuthRequest {
 pub struct UserCredentials {
     pub name: String,
     pub password: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub email: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -64,4 +67,5 @@ pub struct LoginFailure {
 #[derive(Deserialize)]
 pub struct OAuthQuery {
     pub offline: Option<bool>,
+    pub idp: Option<String>,
 }

@@ -4,13 +4,14 @@ use actix_web::{
     get,
     web::{self, Json, Query, ReqData},
 };
+use airborne_authz_macros::authz;
 use diesel::prelude::*;
 
 use crate::{
     file::groups::types::*,
-    middleware::auth::{validate_user, AuthResponse, ADMIN, READ},
+    middleware::auth::{require_org_and_app, AuthResponse},
     run_blocking, types as airborne_types,
-    types::{ABError, AppState},
+    types::AppState,
     utils::db::{models::FileEntry as DbFile, schema::hyperotaserver::files::dsl::*},
 };
 
@@ -38,6 +39,13 @@ fn escape_like_pattern(input: &str) -> String {
         .replace('_', "\\_")
 }
 
+#[authz(
+    resource = "file_group",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"],
+    webhook_allowed = false
+)]
 #[get("")]
 async fn list_file_groups(
     query: Query<FileGroupsQuery>,
@@ -45,17 +53,10 @@ async fn list_file_groups(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<FileGroupsListResponse>> {
     let auth_response = auth_response.into_inner();
-    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
-    {
-        Ok(org_name) => auth_response
-            .application
-            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
-            .map(|access| (org_name, access.name)),
-        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
-            validate_user(auth_response.application.clone(), READ)
-                .map(|app_name| (org_name, app_name))
-        }),
-    }?;
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
 
     let pool = state.db_pool.clone();
     let query = query.into_inner();
