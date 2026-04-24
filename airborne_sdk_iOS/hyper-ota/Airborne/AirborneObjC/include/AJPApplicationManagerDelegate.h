@@ -8,12 +8,6 @@
 #ifndef AJPApplicationManagerDelegate_h
 #define AJPApplicationManagerDelegate_h
 
-#if SWIFT_PACKAGE
-#import "AJPApplicationManifest.h"
-#else
-#import <Airborne/AJPApplicationManifest.h>
-#endif
-
 @class AJPFileUtil;
 @class AJPRemoteFileUtil;
 

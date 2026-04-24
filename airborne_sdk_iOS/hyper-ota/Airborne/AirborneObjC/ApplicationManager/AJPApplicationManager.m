@@ -7,7 +7,6 @@
 
 #import <Foundation/Foundation.h>
 #import "AJPApplicationManager.h"
-#import "AJPApplicationManifest.h"
 #import <WebKit/WebKit.h>
 #import "AJPApplicationConstants.h"
 #import "AJPApplicationTracker.h"
@@ -1715,7 +1714,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (void)updateResources:(AppResources *)resources {
     NSError *error = nil;
-    AJPApplicationResources* appResources = [AJPApplicationResources new];
+    AJPApplicationResources* appResources = [[AJPApplicationResources alloc] init];
     appResources.resources = resources;
     BOOL didUpdate = [self.fileUtil writeInstance:appResources
                                          fileName:APP_RESOURCES_DATA_FILE_NAME

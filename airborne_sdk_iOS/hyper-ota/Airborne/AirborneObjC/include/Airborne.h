@@ -8,19 +8,9 @@
 #if SWIFT_PACKAGE
 #import "AJPApplicationManager.h"
 #import "AJPApplicationManagerDelegate.h"
-#import "AJPApplicationManifest.h"
-#import "AJPApplicationConfig.h"
-#import "AJPApplicationPackage.h"
-#import "AJPApplicationResources.h"
-#import "AJPResource.h"
 #import "AJPHelpers.h"
 #else
 #import <Airborne/AJPApplicationManager.h>
 #import <Airborne/AJPApplicationManagerDelegate.h>
-#import <Airborne/AJPApplicationManifest.h>
-#import <Airborne/AJPApplicationConfig.h>
-#import <Airborne/AJPApplicationPackage.h>
-#import <Airborne/AJPApplicationResources.h>
-#import <Airborne/AJPResource.h>
 #import <Airborne/AJPHelpers.h>
 #endif

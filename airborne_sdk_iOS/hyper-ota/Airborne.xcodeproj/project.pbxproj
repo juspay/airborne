@@ -23,23 +23,14 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		DC0637042F9B74D700CF0345 /* AJPApplicationManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC0637032F9B74D700CF0345 /* AJPApplicationManifest.swift */; };
 		DC2400D02E8BD5C50071EE0E /* AJPApplicationManager.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B72E8BD5C50071EE0E /* AJPApplicationManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DC2400D22E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B82E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DC2400D32E8BD5C50071EE0E /* AJPApplicationConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400A32E8BD5C50071EE0E /* AJPApplicationConstants.h */; };
 		DC2400D42E8BD5C50071EE0E /* AJPApplicationTracker.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400A62E8BD5C50071EE0E /* AJPApplicationTracker.h */; };
 		DC2400D62E8BD5C50071EE0E /* Airborne.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B52E8BD5C50071EE0E /* Airborne.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DC2400D72E8BD5C50071EE0E /* AJPApplicationPackage.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BA2E8BD5C50071EE0E /* AJPApplicationPackage.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DC2400DA2E8BD5C50071EE0E /* AJPResource.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400C02E8BD5C50071EE0E /* AJPResource.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DC2400DB2E8BD5C50071EE0E /* AJPApplicationManifest.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B92E8BD5C50071EE0E /* AJPApplicationManifest.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DC2400DD2E8BD5C50071EE0E /* AJPApplicationConfig.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400B62E8BD5C50071EE0E /* AJPApplicationConfig.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		DC2400DE2E8BD5C50071EE0E /* AJPApplicationResources.h in Headers */ = {isa = PBXBuildFile; fileRef = DC2400BB2E8BD5C50071EE0E /* AJPApplicationResources.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DC2400DF2E8BD5C50071EE0E /* AJPApplicationManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AA2E8BD5C50071EE0E /* AJPApplicationManager.m */; };
-		DC2400E02E8BD5C50071EE0E /* AJPApplicationManifest.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AB2E8BD5C50071EE0E /* AJPApplicationManifest.m */; };
-		DC2400E22E8BD5C50071EE0E /* AJPApplicationConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400A92E8BD5C50071EE0E /* AJPApplicationConfig.m */; };
-		DC2400E32E8BD5C50071EE0E /* AJPApplicationPackage.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AC2E8BD5C50071EE0E /* AJPApplicationPackage.m */; };
-		DC2400E62E8BD5C50071EE0E /* AJPResource.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AE2E8BD5C50071EE0E /* AJPResource.m */; };
 		DC2400E82E8BD5C50071EE0E /* AJPApplicationTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400A72E8BD5C50071EE0E /* AJPApplicationTracker.m */; };
-		DC2400E92E8BD5C50071EE0E /* AJPApplicationResources.m in Sources */ = {isa = PBXBuildFile; fileRef = DC2400AD2E8BD5C50071EE0E /* AJPApplicationResources.m */; };
 		DC2400ED2E8BD5C50071EE0E /* Airborne.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC2400C92E8BD5C50071EE0E /* Airborne.swift */; };
 		DC3A448D2F91FC8F00E8F78D /* AJPFileUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A44872F91FC8F00E8F78D /* AJPFileUtil.swift */; };
 		DC3A448E2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A448B2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift */; };
@@ -52,6 +43,10 @@
 		DC6A9D772F8E3DFB00FE7DF0 /* Airborne.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DCB613FB2E6191FB0099D87E /* Airborne.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DC6A9D842F8E53F100FE7DF0 /* AJPHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = DC6A9D832F8E53F100FE7DF0 /* AJPHelpers.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DC6A9D862F8E540300FE7DF0 /* AJPHelpers.m in Sources */ = {isa = PBXBuildFile; fileRef = DC6A9D852F8E540300FE7DF0 /* AJPHelpers.m */; };
+		DCD493C32F98DD2E000534A0 /* AJPResource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD493C22F98DD2E000534A0 /* AJPResource.swift */; };
+		DCD868E02F9B523900E341CD /* AJPApplicationConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */; };
+		DCD868E12F9B523900E341CD /* AJPApplicationPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD868DE2F9B523900E341CD /* AJPApplicationPackage.swift */; };
+		DCD868E22F9B523900E341CD /* AJPApplicationResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD868DF2F9B523900E341CD /* AJPApplicationResources.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,23 +81,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		DC0637032F9B74D700CF0345 /* AJPApplicationManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationManifest.swift; sourceTree = "<group>"; };
 		DC2400A32E8BD5C50071EE0E /* AJPApplicationConstants.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationConstants.h; sourceTree = "<group>"; };
 		DC2400A62E8BD5C50071EE0E /* AJPApplicationTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationTracker.h; sourceTree = "<group>"; };
 		DC2400A72E8BD5C50071EE0E /* AJPApplicationTracker.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationTracker.m; sourceTree = "<group>"; };
-		DC2400A92E8BD5C50071EE0E /* AJPApplicationConfig.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationConfig.m; sourceTree = "<group>"; };
 		DC2400AA2E8BD5C50071EE0E /* AJPApplicationManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationManager.m; sourceTree = "<group>"; };
-		DC2400AB2E8BD5C50071EE0E /* AJPApplicationManifest.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationManifest.m; sourceTree = "<group>"; };
-		DC2400AC2E8BD5C50071EE0E /* AJPApplicationPackage.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationPackage.m; sourceTree = "<group>"; };
-		DC2400AD2E8BD5C50071EE0E /* AJPApplicationResources.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPApplicationResources.m; sourceTree = "<group>"; };
-		DC2400AE2E8BD5C50071EE0E /* AJPResource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPResource.m; sourceTree = "<group>"; };
 		DC2400B52E8BD5C50071EE0E /* Airborne.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Airborne.h; sourceTree = "<group>"; };
-		DC2400B62E8BD5C50071EE0E /* AJPApplicationConfig.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationConfig.h; sourceTree = "<group>"; };
 		DC2400B72E8BD5C50071EE0E /* AJPApplicationManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManager.h; sourceTree = "<group>"; };
 		DC2400B82E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManagerDelegate.h; sourceTree = "<group>"; };
-		DC2400B92E8BD5C50071EE0E /* AJPApplicationManifest.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationManifest.h; sourceTree = "<group>"; };
-		DC2400BA2E8BD5C50071EE0E /* AJPApplicationPackage.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationPackage.h; sourceTree = "<group>"; };
-		DC2400BB2E8BD5C50071EE0E /* AJPApplicationResources.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationResources.h; sourceTree = "<group>"; };
-		DC2400C02E8BD5C50071EE0E /* AJPResource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPResource.h; sourceTree = "<group>"; };
 		DC2400C92E8BD5C50071EE0E /* Airborne.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Airborne.swift; sourceTree = "<group>"; };
 		DC2400CD2E8BD5C50071EE0E /* Airborne.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = Airborne.modulemap; sourceTree = "<group>"; };
 		DC3A44872F91FC8F00E8F78D /* AJPFileUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPFileUtil.swift; sourceTree = "<group>"; };
@@ -117,6 +103,10 @@
 		DC6A9D832F8E53F100FE7DF0 /* AJPHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPHelpers.h; sourceTree = "<group>"; };
 		DC6A9D852F8E540300FE7DF0 /* AJPHelpers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPHelpers.m; sourceTree = "<group>"; };
 		DCB613FB2E6191FB0099D87E /* Airborne.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Airborne.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCD493C22F98DD2E000534A0 /* AJPResource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPResource.swift; sourceTree = "<group>"; };
+		DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationConfig.swift; sourceTree = "<group>"; };
+		DCD868DE2F9B523900E341CD /* AJPApplicationPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationPackage.swift; sourceTree = "<group>"; };
+		DCD868DF2F9B523900E341CD /* AJPApplicationResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationResources.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -194,12 +184,7 @@
 			children = (
 				DC2400A52E8BD5C50071EE0E /* Constants */,
 				DC2400A82E8BD5C50071EE0E /* Tracker */,
-				DC2400A92E8BD5C50071EE0E /* AJPApplicationConfig.m */,
 				DC2400AA2E8BD5C50071EE0E /* AJPApplicationManager.m */,
-				DC2400AB2E8BD5C50071EE0E /* AJPApplicationManifest.m */,
-				DC2400AC2E8BD5C50071EE0E /* AJPApplicationPackage.m */,
-				DC2400AD2E8BD5C50071EE0E /* AJPApplicationResources.m */,
-				DC2400AE2E8BD5C50071EE0E /* AJPResource.m */,
 			);
 			path = ApplicationManager;
 			sourceTree = "<group>";
@@ -216,13 +201,8 @@
 			isa = PBXGroup;
 			children = (
 				DC2400B52E8BD5C50071EE0E /* Airborne.h */,
-				DC2400B62E8BD5C50071EE0E /* AJPApplicationConfig.h */,
 				DC2400B72E8BD5C50071EE0E /* AJPApplicationManager.h */,
 				DC2400B82E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h */,
-				DC2400B92E8BD5C50071EE0E /* AJPApplicationManifest.h */,
-				DC2400BA2E8BD5C50071EE0E /* AJPApplicationPackage.h */,
-				DC2400BB2E8BD5C50071EE0E /* AJPApplicationResources.h */,
-				DC2400C02E8BD5C50071EE0E /* AJPResource.h */,
 				DC6A9D832F8E53F100FE7DF0 /* AJPHelpers.h */,
 			);
 			path = include;
@@ -241,6 +221,11 @@
 		DC2400CA2E8BD5C50071EE0E /* AirborneSwift */ = {
 			isa = PBXGroup;
 			children = (
+				DCD493C22F98DD2E000534A0 /* AJPResource.swift */,
+				DC0637032F9B74D700CF0345 /* AJPApplicationManifest.swift */,
+				DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */,
+				DCD868DE2F9B523900E341CD /* AJPApplicationPackage.swift */,
+				DCD868DF2F9B523900E341CD /* AJPApplicationResources.swift */,
 				DC2400C92E8BD5C50071EE0E /* Airborne.swift */,
 			);
 			path = AirborneSwift;
@@ -307,13 +292,8 @@
 			files = (
 				DC2400D02E8BD5C50071EE0E /* AJPApplicationManager.h in Headers */,
 				DC2400D22E8BD5C50071EE0E /* AJPApplicationManagerDelegate.h in Headers */,
-				DC2400D72E8BD5C50071EE0E /* AJPApplicationPackage.h in Headers */,
 				DC2400D62E8BD5C50071EE0E /* Airborne.h in Headers */,
-				DC2400DB2E8BD5C50071EE0E /* AJPApplicationManifest.h in Headers */,
-				DC2400DD2E8BD5C50071EE0E /* AJPApplicationConfig.h in Headers */,
-				DC2400DE2E8BD5C50071EE0E /* AJPApplicationResources.h in Headers */,
 				DC6A9D842F8E53F100FE7DF0 /* AJPHelpers.h in Headers */,
-				DC2400DA2E8BD5C50071EE0E /* AJPResource.h in Headers */,
 				DC2400D32E8BD5C50071EE0E /* AJPApplicationConstants.h in Headers */,
 				DC2400D42E8BD5C50071EE0E /* AJPApplicationTracker.h in Headers */,
 			);
@@ -500,20 +480,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				DC2400DF2E8BD5C50071EE0E /* AJPApplicationManager.m in Sources */,
-				DC2400E02E8BD5C50071EE0E /* AJPApplicationManifest.m in Sources */,
 				DC3A448D2F91FC8F00E8F78D /* AJPFileUtil.swift in Sources */,
 				DC3A448E2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift in Sources */,
 				DC3A448F2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift in Sources */,
 				DC3A44902F91FC8F00E8F78D /* AJPNetworkClient.swift in Sources */,
 				DC3A44912F91FC8F00E8F78D /* AJPHelpers.swift in Sources */,
-				DC2400E22E8BD5C50071EE0E /* AJPApplicationConfig.m in Sources */,
+				DCD868E02F9B523900E341CD /* AJPApplicationConfig.swift in Sources */,
+				DCD868E12F9B523900E341CD /* AJPApplicationPackage.swift in Sources */,
+				DCD868E22F9B523900E341CD /* AJPApplicationResources.swift in Sources */,
 				DC3A44AF2F92009000E8F78D /* AJPLoggerDelegate.swift in Sources */,
-				DC2400E32E8BD5C50071EE0E /* AJPApplicationPackage.m in Sources */,
+				DCD493C32F98DD2E000534A0 /* AJPResource.swift in Sources */,
 				DC6A9D352F8E280600FE7DF0 /* AJPApplicationConstants.m in Sources */,
 				DC6A9D862F8E540300FE7DF0 /* AJPHelpers.m in Sources */,
-				DC2400E62E8BD5C50071EE0E /* AJPResource.m in Sources */,
+				DC0637042F9B74D700CF0345 /* AJPApplicationManifest.swift in Sources */,
 				DC2400E82E8BD5C50071EE0E /* AJPApplicationTracker.m in Sources */,
-				DC2400E92E8BD5C50071EE0E /* AJPApplicationResources.m in Sources */,
 				DC2400ED2E8BD5C50071EE0E /* Airborne.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

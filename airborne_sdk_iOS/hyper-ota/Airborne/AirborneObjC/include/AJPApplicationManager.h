@@ -11,12 +11,17 @@
 #import <WebKit/WKWebView.h>
 
 #if SWIFT_PACKAGE
-#import "AJPApplicationManifest.h"
 #import "AJPApplicationManagerDelegate.h"
 #else
-#import <Airborne/AJPApplicationManifest.h>
 #import <Airborne/AJPApplicationManagerDelegate.h>
 #endif
+
+@class AJPApplicationManifest;
+@class AJPResource;
+
+/// Convenience typedefs for the resource map used throughout AJPApplicationManager.
+typedef NSDictionary<NSString*, AJPResource*> AppResources;
+typedef NSMutableDictionary<NSString*, AJPResource*> MutableAppResources;
 
 @interface AJPDownloadResult : NSObject
 
@@ -29,6 +34,18 @@
 @end
 
 typedef void (^PackagesCompletionHandler)(AJPDownloadResult * _Nonnull);
+
+/**
+ * Completion handler block type for release configuration fetch operations.
+ *
+ * @param manifest The successfully fetched and parsed application manifest/release config,
+ *                 or nil if an error occurred
+ * @param error    An error object describing what went wrong, or nil if successful
+ * @param didTimeout YES if the release config timeout occurred before the fetch completed
+ */
+typedef void (^AJPReleaseConfigCompletionHandler)(AJPApplicationManifest * _Nullable manifest,
+                                                   NSError * _Nullable error,
+                                                   BOOL didTimeout);
 
 NS_ASSUME_NONNULL_BEGIN
 
