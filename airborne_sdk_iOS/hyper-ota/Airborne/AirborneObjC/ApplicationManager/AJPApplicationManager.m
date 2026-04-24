@@ -12,6 +12,7 @@
 #import "AJPApplicationTracker.h"
 #if SWIFT_PACKAGE
 @import AirborneSwiftCore;
+@import AirborneSwiftModel;
 #else
 #import <Airborne/Airborne-Swift.h>
 #endif

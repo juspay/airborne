@@ -9,6 +9,7 @@ import Foundation
 #if SWIFT_PACKAGE
 import AirborneObjC
 import AirborneSwiftCore
+import AirborneSwiftModel
 #endif
 
 // MARK: - AirborneDelegate Protocol
@@ -257,7 +258,7 @@ extension AirborneServices {
      */
     @objc public func getIndexBundlePath() -> URL {
         guard
-            let indexFilePath = self.applicationManager?.getCurrentApplicationManifest().package.index.filePath,
+            let indexFilePath = (self.applicationManager?.getCurrentApplicationManifest() as? AJPApplicationManifest)?.package.index.filePath,
             !indexFilePath.isEmpty
         else {
             return bundlePath.url(forResource: "main", withExtension: "jsBundle") ?? bundlePath.bundleURL.appendingPathComponent("main.jsBundle")
@@ -302,8 +303,9 @@ extension AirborneServices {
      *         Returns an empty string if manifest cannot be serialized.
      */
     @objc public func getReleaseConfig() -> String {
-        let manifest = self.applicationManager?.getCurrentApplicationManifest().toDictionary()
-        guard let manifestDict = manifest as? [String: Any] else {
+        guard
+            let manifest = self.applicationManager?.getCurrentApplicationManifest() as? AJPApplicationManifest,
+            let manifestDict = manifest.toDictionary() as? [String: Any] else {
             return ""
         }
         do {
@@ -355,7 +357,7 @@ extension AirborneServices: AJPLoggerDelegate {
     /**
      * Handles logging events from the application manager and forwards them to the delegate.
      */
-    public func trackEvent(withLevel level: String!, label: String!, key: String!, value: Any!, category: String!, subcategory: String!) {
+    public func trackEvent(withLevel level: String, label: String, key: String, value: Any, category: String, subcategory: String) {
         let valueDict = value as? [String: Any] ?? [:]
         self.delegate?.onEvent?(level: level, label: label, key: key, value: valueDict, category: category, subcategory: subcategory)
     }

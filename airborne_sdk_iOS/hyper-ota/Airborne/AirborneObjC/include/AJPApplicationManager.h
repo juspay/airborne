@@ -80,7 +80,12 @@ NS_ASSUME_NONNULL_BEGIN
  *       not necessarily the latest downloaded state
  * @note Safe to call from any thread during or after download operations
  */
+#if SWIFT_PACKAGE
+- (id)getCurrentApplicationManifest;
+#else
 - (AJPApplicationManifest *)getCurrentApplicationManifest;
+#endif
+
 
 
 /** Returns the current download result indicating the overall status of package and resource operations.

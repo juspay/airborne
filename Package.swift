@@ -21,8 +21,13 @@ let package = Package(
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwiftCore"
         ),
         .target(
+            name: "AirborneSwiftModel",
+            dependencies: [],
+            path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwiftModel"
+        ),
+        .target(
             name: "AirborneObjC",
-            dependencies: ["AirborneSwiftCore"],
+            dependencies: ["AirborneSwiftCore", "AirborneSwiftModel"],
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneObjC",
             publicHeadersPath: "include",
             cSettings: [
@@ -34,7 +39,7 @@ let package = Package(
         ),
         .target(
             name: "Airborne",
-            dependencies: ["AirborneObjC", "AirborneSwiftCore"],
+            dependencies: ["AirborneObjC", "AirborneSwiftCore", "AirborneSwiftModel"],
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwift"
         ),
         .testTarget(

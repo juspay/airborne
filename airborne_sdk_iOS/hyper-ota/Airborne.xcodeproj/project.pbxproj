@@ -161,6 +161,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		DC06376C2F9B847700CF0345 /* AirborneSwiftModel */ = {
+			isa = PBXGroup;
+			children = (
+				DCD493C22F98DD2E000534A0 /* AJPResource.swift */,
+				DC0637032F9B74D700CF0345 /* AJPApplicationManifest.swift */,
+				DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */,
+				DCD868DE2F9B523900E341CD /* AJPApplicationPackage.swift */,
+				DCD868DF2F9B523900E341CD /* AJPApplicationResources.swift */,
+			);
+			path = AirborneSwiftModel;
+			sourceTree = "<group>";
+		};
 		DC2400A52E8BD5C50071EE0E /* Constants */ = {
 			isa = PBXGroup;
 			children = (
@@ -221,11 +233,6 @@
 		DC2400CA2E8BD5C50071EE0E /* AirborneSwift */ = {
 			isa = PBXGroup;
 			children = (
-				DCD493C22F98DD2E000534A0 /* AJPResource.swift */,
-				DC0637032F9B74D700CF0345 /* AJPApplicationManifest.swift */,
-				DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */,
-				DCD868DE2F9B523900E341CD /* AJPApplicationPackage.swift */,
-				DCD868DF2F9B523900E341CD /* AJPApplicationResources.swift */,
 				DC2400C92E8BD5C50071EE0E /* Airborne.swift */,
 			);
 			path = AirborneSwift;
@@ -234,6 +241,7 @@
 		DC2400CE2E8BD5C50071EE0E /* Airborne */ = {
 			isa = PBXGroup;
 			children = (
+				DC06376C2F9B847700CF0345 /* AirborneSwiftModel */,
 				DC2400C82E8BD5C50071EE0E /* AirborneObjC */,
 				DC3A448C2F91FC8F00E8F78D /* AirborneSwiftCore */,
 				DC2400CA2E8BD5C50071EE0E /* AirborneSwift */,
@@ -733,7 +741,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GE8BT8LF5K;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.AirborneTestAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -755,7 +763,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GE8BT8LF5K;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.AirborneTestAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -777,7 +785,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GE8BT8LF5K;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.AirborneTestAppTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
