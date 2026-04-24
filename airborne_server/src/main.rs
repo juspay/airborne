@@ -145,7 +145,8 @@ async fn main() -> std::io::Result<()> {
     let secret = app_config.keycloak_secret.clone();
     let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
 
-    let cac_url = app_config.superposition_url.clone();
+    let dashboard_superposition_url = app_config.superposition_url.clone();
+    let rc_superposition_url = app_config.superposition_rc_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
 
     let env = types::Environment {
@@ -202,37 +203,65 @@ async fn main() -> std::io::Result<()> {
         hub = Some(Sheets::new(client, gcp_auth));
     }
 
-    let superposition_client = if app_config.enable_authenticated_superposition {
-        let superposition_user_token = app_config.superposition_user_token.clone().expect(
-            "SUPERPOSITION_USER_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
-        );
-        let superposition_org_token = app_config.superposition_org_token.clone().expect(
-            "SUPERPOSITION_ORG_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
-        );
+    let create_superposition_client =
+        |endpoint_url: String,
+         user_token: Option<String>,
+         org_token: Option<String>,
+         user_token_env_hint: &str,
+         org_token_env_hint: &str| {
+            if app_config.enable_authenticated_superposition {
+                let superposition_user_token = user_token.unwrap_or_else(|| {
+                    panic!(
+                        "{} must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
+                        user_token_env_hint
+                    )
+                });
+                let superposition_org_token = org_token.unwrap_or_else(|| {
+                    panic!(
+                        "{} must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
+                        org_token_env_hint
+                    )
+                });
 
-        // Inject Auth cookie for Superposition SDK calls
-        let cookie_interceptor = CookieIntercept::new(format!(
-            "user={}; org_{}={}",
-            superposition_user_token, superposition_org_id_env, superposition_org_token,
-        ));
+                // Inject Auth cookie for Superposition SDK calls
+                let cookie_interceptor = CookieIntercept::new(format!(
+                    "user={}; org_{}={}",
+                    superposition_user_token, superposition_org_id_env, superposition_org_token,
+                ));
 
-        superposition_sdk::Client::from_conf(
-            SrsConfig::builder()
-                .endpoint_url(cac_url.clone())
-                .behavior_version_latest()
-                .bearer_token(superposition_token.into())
-                .interceptor(cookie_interceptor)
-                .build(),
-        )
-    } else {
-        superposition_sdk::Client::from_conf(
-            SrsConfig::builder()
-                .endpoint_url(cac_url.clone())
-                .behavior_version_latest()
-                .bearer_token(superposition_token.into())
-                .build(),
-        )
-    };
+                superposition_sdk::Client::from_conf(
+                    SrsConfig::builder()
+                        .endpoint_url(endpoint_url)
+                        .behavior_version_latest()
+                        .bearer_token(superposition_token.clone().into())
+                        .interceptor(cookie_interceptor)
+                        .build(),
+                )
+            } else {
+                superposition_sdk::Client::from_conf(
+                    SrsConfig::builder()
+                        .endpoint_url(endpoint_url)
+                        .behavior_version_latest()
+                        .bearer_token(superposition_token.clone().into())
+                        .build(),
+                )
+            }
+        };
+
+    let superposition_client = create_superposition_client(
+        dashboard_superposition_url,
+        app_config.superposition_user_token.clone(),
+        app_config.superposition_org_token.clone(),
+        "SUPERPOSITION_USER_TOKEN",
+        "SUPERPOSITION_ORG_TOKEN",
+    );
+    let rc_superposition_client = create_superposition_client(
+        rc_superposition_url,
+        app_config.superposition_rc_user_token.clone(),
+        app_config.superposition_rc_org_token.clone(),
+        "SUPERPOSITION_RC_USER_TOKEN or SUPERPOSITION_USER_TOKEN",
+        "SUPERPOSITION_RC_ORG_TOKEN or SUPERPOSITION_ORG_TOKEN",
+    );
 
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
@@ -240,6 +269,7 @@ async fn main() -> std::io::Result<()> {
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
+        rc_superposition_client,
         sheets_hub: hub,
     });
 
