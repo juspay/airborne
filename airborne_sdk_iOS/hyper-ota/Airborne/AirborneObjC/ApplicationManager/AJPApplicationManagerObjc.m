@@ -6,16 +6,17 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "AJPApplicationManager.h"
+#import "AJPApplicationManagerObjc.h"
 #import <WebKit/WebKit.h>
-#import "AJPApplicationConstants.h"
 #import "AJPApplicationTracker.h"
+
 #if SWIFT_PACKAGE
 @import AirborneSwiftCore;
 @import AirborneSwiftModel;
 #else
 #import <Airborne/Airborne-Swift.h>
 #endif
+
 typedef NS_ENUM(NSInteger, DownloadStatus) {
     DOWNLOADING,
     COMPLETED,
@@ -23,26 +24,12 @@ typedef NS_ENUM(NSInteger, DownloadStatus) {
     TIMEOUT
 };
 
-@implementation AJPDownloadResult
-
-- (instancetype) initWithManifest:(AJPApplicationManifest* _Nonnull)releaseConfig result:(NSString* _Nonnull)result error:(NSString* _Nullable)error {
-    self = [super init];
-    if(self) {
-        _releaseConfig = releaseConfig;
-        _result = result;
-        _error = error;
-    }
-    return self;
-}
-
-@end
-
 static BOOL isFirstRunAfterInstallation = YES;
 static BOOL isFirstRunAfterAppLaunch = YES;
 
-static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
+static NSMutableDictionary<NSString*,AJPApplicationManagerObjc*>* managers;
 
-@interface AJPApplicationManager() {
+@interface AJPApplicationManagerObjc() {
     BOOL _bootTimeoutOccurred;
     BOOL _releaseConfigTimeoutOccurred;
     DownloadStatus _importantPackageDownloadStatus;
@@ -90,7 +77,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 @end
 
-@implementation AJPApplicationManager
+@implementation AJPApplicationManagerObjc
 
 #pragma mark - Initialiasation
 
@@ -100,13 +87,13 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 + (instancetype)getSharedInstanceWithWorkspace:(NSString *)workspace delegate:(id<AJPApplicationManagerDelegate> _Nonnull)delegate logger:(id<AJPLoggerDelegate> _Nullable)logger {
-    @synchronized ([AJPApplicationManager class]) {
+    @synchronized ([AJPApplicationManagerObjc class]) {
         if(managers == nil) {
             managers = [NSMutableDictionary dictionary];
         }
-        AJPApplicationManager* manager = managers[workspace];
+        AJPApplicationManagerObjc* manager = managers[workspace];
         if (manager == nil || (manager.releaseConfigDownloadStatus == FAILED || manager.importantPackageDownloadStatus == FAILED || manager.importantPackageDownloadStatus == COMPLETED)) {
-            manager = [[AJPApplicationManager alloc] initWithWorkspace:workspace delegate:delegate logger:logger];
+            manager = [[AJPApplicationManagerObjc alloc] initWithWorkspace:workspace delegate:delegate logger:logger];
             managers[workspace] = manager;
         } else {
             [manager.tracker addLogger:logger];
@@ -161,7 +148,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             self.importantPackageDownloadStatus = COMPLETED;
             self.lazyPackageDownloadStatus = COMPLETED;
             [self cleanUpUnwantedFiles];
-            [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_NOTIFICATION
+            [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.RELEASE_CONFIG_NOTIFICATION
                                                                         object:nil
                                                                       userInfo:@{}];
         } else {
@@ -273,8 +260,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     NSFileManager *fm = [NSFileManager defaultManager];
     for (NSString *key in self.resources.resources) {
         NSString *fileName = [self jsFileNameFor:key];
-        NSString *filePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
-        NSString *fullPath = [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:JUSPAY_PACKAGE_DIR];
+        NSString *filePath = [AJPApplicationConstants.JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
+        NSString *fullPath = [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
         if ([fm fileExistsAtPath:fullPath]) {
             [_downloadedSplits addObject:key];
         }
@@ -286,8 +273,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     // Check if any app-pkg-temp.dat file is available in JuspayManifest.
     // If yes, a temporary package exists, which means an update was timedout.
-    NSString *tempPackagePath = [self.fileUtil fullPathInStorageForFilePath:APP_PACKAGE_DATA_TEMP_FILE_NAME
-                                                                       inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *tempPackagePath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME
+                                                                       inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     NSFileManager *fileManager = [NSFileManager defaultManager];
     if (![fileManager fileExistsAtPath:tempPackagePath]) {
         return;
@@ -297,19 +284,19 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     NSError *error = nil;
     // Read temp package data
     AJPApplicationPackage *tempPackage = (AJPApplicationPackage*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationPackage class]
-                                                                                 withContentOfFileName:APP_PACKAGE_DATA_TEMP_FILE_NAME
-                                                                                             inFolder:JUSPAY_MANIFEST_DIR
+                                                                                 withContentOfFileName:AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME
+                                                                                             inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                                                                 error:&error];
     
     if (tempPackage == nil) {
         // Failed to read temp package, clean up
         [self.tracker trackError:@"temp_package_read_failed" value:[@{@"error": error ? [error localizedDescription] : @"unknown error"} mutableCopy]];
-        [self.fileUtil deleteFile:APP_PACKAGE_DATA_TEMP_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:nil];
+        [self.fileUtil deleteFile:AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:nil];
         return;
     }
     
     // Move all files from temp to main
-    NSArray *tempFiles = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:JUSPAY_TEMP_DIR includeSubfolders:YES];
+    NSArray *tempFiles = [self getAllFilesInDirectory:AJPApplicationConstants.JUSPAY_PACKAGE_DIR subFolder:AJPApplicationConstants.JUSPAY_TEMP_DIR includeSubfolders:YES];
     BOOL allMoveSuccessful = YES;
     
     [self.tracker trackInfo:@"temp_package_installation_started"
@@ -332,8 +319,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     if (allMoveSuccessful) {
         NSError *writeError = nil;
         BOOL didUpdate = [self.fileUtil writeInstance:tempPackage
-                                             fileName:APP_PACKAGE_DATA_FILE_NAME
-                                             inFolder:JUSPAY_MANIFEST_DIR
+                                             fileName:AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME
+                                             inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                 error:&writeError];
         
         if (didUpdate) {
@@ -346,14 +333,14 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     }
     
     // Clean up the temp package file and directory
-    [self.fileUtil deleteFile:APP_PACKAGE_DATA_TEMP_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:nil];
+    [self.fileUtil deleteFile:AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:nil];
     [self cleanupTempDirectory];
 }
 
 - (void)handleTempResourcesInstallation {
     // Check if temp resources file exists
-    NSString *tempResourcesPath = [self.fileUtil fullPathInStorageForFilePath:APP_TEMP_RESOURCES_DATA_FILE_NAME
-                                                                      inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *tempResourcesPath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME
+                                                                      inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     NSFileManager *fileManager = [NSFileManager defaultManager];
     if (![fileManager fileExistsAtPath:tempResourcesPath]) {
         return;
@@ -362,15 +349,15 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     NSError *error = nil;
     // Read temp resources data
     AJPApplicationResources *tempResources = (AJPApplicationResources*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationResources class]
-                                                                                           withContentOfFileName:APP_TEMP_RESOURCES_DATA_FILE_NAME
-                                                                                                       inFolder:JUSPAY_MANIFEST_DIR
+                                                                                           withContentOfFileName:AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME
+                                                                                                       inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                                                                           error:&error];
     
     if (tempResources == nil) {
         // Failed to read temp resources, clean up
         [self.tracker trackError:@"temp_resources_read_failed"
                            value:[@{@"error": error ? [error localizedDescription] : @"unknown error"} mutableCopy]];
-        [self.fileUtil deleteFile:APP_TEMP_RESOURCES_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:nil];
+        [self.fileUtil deleteFile:AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:nil];
         return;
     }
     
@@ -401,11 +388,11 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     }
     
     // Clean up the temp resources file
-    [self.fileUtil deleteFile:APP_TEMP_RESOURCES_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:nil];
+    [self.fileUtil deleteFile:AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:nil];
 }
 
 - (void)initializeLazyResourcesDownloadStatus {
-    NSString *storedPackagePath = [self.fileUtil fullPathInStorageForFilePath:APP_PACKAGE_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *storedPackagePath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     NSFileManager *fileManager = [NSFileManager defaultManager];
     isFirstRunAfterInstallation = ![fileManager fileExistsAtPath:storedPackagePath];
     
@@ -426,8 +413,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         // Save the updated package to disk
         NSError *error = nil;
         BOOL didUpdate = [self.fileUtil writeInstance:self.package
-                                             fileName:APP_PACKAGE_DATA_FILE_NAME
-                                             inFolder:JUSPAY_MANIFEST_DIR
+                                             fileName:AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME
+                                             inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                 error:&error];
         
         if (didUpdate) {
@@ -610,12 +597,12 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     }
     
     // Add observer for package completion
-    __weak AJPApplicationManager *weakSelf = self;
-    self.packageResourceObserver = [center addObserverForName:PACKAGE_RESOURCE_NOTIFICATION
+    __weak AJPApplicationManagerObjc *weakSelf = self;
+    self.packageResourceObserver = [center addObserverForName:AJPApplicationConstants.PACKAGE_RESOURCE_NOTIFICATION
                                                        object:nil
                                                         queue:[NSOperationQueue new]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
-        __strong AJPApplicationManager *strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc *strongSelf = weakSelf;
         if (strongSelf) {
             [strongSelf handlePackageResourceCompletion];
         }
@@ -637,9 +624,9 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (NSString *)readPackageFile:(NSString *)fileName {
-    NSString *filePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
+    NSString *filePath = [AJPApplicationConstants.JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
     NSError *fileLoadError = nil;
-    NSString *fileContent = [self.fileUtil loadFile:filePath folder:JUSPAY_PACKAGE_DIR withLocalAssets:self.isLocalAssets error:&fileLoadError];
+    NSString *fileContent = [self.fileUtil loadFile:filePath folder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR withLocalAssets:self.isLocalAssets error:&fileLoadError];
     
     if (fileLoadError) {
         [self.tracker trackError:@"read_package_file" value:[@{
@@ -655,8 +642,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     NSError *fileLoadError = nil;
     
     // Read from JuspayPackages/main (where available resources are stored)
-    NSString *mainResourcePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:resourceFileName];
-    NSString *fileContent = [self.fileUtil loadFile:mainResourcePath folder:JUSPAY_PACKAGE_DIR withLocalAssets:self.isLocalAssets error:&fileLoadError];
+    NSString *mainResourcePath = [AJPApplicationConstants.JUSPAY_MAIN_DIR stringByAppendingPathComponent:resourceFileName];
+    NSString *fileContent = [self.fileUtil loadFile:mainResourcePath folder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR withLocalAssets:self.isLocalAssets error:&fileLoadError];
     
     if (fileLoadError) {
         [self.tracker trackError:@"read_resource_file" value:[@{
@@ -702,8 +689,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (NSString *)getPathForPackageFile:(NSString *)fileName {
-    NSString *filePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
-    return [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *filePath = [AJPApplicationConstants.JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileName];
+    return [self.fileUtil fullPathInStorageForFilePath:filePath inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
 }
 
 - (NSString * _Nullable)getPathForAssetsInReleaseConfig:(NSString *)resourcePath {
@@ -765,7 +752,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                 [self retryFailedLazyDownloads];
             }
         }
-        [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_NOTIFICATION
+        [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.RELEASE_CONFIG_NOTIFICATION
                                                             object:nil
                                                           userInfo:@{}];
     }];
@@ -785,11 +772,11 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         self.currentLazy = [self.package.lazy copy];
         self.downloadedLazy = [self.downloadedApplicationManifest.package.lazy mutableCopy];
         
-        __weak AJPApplicationManager* weakSelf = self;
+        __weak AJPApplicationManagerObjc* weakSelf = self;
         
         [self downloadImportantPackagesWithNewManifest:self.downloadedApplicationManifest.package currentManifest:self.package onCompletion:^(BOOL downloadFailed, BOOL timedOut) {
             if (weakSelf) {
-                __strong AJPApplicationManager* strongSelf = weakSelf;
+                __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                 if (!downloadFailed) { // Important packages downloaded successfully/No updates.
                     [strongSelf didFinishImportantPackageWithLazyDownloadComplete:timedOut];
                     
@@ -799,14 +786,14 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                             if (!weakSelf) {
                                 return;
                             }
-                            __strong AJPApplicationManager* strongSelf = weakSelf;
+                            __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                             NSArray<AJPResource *> *toDownload = [strongSelf getResourcesFrom:strongSelf.downloadedLazy filtering:strongSelf.currentLazy];
                             NSString *packageVersion = strongSelf.downloadedApplicationManifest.package.version;
                             [strongSelf downloadLazyPackageResources:toDownload version:packageVersion singleDownloadHandler:^(BOOL status, AJPResource *resource) {
                                 if (!weakSelf) {
                                     return;
                                 }
-                                __strong AJPApplicationManager* strongSelf = weakSelf;
+                                __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                                 
                                 if (!status) {
                                     return;
@@ -826,7 +813,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                 if (!weakSelf) {
                                     return;
                                 }
-                                __strong AJPApplicationManager* strongSelf = weakSelf;
+                                __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                                 
                                 strongSelf.downloadedApplicationManifest.package.lazy = strongSelf.downloadedLazy;
                                 [strongSelf updatePackageInTemp:strongSelf.downloadedApplicationManifest.package];
@@ -871,20 +858,20 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                             if (!weakSelf) {
                                 return;
                             }
-                            __strong AJPApplicationManager* strongSelf = weakSelf;
+                            __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                             
                             if (status) { // Download success
                                 // Move downloaded lazy package to main.
                                 AJPLazyResource *lazyResource = (AJPLazyResource *)resource;
                                 [strongSelf moveLazyPackageFromTempToMain:lazyResource];
                             }
-                            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @NO, @"downloadStatus": @(status), @"url": resource.url, @"filePath": resource.filePath}];
+                            [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @NO, @"downloadStatus": @(status), @"url": resource.url, @"filePath": resource.filePath}];
                         } downloadCompletion:^{
                             if (!weakSelf) {
                                 return;
                             }
                             
-                            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @YES}];
+                            [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.LAZY_PACKAGE_NOTIFICATION object:nil userInfo:@{@"lazyDownloadsComplete": @YES}];
                         }];
                     }
                 } else {
@@ -902,16 +889,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     }
 
     // Download resources in parallel
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     [self downloadResourcesWithCurrentResources:self.resources.resources
                                    newResources:self.downloadedApplicationManifest.resources.resources
                           singleDownloadHandler:^(NSString* key, AJPResource* value) {
-        __strong AJPApplicationManager* strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
         if (strongSelf) {
             [strongSelf.tracker trackInfo:@"resource_download_completed" value:[@{@"resource" : key} mutableCopy]];
         }
     } downloadCompletion:^ {
-        __strong AJPApplicationManager* strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
         if(strongSelf) {
             strongSelf.resourceDownloadStatus = COMPLETED;
             [strongSelf fireCallbacks];
@@ -921,17 +908,17 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (void)startBootTimeoutTimer {
     
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     NSNumber *bootTimeout = [self getPackageTimeout];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)([bootTimeout intValue] * NSEC_PER_MSEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        AJPApplicationManager *strongSelf = weakSelf;
+        AJPApplicationManagerObjc *strongSelf = weakSelf;
         if (strongSelf == nil) {
             return;
         }
         
         strongSelf.bootTimeoutOccurred = true;
-        [[NSNotificationCenter defaultCenter] postNotificationName:BOOT_TIMEOUT_NOTIFICATION
+        [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.BOOT_TIMEOUT_NOTIFICATION
                                                                         object:nil
                                                                       userInfo:@{}];
 
@@ -940,7 +927,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (void)startReleaseConfigTimeoutTimer {
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     NSNumber *releaseConfigTimeout = [self getReleaseConfigTimeout];
     if (releaseConfigTimeout == nil) {
         return;
@@ -948,7 +935,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)([releaseConfigTimeout intValue] * NSEC_PER_MSEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        AJPApplicationManager *strongSelf = weakSelf;
+        AJPApplicationManagerObjc *strongSelf = weakSelf;
         if (strongSelf == nil) {
             return;
         }
@@ -957,7 +944,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         [strongSelf.tracker trackInfo:@"release_config_timeout"
                                 value:[@{@"timeout": releaseConfigTimeout} mutableCopy]];
         
-        [[NSNotificationCenter defaultCenter] postNotificationName:RELEASE_CONFIG_TIMEOUT_NOTIFICATION
+        [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.RELEASE_CONFIG_TIMEOUT_NOTIFICATION
                                                             object:nil
                                                             userInfo:@{}];
     });
@@ -968,7 +955,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         isFirstRunAfterAppLaunch = NO;
         
         // Get all files in the package directory
-        NSArray *allPackageFiles = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:JUSPAY_MAIN_DIR includeSubfolders:YES];
+        NSArray *allPackageFiles = [self getAllFilesInDirectory:AJPApplicationConstants.JUSPAY_PACKAGE_DIR subFolder:AJPApplicationConstants.JUSPAY_MAIN_DIR includeSubfolders:YES];
         NSMutableSet<NSString *> *requiredFiles = [NSMutableSet set];
         
         // Add files from current package
@@ -1002,14 +989,14 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             // Delete file if it doesn't belong to a required version
             if (!shouldKeep) {
                 [self.tracker trackInfo:@"cleaning_unused_file" value:[@{@"file": fileName} mutableCopy]];
-                [self deleteFile:fileName subFolder:JUSPAY_MAIN_DIR inFolder:JUSPAY_PACKAGE_DIR];
+                [self deleteFile:fileName subFolder:AJPApplicationConstants.JUSPAY_MAIN_DIR inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
             }
         }
         
         // cleanup of temp resources
-        NSArray<NSString*> *resourceFileNames = [self getAllFilesInDirectory:JUSPAY_RESOURCE_DIR subFolder:@"" includeSubfolders:YES];
+        NSArray<NSString*> *resourceFileNames = [self getAllFilesInDirectory:AJPApplicationConstants.JUSPAY_RESOURCE_DIR subFolder:@"" includeSubfolders:YES];
         for (NSString* fileName in resourceFileNames) {
-            [self deleteFile:fileName subFolder:@"" inFolder:JUSPAY_RESOURCE_DIR];
+            [self deleteFile:fileName subFolder:@"" inFolder:AJPApplicationConstants.JUSPAY_RESOURCE_DIR];
         }
     }
 }
@@ -1038,16 +1025,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (void)fetchReleaseConfigWithCompletionHandler:(AJPReleaseConfigCompletionHandler)completionHandler {
 
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     __block id timeoutObserver = nil;
     __block NSURLSessionDataTask *manifestDataTask = nil;
 
-    timeoutObserver = [NSNotificationCenter.defaultCenter addObserverForName:RELEASE_CONFIG_TIMEOUT_NOTIFICATION
+    timeoutObserver = [NSNotificationCenter.defaultCenter addObserverForName:AJPApplicationConstants.RELEASE_CONFIG_TIMEOUT_NOTIFICATION
                                                                             object:nil
                                                                             queue:[NSOperationQueue new]
                                                                             usingBlock:^(NSNotification * _Nonnull note) {
 
-        __strong AJPApplicationManager *strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc *strongSelf = weakSelf;
         if (!strongSelf) return;
         
         [[NSNotificationCenter defaultCenter] removeObserver:timeoutObserver];
@@ -1153,7 +1140,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (AJPApplicationConfig *)readApplicationConfig {
     NSError *err = nil;
-    AJPApplicationConfig* config = (AJPApplicationConfig*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationConfig class] withContentOfFileName:APP_CONFIG_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&err];
+    AJPApplicationConfig* config = (AJPApplicationConfig*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationConfig class] withContentOfFileName:AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:&err];
 
     return config;
 }
@@ -1161,7 +1148,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 - (void)updateConfig:(AJPApplicationConfig *)config {
     if(![config.version isEqualToString:self.config.version]) {
         NSError *error = nil;
-        BOOL didUpdate = [self.fileUtil writeInstance:config fileName:APP_CONFIG_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&error];
+        BOOL didUpdate = [self.fileUtil writeInstance:config fileName:AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:&error];
         if(didUpdate) {
             @synchronized(self) {
                 self.config = config;
@@ -1180,8 +1167,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 - (void)saveManifestToTemp:(AJPApplicationManifest *)manifest {
     NSError *error = nil;
     BOOL didSave = [self.fileUtil writeInstance:manifest
-                                       fileName:APP_MANIFEST_DATA_TEMP_FILE_NAME
-                                       inFolder:JUSPAY_MANIFEST_DIR
+                                       fileName:AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                       inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                           error:&error];
     if (didSave) {
         [self.tracker trackInfo:@"manifest_saved_to_temp" value:[@{@"config_version": manifest.config.version, @"package_version": manifest.package.version} mutableCopy]];
@@ -1192,16 +1179,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (AJPApplicationManifest *)readTempManifest {
-    NSString *tempManifestPath = [self.fileUtil fullPathInStorageForFilePath:APP_MANIFEST_DATA_TEMP_FILE_NAME
-                                                                    inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *tempManifestPath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                                                    inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     if (![[NSFileManager defaultManager] fileExistsAtPath:tempManifestPath]) {
         return nil;
     }
     
     NSError *error = nil;
     AJPApplicationManifest *manifest = (AJPApplicationManifest *)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationManifest class]
-                                                                                     withContentOfFileName:APP_MANIFEST_DATA_TEMP_FILE_NAME
-                                                                                                 inFolder:JUSPAY_MANIFEST_DIR
+                                                                                     withContentOfFileName:AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                                                                                 inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                                                                     error:&error];
     if (manifest == nil) {
         [self.tracker trackError:@"temp_manifest_read_failed"
@@ -1211,10 +1198,10 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (void)deleteTempManifest {
-    NSString *tempManifestPath = [self.fileUtil fullPathInStorageForFilePath:APP_MANIFEST_DATA_TEMP_FILE_NAME
-                                                                    inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *tempManifestPath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME
+                                                                    inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     if ([[NSFileManager defaultManager] fileExistsAtPath:tempManifestPath]) {
-        [self.fileUtil deleteFile:APP_MANIFEST_DATA_TEMP_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:nil];
+        [self.fileUtil deleteFile:AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:nil];
     }
 }
 
@@ -1222,7 +1209,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (AJPApplicationPackage *)readApplicationPackage {
     NSError* err = nil;
-    AJPApplicationPackage* package =  (AJPApplicationPackage*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationPackage class] withContentOfFileName:APP_PACKAGE_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&err];
+    AJPApplicationPackage* package =  (AJPApplicationPackage*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationPackage class] withContentOfFileName:AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:&err];
         return package;
 }
 
@@ -1236,13 +1223,13 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     __block BOOL allDownloadsComplete = NO;
     
     // Set up boot timeout handler
-    __weak AJPApplicationManager* weakSelf = self;
-    __block id timeoutObserver = [NSNotificationCenter.defaultCenter addObserverForName:BOOT_TIMEOUT_NOTIFICATION
+    __weak AJPApplicationManagerObjc* weakSelf = self;
+    __block id timeoutObserver = [NSNotificationCenter.defaultCenter addObserverForName:AJPApplicationConstants.BOOT_TIMEOUT_NOTIFICATION
                                                        object:nil
                                                         queue:[NSOperationQueue new]
                                                    usingBlock:^(NSNotification * _Nonnull note) {
         // Handle boot timeout
-        __strong AJPApplicationManager* strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
         if (strongSelf) {
             [downloadLock lock];
             if (!allDownloadsComplete) {
@@ -1298,19 +1285,19 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         dispatch_group_enter(group);
         dispatch_group_async(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
             if (weakSelf != nil) {
-                __strong AJPApplicationManager* strongSelf = weakSelf;
+                __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                 
                 // Get filename without path for saving to temp
                 NSString *fileName = [[split.url pathExtension] isEqualToString:@"zip"] ? split.url.lastPathComponent : split.filePath;
-                NSString *tempPath = [JUSPAY_TEMP_DIR stringByAppendingPathComponent:fileName];
+                NSString *tempPath = [AJPApplicationConstants.JUSPAY_TEMP_DIR stringByAppendingPathComponent:fileName];
                 
                 [strongSelf downloadFileFromURL:split.url
                           andSaveInFilePath:tempPath
-                                    inFolder:JUSPAY_PACKAGE_DIR
+                                    inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR
                                     checksum:split.checksum
                            completionHandler:^(NSError *error) {
                     if (weakSelf) {
-                        __strong AJPApplicationManager* strongSelf = weakSelf;
+                        __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                         [downloadLock lock];
                         
                         // Update download tracking
@@ -1336,7 +1323,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     // When all downloads complete
     dispatch_group_notify(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-        __strong AJPApplicationManager* strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
         if (strongSelf) {
             [downloadLock lock];
             
@@ -1397,8 +1384,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (void)moveAllPackagesFromTempToMain {
-    NSString *tempDirPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_TEMP_DIR
-                                                             inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *tempDirPath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.JUSPAY_TEMP_DIR
+                                                             inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSError *error = nil;
@@ -1427,11 +1414,11 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 }
 
 - (BOOL)movePackageFromTempToMain:(NSString *)fileName error:(NSError **)error {
-    NSString *tempFilePath = [NSString stringWithFormat:@"%@/%@", JUSPAY_TEMP_DIR, fileName];
-    NSString *mainFilePath = [NSString stringWithFormat:@"%@/%@", JUSPAY_MAIN_DIR, fileName];
+    NSString *tempFilePath = [NSString stringWithFormat:@"%@/%@", AJPApplicationConstants.JUSPAY_TEMP_DIR, fileName];
+    NSString *mainFilePath = [NSString stringWithFormat:@"%@/%@", AJPApplicationConstants.JUSPAY_MAIN_DIR, fileName];
 
-    NSString *tempPath = [self.fileUtil fullPathInStorageForFilePath:tempFilePath inFolder:JUSPAY_PACKAGE_DIR];
-    NSString *mainPath = [self.fileUtil fullPathInStorageForFilePath:mainFilePath inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *tempPath = [self.fileUtil fullPathInStorageForFilePath:tempFilePath inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
+    NSString *mainPath = [self.fileUtil fullPathInStorageForFilePath:mainFilePath inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
 
     NSFileManager *fileManager = [NSFileManager defaultManager];
     if ([fileManager fileExistsAtPath:mainPath]) {
@@ -1479,15 +1466,15 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     [self.tracker trackInfo:@"lazy_package_download_started" value:[@{@"package_version" : version} mutableCopy]];
 
     dispatch_group_t group = dispatch_group_create();
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     
     for (AJPResource *split in resourcesToDownload) {
         dispatch_group_enter(group);
         dispatch_group_async(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            __strong AJPApplicationManager* strongSelf = weakSelf;
+            __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
             if (strongSelf != nil) {
-                NSString *tempFilePath = [NSString stringWithFormat:@"%@/%@", JUSPAY_TEMP_DIR, split.filePath];
-                [strongSelf downloadFileFromURL:split.url andSaveInFilePath:tempFilePath inFolder:JUSPAY_PACKAGE_DIR checksum:split.checksum completionHandler:^(NSError *error) {
+                NSString *tempFilePath = [NSString stringWithFormat:@"%@/%@", AJPApplicationConstants.JUSPAY_TEMP_DIR, split.filePath];
+                [strongSelf downloadFileFromURL:split.url andSaveInFilePath:tempFilePath inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR checksum:split.checksum completionHandler:^(NSError *error) {
                     if (error != nil) {
                         [strongSelf.tracker trackError:@"lazy_package_download_error" value:[@{@"url": [split.url absoluteString], @"error": [error localizedDescription]} mutableCopy]];
                         strongSelf.packageError = [NSString stringWithFormat:@"Failed to download lazy package: %@", [error localizedDescription]];
@@ -1508,7 +1495,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     }
     
     dispatch_group_notify(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        __strong AJPApplicationManager* strongSelf = weakSelf;
+        __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
         if (strongSelf) {
             strongSelf.lazyPackageDownloadStatus = COMPLETED;
             [strongSelf.tracker trackInfo:@"lazy_package_download_result"
@@ -1535,18 +1522,18 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     if (failedDownloads.count > 0) {
         [self.tracker trackInfo:@"retrying_failed_lazy_downloads" value:[@{@"count": @(failedDownloads.count)} mutableCopy]];
         
-        __weak AJPApplicationManager *weakSelf = self;
+        __weak AJPApplicationManagerObjc *weakSelf = self;
         // Download the failed lazy resources
         [self downloadLazyPackageResources:failedDownloads version:self.package.version singleDownloadHandler:^(BOOL status, AJPResource *resource) {
             if (status && [resource isKindOfClass:[AJPLazyResource class]]) {
                 if (weakSelf) {
-                    __strong AJPApplicationManager* strongSelf = weakSelf;
+                    __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                     AJPLazyResource *lazyResource = (AJPLazyResource *)resource;
                     [strongSelf moveLazyPackageFromTempToMain:lazyResource];
                 }
                 
             }
-            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION
+            [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.LAZY_PACKAGE_NOTIFICATION
                                                                 object:nil
                                                               userInfo:@{
                                                                     @"lazyDownloadsComplete": @NO,
@@ -1555,7 +1542,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                                                     @"filePath": resource.filePath
                                                               }];
         } downloadCompletion:^{
-                [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION
+                [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.LAZY_PACKAGE_NOTIFICATION
                                                                     object:nil
                                                                   userInfo:@{@"lazyDownloadsComplete": @YES}];
         }];
@@ -1579,16 +1566,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     if (failedDownloads.count > 0) {
         [self.tracker trackInfo:@"retrying_failed_lazy_downloads" value:[@{@"count": @(failedDownloads.count)} mutableCopy]];
         
-        __weak AJPApplicationManager *weakSelf = self;
+        __weak AJPApplicationManagerObjc *weakSelf = self;
         [self downloadLazyPackageResources:failedDownloads version:self.package.version singleDownloadHandler:^(BOOL status, AJPResource *resource) {
             if (status && [resource isKindOfClass:[AJPLazyResource class]]) {
                 if (weakSelf) {
-                    __strong AJPApplicationManager* strongSelf = weakSelf;
+                    __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
                     AJPLazyResource *lazyResource = (AJPLazyResource *)resource;
                     [strongSelf moveLazyPackageFromTempToMain:lazyResource];
                 }
             }
-            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION
+            [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.LAZY_PACKAGE_NOTIFICATION
                                                                 object:nil
                                                               userInfo:@{
                                                                     @"lazyDownloadsComplete": @NO,
@@ -1597,7 +1584,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
                                                                     @"filePath": resource.filePath
                                                               }];
         } downloadCompletion:^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:LAZY_PACKAGE_NOTIFICATION
+            [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.LAZY_PACKAGE_NOTIFICATION
                                                                 object:nil
                                                               userInfo:@{@"lazyDownloadsComplete": @YES}];
             if (completion) {
@@ -1614,11 +1601,11 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (void)updatePackage:(AJPApplicationPackage *)package didDownloadImportant:(BOOL)didDownloadImportant startTime:(NSTimeInterval)startTime {
     NSError *error = nil;
-    [self.tracker trackInfo:@"app_update_result" value:[@{@"trying_to_install_package": [NSString stringWithFormat:@"New app version downloaded, installing to disk. %@", package.version]}mutableCopy]];
-    if (didDownloadImportant == false || [self isAppInstalledWithPackage:package inSubFolder:JUSPAY_MAIN_DIR]) {
+    [self.tracker trackInfo:@"AJPApplicationConstants.APP_update_result" value:[@{@"trying_to_install_package": [NSString stringWithFormat:@"New app version downloaded, installing to disk. %@", package.version]}mutableCopy]];
+    if (didDownloadImportant == false || [self isAppInstalledWithPackage:package inSubFolder:AJPApplicationConstants.JUSPAY_MAIN_DIR]) {
         BOOL didUpdate = [self.fileUtil writeInstance:package
-                                             fileName:APP_PACKAGE_DATA_FILE_NAME
-                                             inFolder:JUSPAY_MANIFEST_DIR
+                                             fileName:AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME
+                                             inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                 error:&error];
         if(didUpdate) {
             @synchronized(self) {
@@ -1629,7 +1616,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             NSMutableDictionary<NSString*,id> *log = [NSMutableDictionary dictionary];
             log[@"error"] = error == nil ? @"release cofig write failed":[error localizedDescription];
             log[@"result"] = @"FAILED";
-            log[@"file_name"] = APP_PACKAGE_DATA_FILE_NAME;
+            log[@"file_name"] = AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME;
             log[@"time_taken"] = [NSNumber numberWithDouble:(([[NSDate date] timeIntervalSince1970] * 1000) - startTime)];
             [self.tracker trackInfo:@"package_update_result" value:log];
         }
@@ -1640,16 +1627,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (void)updatePackageInTemp:(AJPApplicationPackage *)package {
     NSError *error = nil;
-    [self.tracker trackInfo:@"app_update_result" value:[@{@"trying_to_install_temp_package": [NSString stringWithFormat:@"New app version downloaded in temp, installing to disk. %@", package.version]} mutableCopy]];
+    [self.tracker trackInfo:@"AJPApplicationConstants.APP_update_result" value:[@{@"trying_to_install_temp_package": [NSString stringWithFormat:@"New app version downloaded in temp, installing to disk. %@", package.version]} mutableCopy]];
     BOOL didUpdate = [self.fileUtil writeInstance:package
-                                         fileName:APP_PACKAGE_DATA_TEMP_FILE_NAME
-                                         inFolder:JUSPAY_MANIFEST_DIR
+                                         fileName:AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME
+                                         inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                             error:&error];
     if (!didUpdate) {
         NSMutableDictionary<NSString*,id> *log = [NSMutableDictionary dictionary];
         log[@"error"] = error == nil ? @"release cofig write failed": [error localizedDescription];
         log[@"result"] = @"FAILED";
-        log[@"file_name"] = APP_PACKAGE_DATA_TEMP_FILE_NAME;
+        log[@"file_name"] = AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME;
         [self.tracker trackInfo:@"package_update_result" value:log];
     }
 }
@@ -1676,8 +1663,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             // Save the updated package to disk
             NSError *error = nil;
             BOOL didUpdate = [self.fileUtil writeInstance:self.package
-                                                 fileName:APP_PACKAGE_DATA_FILE_NAME
-                                                 inFolder:JUSPAY_MANIFEST_DIR
+                                                 fileName:AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME
+                                                 inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                                     error:&error];
             
             if (didUpdate) {
@@ -1694,7 +1681,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (BOOL)isAppInstalledWithPackage:(AJPApplicationPackage *)package inSubFolder:(NSString *)subFolder {
     
-    NSArray<NSString *>* downloadedFileNames = [self getAllFilesInDirectory:JUSPAY_PACKAGE_DIR subFolder:subFolder includeSubfolders:YES];
+    NSArray<NSString *>* downloadedFileNames = [self getAllFilesInDirectory:AJPApplicationConstants.JUSPAY_PACKAGE_DIR subFolder:subFolder includeSubfolders:YES];
     for (AJPResource *split in package.allImportantSplits) {
         NSString* fileNameOnDisk = [self jsFileNameFor:split.filePath];
         if (![downloadedFileNames containsObject:fileNameOnDisk]) {
@@ -1709,7 +1696,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (AJPApplicationResources *)readApplicationResources {
     NSError* error = nil;
-    AJPApplicationResources* resources = (AJPApplicationResources*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationResources class] withContentOfFileName:APP_RESOURCES_DATA_FILE_NAME inFolder:JUSPAY_MANIFEST_DIR error:&error];
+    AJPApplicationResources* resources = (AJPApplicationResources*)[self.fileUtil getDecodedInstanceForClass:[AJPApplicationResources class] withContentOfFileName:AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR error:&error];
         return resources;
 }
 
@@ -1718,8 +1705,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     AJPApplicationResources* appResources = [[AJPApplicationResources alloc] init];
     appResources.resources = resources;
     BOOL didUpdate = [self.fileUtil writeInstance:appResources
-                                         fileName:APP_RESOURCES_DATA_FILE_NAME
-                                         inFolder:JUSPAY_MANIFEST_DIR
+                                         fileName:AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME
+                                         inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                             error:&error ];
     if(didUpdate) {
         @synchronized(self) {
@@ -1806,7 +1793,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     // Step 4: Start the download loop with timeout awareness
     dispatch_group_t group = dispatch_group_create();
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     
     // Download each resource
     for (AJPResource *resource in resourcesToDownload) {
@@ -1818,7 +1805,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
         
         dispatch_group_enter(group);
         dispatch_group_async(group, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-            __strong AJPApplicationManager* strongSelf = weakSelf;
+            __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
             if (strongSelf == nil || [strongSelf isBootTimeoutOccurred]) {
                 dispatch_group_leave(group);
                 return;
@@ -1826,7 +1813,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
             
             [strongSelf downloadFileFromURL:resource.url
                            andSaveInFilePath:resource.filePath
-                                    inFolder:JUSPAY_RESOURCE_DIR
+                                    inFolder:AJPApplicationConstants.JUSPAY_RESOURCE_DIR
                                     checksum:resource.checksum
                            completionHandler:^(NSError* downloadError) {
                 if (downloadError != nil) {
@@ -1879,11 +1866,11 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     NSString *fileNameOnDisk = [self jsFileNameFor:resource.filePath];
     // Source path in JuspayResources (temp location)
     
-    NSString *sourcePath = [self.fileUtil fullPathInStorageForFilePath:fileNameOnDisk inFolder:JUSPAY_RESOURCE_DIR];
+    NSString *sourcePath = [self.fileUtil fullPathInStorageForFilePath:fileNameOnDisk inFolder:AJPApplicationConstants.JUSPAY_RESOURCE_DIR];
     
     // Destination path in JuspayPackages/main
-    NSString *destFilePath = [JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileNameOnDisk];
-    NSString *destPath = [self.fileUtil fullPathInStorageForFilePath:destFilePath inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *destFilePath = [AJPApplicationConstants.JUSPAY_MAIN_DIR stringByAppendingPathComponent:fileNameOnDisk];
+    NSString *destPath = [self.fileUtil fullPathInStorageForFilePath:destFilePath inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
     
     // Remove existing file at destination if it exists
     if ([fileManager fileExistsAtPath:destPath]) {
@@ -1922,8 +1909,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     // Save to file
     NSError *error = nil;
     BOOL didSave = [self.fileUtil writeInstance:self.tempResources
-                                       fileName:APP_TEMP_RESOURCES_DATA_FILE_NAME
-                                       inFolder:JUSPAY_MANIFEST_DIR
+                                       fileName:AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME
+                                       inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                           error:&error];
     
     if (!didSave) {
@@ -1950,18 +1937,18 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 
 - (BOOL)doesCurrentResourceFileExist {
     // Check if current app-resources.dat file exists
-    NSString *currentResourceFilePath = [self.fileUtil fullPathInStorageForFilePath:APP_RESOURCES_DATA_FILE_NAME
-                                                                            inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *currentResourceFilePath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME
+                                                                            inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     return [[NSFileManager defaultManager] fileExistsAtPath:currentResourceFilePath];
 }
 
 - (BOOL)moveCurrentResourceFileAsOld:(NSError **)error {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     
-    NSString *currentResourcePath = [self.fileUtil fullPathInStorageForFilePath:APP_RESOURCES_DATA_FILE_NAME
-                                                                        inFolder:JUSPAY_MANIFEST_DIR];
-    NSString *oldResourcePath = [self.fileUtil fullPathInStorageForFilePath:APP_OLD_RESOURCES_DATA_FILE_NAME
-                                                                    inFolder:JUSPAY_MANIFEST_DIR];
+    NSString *currentResourcePath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME
+                                                                        inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
+    NSString *oldResourcePath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME
+                                                                    inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR];
     
     // Remove old resources file if it exists
     if ([fileManager fileExistsAtPath:oldResourcePath]) {
@@ -1979,8 +1966,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     // Write it as old-app-resources.dat
     return [self.fileUtil writeInstance:emptyResources
-                               fileName:APP_OLD_RESOURCES_DATA_FILE_NAME
-                               inFolder:JUSPAY_MANIFEST_DIR
+                               fileName:AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME
+                               inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
                                   error:error];
 }
 
@@ -2003,8 +1990,8 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 - (AJPApplicationResources *)loadOldResourcesForComparison:(NSError **)error {
     AJPApplicationResources *oldResources = (AJPApplicationResources*)[self.fileUtil
         getDecodedInstanceForClass:[AJPApplicationResources class]
-        withContentOfFileName:APP_OLD_RESOURCES_DATA_FILE_NAME
-        inFolder:JUSPAY_MANIFEST_DIR
+        withContentOfFileName:AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME
+        inFolder:AJPApplicationConstants.JUSPAY_MANIFEST_DIR
         error:error];
     
     if (oldResources == nil && *error == nil) {
@@ -2044,7 +2031,7 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
     
     if (shouldFire) {
         [self.tracker trackInfo:@"update_end" value:[@{@"time_taken":[NSNumber numberWithDouble:(([[NSDate date] timeIntervalSince1970] * 1000) - self.startTime)]} mutableCopy]];
-        [[NSNotificationCenter defaultCenter] postNotificationName:PACKAGE_RESOURCE_NOTIFICATION
+        [[NSNotificationCenter defaultCenter] postNotificationName:AJPApplicationConstants.PACKAGE_RESOURCE_NOTIFICATION
                                                             object:nil
                                                           userInfo:@{}];
     }
@@ -2057,16 +2044,16 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 - (void)prepareTempDirectory {
     [self cleanupTempDirectory];
     // Create fresh temp directory
-    NSString *tempDirPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_TEMP_DIR
-                                                               inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *tempDirPath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.JUSPAY_TEMP_DIR
+                                                               inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
     [self.fileUtil createFolderIfDoesNotExist:tempDirPath];
 }
 
 // Clean up temp directory
 - (void)cleanupTempDirectory {
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSString *tempDirPath = [self.fileUtil fullPathInStorageForFilePath:JUSPAY_TEMP_DIR
-                                                               inFolder:JUSPAY_PACKAGE_DIR];
+    NSString *tempDirPath = [self.fileUtil fullPathInStorageForFilePath:AJPApplicationConstants.JUSPAY_TEMP_DIR
+                                                               inFolder:AJPApplicationConstants.JUSPAY_PACKAGE_DIR];
     
     if ([fileManager fileExistsAtPath:tempDirPath]) {
         [fileManager removeItemAtPath:tempDirPath error:nil];
@@ -2219,10 +2206,10 @@ static NSMutableDictionary<NSString*,AJPApplicationManager*>* managers;
 - (void)downloadFileFromURL:(NSURL *)resourceURL andSaveInFilePath:(NSString *)filePath inFolder:(NSString*)folderName checksum:(NSString *)checksum completionHandler:(void (^)(NSError*))completionHandler {
 
     NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970] * 1000;
-    __weak AJPApplicationManager* weakSelf = self;
+    __weak AJPApplicationManagerObjc* weakSelf = self;
     [self.remoteFileUtil downloadFileFromURL:[resourceURL absoluteString] andSaveFileAtUrl:[self.fileUtil fullPathInStorageForFilePath:filePath inFolder:folderName] checksum:checksum callback:^(BOOL status, id  _Nullable data, NSString * _Nullable error, NSURLResponse * _Nullable response) {
         if(weakSelf) {
-            __strong AJPApplicationManager* strongSelf = weakSelf;
+            __strong AJPApplicationManagerObjc* strongSelf = weakSelf;
             if (status) {
                 NSMutableDictionary<NSString*,id> *logVal = [NSMutableDictionary dictionary];
                 logVal[@"url"] = [resourceURL absoluteString];

@@ -37,7 +37,7 @@ final class AJPApplicationManifestTests: XCTestCase {
     // MARK: - Init from Data
 
     func testInitWithValidData() throws {
-        let manifest = AJPApplicationManifest(data: makeManifestJSON() as NSData, error: nil)
+        let manifest = try? AJPApplicationManifest(data: makeManifestJSON() as NSData)
 
         XCTAssertNotNil(manifest)
         XCTAssertEqual(manifest?.config.version, "1.0.0")
@@ -52,23 +52,31 @@ final class AJPApplicationManifestTests: XCTestCase {
 
     func testInitWithInvalidDataReturnsNil() {
         let badData = "not json at all".data(using: .utf8)! as NSData
-        var error: NSError?
-        let manifest = AJPApplicationManifest(data: badData, error: &error)
-
+        
+        var manifest: AJPApplicationManifest?
+        do {
+            manifest = try AJPApplicationManifest(data: badData)
+        } catch {
+            let error =  error as NSError
+            XCTAssertNotNil(error)
+            XCTAssertEqual(error.domain, "ApplicationManifestError")
+            XCTAssertEqual(error.code, 500)
+        }
+        
         XCTAssertNil(manifest)
-        XCTAssertNotNil(error)
-        XCTAssertEqual(error?.domain, "ApplicationManifestError")
-        XCTAssertEqual(error?.code, 500)
     }
 
     func testInitWithNonDictionaryJSONReturnsNil() {
         // JSON root is an array, not an object
         let arrayData = try! JSONSerialization.data(withJSONObject: ["a", "b"])
-        var error: NSError?
-        let manifest = AJPApplicationManifest(data: arrayData as NSData, error: &error)
+        var manifest: AJPApplicationManifest?
+        do {
+            manifest = try AJPApplicationManifest(data: arrayData as NSData)
+        } catch {
+            XCTAssertNotNil(error)
+        }
 
         XCTAssertNil(manifest)
-        XCTAssertNotNil(error)
     }
 
     // MARK: - Composed Init
@@ -88,7 +96,10 @@ final class AJPApplicationManifestTests: XCTestCase {
     // MARK: - toDictionary
 
     func testToDictionaryShape() {
-        let manifest = AJPApplicationManifest(data: makeManifestJSON() as NSData, error: nil)!
+        guard let manifest = try? AJPApplicationManifest(data: makeManifestJSON() as NSData) else {
+            XCTFail()
+            return
+        }
         let dict = manifest.toDictionary()
 
         XCTAssertNotNil(dict["config"])
@@ -105,7 +116,10 @@ final class AJPApplicationManifestTests: XCTestCase {
     // MARK: - NSSecureCoding
 
     func testSecureCodingRoundTrip() throws {
-        let manifest = AJPApplicationManifest(data: makeManifestJSON() as NSData, error: nil)!
+        guard let manifest = try? AJPApplicationManifest(data: makeManifestJSON() as NSData) else {
+            XCTFail()
+            return
+        }
 
         let data = try NSKeyedArchiver.archivedData(withRootObject: manifest, requiringSecureCoding: true)
         let decoded = try NSKeyedUnarchiver.unarchivedObject(ofClass: AJPApplicationManifest.self, from: data)
@@ -128,10 +142,13 @@ final class AJPApplicationManifestTests: XCTestCase {
             "resources": []
         ]
         let data = try! JSONSerialization.data(withJSONObject: json) as NSData
-        let manifest = AJPApplicationManifest(data: data, error: nil)
+        guard let manifest = try? AJPApplicationManifest(data: data as NSData) else {
+            XCTFail()
+            return
+        }
 
         XCTAssertNotNil(manifest)
-        XCTAssertEqual(manifest?.config.version, "")          // default
-        XCTAssertEqual(manifest?.config.bootTimeout, NSNumber(value: 1000)) // default
+        XCTAssertEqual(manifest.config.version, "")          // default
+        XCTAssertEqual(manifest.config.bootTimeout, NSNumber(value: 1000)) // default
     }
 }

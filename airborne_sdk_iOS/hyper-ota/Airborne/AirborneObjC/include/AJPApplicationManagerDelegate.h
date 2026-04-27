@@ -8,6 +8,8 @@
 #ifndef AJPApplicationManagerDelegate_h
 #define AJPApplicationManagerDelegate_h
 
+#import <Foundation/Foundation.h>
+
 @class AJPFileUtil;
 @class AJPRemoteFileUtil;
 

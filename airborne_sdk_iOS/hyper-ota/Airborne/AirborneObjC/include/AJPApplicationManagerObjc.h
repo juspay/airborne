@@ -18,20 +18,11 @@
 
 @class AJPApplicationManifest;
 @class AJPResource;
+@class AJPDownloadResult;
 
 /// Convenience typedefs for the resource map used throughout AJPApplicationManager.
 typedef NSDictionary<NSString*, AJPResource*> AppResources;
 typedef NSMutableDictionary<NSString*, AJPResource*> MutableAppResources;
-
-@interface AJPDownloadResult : NSObject
-
-@property (strong, nonatomic, readonly) NSString* _Nonnull result;
-@property (strong, nonatomic, readonly) AJPApplicationManifest* _Nonnull releaseConfig;
-@property (strong, nonatomic, readonly) NSString* _Nullable error;
-
-- (instancetype _Nullable)initWithManifest:(AJPApplicationManifest* _Nonnull)releaseConfig result:(NSString* _Nonnull)result error:(NSString* _Nullable)error;
-
-@end
 
 typedef void (^PackagesCompletionHandler)(AJPDownloadResult * _Nonnull);
 
@@ -49,7 +40,7 @@ typedef void (^AJPReleaseConfigCompletionHandler)(AJPApplicationManifest * _Null
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface AJPApplicationManager : NSObject
+@interface AJPApplicationManagerObjc : NSObject
 
 /**
  * Returns a shared instance of AJPApplicationManager for the specified workspace.

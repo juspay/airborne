@@ -50,16 +50,13 @@ import Foundation
     /// - Parameters:
     ///   - data: Raw UTF-8 JSON bytes.
     ///   - jsonError: On failure, set to the underlying JSON parse error.
-    public init?(data: NSData, error jsonError: NSErrorPointer) {
+    public init(data: NSData) throws {
         guard let dict = try? JSONSerialization.jsonObject(with: data as Data) as? [String: Any] else {
-            if let ptr = jsonError {
-                ptr.pointee = NSError(
-                    domain: "ApplicationManifestError",
-                    code: 500,
-                    userInfo: [NSLocalizedDescriptionKey: "Invalid JSON or not a dictionary"]
-                )
-            }
-            return nil
+            throw NSError(
+                domain: "ApplicationManifestError",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid JSON or not a dictionary"]
+            )
         }
 
         self.config = (try? AJPApplicationConfig(dictionary: (dict["config"] as? NSDictionary) ?? NSDictionary())) ?? AJPApplicationConfig()

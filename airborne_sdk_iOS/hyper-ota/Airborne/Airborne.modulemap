@@ -1,12 +1,10 @@
 framework module Airborne {
     umbrella header "Airborne.h"
 
-    header "AJPApplicationManager.h"
     header "AJPApplicationManagerDelegate.h"
     header "AJPHelpers.h"
-
-    exclude header "AJPApplicationConstants.h"
-    exclude header "AJPApplicationTracker.h"
+    header "AJPApplicationTracker.h"
+    header "AJPApplicationManagerObjc.h"
 
     export *
     module * { export * }
