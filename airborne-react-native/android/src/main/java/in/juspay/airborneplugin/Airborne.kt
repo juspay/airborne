@@ -12,12 +12,20 @@ import javax.net.ssl.X509TrustManager
 
 @Keep
 class Airborne(
-    context: Context,
-    releaseConfigUrl: String,
-    private val airborneInterface: AirborneInterface
+    private val context: Context,
+    private val releaseConfigUrl: String,
+    private val airborneInterface: AirborneInterface,
+    private val shouldUpdate: Boolean
 ) {
 
-    constructor(context: Context, releaseConfigUrl: String) : this(context, releaseConfigUrl, object : AirborneInterface() {})
+    constructor(context: Context, releaseConfigUrl: String) : this(context, releaseConfigUrl, object : AirborneInterface() {}, true)
+
+    constructor(context: Context, releaseConfigUrl: String, airborneInterface: AirborneInterface) : this(
+        context,
+        releaseConfigUrl,
+        airborneInterface,
+        true
+    )
 
     /**
      * Default no-op TrackerCallback.
@@ -59,6 +67,7 @@ class Airborne(
 
     init {
         airborneObjectMap.put(airborneInterface.getNamespace(), this)
+        applicationManager.shouldUpdate = shouldUpdate
         applicationManager.loadApplication(airborneInterface.getNamespace(), airborneInterface.getLazyDownloadCallback())
     }
 
@@ -94,15 +103,13 @@ class Airborne(
     }
 
     /**
-     * Set custom SSL configuration for mTLS support.
-     * Call this before network requests are made to enable client certificate authentication.
-     *
-     * @param sslSocketFactory SSL socket factory configured with client certificate
-     * @param trustManager Trust manager for server certificate validation
+     * Checks for updates by fetching the remote RC and comparing with local.
+     * Uses the dimensions provided via AirborneInterface at init time.
+     * @return JSON string with update metadata.
      */
     @Keep
-    fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
-        applicationManager.setSslConfig(sslSocketFactory, trustManager)
+    fun checkForUpdate(): String {
+        return applicationManager.checkForUpdate()
     }
 
     companion object {
