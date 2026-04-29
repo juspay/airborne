@@ -314,6 +314,90 @@ extension AirborneServices {
             return ""
         }
     }
+
+    @objc public func checkForUpdate(_ completion: @escaping (String) -> Void) {
+        let serializeResult: ([String: Any]) -> String = { result in
+            guard JSONSerialization.isValidJSONObject(result),
+                  let jsonData = try? JSONSerialization.data(withJSONObject: result),
+                  let jsonString = String(data: jsonData, encoding: .utf8) else {
+                return "{\"updateAvailable\":false,\"error\":\"Failed to serialize result\"}"
+            }
+            return jsonString
+        }
+
+        guard !self.releaseConfigURL.isEmpty else {
+            completion(serializeResult(["updateAvailable": false, "error": "No release config URL"]))
+            return
+        }
+
+        guard let url = URL(string: self.releaseConfigURL) else {
+            completion(serializeResult(["updateAvailable": false, "error": "Invalid release config URL"]))
+            return
+        }
+
+        let localRCJson = self.getReleaseConfig()
+        let localData = localRCJson.data(using: .utf8) ?? Data()
+        let localDict = (try? JSONSerialization.jsonObject(with: localData)) as? [String: Any]
+        let localConfig = localDict?["config"] as? [String: Any]
+        let localPackage = localDict?["package"] as? [String: Any]
+        let localRCVersion = localDict?["version"] as? String ?? ""
+        let localVersion = localConfig?["version"] as? String ?? ""
+        let localPkgVersion = localPackage?["version"] as? String ?? ""
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("no-cache", forHTTPHeaderField: "cache-control")
+        request.setValue(localRCVersion, forHTTPHeaderField: "x-release-config-version")
+        request.setValue(localPkgVersion, forHTTPHeaderField: "x-package-version")
+        request.setValue(localVersion, forHTTPHeaderField: "x-config-version")
+
+        if !self.dimensions.isEmpty {
+            let dimensionString = self.dimensions.sorted { $0.key < $1.key }
+                .map { "\($0.key)=\($0.value)" }
+                .joined(separator: ";")
+            request.setValue(dimensionString, forHTTPHeaderField: "x-dimension")
+        }
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(serializeResult(["updateAvailable": false, "error": error.localizedDescription]))
+                return
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(serializeResult(["updateAvailable": false, "error": "Invalid HTTP response"]))
+                return
+            }
+
+            guard httpResponse.statusCode == 200, let data = data else {
+                completion(serializeResult(["updateAvailable": false, "error": "HTTP \(httpResponse.statusCode)"]))
+                return
+            }
+
+            guard let remoteDict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                completion(serializeResult(["updateAvailable": false, "error": "Failed to parse release config"]))
+                return
+            }
+
+            let remoteConfig = remoteDict["config"] as? [String: Any]
+            let remotePackage = remoteDict["package"] as? [String: Any]
+            let remoteVersion = remoteConfig?["version"] as? String ?? ""
+            let remotePkgVersion = remotePackage?["version"] as? String ?? ""
+
+            completion(
+                serializeResult(
+                    [
+                        "updateAvailable": remoteVersion != localVersion,
+                        "currentVersion": localVersion,
+                        "remoteVersion": remoteVersion,
+                        "currentPackageVersion": localPkgVersion,
+                        "remotePackageVersion": remotePkgVersion
+                    ]
+                )
+            )
+        }
+        task.resume()
+    }
     
     /**
      * Reads and returns the content of a package file.

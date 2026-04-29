@@ -1,15 +1,12 @@
 package `in`.juspay.airborneplugin
 
 import android.content.Context
-import android.util.Log
 import androidx.annotation.Keep
 import `in`.juspay.airborne.HyperOTAServices
 import `in`.juspay.airborne.LazyDownloadCallback
 import `in`.juspay.airborne.TrackerCallback
-import `in`.juspay.airborne.network.OTANetUtils
 import `in`.juspay.hyperutil.constants.LogLevel
 import org.json.JSONObject
-import java.nio.charset.StandardCharsets
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509TrustManager
 
@@ -112,62 +109,7 @@ class Airborne(
      */
     @Keep
     fun checkForUpdate(): String {
-        val netUtils = OTANetUtils(context, airborneInterface.getNamespace(), "")
-        val headers = mutableMapOf<String, String>("cache-control" to "no-cache")
-        val localRc = applicationManager.readReleaseConfig()
-        try {
-            val localJson = JSONObject(localRc)
-            headers["x-release-config-version"] = localJson.optJSONObject("config")?.optString("version", "") ?: ""
-            headers["x-package-version"] = localJson.optJSONObject("package")?.optString("version", "") ?: ""
-            headers["x-config-version"] = localJson.optJSONObject("config")?.optString("version", "") ?: ""
-        } catch (_: Exception) {}
-
-        val dims = airborneInterface.getDimensions()
-        if (dims.isNotEmpty()) {
-            val sorted = dims.toSortedMap()
-            headers["x-dimension"] = sorted.entries.joinToString(";") { "${it.key}=${it.value}" }
-        }
-
-        return try {
-            val resp = netUtils.doGet(releaseConfigUrl, headers, null, null, null)
-            val code = resp.code
-            val body = resp.body
-            if (code != 200 || body == null) {
-                resp.close()
-                JSONObject().put("updateAvailable", false).put("error", "HTTP $code").toString()
-            } else {
-                val serialized = String(body.bytes(), StandardCharsets.UTF_8)
-                resp.close()
-                val remoteJson = JSONObject(serialized)
-                val localVersion = try { JSONObject(localRc).optJSONObject("config")?.optString("version", "") ?: "" } catch (_: Exception) { "" }
-                val localPkgVersion = try { JSONObject(localRc).optJSONObject("package")?.optString("version", "") ?: "" } catch (_: Exception) { "" }
-                val remoteVersion = remoteJson.optJSONObject("config")?.optString("version", "") ?: ""
-                val remotePkgVersion = remoteJson.optJSONObject("package")?.optString("version", "") ?: ""
-                val updateAvailable = remoteVersion != localVersion
-                JSONObject()
-                    .put("updateAvailable", updateAvailable)
-                    .put("currentVersion", localVersion)
-                    .put("remoteVersion", remoteVersion)
-                    .put("currentPackageVersion", localPkgVersion)
-                    .put("remotePackageVersion", remotePkgVersion)
-                    .toString()
-            }
-        } catch (e: Exception) {
-            Log.e("Airborne", "checkForUpdate failed: $e")
-            JSONObject().put("updateAvailable", false).put("error", e.message).toString()
-        }
-    }
-
-    /**
-     * Set custom SSL configuration for mTLS support.
-     * Call this before network requests are made to enable client certificate authentication.
-     *
-     * @param sslSocketFactory SSL socket factory configured with client certificate
-     * @param trustManager Trust manager for server certificate validation
-     */
-    @Keep
-    fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
-        applicationManager.setSslConfig(sslSocketFactory, trustManager)
+        return applicationManager.checkForUpdate()
     }
 
     companion object {
