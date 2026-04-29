@@ -1069,7 +1069,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.startReleaseConfigTimeoutTimer()
         
-        guard let manifestUrl = URL(string: self.delegate?.getReleaseConfigURL() ?? "") else {
+        guard let manifestUrl = URL(string: self.releaseConfigURL) else {
             completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
             return
         }
