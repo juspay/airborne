@@ -45,6 +45,7 @@ use serde_json::json;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     sync::Arc,
+    time::Duration,
 };
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
@@ -58,9 +59,12 @@ use crate::{
     },
     utils::{
         interceptor::CookieIntercept,
+        metrics::push_metrics_task,
         migrations::{
             get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
         },
+        redis::RedisCache,
+        superposition_provider::ProviderRegistry,
     },
 };
 
@@ -86,6 +90,15 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to build AppConfig");
 
+    // Needed for provider registry to authenticate with Superposition and manage providers
+    let superposition_token = if app_config.enable_authenticated_superposition {
+        app_config.superposition_token.clone().expect(
+            "SUPERPOSITION_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true to use provider registry features",
+        )
+    } else {
+        String::new()
+    };
+
     let superposition_migration_strategy =
         SuperpositionMigrationStrategy::from(app_config.superposition_migration_strategy.clone());
 
@@ -95,7 +108,18 @@ async fn main() -> std::io::Result<()> {
         .map(|s| s.trim().into())
         .collect();
 
-    let force_path_style = app_config.aws_endpoint_url.is_some();
+    // Push metrics to Victoria Metrics
+    if !app_config.victoria_metrics_url.is_empty() {
+        info!("Starting Victoria Metrics push task");
+        let metrics_url = app_config.victoria_metrics_url.clone();
+        tokio::spawn(push_metrics_task(metrics_url));
+    }
+
+    let force_path_style = app_config
+        .aws_endpoint_url
+        .as_ref()
+        .map(|url| url.contains("localstack"))
+        .unwrap_or(false);
 
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
@@ -143,7 +167,6 @@ async fn main() -> std::io::Result<()> {
     let pool = db::establish_pool(&app_config).await;
 
     let secret = app_config.keycloak_secret.clone();
-    let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
 
     let cac_url = app_config.superposition_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
@@ -218,29 +241,70 @@ async fn main() -> std::io::Result<()> {
 
         superposition_sdk::Client::from_conf(
             SrsConfig::builder()
+                .bearer_token("abcd".into())
                 .endpoint_url(cac_url.clone())
                 .behavior_version_latest()
-                .bearer_token(superposition_token.into())
                 .interceptor(cookie_interceptor)
                 .build(),
         )
     } else {
         superposition_sdk::Client::from_conf(
             SrsConfig::builder()
+                .bearer_token("abcd".into())
                 .endpoint_url(cac_url.clone())
                 .behavior_version_latest()
-                .bearer_token(superposition_token.into())
                 .build(),
         )
     };
 
+    // Initialize Redis client
+    let redis_cache = if let Some(redis_url) = app_config.redis_url {
+        info!("Initializing Redis cache");
+
+        let redis_client =
+            redis::Client::open(redis_url.as_str()).expect("Failed to create Redis client");
+
+        Some(
+            RedisCache::new(redis_client, "airborne".to_string())
+                .await
+                .expect("Failed to create Redis cache instance"),
+        )
+    } else {
+        info!("REDIS_URL not set, skipping Redis cache initialization");
+        None
+    };
+
+    let provider_url = cac_url + "/";
+
+    let provider_registry = Arc::new(ProviderRegistry::new(
+        superposition_org_id_env.clone(),
+        superposition_token.clone(),
+        provider_url.clone(),
+    ));
+
+    if app_config.superposition_clear_unused_providers {
+        info!("Starting unused superposition provider eviction task with TTL {} seconds and check interval {} seconds", app_config.superposition_unused_provider_ttl, app_config.superposition_unused_provider_check_interval);
+
+        let provider_registry_clone = provider_registry.clone();
+        tokio::spawn(async move {
+            provider_registry_clone
+                .run_ttl_eviction(
+                    Duration::from_secs(app_config.superposition_unused_provider_ttl),
+                    Duration::from_secs(app_config.superposition_unused_provider_check_interval),
+                )
+                .await;
+        });
+    }
+
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
         db_pool: pool,
+        redis_cache,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
+        provider_registry,
     });
 
     // Start the background cleanup job for transaction reconciliation
@@ -257,7 +321,7 @@ async fn main() -> std::io::Result<()> {
                 superposition_migration.err()
             );
         } else {
-            println!("Superposition migration completed successfully");
+            info!("Superposition migration completed successfully");
         }
     }
 

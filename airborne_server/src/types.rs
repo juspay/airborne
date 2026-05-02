@@ -17,30 +17,40 @@ use actix_web::{
     http::{header::HeaderMap, StatusCode},
     HttpRequest, HttpResponse, Responder,
 };
+use std::sync::Arc;
+
 use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
 use http::{HeaderName, HeaderValue};
 use keycloak::KeycloakError;
 use log::error;
+use open_feature::EvaluationError;
 use serde::{Deserialize, Deserializer, Serialize};
 use superposition_sdk::Client;
 use thiserror::Error;
 
 use crate::{
     organisation::{application::types::OrgAppError, types::OrgError},
-    utils::{db, migrations::SuperpositionDefaultConfig},
+    utils::{
+        db,
+        migrations::SuperpositionDefaultConfig,
+        redis::RedisCache,
+        superposition_provider::{ProviderRegistry, RegistryError},
+    },
 };
 
 #[derive(Clone)]
 pub struct AppState {
     pub env: Environment,
     pub db_pool: db::DbPool,
+    pub redis_cache: Option<RedisCache>,
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
     pub superposition_client: Client,
     pub sheets_hub: Option<
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
+    pub provider_registry: Arc<ProviderRegistry>,
 }
 
 #[derive(Clone, Debug)]
@@ -178,6 +188,24 @@ impl From<jsonwebtoken::errors::Error> for ABError {
                 ABError::InternalServerError("service error".into())
             }
         }
+    }
+}
+
+impl From<RegistryError> for ABError {
+    fn from(err: RegistryError) -> Self {
+        match err {
+            RegistryError::ProviderInitFailed(e) => {
+                error!("{:?}", e);
+                ABError::InternalServerError("service error".into())
+            }
+        }
+    }
+}
+
+impl From<EvaluationError> for ABError {
+    fn from(err: EvaluationError) -> Self {
+        error!("Evaluation error: {:?}", err);
+        ABError::InternalServerError("feature flag evaluation error".into())
     }
 }
 

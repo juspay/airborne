@@ -4,7 +4,6 @@ use aws_smithy_types::Document;
 use log::info;
 use serde_json::{json, Map, Value};
 
-use crate::types as airborne_types;
 use crate::types::ABError;
 
 pub fn document_to_json_value(doc: &Document) -> Value {
@@ -76,15 +75,49 @@ pub fn value_to_document(doc: &Value) -> Document {
     }
 }
 
-pub fn dotted_docs_to_nested<T>(input: T) -> airborne_types::Result<Value>
+/// Adapter so we can accept both `Document` and `serde_json::Value`.
+pub trait IntoJsonValue {
+    fn into_json_value(self) -> Value;
+}
+
+impl IntoJsonValue for Value {
+    #[inline]
+    fn into_json_value(self) -> Value {
+        self
+    }
+}
+
+impl IntoJsonValue for &Value {
+    #[inline]
+    fn into_json_value(self) -> Value {
+        self.clone()
+    }
+}
+
+impl IntoJsonValue for Document {
+    #[inline]
+    fn into_json_value(self) -> Value {
+        document_to_json_value(&self)
+    }
+}
+
+impl IntoJsonValue for &Document {
+    #[inline]
+    fn into_json_value(self) -> Value {
+        document_to_json_value(self)
+    }
+}
+
+pub fn dotted_docs_to_nested<I, V>(input: I) -> Result<Value, ABError>
 where
-    T: IntoIterator<Item = (String, Document)>,
+    I: IntoIterator<Item = (String, V)>,
+    V: IntoJsonValue,
 {
     let mut root = Value::Object(Map::new());
 
-    for (key, doc) in input {
-        // Convert Smithy Document -> serde_json::Value once.
-        let val = document_to_json_value(&doc);
+    for (key, v) in input {
+        // Convert once via the adapter.
+        let val = v.into_json_value();
 
         // Iterative descent through dotted path.
         let mut cursor = &mut root;
@@ -119,7 +152,7 @@ where
                 .or_insert_with(|| Value::Object(Map::new()));
         }
 
-        // Insert the value at the parent object
+        // Insert the value at the parent object.
         if !cursor.is_object() {
             info!(
                 "Path conflict at {}: found {}",

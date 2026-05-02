@@ -69,6 +69,7 @@ async fn create_dimension_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -197,6 +198,7 @@ async fn list_dimensions_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -276,6 +278,7 @@ async fn update_dimension_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -350,6 +353,7 @@ async fn delete_dimension_api(
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -390,6 +394,7 @@ async fn create_release_view_api(
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )
@@ -606,6 +611,7 @@ async fn update_release_view_api(
 
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
         state.db_pool.clone(),
+        &state.redis_cache,
         application.clone(),
         organisation.clone(),
     )

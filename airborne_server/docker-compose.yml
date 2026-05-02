@@ -107,7 +107,48 @@ services:
       retries: 10
       start_period: 10s
 
+  redis:
+    image: docker.io/redis:7-alpine
+    container_name: hyper-ota-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: hyper-ota-redis-insight
+    ports:
+      - "${REDIS_INSIGHT_PORT:-5540}:5540"
+    volumes:
+      - redis_insight_data:/data
+    environment:
+      - REDIS_INSIGHT_ENHANCED_METRICS=true
+      - REDIS_URL=redis://redis:6379
+      - RI_REDIS_HOST=redis
+      - RI_REDIS_PORT=6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5540"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   keycloak_postgres_data:
+  redis_data:
+  redis_insight_data:
   init-data: # Define the shared volume
