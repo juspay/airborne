@@ -6,6 +6,7 @@ use std::{fs::File, io::Read};
 
 use actix_multipart::form::MultipartForm;
 use actix_web::{
+    delete,
     error::PayloadError,
     get, patch, post,
     web::{self, Json, Path, Payload, Query, ReqData},
@@ -48,6 +49,7 @@ pub fn add_routes() -> Scope {
         .service(list_file_tags)
         .service(get_file)
         .service(update_file)
+        .service(delete_file)
         .service(groups::add_routes())
 }
 
@@ -61,11 +63,7 @@ fn db_file_to_response(file: &DbFile) -> FileResponse {
         size: file.size,
         checksum: file.checksum.clone(),
         metadata: file.metadata.clone(),
-        status: if file.size > 0 {
-            FileStatus::Ready
-        } else {
-            FileStatus::Pending
-        },
+        status: file.status,
         created_at: file.created_at.to_rfc3339(),
     }
 }
@@ -143,6 +141,7 @@ async fn create_file(
             .filter(app_id.eq(&application))
             .filter(file_path.eq(&request.file_path))
             .filter(tag.is_not_distinct_from(&request.tag))
+            .filter(status.ne(FileStatus::Deleted))
             .select(DbFile::as_select())
             .first::<DbFile>(&mut conn)
             .optional()?;
@@ -189,6 +188,7 @@ async fn create_file(
                 checksum: file_checksum,
                 metadata: request.metadata.clone().unwrap_or_else(|| json!({})),
                 created_at: Utc::now(),
+                status: FileStatus::Ready,
             };
 
             diesel::insert_into(files)
@@ -237,6 +237,7 @@ async fn bulk_create_files(
                     .filter(app_id.eq(&application))
                     .filter(file_path.eq(&file_req.file_path))
                     .filter(tag.eq(&file_req.tag))
+                    .filter(status.ne(FileStatus::Deleted))
                     .select(DbFile::as_select())
                     .first::<DbFile>(conn)
                     .optional()?;
@@ -278,6 +279,7 @@ async fn bulk_create_files(
                     checksum: "".to_string(),
                     metadata: file_req.metadata.clone().unwrap_or_else(|| json!({})),
                     created_at: Utc::now(),
+                    status: FileStatus::Pending,
                 };
 
                 new_files.push(new_file);
@@ -306,7 +308,11 @@ async fn bulk_create_files(
             if let Ok((file_size, file_checksum)) = utils::download_and_checksum(&file_url).await {
                 let mut conn = pool.get()?;
                 diesel::update(files.find(res_id))
-                    .set((size.eq(file_size as i64), checksum.eq(file_checksum)))
+                    .set((
+                        size.eq(file_size as i64),
+                        checksum.eq(file_checksum),
+                        status.eq(FileStatus::Ready),
+                    ))
                     .execute(&mut conn)?;
                 Ok(())
             } else {
@@ -379,6 +385,7 @@ async fn get_file(
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
                 .filter(version.eq(f_version))
+                .filter(status.ne(FileStatus::Deleted))
                 .select(DbFile::as_select())
                 .first::<DbFile>(&mut conn)
                 .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?
@@ -388,6 +395,7 @@ async fn get_file(
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
                 .filter(tag.eq(f_tag))
+                .filter(status.ne(FileStatus::Deleted))
                 .select(DbFile::as_select())
                 .first::<DbFile>(&mut conn)
                 .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?
@@ -411,6 +419,120 @@ fn parse_tags(tags: Option<&str>) -> Vec<String> {
             .collect()
     })
     .unwrap_or_default()
+}
+
+#[delete("")]
+async fn delete_file(
+    req: Query<DeleteFileQuery>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<DeleteFileResponse>> {
+    let file_id = req.file_id.clone();
+    if file_id.is_empty() {
+        return Err(ABError::BadRequest("File key cannot be empty".to_string()));
+    }
+
+    info!(
+        "Received delete request for file_id: {}, delete_all_versions: {}",
+        file_id, req.delete_all_versions
+    );
+
+    let (input_file_path, file_version, file_tag) = utils::parse_file_key(&file_id);
+
+    if input_file_path.is_empty() {
+        return Err(ABError::BadRequest("File path cannot be empty".to_string()));
+    }
+
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = match validate_user(auth_response.organisation.clone(), ADMIN)
+    {
+        Ok(org_name) => auth_response
+            .application
+            .ok_or_else(|| ABError::Forbidden("No Access".to_string()))
+            .map(|access| (org_name, access.name)),
+        Err(_) => validate_user(auth_response.organisation.clone(), READ).and_then(|org_name| {
+            validate_user(auth_response.application.clone(), WRITE)
+                .map(|app_name| (org_name, app_name))
+        }),
+    }?;
+
+    let pool = state.db_pool.clone();
+
+    let res = run_blocking!({
+        let mut conn = pool.get()?;
+
+        let base_query = || {
+            files
+                .filter(org_id.eq(&organisation))
+                .filter(app_id.eq(&application))
+                .filter(file_path.eq(&input_file_path))
+                .filter(status.ne(FileStatus::Deleted))
+        };
+
+        let target_files = if req.delete_all_versions {
+            base_query()
+                .select(DbFile::as_select())
+                .load::<DbFile>(&mut conn)
+                .map_err(|_| {
+                    ABError::NotFound(format!("File with path '{}' not found", input_file_path))
+                })?
+        } else if let Some(f_version) = file_version {
+            let file = base_query()
+                .filter(version.eq(f_version))
+                .select(DbFile::as_select())
+                .first::<DbFile>(&mut conn)
+                .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?;
+            vec![file]
+        } else if let Some(f_tag) = &file_tag {
+            let file = base_query()
+                .filter(tag.eq(f_tag))
+                .select(DbFile::as_select())
+                .first::<DbFile>(&mut conn)
+                .map_err(|_| ABError::NotFound(format!("File with ID '{}' not found", file_id)))?;
+            vec![file]
+        } else {
+            return Err(ABError::BadRequest(
+                "File key must contain a version or tag or if you want to delete all versions, set delete_all_versions to true".to_string(),
+            ));
+        };
+
+        if target_files.is_empty() {
+            return Err(ABError::NotFound(format!(
+                "File with ID '{}' not found",
+                file_id
+            )));
+        }
+
+        let deleted_versions = conn.transaction::<Vec<i32>, ABError, _>(|conn| {
+            let mut versions = vec![];
+            for target_file in &target_files {
+                let deleted_file = diesel::update(files.find(target_file.id))
+                    .set((tag.eq(None::<String>), status.eq(FileStatus::Deleted)))
+                    .get_result::<DbFile>(conn)
+                    .map_err(|_| {
+                        ABError::InternalServerError("Failed to delete file".to_string())
+                    })?;
+
+                versions.push(deleted_file.version);
+            }
+            Ok(versions)
+        })?;
+
+        Ok(DeleteFileResponse {
+            id: file_id,
+            file_path: input_file_path,
+            url: target_files[0].url.clone(),
+            versions: deleted_versions,
+            tag: file_tag,
+            size: target_files[0].size,
+            checksum: target_files[0].checksum.clone(),
+            metadata: target_files[0].metadata.clone(),
+            status: FileStatus::Deleted,
+            created_at: target_files[0].created_at.to_rfc3339(),
+        })
+    })?;
+
+    Ok(Json(res))
 }
 
 #[get("/list")]
@@ -446,6 +568,7 @@ async fn list_files(
             let mut count_query = files
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
+                .filter(status.ne(FileStatus::Deleted))
                 .into_boxed();
 
             if let Some(search_term) = &search_term {
@@ -471,6 +594,7 @@ async fn list_files(
         let mut data_query = files
             .filter(org_id.eq(&organisation))
             .filter(app_id.eq(&application))
+            .filter(status.ne(FileStatus::Deleted))
             .into_boxed();
 
         if let Some(search_term) = &search_term {
@@ -651,6 +775,7 @@ async fn update_file(
                     .filter(org_id.eq(&organisation))
                     .filter(app_id.eq(&application))
                     .filter(version.eq(f_version))
+                    .filter(status.ne(FileStatus::Deleted))
                     .select(DbFile::as_select())
                     .first::<DbFile>(conn)?
             } else if let Some(f_tag) = file_tag {
@@ -659,6 +784,7 @@ async fn update_file(
                     .filter(org_id.eq(&organisation))
                     .filter(app_id.eq(&application))
                     .filter(tag.eq(f_tag))
+                    .filter(status.ne(FileStatus::Deleted))
                     .select(DbFile::as_select())
                     .first::<DbFile>(conn)?
             } else {
@@ -749,6 +875,7 @@ async fn upload_file(
                 .filter(app_id.eq(&app))
                 .filter(file_path.eq(&fp))
                 .filter(tag.is_not_distinct_from(&tg))
+                .filter(status.ne(FileStatus::Deleted))
                 .select(DbFile::as_select())
                 .first::<DbFile>(&mut conn)
                 .optional()
@@ -836,6 +963,7 @@ async fn upload_file(
                         checksum: "".to_string(),
                         metadata: json!({}),
                         created_at: Utc::now(),
+                        status: FileStatus::Pending,
                     };
 
                     diesel::insert_into(files)
@@ -910,6 +1038,7 @@ async fn upload_file(
                             url.eq(full_url),
                             size.eq(file_size),
                             checksum.eq(checksum_hex),
+                            status.eq(FileStatus::Ready),
                         ))
                         .get_result::<DbFile>(&mut conn)
                         .map_err(|_| ABError::InternalServerError("DB Error".to_string()))?;
@@ -1031,6 +1160,7 @@ async fn upload_bulk_files(
                 checksum: "".to_string(),
                 metadata: m.metadata.clone().unwrap_or_else(|| json!({})),
                 created_at: Utc::now(),
+                status: FileStatus::Pending,
             };
             to_be_uploaded.push((m, new_file));
         }
@@ -1107,6 +1237,7 @@ async fn upload_bulk_files(
                                 url.eq(file_url),
                                 size.eq(file_size),
                                 checksum.eq(file_checksum),
+                                status.eq(FileStatus::Ready),
                             ))
                             .execute(&mut conn)?;
                         Ok(())

@@ -39,6 +39,11 @@ import {
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
 import {
+  DeleteFileCommand,
+  DeleteFileCommandInput,
+  DeleteFileCommandOutput,
+} from "./commands/DeleteFileCommand";
+import {
   GetReleaseCommand,
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
@@ -124,6 +129,7 @@ const commands = {
   CreatePackageCommand,
   CreateReleaseCommand,
   DeleteDimensionCommand,
+  DeleteFileCommand,
   GetReleaseCommand,
   GetUserCommand,
   ListDimensionsCommand,
@@ -259,6 +265,23 @@ export interface Airborne {
     args: DeleteDimensionCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: DeleteDimensionCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link DeleteFileCommand}
+   */
+  deleteFile(
+    args: DeleteFileCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<DeleteFileCommandOutput>;
+  deleteFile(
+    args: DeleteFileCommandInput,
+    cb: (err: any, data?: DeleteFileCommandOutput) => void
+  ): void;
+  deleteFile(
+    args: DeleteFileCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: DeleteFileCommandOutput) => void
   ): void;
 
   /**

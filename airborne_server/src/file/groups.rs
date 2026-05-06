@@ -7,10 +7,10 @@ use actix_web::{
 use diesel::prelude::*;
 
 use crate::{
-    file::groups::types::*,
+    file::{groups::types::*, types::FileStatus},
     middleware::auth::{validate_user, AuthResponse, ADMIN, READ},
-    run_blocking, types as airborne_types,
-    types::{ABError, AppState},
+    run_blocking,
+    types::{self as airborne_types, ABError, AppState},
     utils::db::{models::FileEntry as DbFile, schema::hyperotaserver::files::dsl::*},
 };
 
@@ -100,6 +100,7 @@ async fn list_file_groups(
             let mut path_query = files
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
+                .filter(status.ne(FileStatus::Deleted))
                 .into_boxed();
 
             if let Some(search) = &search_term {
@@ -121,6 +122,7 @@ async fn list_file_groups(
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
                 .filter(tag.eq_any(&tags_filter))
+                .filter(status.ne(FileStatus::Deleted))
                 .into_boxed();
 
             if let Some(search) = &search_term {
@@ -146,6 +148,7 @@ async fn list_file_groups(
             let file_versions: Vec<DbFile> = files
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
+                .filter(status.ne(FileStatus::Deleted))
                 .filter(file_path.eq(&fp))
                 .order(version.desc())
                 .limit(50)
@@ -156,6 +159,7 @@ async fn list_file_groups(
                 .filter(org_id.eq(&organisation))
                 .filter(app_id.eq(&application))
                 .filter(file_path.eq(&fp))
+                .filter(status.ne(FileStatus::Deleted))
                 .select(diesel::dsl::count_star())
                 .first::<i64>(&mut conn)?;
 

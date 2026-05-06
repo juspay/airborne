@@ -1,13 +1,20 @@
 use actix_multipart::form::{tempfile::TempFile, MultipartForm};
 use actix_web::error::PayloadError;
 use bytes::Bytes;
+use diesel::deserialize::{self, FromSql};
+use diesel::pg::{Pg, PgValue};
+use diesel::serialize::{self, IsNull, Output, ToSql};
+use diesel::{AsExpression, FromSqlRow};
 use http_body::Frame;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Display;
+use std::io::Write;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
+
+use crate::utils::db::schema::hyperotaserver::sql_types::FileStatusType;
 
 #[derive(Serialize, Deserialize)]
 pub struct FileRequest {
@@ -17,6 +24,26 @@ pub struct FileRequest {
     pub metadata: Option<Value>,
     pub size: Option<u64>,
     pub checksum: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteFileQuery {
+    pub file_id: String,
+    pub delete_all_versions: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeleteFileResponse {
+    pub id: String,
+    pub file_path: String,
+    pub url: String,
+    pub versions: Vec<i32>,
+    pub tag: Option<String>,
+    pub size: i64,
+    pub checksum: String,
+    pub metadata: Value,
+    pub status: FileStatus,
+    pub created_at: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,10 +57,13 @@ pub struct UpdateFileRequest {
     pub tag: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, AsExpression, FromSqlRow)]
+#[diesel(sql_type = FileStatusType)]
+#[serde(rename_all = "lowercase")]
 pub enum FileStatus {
     Pending,
     Ready,
+    Deleted,
 }
 
 impl Display for FileStatus {
@@ -41,6 +71,29 @@ impl Display for FileStatus {
         match self {
             FileStatus::Pending => write!(f, "pending"),
             FileStatus::Ready => write!(f, "ready"),
+            FileStatus::Deleted => write!(f, "deleted"),
+        }
+    }
+}
+
+impl ToSql<FileStatusType, Pg> for FileStatus {
+    fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Pg>) -> serialize::Result {
+        match *self {
+            FileStatus::Pending => out.write_all(b"pending")?,
+            FileStatus::Ready => out.write_all(b"ready")?,
+            FileStatus::Deleted => out.write_all(b"deleted")?,
+        }
+        Ok(IsNull::No)
+    }
+}
+
+impl FromSql<FileStatusType, Pg> for FileStatus {
+    fn from_sql(bytes: PgValue<'_>) -> deserialize::Result<Self> {
+        match bytes.as_bytes() {
+            b"pending" => Ok(FileStatus::Pending),
+            b"ready" => Ok(FileStatus::Ready),
+            b"deleted" => Ok(FileStatus::Deleted),
+            _ => Err("Unrecognized file_status variant".into()),
         }
     }
 }

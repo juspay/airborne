@@ -16,12 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, ChevronDown, ChevronRight, File, Filter, Plus, Loader2, Pencil } from "lucide-react";
-import { FileCreationModal } from "@/components/file-creation-modal";
-import { useAppContext } from "@/providers/app-context";
-import { apiFetch } from "@/lib/api";
-import { hasAppAccess } from "@/lib/utils";
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Search, ChevronDown, ChevronRight, File, Filter, Plus, Loader2, Pencil, Trash2 } from "lucide-react";
 import { toastSuccess, toastError } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -34,8 +29,19 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import type { FileGroup, FileGroupsResponse, TagInfo, TagsResponse } from "@/types/files";
+import { FileCreationModal } from "@/components/file-creation-modal";
+import { FileDeleteModal } from "@/components/file-delete-modal";
+import { useAppContext } from "@/providers/app-context";
+import { apiFetch } from "@/lib/api";
+import { hasAppAccess } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const FILES_PER_PAGE = 15;
+type FileToDelete = {
+  id: string;
+  file_path: string;
+  version: number;
+};
 
 export default function FilesPage() {
   const { token, org, app, getOrgAccess, getAppAccess } = useAppContext();
@@ -51,6 +57,8 @@ export default function FilesPage() {
   // UI state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [fileToDelete, setFileToDelete] = useState<FileToDelete | null>(null);
 
   // Edit Tag dialog state
   const [isEditTagDialogOpen, setIsEditTagDialogOpen] = useState(false);
@@ -94,6 +102,15 @@ export default function FilesPage() {
   const groups = groupsData?.groups || [];
   const totalPages = groupsData?.total_pages || 1;
   const tags = tagsData?.data || [];
+
+  function handleDeleteClick(filePath: string, version: number) {
+    setFileToDelete({
+      id: `${filePath}@version:${version}`,
+      file_path: filePath,
+      version,
+    });
+    setIsDeleteModalOpen(true);
+  }
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -395,7 +412,7 @@ export default function FilesPage() {
                                     <TableHead>URL</TableHead>
                                     <TableHead>Size</TableHead>
                                     <TableHead>Created</TableHead>
-                                    <TableHead className="w-24">Actions</TableHead>
+                                    <TableHead className="w-52">Actions</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -424,18 +441,32 @@ export default function FilesPage() {
                                         </TableCell>
                                         <TableCell>
                                           {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-7 px-2"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleEditTag(group.file_path, version.version, versionTag || "");
-                                              }}
-                                            >
-                                              <Pencil className="h-3.5 w-3.5 mr-1" />
-                                              Edit Tag
-                                            </Button>
+                                            <div className="flex items-center gap-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleEditTag(group.file_path, version.version, versionTag || "");
+                                                }}
+                                              >
+                                                <Pencil className="h-3.5 w-3.5 mr-1" />
+                                                Edit Tag
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDeleteClick(group.file_path, version.version);
+                                                }}
+                                              >
+                                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                                Delete
+                                              </Button>
+                                            </div>
                                           )}
                                         </TableCell>
                                       </TableRow>
@@ -521,6 +552,17 @@ export default function FilesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <FileDeleteModal
+        open={isDeleteModalOpen}
+        onOpenChange={(open) => {
+          setIsDeleteModalOpen(open);
+          if (!open) {
+            setFileToDelete(null);
+          }
+        }}
+        file={fileToDelete}
+        onDeleted={() => mutate()}
+      />
     </div>
   );
 }

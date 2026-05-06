@@ -3,6 +3,7 @@ use diesel::deserialize::Queryable;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::file::types::FileStatus;
 use crate::utils::db::schema::hyperotaserver::{
     builds, cleanup_outbox, configs, files, packages, packages_v2, release_views, releases,
     user_credentials, workspace_names,
@@ -108,6 +109,7 @@ pub struct FileEntry {
     #[diesel(sql_type = diesel::sql_types::Jsonb)]
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub status: FileStatus,
 }
 
 #[derive(Insertable)]
@@ -124,6 +126,7 @@ pub struct NewFileEntry {
     #[diesel(sql_type = diesel::sql_types::Jsonb)]
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub status: FileStatus,
 }
 
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]
