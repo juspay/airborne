@@ -6,8 +6,12 @@
 //
 
 #import "AJPApplicationTracker.h"
-#import "AJPApplicationConstants.h"
 #import "AJPHelpers.h"
+#if SWIFT_PACKAGE
+@import AirborneSwiftModel;
+#else
+#import <Airborne/Airborne-Swift.h>
+#endif
 
 @interface AJPApplicationTracker()
 
@@ -53,7 +57,7 @@
 }
 
 - (void)trackEventWithLevel:(NSString *)level label:(NSString*)label key:(NSString *)key value:(NSMutableDictionary<NSString*,id>*)value {
-    [self trackEventWithLevel:level label:label key:key value:value category:@"lifecycle" subcategory:APPL_MANAGER_SUB_CAT];
+    [self trackEventWithLevel:level label:label key:key value:value category:@"lifecycle" subcategory:AJPApplicationConstants.APPL_MANAGER_SUB_CAT];
 }
 
 - (void)trackEventWithLevel:(NSString *)level label:(NSString *)label key:(NSString *)key value:(id)value category:(NSString *)category subcategory:(NSString *)subcategory {
@@ -77,7 +81,7 @@
         if(logger && [logger conformsToProtocol:@protocol(AJPLoggerDelegate)]) {
             didSendLog = YES;
             if ([logger respondsToSelector:@selector(trackEventWithLevel:label:key:value:category:subcategory:)]) {
-                [logger trackEventWithLevel:level label:label key:key value:finalValue category:@"lifecycle" subcategory:APPL_MANAGER_SUB_CAT];
+                [logger trackEventWithLevel:level label:label key:key value:finalValue category:@"lifecycle" subcategory:AJPApplicationConstants.APPL_MANAGER_SUB_CAT];
             }
         }
     }
@@ -87,7 +91,7 @@
         if (logsManagerClass) {
             NSString *selectorString = @"trackEventWithLevel:label:value:category:subcategory:workspace:";
             
-            NSInvocation *invocation = [AJPHelpersObjc getInvocatorForSelectorString:selectorString className:className isInstanceMethod:NO target:logsManagerClass arguments:@[level, label, finalValue, @"lifecycle", APPL_MANAGER_SUB_CAT, self.workspace]];
+            NSInvocation *invocation = [AJPHelpersObjc getInvocatorForSelectorString:selectorString className:className isInstanceMethod:NO target:logsManagerClass arguments:@[level, label, finalValue, @"lifecycle", AJPApplicationConstants.APPL_MANAGER_SUB_CAT, self.workspace]];
             [invocation invoke];
         }
     }

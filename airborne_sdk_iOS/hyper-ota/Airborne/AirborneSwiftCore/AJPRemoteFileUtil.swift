@@ -118,7 +118,7 @@ public typealias AJPDownloadCallback = @convention(block) (Bool, Data?, String?,
     ///   - localURL: The local file path to save the file to.
     ///   - expectedChecksum: An optional SHA256 checksum to validate against.
     /// - Returns: A tuple of (success, data, error message, response).
-    public func downloadFile(
+    open func downloadFile(
         from remoteURL: String,
         andSaveFileAtUrl localURL: String,
         checksum expectedChecksum: String?
