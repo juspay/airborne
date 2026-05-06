@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.34.0 - 2026-05-06
+### Package updates
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.5.0
+### Global changes
+#### Bug Fixes
+- Updating submodule URL to https to fix SPM error - (d39b22e) - Balaganesh S
+#### Features
+- Migrating ApplicationManifest & ApplicationManager to Swift - (92b7ed0) - Balaganesh S
+
+- - -
+
 ## v0.33.0 - 2026-04-20
 ### Package updates
 - airborne_sdk_ios bumped to airborne_sdk_ios-v0.4.0
