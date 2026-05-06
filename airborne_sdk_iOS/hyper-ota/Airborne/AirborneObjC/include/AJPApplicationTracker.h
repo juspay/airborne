@@ -7,19 +7,19 @@
 
 #import <Foundation/Foundation.h>
 
-#if SWIFT_PACKAGE
-@import AirborneSwiftCore;
-#else
-#import <Airborne/Airborne-Swift.h>
-#endif
-
 NS_ASSUME_NONNULL_BEGIN
+
+@protocol AJPLoggerDelegate;
 
 @interface AJPApplicationTracker : NSObject <AJPLoggerDelegate>
 
 - (instancetype)initWithManagerId:(NSString *)managerId workspace:(NSString *)workspace;
 
-- (void)addLogger:( id<AJPLoggerDelegate> _Nullable)logger;
+#if SWIFT_PACKAGE
+- (void)addLogger:(id _Nullable)logger;
+#else
+- (void)addLogger:(id<AJPLoggerDelegate> _Nullable)logger;
+#endif
 
 - (void)trackInfo:(NSString *)key value:(NSMutableDictionary<NSString *,id> *)value;
 
