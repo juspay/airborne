@@ -14,6 +14,7 @@
 
 use crate::utils::kms::{decrypt_env, decrypt_master_key};
 use aws_sdk_kms::Client;
+use std::collections::HashSet;
 use std::env;
 use std::str::FromStr;
 
@@ -42,13 +43,22 @@ pub struct AppConfig {
     pub aws_bucket: String,
     pub aws_endpoint_url: Option<String>,
 
-    // Keycloak settings
-    pub keycloak_url: String,
-    pub keycloak_external_url: String,
-    pub keycloak_realm: String,
-    pub keycloak_client_id: String,
-    pub keycloak_secret: String,
-    pub keycloak_public_key: String,
+    // Authentication provider settings
+    pub authn_provider: String,
+    pub authz_provider: String,
+    pub oidc_issuer_url: Option<String>,
+    pub oidc_external_issuer_url: Option<String>,
+    pub oidc_client_id: Option<String>,
+    pub oidc_client_secret: Option<String>,
+    pub oidc_clock_skew_secs: u64,
+    pub authz_bootstrap_super_admins: Option<String>,
+    pub authz_casbin_auto_load_secs: Option<u64>,
+    pub auth_admin_client_id: Option<String>,
+    pub auth_admin_client_secret: Option<String>,
+    pub auth_admin_token_url: Option<String>,
+    pub auth_admin_audience: Option<String>,
+    pub auth_admin_scopes: Option<String>,
+    pub auth_admin_issuer: Option<String>,
 
     // Superposition settings
     pub superposition_url: String,
@@ -59,7 +69,7 @@ pub struct AppConfig {
     pub enable_authenticated_superposition: bool,
 
     // Feature flags
-    pub enable_google_signin: bool,
+    pub enabled_oidc_idps: Vec<String>,
     pub organisation_creation_disabled: bool,
 
     // Google Sheets
@@ -135,6 +145,17 @@ impl AppConfig {
         let get_optional =
             |name: &str| -> Option<String> { env::var(name).ok().filter(|v| !v.is_empty()) };
 
+        let legacy_google_signin_enabled: bool = parse_env("ENABLE_GOOGLE_SIGNIN", false);
+        let enabled_oidc_idps = get_optional("OIDC_ENABLED_IDPS")
+            .map(|raw| parse_csv_env_list(&raw))
+            .unwrap_or_else(|| {
+                if legacy_google_signin_enabled {
+                    vec!["google".to_string()]
+                } else {
+                    Vec::new()
+                }
+            });
+
         Ok(AppConfig {
             // Server settings
             port: parse_env("PORT", 8081),
@@ -159,13 +180,24 @@ impl AppConfig {
             aws_bucket: get_env("AWS_BUCKET", None)?,
             aws_endpoint_url: get_optional("AWS_ENDPOINT_URL"),
 
-            // Keycloak settings
-            keycloak_url: get_env("KEYCLOAK_URL", None)?,
-            keycloak_external_url: get_env("KEYCLOAK_EXTERNAL_URL", Some("localhost:8180"))?,
-            keycloak_realm: get_env("KEYCLOAK_REALM", None)?,
-            keycloak_client_id: get_env("KEYCLOAK_CLIENT_ID", None)?,
-            keycloak_secret: get_secret("KEYCLOAK_SECRET")?,
-            keycloak_public_key: get_env("KEYCLOAK_PUBLIC_KEY", None)?,
+            // Authentication provider settings
+            authn_provider: get_env("AUTHN_PROVIDER", Some("keycloak"))?,
+            authz_provider: get_env("AUTHZ_PROVIDER", Some("casbin"))?,
+            oidc_issuer_url: get_optional("OIDC_ISSUER_URL"),
+            oidc_external_issuer_url: get_optional("OIDC_EXTERNAL_ISSUER_URL"),
+            oidc_client_id: get_optional("OIDC_CLIENT_ID"),
+            oidc_client_secret: get_optional_secret("OIDC_CLIENT_SECRET")?,
+            oidc_clock_skew_secs: parse_env("OIDC_CLOCK_SKEW_SECS", 60),
+            authz_bootstrap_super_admins: get_optional("AUTHZ_BOOTSTRAP_SUPER_ADMINS"),
+            authz_casbin_auto_load_secs: env::var("AUTHZ_CASBIN_AUTOLOAD_SECS")
+                .ok()
+                .and_then(|value| value.parse::<u64>().ok()),
+            auth_admin_client_id: get_optional("AUTH_ADMIN_CLIENT_ID"),
+            auth_admin_client_secret: get_optional_secret("AUTH_ADMIN_CLIENT_SECRET")?,
+            auth_admin_token_url: get_optional("AUTH_ADMIN_TOKEN_URL"),
+            auth_admin_audience: get_optional("AUTH_ADMIN_AUDIENCE"),
+            auth_admin_scopes: get_optional("AUTH_ADMIN_SCOPES"),
+            auth_admin_issuer: get_optional("AUTH_ADMIN_ISSUER"),
 
             // Superposition settings
             superposition_url: get_env("SUPERPOSITION_URL", None)?,
@@ -179,7 +211,7 @@ impl AppConfig {
             ),
 
             // Feature flags
-            enable_google_signin: parse_env("ENABLE_GOOGLE_SIGNIN", false),
+            enabled_oidc_idps,
             organisation_creation_disabled: parse_env("ORGANISATION_CREATION_DISABLED", false),
 
             // Google Sheets
@@ -201,4 +233,14 @@ impl AppConfig {
             migrations_to_run_on_boot: get_env("MIGRATIONS_TO_RUN_ON_BOOT", Some(""))?,
         })
     }
+}
+
+fn parse_csv_env_list(raw: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    raw.split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_ascii_lowercase())
+        .filter(|value| seen.insert(value.clone()))
+        .collect()
 }

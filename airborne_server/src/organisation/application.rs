@@ -16,12 +16,11 @@ use std::collections::HashMap;
 
 use actix_web::web::{Json, ReqData};
 use actix_web::Scope;
+use airborne_authz_macros::authz;
 
 use actix_web::{post, web};
 use aws_smithy_types::Document;
 use diesel::RunQueryDsl;
-use keycloak::types::GroupRepresentation;
-use keycloak::KeycloakAdmin;
 use log::info;
 use serde::{Deserialize, Serialize};
 use superposition_sdk::operation::create_default_config::CreateDefaultConfigOutput;
@@ -29,7 +28,7 @@ use superposition_sdk::types::WorkspaceStatus;
 use superposition_sdk::Client;
 
 use crate::{
-    middleware::auth::{validate_user, AuthResponse, ADMIN},
+    middleware::auth::{require_scope_name, AuthResponse},
     types::{self as airborne_types, ABError, AppState},
     utils::{
         db::{
@@ -37,9 +36,7 @@ use crate::{
             schema::hyperotaserver::workspace_names,
         },
         document::schema_doc_to_hashmap,
-        keycloak::get_token,
         migrations::{migrate_superposition_workspace, SuperpositionMigrationStrategy},
-        transaction_manager::TransactionManager,
     },
 };
 
@@ -138,6 +135,14 @@ where
     })
 }
 
+#[authz(
+    resource = "application",
+    action = "create",
+    org_roles = ["owner", "admin"],
+    app_roles = [],
+    allow_org = true,
+    allow_app = false
+)]
 #[post("/create")]
 async fn add_application(
     body: Json<ApplicationCreateRequest>,
@@ -148,304 +153,73 @@ async fn add_application(
     let body = body.into_inner();
     let application = body.application;
 
-    // Check if the user token is still valid
     let auth_response = auth_response.into_inner();
     let sub = &auth_response.sub;
+    let organisation = require_scope_name(auth_response.organisation, "organisation")?;
+    info!(
+        "Validated org context '{}' while creating app '{}'",
+        organisation, application
+    );
 
-    let organisation = auth_response.organisation;
-
-    info!("Validating organisation: {:?}", organisation);
-    let organisation = validate_user(organisation, ADMIN).map_err(|e| {
-        info!("Error validating organisation: {:?}", e);
-        ABError::Forbidden(format!(
-            "User does not have ADMIN access to organisation: {}",
-            e
-        ))
-    })?;
-    info!("Organisation validated successfully.");
-
-    // Create a transaction manager to track resources
-    let transaction = TransactionManager::new(&application, "application_create");
-
-    // Get DB connection
-    let mut conn = state.db_pool.get()?;
-
-    // Get Keycloak Admin Token
-    let client = reqwest::Client::new();
-    let admin_token = get_token(state.env.clone(), client).await.map_err(|e| {
-        info!("Error retrieving Keycloak admin token: {:?}", e);
-        ABError::Unauthorized(format!("Error retrieving Keycloak admin token: {}", e))
-    })?;
-    info!("Admin token retrieved successfully.");
-    let client = reqwest::Client::new();
-    let admin = KeycloakAdmin::new(&state.env.keycloak_url.clone(), admin_token, client);
-    let realm = state.env.realm.clone();
-
-    let groups = admin
-        .realm_groups_get(
-            &realm,
-            None,
-            Some(true), // Exact Match
-            None,
-            Some(2), // Check only one group; Should be 5xx if more than 1
-            Some(false),
-            None,
-            Some(organisation.clone()),
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("{}", e)))?;
-
-    if groups.is_empty() {
-        Err(ABError::NotFound(format!(
-            "Organisation '{}' not found in Keycloak",
-            organisation
-        )))
-    }
-    // It is possible that application group comes up in this query; Change to path
-    // else if groups.len() != 1 {
-    //     return Err(error::ErrorInternalServerError(Json(json!({"Error" : "Inconsistant database entries"}))));
-    // }
-    else {
-        // Reject if application already exists
-        if groups[0]
-            .sub_groups
-            .clone()
-            .unwrap_or_default()
-            .iter()
-            .any(|g| g.name == Some(application.clone()))
-        {
-            return Err(ABError::BadRequest(format!(
-                "Application '{}' already exists in organisation '{}'",
-                application, organisation
-            )));
-        }
-
-        // Step 1: Create application group in Keycloak
-        let parent_group_id = match admin
-            .realm_groups_with_group_id_children_post(
-                &realm,
-                &groups[0].id.clone().unwrap_or_default().clone(),
-                GroupRepresentation {
-                    name: Some(application.clone()),
-                    ..Default::default()
-                },
-            )
-            .await
-        {
-            Ok(id) => {
-                let group_id = id.unwrap_or_default();
-                // Record this resource in the transaction
-                transaction.add_keycloak_group(&group_id);
-                info!("Created application group with ID: {}", group_id);
-                group_id
-            }
-            Err(e) => {
-                // No rollback needed yet - this is the first operation
-                return Err(ABError::InternalServerError(format!(
-                    "Failed to create application group: {}",
-                    e
-                )));
-            }
-        };
-
-        // Step 2: Create role groups and add user to them
-        let roles = ["read", "write", "admin"];
-        for role in roles {
-            match admin
-                .realm_groups_with_group_id_children_post(
-                    &realm,
-                    &parent_group_id,
-                    GroupRepresentation {
-                        name: Some(role.to_string()),
-                        ..Default::default()
-                    },
-                )
-                .await
-            {
-                Ok(id) => {
-                    let role_group_id = id.unwrap_or_default();
-                    // Record this resource in the transaction
-                    transaction.add_keycloak_group(&role_group_id);
-                    info!("Created role group {} with ID: {}", role, role_group_id);
-
-                    // Add the user to the role-specific group
-                    match admin
-                        .realm_users_with_user_id_groups_with_group_id_put(
-                            &realm,
-                            sub,
-                            &role_group_id,
-                        )
-                        .await
-                    {
-                        Ok(_) => {
-                            // Record this user-group relationship in the transaction
-                            transaction.add_keycloak_resource(
-                                "user_group_membership",
-                                &format!("{}:{}", sub, role_group_id),
-                            );
-                            info!("Added user to role group: {}", role);
-                        }
-                        Err(e) => {
-                            // Handle rollback and return error
-                            if let Err(rollback_err) = transaction
-                                .handle_rollback_if_needed(&admin, &realm, &state)
-                                .await
-                            {
-                                info!("Rollback failed: {}", rollback_err);
-                            }
-
-                            return Err(ABError::InternalServerError(format!(
-                                "Failed to add user to role group {}: {}",
-                                role, e
-                            )));
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Handle rollback and return error
-                    if let Err(rollback_err) = transaction
-                        .handle_rollback_if_needed(&admin, &realm, &state)
-                        .await
-                    {
-                        info!("Rollback failed: {}", rollback_err);
-                    }
-
-                    return Err(ABError::InternalServerError(format!(
-                        "Failed to create role group {}: {}",
-                        role, e
-                    )));
-                }
-            }
-        }
-
-        // Store workspace name in our database with a placeholder, then update to "workspace{id}"
-        let new_workspace_name = NewWorkspaceName {
-            organization_id: &organisation,
-            application_id: &application,
-            workspace_name: "pending",
-        };
-
-        let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-        info!(
-            "Using Superposition Org ID from environment: {}",
-            superposition_org_id_from_env
-        );
-        // Insert and get the inserted row (to get the id)
-        let mut inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
-            .values(&new_workspace_name)
-            .get_result(&mut conn)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
-            })?;
-
-        let generated_id = inserted_workspace.id;
-        let generated_workspace_name = format!("workspace{}", generated_id);
-        inserted_workspace.workspace_name = generated_workspace_name.clone();
-
-        // Update the workspace_name to "workspace{id}"
-        diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
-            .set(workspace_names::workspace_name.eq(&generated_workspace_name))
-            .execute(&mut conn)
-            .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
-            })?;
-
-        // Step 4: Create workspace in Superposition
-
-        match state
-            .superposition_client
-            .create_workspace()
-            .org_id(superposition_org_id_from_env.clone())
-            .workspace_name(generated_workspace_name.clone())
-            .workspace_status(WorkspaceStatus::Enabled)
-            .allow_experiment_self_approval(true)
-            .workspace_admin_email("pp-sdk@juspay.in".to_string())
-            .send()
-            .await
-        {
-            Ok(workspace) => {
-                // Record Superposition resource using workspace name as the ID
-                transaction.set_superposition_resource(&workspace.workspace_name);
-                info!("Created workspace in Superposition: {:?}", workspace);
-                workspace
-            }
-            Err(e) => {
-                // Handle rollback and return error
-                if let Err(rollback_err) = transaction
-                    .handle_rollback_if_needed(&admin, &realm, &state)
-                    .await
-                {
-                    info!("Rollback failed: {}", rollback_err);
-                }
-
-                return Err(ABError::InternalServerError(format!(
-                    "Failed to create workspace in Superposition: {}",
-                    e
-                )));
-            }
-        };
-
-        // Helper function to create default config with error handling
-        async fn create_config_with_tx<E>(
-            create_fn: impl futures::Future<Output = Result<(), E>>,
-            key: &str,
-            transaction: &TransactionManager,
-            admin: &KeycloakAdmin,
-            realm: &str,
-            state: &web::Data<AppState>,
-        ) -> Result<(), ABError>
-        where
-            E: std::fmt::Display,
-        {
-            match create_fn.await {
-                Ok(result) => {
-                    info!("Created configuration for key: {}", key);
-                    Ok(result)
-                }
-                Err(e) => {
-                    // Handle rollback
-                    if let Err(rollback_err) = transaction
-                        .handle_rollback_if_needed(admin, realm, state)
-                        .await
-                    {
-                        info!("Rollback failed: {}", rollback_err);
-                    }
-
-                    Err(ABError::InternalServerError(format!(
-                        "Failed to create configuration for {}: {}",
-                        key, e
-                    )))
-                }
-            }
-        }
-
-        create_config_with_tx(
-            async {
-                migrate_superposition_workspace(
-                    &inserted_workspace,
-                    &state,
-                    &SuperpositionMigrationStrategy::Patch,
-                )
-                .await
-                .map_err(|e| {
-                    ABError::InternalServerError(format!("Workspace migration error: {}", e))
-                })
-            },
-            "migrate_superposition_workspace",
-            &transaction,
-            &admin,
-            &realm,
-            &state,
-        )
+    state
+        .authz_provider
+        .create_application(state.get_ref(), &organisation, &application, sub)
         .await?;
 
-        // Mark transaction as complete since all operations have succeeded
-        transaction.set_database_inserted();
+    let mut conn = state.db_pool.get()?;
+    let new_workspace_name = NewWorkspaceName {
+        organization_id: &organisation,
+        application_id: &application,
+        workspace_name: "pending",
+    };
 
-        Ok(Json(Application {
-            application,
-            organisation,
-            access: roles.iter().map(|&s| s.to_string()).collect(),
-        }))
-    }
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+    let mut inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
+        .values(&new_workspace_name)
+        .get_result(&mut conn)
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
+        })?;
+
+    let generated_id = inserted_workspace.id;
+    let generated_workspace_name = format!("workspace{}", generated_id);
+    inserted_workspace.workspace_name = generated_workspace_name.clone();
+
+    diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+        .set(workspace_names::workspace_name.eq(&generated_workspace_name))
+        .execute(&mut conn)
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
+        })?;
+
+    state
+        .superposition_client
+        .create_workspace()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_name(generated_workspace_name.clone())
+        .workspace_status(WorkspaceStatus::Enabled)
+        .allow_experiment_self_approval(true)
+        .workspace_admin_email("pp-sdk@juspay.in".to_string())
+        .send()
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!(
+                "Failed to create workspace in Superposition: {}",
+                e
+            ))
+        })?;
+
+    migrate_superposition_workspace(
+        &inserted_workspace,
+        &state,
+        &SuperpositionMigrationStrategy::Patch,
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace migration error: {}", e)))?;
+
+    Ok(Json(Application {
+        application,
+        organisation,
+        access: vec!["read".to_string(), "write".to_string(), "admin".to_string()],
+    }))
 }

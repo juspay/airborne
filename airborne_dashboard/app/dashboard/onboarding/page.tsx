@@ -9,8 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Rocket, Check, ChevronRight, Smartphone, Globe, Users, Target, Zap, Shield, BarChart3 } from "lucide-react";
+import { definePagePermissions } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({});
 
 export default function OnboardingPage() {
+  usePagePermissions(PAGE_AUTHZ);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
 

@@ -23,17 +23,20 @@ use http::{HeaderName, HeaderValue};
 use keycloak::KeycloakError;
 use log::error;
 use serde::{Deserialize, Deserializer, Serialize};
+use std::sync::Arc;
 use superposition_sdk::Client;
 use thiserror::Error;
 
 use crate::{
-    organisation::{application::types::OrgAppError, types::OrgError},
+    provider::{authn::AuthNProvider, authz::AuthZProvider},
     utils::{db, migrations::SuperpositionDefaultConfig},
 };
 
 #[derive(Clone)]
 pub struct AppState {
     pub env: Environment,
+    pub authn_provider: Arc<dyn AuthNProvider>,
+    pub authz_provider: Arc<dyn AuthZProvider>,
     pub db_pool: db::DbPool,
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
@@ -46,19 +49,120 @@ pub struct AppState {
 #[derive(Clone, Debug)]
 pub struct Environment {
     pub public_url: String,
+    pub authn_issuer_url: String,
+    pub authn_external_issuer_url: String,
+    pub authn_client_id: String,
+    pub authn_client_secret: String,
+    pub authn_clock_skew_secs: u64,
+    pub auth_admin_client_id: String,
+    pub auth_admin_client_secret: String,
+    pub auth_admin_token_url: String,
+    pub auth_admin_audience: Option<String>,
+    pub auth_admin_scopes: Option<String>,
     pub keycloak_url: String,
-    pub keycloak_external_url: String,
-    pub keycloak_public_key: String,
-    pub client_id: String,
-    pub secret: String,
     pub realm: String,
     pub bucket_name: String,
     pub superposition_org_id: String,
-    pub enable_google_signin: bool,
+    pub enabled_oidc_idps: Vec<String>,
     pub organisation_creation_disabled: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
     pub default_configs: Vec<SuperpositionDefaultConfig>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthnProviderKind {
+    Keycloak,
+    Oidc,
+    Okta,
+    Auth0,
+}
+
+impl AuthnProviderKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthnProviderKind::Keycloak => "keycloak",
+            AuthnProviderKind::Oidc => "oidc",
+            AuthnProviderKind::Okta => "okta",
+            AuthnProviderKind::Auth0 => "auth0",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AuthzProviderKind {
+    Casbin,
+}
+
+impl AuthzProviderKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AuthzProviderKind::Casbin => "casbin",
+        }
+    }
+}
+
+impl std::str::FromStr for AuthzProviderKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value.to_ascii_lowercase().as_str() {
+            "casbin" => Ok(AuthzProviderKind::Casbin),
+            _ => Err(format!(
+                "Unsupported AUTHZ_PROVIDER '{}'. Expected one of: casbin",
+                value
+            )),
+        }
+    }
+}
+
+impl std::str::FromStr for AuthnProviderKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value.to_ascii_lowercase().as_str() {
+            "keycloak" => Ok(AuthnProviderKind::Keycloak),
+            "oidc" => Ok(AuthnProviderKind::Oidc),
+            "okta" => Ok(AuthnProviderKind::Okta),
+            "auth0" => Ok(AuthnProviderKind::Auth0),
+            _ => Err(format!(
+                "Unsupported AUTHN_PROVIDER '{}'. Expected one of: keycloak, oidc, okta, auth0",
+                value
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod authn_provider_tests {
+    use super::{AuthnProviderKind, AuthzProviderKind};
+    use std::str::FromStr;
+
+    #[test]
+    fn parses_provider_names_case_insensitively() {
+        assert_eq!(
+            AuthnProviderKind::from_str("keycloak").expect("keycloak should parse"),
+            AuthnProviderKind::Keycloak
+        );
+        assert_eq!(
+            AuthnProviderKind::from_str("OIDC").expect("oidc should parse"),
+            AuthnProviderKind::Oidc
+        );
+        assert_eq!(
+            AuthnProviderKind::from_str("Okta").expect("okta should parse"),
+            AuthnProviderKind::Okta
+        );
+        assert_eq!(
+            AuthnProviderKind::from_str("AUTH0").expect("auth0 should parse"),
+            AuthnProviderKind::Auth0
+        );
+        assert_eq!(
+            AuthzProviderKind::from_str("CASBIN").expect("casbin should parse"),
+            AuthzProviderKind::Casbin
+        );
+    }
 }
 pub trait AppError: std::error::Error + Send + Sync + 'static {
     fn code(&self) -> &'static str;
@@ -76,12 +180,6 @@ pub struct ErrorBody {
 
 #[derive(Debug, Error)]
 pub enum ABError {
-    #[error(transparent)]
-    OrgAppError(#[from] OrgAppError),
-
-    #[error(transparent)]
-    OrgError(#[from] OrgError),
-
     #[error("{0}")]
     NotFound(String),
 
@@ -190,8 +288,6 @@ impl AppError for ABError {
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
             ABError::R2D2Error(_) => ABErrorCodes::InternalServerError.label(),
-            ABError::OrgAppError(org_app_error) => org_app_error.code(),
-            ABError::OrgError(org_error) => org_error.code(),
         }
     }
 
@@ -203,8 +299,6 @@ impl AppError for ABError {
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
             ABError::R2D2Error(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            ABError::OrgAppError(org_app_error) => org_app_error.status_code(),
-            ABError::OrgError(org_error) => org_error.status_code(),
         }
     }
 

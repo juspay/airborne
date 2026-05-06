@@ -9,7 +9,15 @@ import { useAppContext } from "@/providers/app-context";
 import EditReleaseView from "@/components/releaseViews/EditReleaseView";
 import DeleteReleaseView from "@/components/releaseViews/DeleteReleaseView";
 import ViewReleaseInfo from "@/components/releaseViews/ViewReleaseInfo";
-import { hasAppAccess } from "@/lib/utils";
+import { definePagePermissions, permission } from "@/lib/page-permissions";
+import { usePagePermissions } from "@/hooks/use-page-permissions";
+
+const PAGE_AUTHZ = definePagePermissions({
+  read_views: permission("release_view", "read", "app"),
+  create_view: permission("release_view", "create", "app"),
+  update_view: permission("release_view", "update", "app"),
+  delete_view: permission("release_view", "delete", "app"),
+});
 
 export type View = {
   id: string;
@@ -27,7 +35,9 @@ type ReleaseViewListResponse = {
 };
 
 export default function ViewsPage() {
-  const { token, org, app, getAppAccess, getOrgAccess } = useAppContext();
+  const { token, org, app } = useAppContext();
+  const permissions = usePagePermissions(PAGE_AUTHZ);
+  const canManageViews = permissions.can("create_view") || permissions.can("update_view");
 
   const [viewsList, setViewsList] = useState<View[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -134,9 +144,7 @@ export default function ViewsPage() {
               </h1>
               <p className="text-muted-foreground mt-2">Create and manage custom filtered views for your dashboard</p>
             </div>
-            {hasAppAccess(getOrgAccess(org), getAppAccess(org, app)) && (
-              <CreateReleaseView onViewCreated={onViewCreated} />
-            )}
+            {canManageViews && <CreateReleaseView onViewCreated={onViewCreated} />}
           </div>
 
           <Card>
@@ -167,20 +175,26 @@ export default function ViewsPage() {
                               className="flex items-center gap-1"
                               onClick={(e) => e.stopPropagation()} // prevent toggle when clicking actions
                             >
-                              <EditReleaseView
-                                view={view}
-                                onViewUpdated={(updatedView: View) => {
-                                  setViewsList((prev) => prev.map((v) => (v.id === updatedView.id ? updatedView : v)));
-                                }}
-                              />
-                              <DeleteReleaseView
-                                view={view}
-                                onViewDeleted={(viewId: string) => {
-                                  setViewsList((prev) => prev.filter((v) => v.id !== viewId));
-                                  setTotalItems((prev) => prev - 1);
-                                  if (selectedView?.id === viewId) setSelectedView(null);
-                                }}
-                              />
+                              {permissions.can("update_view") && (
+                                <EditReleaseView
+                                  view={view}
+                                  onViewUpdated={(updatedView: View) => {
+                                    setViewsList((prev) =>
+                                      prev.map((v) => (v.id === updatedView.id ? updatedView : v))
+                                    );
+                                  }}
+                                />
+                              )}
+                              {permissions.can("delete_view") && (
+                                <DeleteReleaseView
+                                  view={view}
+                                  onViewDeleted={(viewId: string) => {
+                                    setViewsList((prev) => prev.filter((v) => v.id !== viewId));
+                                    setTotalItems((prev) => prev - 1);
+                                    if (selectedView?.id === viewId) setSelectedView(null);
+                                  }}
+                                />
+                              )}
                             </div>
                           </CardHeader>
 

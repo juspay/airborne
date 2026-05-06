@@ -162,7 +162,7 @@ aws --endpoint-url=${AWS_ENDPOINT_URL} s3 mb s3://$AWS_BUCKET >/dev/null 2>&1 ||
 echo "${GREEN}✅ S3 bucket ready: $AWS_BUCKET${NC}"
 
 # Variables that need encryption/processing
-SENSITIVE_VARS=("DB_PASSWORD" "DB_MIGRATION_PASSWORD" "KEYCLOAK_SECRET")
+SENSITIVE_VARS=("DB_PASSWORD" "DB_MIGRATION_PASSWORD" "OIDC_CLIENT_SECRET" "AUTH_ADMIN_CLIENT_SECRET")
 
 # Get values from .env.example or .env.generated
 get_value() {
@@ -248,8 +248,8 @@ if [ "$USE_ENCRYPTION" = "true" ]; then
         VALUE=$(get_value "$var")
         
         if [ -n "$VALUE" ]; then
-            # Skip KEYCLOAK_SECRET if already handled by init-keycloak.sh
-            if [ "$var" = "KEYCLOAK_SECRET" ]; then
+            # Skip auth secrets if already handled by init-keycloak.sh
+            if [ "$var" = "OIDC_CLIENT_SECRET" ] || [ "$var" = "AUTH_ADMIN_CLIENT_SECRET" ]; then
                 # Check if already encrypted in .env
                 CURRENT_VAL=$(grep "^${var}=" ".env" 2>/dev/null | cut -d'=' -f2- | head -1)
                 CURRENT_VAL=$(strip_shell_quotes "$CURRENT_VAL")
@@ -286,8 +286,8 @@ else
     
     # Copy plaintext values from .env.example if not present
     for var in "${SENSITIVE_VARS[@]}"; do
-        # Skip KEYCLOAK_SECRET (handled by init-keycloak.sh)
-        if [ "$var" = "KEYCLOAK_SECRET" ]; then
+        # Skip auth secrets (handled by init-keycloak.sh)
+        if [ "$var" = "OIDC_CLIENT_SECRET" ] || [ "$var" = "AUTH_ADMIN_CLIENT_SECRET" ]; then
             continue
         fi
         
