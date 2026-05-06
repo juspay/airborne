@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #![deny(unused_crate_dependencies)]
+use airborne_authz_macros as _;
+
+mod authz;
 mod build;
 mod config;
 mod dashboard;
@@ -21,11 +24,13 @@ mod file;
 mod middleware;
 mod organisation;
 mod package;
+mod provider;
 mod release;
 mod token;
 mod types;
 mod user;
 mod utils;
+mod webhook;
 
 use actix_web::{
     web::{self, PathConfig, QueryConfig},
@@ -44,17 +49,25 @@ use log::info;
 use serde_json::json;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
+    str::FromStr,
     sync::Arc,
 };
 use superposition_sdk::config::Config as SrsConfig;
 use tracing_actix_web::TracingLogger;
-use utils::{db, transaction_manager::start_cleanup_job};
+use utils::db;
 
 use crate::{
     dashboard::configuration,
     middleware::{
         auth::Auth,
         request::{req_id_header_mw, WithRequestId},
+    },
+    provider::{
+        authn::build_authn_provider,
+        authz::{
+            build_authz_provider,
+            migration::{import_keycloak_authz_to_casbin, parse_keycloak_admin_issuer},
+        },
     },
     utils::{
         interceptor::CookieIntercept,
@@ -72,12 +85,66 @@ pub fn calculate_bucket_index(identifier: &str, group_id: &i64) -> usize {
     (hasher.finish() % 100) as usize
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StartupCommand {
+    Serve,
+    ImportKeycloakAuthz { apply: bool },
+}
+
+fn parse_startup_command() -> Result<StartupCommand, String> {
+    let mut args = std::env::args().skip(1);
+    let Some(command) = args.next() else {
+        return Ok(StartupCommand::Serve);
+    };
+
+    if command != "authz-import-keycloak" {
+        return Ok(StartupCommand::Serve);
+    }
+
+    let mut apply = false;
+    let mut dry_run = false;
+    for arg in args {
+        match arg.as_str() {
+            "--apply" => apply = true,
+            "--dry-run" => dry_run = true,
+            unknown => {
+                return Err(format!(
+                    "Unknown argument '{}'. Supported flags: --dry-run, --apply",
+                    unknown
+                ));
+            }
+        }
+    }
+
+    if apply && dry_run {
+        return Err("Use either --apply or --dry-run, not both".to_string());
+    }
+
+    Ok(StartupCommand::ImportKeycloakAuthz { apply })
+}
+
+fn trim_trailing_slash(value: &str) -> String {
+    value.trim_end_matches('/').to_string()
+}
+
+fn normalize_external_base_url(value: &str) -> String {
+    let trimmed = trim_trailing_slash(value);
+    if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+        trimmed
+    } else {
+        format!("http://{trimmed}")
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let log_format = std::env::var("LOG_FORMAT").unwrap_or_default();
     utils::init_tracing(log_format);
 
     dotenv().ok();
+    let startup_command = parse_startup_command().expect(
+        "Invalid startup command. Use 'authz-import-keycloak [--dry-run|--apply]' or run without arguments",
+    );
 
     let shared_config = aws_config::from_env().load().await;
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
@@ -86,20 +153,26 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to build AppConfig");
 
-    let superposition_migration_strategy =
-        SuperpositionMigrationStrategy::from(app_config.superposition_migration_strategy.clone());
-
     let migrations_to_run_on_boot: Vec<String> = app_config
         .migrations_to_run_on_boot
         .split(',')
-        .map(|s| s.trim().into())
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty())
         .collect();
+
+    let superposition_migration_strategy =
+        SuperpositionMigrationStrategy::from(app_config.superposition_migration_strategy.clone());
 
     let force_path_style = app_config.aws_endpoint_url.is_some();
 
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
-    if migrations_to_run_on_boot.contains(&"db".to_string()) {
+    let should_run_db_migrations = migrations_to_run_on_boot.iter().any(|m| m == "db");
+    let should_run_keycloak_to_casbin = migrations_to_run_on_boot
+        .iter()
+        .any(|m| m == "keycloaktocasbin");
+
+    if should_run_db_migrations || should_run_keycloak_to_casbin {
         info!("Running pending database migrations");
         let mut conn = db::establish_connection(&app_config).await;
         conn.run_pending_migrations(MIGRATIONS)
@@ -142,26 +215,110 @@ async fn main() -> std::io::Result<()> {
     info!("Creating db pool");
     let pool = db::establish_pool(&app_config).await;
 
-    let secret = app_config.keycloak_secret.clone();
+    if let StartupCommand::ImportKeycloakAuthz { apply } = startup_command {
+        info!("Running Keycloak -> Casbin import (apply={})", apply);
+        let mut conn = db::establish_connection(&app_config).await;
+        conn.run_pending_migrations(MIGRATIONS)
+            .expect("Failed to run pending migrations before import");
+        import_keycloak_authz_to_casbin(&app_config, pool.clone(), apply)
+            .await
+            .expect("Failed to complete Keycloak -> Casbin import");
+        return Ok(());
+    }
+
+    if should_run_keycloak_to_casbin {
+        info!("Running Keycloak -> Casbin import from MIGRATIONS_TO_RUN_ON_BOOT");
+        import_keycloak_authz_to_casbin(&app_config, pool.clone(), true)
+            .await
+            .expect("Failed to complete Keycloak -> Casbin import");
+    }
+
     let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
 
     let cac_url = app_config.superposition_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
 
+    let authn_provider_kind = types::AuthnProviderKind::from_str(&app_config.authn_provider)
+        .expect("AUTHN_PROVIDER must be one of: keycloak, oidc, okta, auth0");
+    let authz_provider_kind = types::AuthzProviderKind::from_str(&app_config.authz_provider)
+        .expect("AUTHZ_PROVIDER must be one of: casbin");
+    let issuer = app_config
+        .oidc_issuer_url
+        .clone()
+        .expect("OIDC_ISSUER_URL must be set");
+    let external_issuer = app_config
+        .oidc_external_issuer_url
+        .clone()
+        .unwrap_or_else(|| issuer.clone());
+    let authn_issuer_url = trim_trailing_slash(&issuer);
+    let authn_external_issuer_url = normalize_external_base_url(&external_issuer);
+    let authn_client_id = app_config
+        .oidc_client_id
+        .clone()
+        .expect("OIDC_CLIENT_ID must be set");
+    let authn_client_secret = app_config
+        .oidc_client_secret
+        .clone()
+        .expect("OIDC_CLIENT_SECRET must be set");
+    let authn_clock_skew_secs = app_config.oidc_clock_skew_secs;
+    let authz_bootstrap_super_admins = app_config
+        .authz_bootstrap_super_admins
+        .clone()
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_ascii_lowercase())
+        .collect::<Vec<_>>();
+    let authz_casbin_auto_load_secs = app_config.authz_casbin_auto_load_secs;
+    let auth_admin_client_id = app_config.auth_admin_client_id.clone().unwrap_or_default();
+    let auth_admin_client_secret = app_config
+        .auth_admin_client_secret
+        .clone()
+        .unwrap_or_default();
+    let auth_admin_token_url = app_config.auth_admin_token_url.clone().unwrap_or_default();
+    let auth_admin_audience = app_config.auth_admin_audience.clone();
+    let auth_admin_scopes = app_config.auth_admin_scopes.clone();
+    let (keycloak_url, realm) = app_config
+        .auth_admin_issuer
+        .as_deref()
+        .map(parse_keycloak_admin_issuer)
+        .transpose()
+        .expect("Invalid AUTH_ADMIN_ISSUER format")
+        .unwrap_or_else(|| ("".to_string(), "".to_string()));
+
+    if authn_provider_kind == types::AuthnProviderKind::Keycloak {
+        if auth_admin_client_id.trim().is_empty() {
+            panic!("AUTH_ADMIN_CLIENT_ID must be set when AUTHN_PROVIDER=keycloak");
+        }
+        if auth_admin_client_secret.trim().is_empty() {
+            panic!("AUTH_ADMIN_CLIENT_SECRET must be set when AUTHN_PROVIDER=keycloak");
+        }
+        if auth_admin_token_url.trim().is_empty() {
+            panic!("AUTH_ADMIN_TOKEN_URL must be set when AUTHN_PROVIDER=keycloak");
+        }
+        if keycloak_url.trim().is_empty() || realm.trim().is_empty() {
+            panic!("AUTH_ADMIN_ISSUER must be set when AUTHN_PROVIDER=keycloak");
+        }
+    }
+
     let env = types::Environment {
         public_url: app_config.public_endpoint.clone(),
-        keycloak_url: app_config.keycloak_url.clone(),
-        keycloak_external_url: app_config.keycloak_external_url.clone(),
-        keycloak_public_key: format!(
-            "-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
-            app_config.keycloak_public_key
-        ),
-        client_id: app_config.keycloak_client_id.clone(),
-        secret: secret.clone(),
-        realm: app_config.keycloak_realm.clone(),
+        authn_issuer_url,
+        authn_external_issuer_url,
+        authn_client_id: authn_client_id.clone(),
+        authn_client_secret: authn_client_secret.clone(),
+        authn_clock_skew_secs,
+        auth_admin_client_id,
+        auth_admin_client_secret,
+        auth_admin_token_url,
+        auth_admin_audience,
+        auth_admin_scopes,
+        keycloak_url,
+        realm,
         bucket_name: app_config.aws_bucket.clone(),
         superposition_org_id: app_config.superposition_org_id.clone(),
-        enable_google_signin: app_config.enable_google_signin,
+        enabled_oidc_idps: app_config.enabled_oidc_idps.clone(),
         organisation_creation_disabled: app_config.organisation_creation_disabled,
         google_spreadsheet_id: spreadsheet_id.clone().unwrap_or_default(),
         cloudfront_distribution_id: app_config.cloudfront_distribution_id.clone(),
@@ -234,21 +391,38 @@ async fn main() -> std::io::Result<()> {
         )
     };
 
+    let authz_provider = build_authz_provider(
+        authz_provider_kind,
+        authz_bootstrap_super_admins.clone(),
+        pool.clone(),
+        authz_casbin_auto_load_secs,
+    )
+    .await
+    .expect("Failed to initialize AuthZ provider");
+
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
+        authn_provider: build_authn_provider(authn_provider_kind),
+        authz_provider,
         db_pool: pool,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
     });
+    app_state
+        .authz_provider
+        .bootstrap(app_state.as_ref())
+        .await
+        .expect("Failed to bootstrap AuthZ provider");
 
     // Start the background cleanup job for transaction reconciliation
     let app_state_data = web::Data::from(app_state.clone());
-    let _cleanup_handle = start_cleanup_job(app_state_data.clone());
-    info!("Started transaction cleanup background job");
 
-    if migrations_to_run_on_boot.contains(&"superposition".to_string()) {
+    if migrations_to_run_on_boot
+        .iter()
+        .any(|m| m == "superposition")
+    {
         let superposition_migration =
             migrate_superposition(&app_state_data, superposition_migration_strategy).await;
         if superposition_migration.is_err() {
@@ -257,7 +431,7 @@ async fn main() -> std::io::Result<()> {
                 superposition_migration.err()
             );
         } else {
-            println!("Superposition migration completed successfully");
+            info!("Superposition migration completed successfully");
         }
     }
 
@@ -291,6 +465,7 @@ async fn main() -> std::io::Result<()> {
                     .service(
                         web::scope("/dashboard/configuration").service(configuration::add_routes()),
                     )
+                    .service(web::scope("/authz").wrap(Auth).service(authz::add_routes()))
                     .service(
                         web::scope("/organisations")
                             .wrap(Auth)
@@ -309,7 +484,12 @@ async fn main() -> std::io::Result<()> {
                             .wrap(Auth)
                             .service(package::add_routes()),
                     )
-                    .service(release::add_routes("releases")),
+                    .service(release::add_routes("releases"))
+                    .service(
+                        web::scope("/webhook")
+                            .wrap(Auth)
+                            .service(webhook::add_routes()),
+                    ),
             )
     })
     .workers(num_workers)

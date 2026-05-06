@@ -5,11 +5,11 @@ The Airborne Server is a robust backend system designed to power the Software-as
 ## Key Features
 
 - **Multi-Tenant Architecture:** Securely manage multiple organizations and their respective applications.
-- **Granular Access Control:** Leverages Keycloak for fine-grained user permissions and roles.
+- **Granular Access Control:** Uses a modular AuthZ provider interface with Casbin + PostgreSQL policy storage.
 - **Flexible Package Management:** Supports versioning and distribution of application packages.
 - **Dynamic Configuration:** Manage application configurations and release-specific settings.
 - **Controlled Releases:** Facilitates staged rollouts and management of application releases.
-- **Transactional Integrity:** Ensures consistency across distributed operations involving Keycloak, Superposition, and S3.
+- **Transactional Integrity:** Ensures consistency across distributed operations involving external services such as Superposition and S3.
 - **Admin Dashboard:** A React-based user interface for server administration and monitoring.
 
 ## Table of Contents
@@ -27,7 +27,7 @@ The Airborne Server is a robust backend system designed to power the Software-as
   - [Public Release Endpoints](#public-release-endpoints)
   - [Dashboard Access](#dashboard-access)
 - [Database Architecture](#database-architecture)
-- [Keycloak Integration](#keycloak-integration)
+- [Auth Providers](#auth-providers)
 - [Development Environment](#development-environment)
   - [Prerequisites](#prerequisites)
   - [Environment Variables](#environment-variables)
@@ -40,7 +40,7 @@ The Airborne Server is a robust backend system designed to power the Software-as
 
 ## Overview
 
-The Airborne Server acts as the central nervous system for delivering updates to applications. It handles the complexities of storing package assets (via AWS S3), managing configurations (via Superposition and its internal database), and authenticating/authorizing users (via Keycloak). This allows development teams to focus on building features while relying on a stable platform for update distribution.
+The Airborne Server acts as the central nervous system for delivering updates to applications. It handles the complexities of storing package assets (via AWS S3), managing configurations (via Superposition and its internal database), and enforcing AuthN/AuthZ with provider-based integrations. This allows development teams to focus on building features while relying on a stable platform for update distribution.
 
 **Related Systems:**
 
@@ -48,21 +48,25 @@ The Airborne Server acts as the central nervous system for delivering updates to
 
 ## API Reference
 
-All API endpoints are versioned and adhere to RESTful principles. Authentication is primarily handled through JWT Bearer tokens issued by Keycloak. Specific permissions are required for various operations, as detailed below.
+All API endpoints are versioned and adhere to RESTful principles. Authentication is handled through OIDC-compatible JWT Bearer tokens (with Keycloak as default). Specific permissions are required for various operations, as detailed below.
 The base path for all API routes is implicitly defined by the Actix web server configuration in `main.rs`.
 
 ### Authentication
 
-Authentication is managed via Keycloak. Most endpoints require a valid JWT Bearer token.
+Authentication is OIDC-based and provider-configurable (`AUTHN_PROVIDER=keycloak|oidc|okta|auth0`).
+Authorization is provider-based (`AUTHZ_PROVIDER=casbin` in this rollout) and enforced by Casbin policies persisted in PostgreSQL.
+Most endpoints require a valid JWT Bearer token.
 
 ### User Management
 
 Base Path: `/users` (for creation/login), `/user` (for fetching authenticated user details)
 
 - **`POST /users/create`**: Registers a new user.
-  - **Request Body**: `application/json` - `{ "name": "username", "password": "userpassword" }`
+  - Available only when `AUTHN_PROVIDER=keycloak`.
+  - **Request Body**: `application/json` - `{ "name": "username", "password": "userpassword", "first_name": "Jane", "last_name": "Doe", "email": "jane@example.com" }`
   - **Response**: `application/json` - User details including a JWT token.
 - **`POST /users/login`**: Authenticates an existing user.
+  - Available only when the configured provider supports password login (Keycloak in v1).
   - **Request Body**: `application/json` - `{ "name": "username", "password": "userpassword" }`
   - **Response**: `application/json` - User details including a JWT token.
 - **`GET /user`**: Retrieves details for the currently authenticated user, including their organizational affiliations.
@@ -91,15 +95,15 @@ Base Path: `/organisation/user` (Operations are scoped to the organization conte
 
 - **`POST /organisation/user/create`**: Adds a user to the current organization with a specified access role.
   - **Authentication**: Required (Write permissions for the organization).
-  - **Request Body**: `application/json` - `{ "user": "username", "access": "read|write|admin|owner" }`
+  - **Request Body**: `application/json` - `{ "user": "user@example.com", "access": "read|write|admin|owner" }`
   - **Response**: `application/json` - Success confirmation.
 - **`POST /organisation/user/update`**: Modifies a user's access role within the current organization.
   - **Authentication**: Required (Admin permissions for the organization).
-  - **Request Body**: `application/json` - `{ "user": "username", "access": "read|write|admin|owner" }`
+  - **Request Body**: `application/json` - `{ "user": "user@example.com", "access": "read|write|admin|owner" }`
   - **Response**: `application/json` - Success confirmation.
 - **`POST /organisation/user/remove`**: Removes a user from the current organization.
   - **Authentication**: Required (Admin permissions for the organization).
-  - **Request Body**: `application/json` - `{ "user": "username" }`
+  - **Request Body**: `application/json` - `{ "user": "user@example.com" }`
   - **Response**: `application/json` - Success confirmation.
 - **`GET /organisation/user/list`**: Retrieves a list of all users within the current organization, including their roles.
   - **Authentication**: Required (Read permissions for the organization).
@@ -227,7 +231,7 @@ The server utilizes a PostgreSQL database, `airborneserver`, to persist its oper
 
 4.  **`cleanup_outbox`**: Facilitates transactional consistency for distributed operations.
 
-    - **Purpose**: Implements an outbox pattern to manage rollbacks or retries for operations spanning multiple services (Keycloak, Superposition, S3).
+    - **Purpose**: Implements an outbox pattern to manage rollbacks or retries for operations spanning multiple services.
     - **Key Columns**:
       - `transaction_id` (Text, PK): Unique transaction identifier.
       - `entity_name` (Text): Identifier of the primary entity involved (e.g., org name).
@@ -243,17 +247,21 @@ The server utilizes a PostgreSQL database, `airborneserver`, to persist its oper
       - `id` (Integer, PK, Auto-increment): Unique internal ID.
       - `organization_id` (Text): Associated organization ID.
       - `workspace_name` (Text): The unique workspace name (e.g., "workspace123").
+      - `application_id` (Text): Associated application ID (unique with `organization_id`).
 
-## Keycloak Integration
+6.  **`casbin_rule`**: Authorization policy storage for Casbin.
+    - **Purpose**: Stores RBAC/ABAC policy rows used by the Casbin enforcer.
+    - **Key Columns**:
+      - `ptype`, `v0`..`v5`: Casbin policy tuple columns.
 
-Keycloak is integral to the Airborne Server's security and operational model. It serves the following critical functions:
+## Auth Providers
 
-- **Identity and Access Management (IAM)**: Provides robust user authentication (username/password) and manages user identities.
-- **Token-Based Authentication**: Issues JSON Web Tokens (JWTs) upon successful login. These tokens are used as Bearer tokens to authenticate API requests to protected endpoints.
-- **Authorization and Permissions**: Manages user roles and permissions through a group-based hierarchy. Organizations and applications are represented as groups in Keycloak, with sub-groups defining access levels (e.g., `owner`, `admin`, `write`, `read`).
-- **Service Accounts**: Utilized for server-to-server communication between the Airborne Server and Keycloak for administrative tasks like user creation or group management, without requiring user credentials.
+Airborne uses separate provider abstractions for authentication and authorization:
 
-The server validates incoming JWTs, extracts user identity and associated permissions (derived from group memberships), and enforces access control rules for all protected resources and operations.
+- **AuthN (`AuthNProvider`)**: OIDC-based login/token verification with pluggable providers (`keycloak`, `oidc`, `okta`, `auth0`).
+- **AuthZ (`AuthZProvider`)**: Casbin-backed authorization (`AUTHZ_PROVIDER=casbin`) with policies stored in PostgreSQL.
+- **Canonical subject**: Authorization uses normalized email as the subject.
+- **Keycloak admin APIs**: Used only for provider-specific admin flows such as Keycloak signup and optional migration tooling.
 
 ## Development Environment
 
@@ -290,11 +298,28 @@ To set up the development environment for the Airborne Server, you will need the
 
 The server relies on a set of environment variables for its configuration. These are typically managed in a `.env` file at the root of the `airborne_server/` directory. Critical variables include:
 
-- `KEYCLOAK_URL`: URL of the Keycloak instance.
-- `KEYCLOAK_CLIENT_ID`: Client ID for the Airborne Server in Keycloak.
-- `KEYCLOAK_SECRET`: Client secret (typically KMS encrypted for production).
-- `KEYCLOAK_REALM`: Keycloak realm name.
-- `KEYCLOAK_PUBLIC_KEY`: Public key for validating JWTs issued by Keycloak.
+- `AUTHN_PROVIDER`: Authentication provider (`keycloak` by default, or `oidc`/`okta`/`auth0`).
+- `AUTHZ_PROVIDER`: Authorization provider (`casbin`).
+- `OIDC_ISSUER_URL`: OIDC issuer URL.
+- `OIDC_EXTERNAL_ISSUER_URL`: External issuer URL for browser redirects (optional, defaults to `OIDC_ISSUER_URL`).
+- `OIDC_CLIENT_ID`: OIDC client ID.
+- `OIDC_CLIENT_SECRET`: OIDC client secret.
+- `OIDC_ENABLED_IDPS`: Comma-separated identity provider IDs that enable OIDC login/buttons (for example: `keycloak,okta`).
+  - Leaving this empty keeps OIDC login disabled even if `OIDC_ISSUER_URL` / `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` are set.
+  - This also affects `/users/oauth/url` endpoints; populate `OIDC_ENABLED_IDPS` to enable those OAuth URL flows.
+- `OIDC_CLOCK_SKEW_SECS`: JWT validation leeway (seconds) applied for clock skew on `exp`/`nbf` checks (default: `60`).
+- `AUTHZ_BOOTSTRAP_SUPER_ADMINS`: Optional comma-separated emails bootstrapped as super-admins.
+- `AUTHZ_CASBIN_POOL_SIZE`: Optional DB connection pool size for Casbin adapter.
+- `AUTHZ_CASBIN_AUTOLOAD_SECS`: Optional Casbin policy reload interval.
+- `MIGRATIONS_TO_RUN_ON_BOOT`: Optional comma-separated startup jobs.
+  - Supported values: `db`, `superposition`, `keycloaktocasbin`.
+  - Use `keycloaktocasbin` to run Keycloak->Casbin authz import during startup.
+- `AUTH_ADMIN_CLIENT_ID`: Client ID for provider admin API token acquisition.
+- `AUTH_ADMIN_CLIENT_SECRET`: Client secret for provider admin API token acquisition.
+- `AUTH_ADMIN_TOKEN_URL`: OAuth token endpoint for provider admin API access tokens.
+- `AUTH_ADMIN_AUDIENCE`: Optional audience parameter (commonly used for Auth0).
+- `AUTH_ADMIN_SCOPES`: Optional space-separated scopes (commonly used for Okta/Auth0).
+- `AUTH_ADMIN_ISSUER`: Issuer URL used to derive Keycloak admin realm/base URL (`.../realms/<realm>`). Required for Keycloak signup/import flows.
 - `SUPERPOSITION_URL`: URL of the Superposition service.
 - `SUPERPOSITION_ORG_ID`: The organization ID within Superposition used by the server.
 - `AWS_BUCKET`: Name of the S3 bucket for storing package assets.
@@ -324,6 +349,27 @@ Database schema changes are managed using Diesel CLI.
     ```
 
 - **Automatic Migrations**: The server application is configured to attempt to run any pending migrations automatically upon startup.
+
+### AuthZ Migration (Keycloak -> Casbin)
+
+Use the one-time import command to convert existing Keycloak group memberships into Casbin policies:
+
+```bash
+cargo run -- authz-import-keycloak --dry-run
+cargo run -- authz-import-keycloak --apply
+```
+
+You can also trigger this via startup migrations env (useful for automation):
+
+```bash
+MIGRATIONS_TO_RUN_ON_BOOT=db,keycloaktocasbin cargo run
+```
+
+Mapping rules:
+
+- `/super_admin` -> system super-admin policy
+- `/{org}/{role}` -> organisation-scope policy
+- `/{org}/{app}/{role}` -> application-scope policy
 
 ### Running the Server
 

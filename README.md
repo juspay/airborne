@@ -136,7 +136,7 @@ For developers who need comprehensive backend solutions to manage updates and an
 
 A robust backend system that can manage application versions, store update packages, and deliver them to your SDK-integrated applications.
 
-- **Key functionalities**: User authentication (via Keycloak), organization/application management, package storage, release configurations, and a dashboard UI.
+- **Key functionalities**: User authentication (OIDC-based; Keycloak-compatible), organization/application management, package storage, release configurations, and a dashboard UI.
 - **Technology stack**: Rust (Actix Web), PostgreSQL, Keycloak, Docker, LocalStack (for AWS emulation).
 
 #### **[Airborne Analytics Server](airborne_analytics_server/README.md)**
@@ -287,16 +287,23 @@ The Airborne server uses the following environment variables. All secrets can be
 
 *Required when using real AWS. Not needed for LocalStack.
 
-#### Keycloak Settings
+#### AuthN Provider Settings
 
 | Variable | Required | Encrypted | Default | Description |
 |----------|----------|-----------|---------|-------------|
-| `KEYCLOAK_URL` | Yes | No | - | Keycloak internal URL |
-| `KEYCLOAK_EXTERNAL_URL` | No | No | `localhost:8180` | Keycloak external URL |
-| `KEYCLOAK_REALM` | Yes | No | - | Keycloak realm name |
-| `KEYCLOAK_CLIENT_ID` | Yes | No | - | Keycloak client ID |
-| `KEYCLOAK_SECRET` | Yes | **Yes** | - | Keycloak client secret |
-| `KEYCLOAK_PUBLIC_KEY` | Yes | No | - | Keycloak realm public key (for JWT verification) |
+| `AUTHN_PROVIDER` | No | No | `keycloak` | AuthN provider (`keycloak`, `oidc`, `okta`, or `auth0`) |
+| `OIDC_ISSUER_URL` | Yes | No | - | OIDC issuer URL |
+| `OIDC_EXTERNAL_ISSUER_URL` | No | No | - | External OIDC issuer/base URL used for browser redirects (defaults to `OIDC_ISSUER_URL`) |
+| `OIDC_CLIENT_ID` | Yes | No | - | OIDC client ID |
+| `OIDC_CLIENT_SECRET` | Yes | **Yes** | - | OIDC client secret |
+| `AUTH_ADMIN_CLIENT_ID` | Yes | No | - | Client ID used for AuthZ/admin API token acquisition |
+| `AUTH_ADMIN_CLIENT_SECRET` | Yes | **Yes** | - | Client secret used for AuthZ/admin API token acquisition |
+| `AUTH_ADMIN_TOKEN_URL` | Yes | No | - | OAuth token endpoint for admin API access tokens |
+| `AUTH_ADMIN_AUDIENCE` | No | No | - | Optional audience parameter (commonly required by Auth0) |
+| `AUTH_ADMIN_SCOPES` | No | No | - | Optional space-separated scopes (commonly required by Okta/Auth0) |
+| `AUTH_ADMIN_ISSUER` | Yes | No | - | Issuer URL used to derive Keycloak AuthZ realm/base URL |
+
+For current Keycloak-backed authorization, `AUTH_ADMIN_ISSUER` must be a Keycloak realm issuer URL (`.../realms/<realm>`).
 
 #### Superposition Settings
 
@@ -315,7 +322,7 @@ The Airborne server uses the following environment variables. All secrets can be
 
 | Variable | Required | Encrypted | Default | Description |
 |----------|----------|-----------|---------|-------------|
-| `ENABLE_GOOGLE_SIGNIN` | No | No | `false` | Enable Google Sign-In for organisation creation |
+| `OIDC_ENABLED_IDPS` | No | No | (empty) | Comma-separated OIDC IdP hints for Keycloak OAuth (for example: `google,github`) |
 | `ORGANISATION_CREATION_DISABLED` | No | No | `false` | Disable organisation creation via API |
 
 *When `ORGANISATION_CREATION_DISABLED=true`, the following are required:*
@@ -332,7 +339,7 @@ Note: the environment variable is spelled `ORGANISATION_CREATION_DISABLED`.
 | `GCP_SERVICE_ACCOUNT_PATH` | Conditional | No | - | Path to GCP service account JSON file |
 | `GOOGLE_SERVICE_ACCOUNT_KEY` | Conditional | **Yes** | - | GCP service account key JSON content |
 
-*Required when `ORGANISATION_CREATION_DISABLED=true` and `ENABLE_GOOGLE_SIGNIN=true`*
+*Required when `ORGANISATION_CREATION_DISABLED=true`*
 
 #### Public Endpoint
 

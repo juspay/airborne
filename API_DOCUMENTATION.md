@@ -17,6 +17,8 @@ x-organisation: <organisation_name>
 x-application: <application_name>
 ```
 
+AuthZ subject resolution is email-based. Tokens missing an email claim are rejected on protected routes.
+
 ---
 
 ## 1. Authentication Endpoints
@@ -25,6 +27,7 @@ x-application: <application_name>
 **Endpoint:** `POST /users/login`
 
 **Description:** Authenticates a user and returns a JWT token along with user details.
+When the configured AuthN provider does not support password login, this endpoint returns `400 Bad Request`.
 
 **Headers:**
 ```json
@@ -125,6 +128,7 @@ x-application: <application_name>
 **Endpoint:** `POST /users/create`
 
 **Description:** Creates a new user account.
+Registration is supported only when `AUTHN_PROVIDER=keycloak`; otherwise this endpoint returns `400 Bad Request`.
 
 **Headers:**
 ```json
@@ -145,9 +149,21 @@ x-application: <application_name>
     "password": {
       "type": "string",
       "description": "User password"
+    },
+    "first_name": {
+      "type": "string",
+      "description": "User first name (required for Keycloak signup)"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "User last name (required for Keycloak signup)"
+    },
+    "email": {
+      "type": "string",
+      "description": "User email (required for Keycloak signup)"
     }
   },
-  "required": ["name", "password"]
+  "required": ["name", "password", "first_name", "last_name", "email"]
 }
 ```
 
@@ -156,7 +172,11 @@ x-application: <application_name>
 ### 1.3 Get OAuth URL
 **Endpoint:** `GET /users/oauth/url`
 
-**Description:** Gets the OAuth URL for Google Sign-in (if enabled).
+**Description:** Gets the OIDC/OAuth authorization URL for the configured AuthN provider.
+
+**Query Parameters:**
+- `offline` (optional, boolean): when `true`, requests offline access (refresh token flow for PAT generation).
+- `idp` (optional, string): OIDC provider hint (for Keycloak this maps to `kc_idp_hint`, for example `google` or `github`).
 
 **Headers:**
 ```json
@@ -172,7 +192,7 @@ x-application: <application_name>
   "properties": {
     "auth_url": {
       "type": "string",
-      "description": "Google OAuth authorization URL"
+      "description": "OIDC/OAuth authorization URL"
     },
     "state": {
       "type": "string",
@@ -185,7 +205,7 @@ x-application: <application_name>
 ### 1.4 OAuth Login
 **Endpoint:** `POST /users/oauth/login`
 
-**Description:** Completes OAuth login flow with authorization code.
+**Description:** Completes OIDC/OAuth login flow with authorization code.
 
 **Headers:**
 ```json
@@ -217,7 +237,8 @@ x-application: <application_name>
 ### 1.5 OAuth Signup
 **Endpoint:** `POST /users/oauth/signup`
 
-**Description:** Completes OAuth signup flow with authorization code.
+**Description:** Completes OIDC/OAuth signup flow with authorization code.
+Signup is provider-capability gated and in v1 is supported only for `AUTHN_PROVIDER=keycloak`.
 
 **Headers:**
 ```json
@@ -540,7 +561,7 @@ x-application: <application_name>
   "properties": {
     "user": {
       "type": "string",
-      "description": "Username to add"
+      "description": "User email to add"
     },
     "access": {
       "type": "string",
@@ -588,7 +609,7 @@ x-application: <application_name>
   "properties": {
     "user": {
       "type": "string",
-      "description": "Username to update"
+      "description": "User email to update"
     },
     "access": {
       "type": "string",
@@ -636,7 +657,7 @@ x-application: <application_name>
   "properties": {
     "user": {
       "type": "string",
-      "description": "Username to remove"
+      "description": "User email to remove"
     }
   },
   "required": ["user"]
@@ -659,7 +680,7 @@ x-application: <application_name>
 ```
 
 ### 4.4 List Organisation Users
-**Endpoint:** `GET /organisation/user`
+**Endpoint:** `GET /organisation/user/list`
 
 **Description:** Lists all users in an organisation with their access levels.
 
@@ -682,11 +703,17 @@ x-application: <application_name>
       "items": {
         "type": "object",
         "properties": {
-          "user": {
+          "username": {
             "type": "string"
           },
-          "access": {
-            "type": "string"
+          "email": {
+            "type": ["string", "null"]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }
@@ -2319,7 +2346,7 @@ All endpoints may return the following error responses:
 
 6. **Search**: File listing supports search functionality via the `search` query parameter.
 
-7. **OAuth**: Google OAuth endpoints are only available when `ENABLE_GOOGLE_SIGNIN` is set to `true`.
+7. **OAuth**: OIDC OAuth endpoints are available when OIDC login is enabled; Keycloak IdP options are controlled by `OIDC_ENABLED_IDPS`.
 
 8. **Organization Creation**: The `/organisations/request` endpoint is used when `ORGANISATION_CREATION_DISABLED` is `true`.
 
