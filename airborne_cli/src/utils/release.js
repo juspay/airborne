@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { promptWithType } from "./prompt.js";
 import { execSync } from "child_process";
+import { compileHermesBundle } from "./hermes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -123,6 +124,10 @@ export async function createLocalReleaseConfig(
       throw new Error(
         `React Native bundle command failed: ${bundleResult.error}`
       );
+    }
+    
+    if (airborneConfig.hermes_enabled) {
+      await compileHermesBundle(options.directory_path, `${build_folder}/${index_file_path}`);
     }
 
     const baseDir = path.isAbsolute(options.directory_path)
@@ -267,6 +272,10 @@ export async function updateLocalReleaseConfig(
       throw new Error(
         `React Native bundle command failed: ${bundleResult.error}`
       );
+    }
+    
+    if (airborneConfig.hermes_enabled) {
+      await compileHermesBundle(options.directory_path, `${build_folder}/${index_file_path}`);
     }
 
     const baseDir = path.isAbsolute(options.directory_path)
