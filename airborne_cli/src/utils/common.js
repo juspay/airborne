@@ -82,6 +82,7 @@ const cliToConfigMap = {
   bootTimeout: "boot_timeout",
   releaseConfigTimeout: "release_config_timeout",
   expo: "expo",
+  hermesEnabled: "hermes_enabled",
 };
 
 export function normalizeOptions(options = {}) {
@@ -120,6 +121,7 @@ export async function writeAirborneConfig(options) {
   try {
     const filledOptions = await fillAirborneConfigOptions(options);
     const config = {
+      hermes_enabled: filledOptions.hermes_enabled,
       expo: filledOptions.expo,
       js_entry_file: filledOptions.js_entry_file,
       android: {
@@ -173,6 +175,12 @@ export async function fillAirborneConfigOptions(options = {}) {
   const isExpo = getNested(result, "expo");
 
   const questions = [
+    {
+      key: "hermes_enabled",
+      question: "\n Enable Hermes engine? (y/n, default: no): ",
+      expectedType: "boolean",
+      defaultValue: false,
+    },
     {
       key: "android.organisation",
       question: "\n Please enter the Android organisation name: ",

@@ -66,7 +66,8 @@ program
       -j <js-entry-file> \\
       -a <android-index-file> \\
       -i <ios-index-file> \\
-      -e
+      -e \\
+      --hermes-enabled
 
   Parameters:
       [directoryPath] (optional) : Directory where config will be created (defaults to current directory)
@@ -78,6 +79,7 @@ program
       -a, --android-index-file <string> (optional) : Path to the Android bundle output file
       -i, --ios-index-file <string> (optional) : Path to the iOS bundle output file
       -e, --expo (optional) : Indicates if the project is using Expo
+      --hermes-enabled (optional) : Enable Hermes engine for the project
 
 `
   )
@@ -104,6 +106,7 @@ program
   )
   .option("-i, --ios-index-file <path>", "Path to the iOS bundle output file")
   .option("-e, --expo", "Indicates if the project is using Expo")
+  .option("--hermes-enabled", "Enable Hermes engine for the project")
   .addHelpText(
     "after",
     `
@@ -135,7 +138,10 @@ Examples:
 5. Create config for an Expo project:
    $ airborne-devkit create-local-airborne-config -e
 
-6. Create config for Expo project with all options:
+6. Create config with Hermes enabled:
+   $ airborne-devkit create-local-airborne-config --hermes-enabled
+
+7. Create config for Expo project with all options:
    $ airborne-devkit create-local-airborne-config \\
      --android-organisation "MyCompany" \\
      --ios-organisation "MyCompany" \\
