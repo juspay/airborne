@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.19.0 - 2026-05-11
+#### Features
+- casbin - (1232b11) - yuvrajjsingh0
+- migration to OIDC and provider based admin apis - (7463358) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.18.2 - 2026-05-11
 #### Bug Fixes
 - semver and race conditions - (2be5007) - yuvrajjsingh0

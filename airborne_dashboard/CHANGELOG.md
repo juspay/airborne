@@ -2,6 +2,25 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.14.0 - 2026-05-11
+#### Features
+- casbin - (1232b11) - yuvrajjsingh0
+- migration to OIDC and provider based admin apis - (7463358) - yuvrajjsingh0
+
+- - -
+
+## v0.35.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.35.0 [skip ci] - (7a62afa) - Airborne Bot
+
+- - -
+
+## v0.34.2 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.34.2 [skip ci] - (da14a3e) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.13.2 - 2026-05-11
 #### Bug Fixes
 - app creation flow rollbacks and app, org name validation - (825b29b) - yuvrajjsingh0

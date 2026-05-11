@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.36.0 - 2026-05-11
+### Package updates
+- airborne_server bumped to airborne_server-v0.19.0
+- airborne_dashboard bumped to airborne_dashboard-v0.14.0
+### Global changes
+#### Features
+- migration to OIDC and provider based admin apis - (7463358) - yuvrajjsingh0
+- casbin - (1232b11) - yuvrajjsingh0
+
+- - -
+
 ## v0.35.0 - 1970-01-01
 ### Package updates
 - airborne_cli bumped to airborne_cli-v0.4.0
