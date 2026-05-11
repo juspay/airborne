@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.18.2 - 2026-05-11
+#### Bug Fixes
+- semver and race conditions - (2be5007) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.18.1 - 2026-05-11
 #### Bug Fixes
 - app creation flow rollbacks and app, org name validation - (825b29b) - yuvrajjsingh0
