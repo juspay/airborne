@@ -2,6 +2,36 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.13.2 - 2026-05-11
+#### Bug Fixes
+- app creation flow rollbacks and app, org name validation - (825b29b) - yuvrajjsingh0
+
+- - -
+
+## v0.34.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.34.0 [skip ci] - (0c761ce) - Airborne Bot
+
+- - -
+
+## v0.33.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.33.0 [skip ci] - (41d1b1c) - Airborne Bot
+
+- - -
+
+## v0.32.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.32.0 [skip ci] - (6fcfb70) - Airborne Bot
+
+- - -
+
+## v0.31.2 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.31.2 [skip ci] - (1776935) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.13.1 - 2026-04-07
 #### Bug Fixes
 - File chooser pagination and release page width - (2b23966) - yuvrajjsingh0
