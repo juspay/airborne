@@ -2,6 +2,90 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.4.0 - 2026-05-11
+#### Features
+- add hermes build capability - (1131f49) - Yash Rajput
+
+- - -
+
+## v0.34.2 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.34.2 [skip ci] - (da14a3e) - Airborne Bot
+
+- - -
+
+## v0.34.1 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.34.1 [skip ci] - (0bbc8f3) - Airborne Bot
+
+- - -
+
+## v0.34.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.34.0 [skip ci] - (0c761ce) - Airborne Bot
+
+- - -
+
+## v0.33.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.33.0 [skip ci] - (41d1b1c) - Airborne Bot
+
+- - -
+
+## v0.32.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.32.0 [skip ci] - (6fcfb70) - Airborne Bot
+
+- - -
+
+## v0.31.2 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.31.2 [skip ci] - (1776935) - Airborne Bot
+
+- - -
+
+## v0.31.1 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.31.1 [skip ci] - (fd3e886) - Airborne Bot
+
+- - -
+
+## v0.31.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.31.0 [skip ci] - (9f47c56) - Airborne Bot
+
+- - -
+
+## v0.30.1 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.30.1 [skip ci] - (4a81918) - Airborne Bot
+
+- - -
+
+## v0.30.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.30.0 [skip ci] - (e345581) - Airborne Bot
+
+- - -
+
+## v0.29.2 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.29.2 [skip ci] - (8cd1d49) - Airborne Bot
+
+- - -
+
+## v0.29.1 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.29.1 [skip ci] - (e9670ef) - Airborne Bot
+
+- - -
+
+## v0.29.0 - 2026-05-11
+#### Miscellaneous Chores
+- **(version)** v0.29.0 [skip ci] - (4d13783) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.3.0 - 2026-03-26
 #### Features
 - add platform-specific configuration and improve file processing and update smithy-cli-generator submodule - (823cfe5) - Yash Rajput
