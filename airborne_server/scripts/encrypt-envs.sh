@@ -66,6 +66,87 @@ shell_quote() {
     printf "'%s'" "$(printf '%s' "$value" | sed "s/'/'\\\\''/g")"
 }
 
+strip_shell_quotes() {
+    local value="$1"
+
+    if [[ ${#value} -ge 2 ]]; then
+        if [[ "${value#\'}" != "$value" ]] && [[ "${value%\'}" != "$value" ]]; then
+            value="${value#\'}"
+            value="${value%\'}"
+            value="${value//\'\\\'\'/\'}"
+        elif [[ "${value#\"}" != "$value" ]] && [[ "${value%\"}" != "$value" ]]; then
+            value="${value#\"}"
+            value="${value%\"}"
+        fi
+    fi
+
+    printf '%s' "$value"
+}
+
+read_env_raw() {
+    local key="$1"
+    local value
+    value=$(grep "^${key}=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | head -1)
+    strip_shell_quotes "$value"
+}
+
+is_value_empty() {
+    local value="$1"
+    case "$value" in
+        ""|"''"|'""')
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+upsert_env_raw() {
+    local key="$1"
+    local raw_value="$2"
+    local tmp_file
+
+    tmp_file=$(mktemp "${TMPDIR:-/tmp}/airborne-env.XXXXXX")
+
+    if [[ -f "$ENV_FILE" ]]; then
+        awk -v key="$key" -v value="$raw_value" '
+            BEGIN { updated = 0 }
+            index($0, key "=") == 1 { print key "=" value; updated = 1; next }
+            { print }
+            END { if (!updated) print key "=" value }
+        ' "$ENV_FILE" > "$tmp_file"
+    else
+        printf "%s=%s\n" "$key" "$raw_value" > "$tmp_file"
+    fi
+
+    mv "$tmp_file" "$ENV_FILE"
+}
+
+sync_superposition_rc_env_defaults() {
+    local superposition_url superposition_rc_url
+    local superposition_user_token superposition_rc_user_token
+    local superposition_org_token superposition_rc_org_token
+
+    superposition_url=$(read_env_raw "SUPERPOSITION_URL")
+    superposition_rc_url=$(read_env_raw "SUPERPOSITION_RC_URL")
+    if is_value_empty "$superposition_rc_url"; then
+        upsert_env_raw "SUPERPOSITION_RC_URL" "$superposition_url"
+    fi
+
+    superposition_user_token=$(read_env_raw "SUPERPOSITION_USER_TOKEN")
+    superposition_rc_user_token=$(read_env_raw "SUPERPOSITION_RC_USER_TOKEN")
+    if is_value_empty "$superposition_rc_user_token"; then
+        upsert_env_raw "SUPERPOSITION_RC_USER_TOKEN" "$superposition_user_token"
+    fi
+
+    superposition_org_token=$(read_env_raw "SUPERPOSITION_ORG_TOKEN")
+    superposition_rc_org_token=$(read_env_raw "SUPERPOSITION_RC_ORG_TOKEN")
+    if is_value_empty "$superposition_rc_org_token"; then
+        upsert_env_raw "SUPERPOSITION_RC_ORG_TOKEN" "$superposition_org_token"
+    fi
+}
+
 # Function to encrypt a value using AES-GCM
 encrypt_value() {
     local value="$1"
@@ -105,6 +186,8 @@ SECRETS=(
     "SUPERPOSITION_TOKEN"
     "SUPERPOSITION_USER_TOKEN"
     "SUPERPOSITION_ORG_TOKEN"
+    "SUPERPOSITION_RC_USER_TOKEN"
+    "SUPERPOSITION_RC_ORG_TOKEN"
     "GOOGLE_SERVICE_ACCOUNT_KEY"
 )
 
@@ -122,6 +205,9 @@ if [[ ! -f "$ENV_FILE" ]]; then
     echo -e "${YELLOW}Creating .env from .env.example...${NC}"
     cp "$ENV_EXAMPLE" "$ENV_FILE"
 fi
+
+# Keep local RC Superposition vars aligned with existing Superposition vars when unset.
+sync_superposition_rc_env_defaults
 
 if [[ "$PLAINTEXT_MODE" == true ]]; then
     echo -e "${GREEN}✅ Plaintext .env file ready at: $ENV_FILE${NC}"

@@ -1226,7 +1226,8 @@ async fn serve_release(
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
-    serve_release_handler(path, req, query, state).await
+    let superposition_client = state.rc_superposition_client.clone();
+    serve_release_handler(path, req, query, state, superposition_client).await
 }
 
 #[get("v2/{organisation}/{application}")]
@@ -1236,7 +1237,8 @@ async fn serve_release_v2(
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
-    serve_release_handler(path, req, query, state).await
+    let superposition_client = state.rc_superposition_client.clone();
+    serve_release_handler(path, req, query, state, superposition_client).await
 }
 
 async fn serve_release_handler(
@@ -1244,6 +1246,7 @@ async fn serve_release_handler(
     req: actix_web::HttpRequest,
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
+    superposition_client: superposition_sdk::Client,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
     let (organisation, application) = path.into_inner();
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
@@ -1282,8 +1285,7 @@ async fn serve_release_handler(
     info!("Context for serving release: {:?}", context);
 
     let applicable_variants = context.iter().fold(
-        state
-            .superposition_client
+        superposition_client
             .applicable_variants()
             .workspace_id(workspace_name.clone())
             .org_id(superposition_org_id_from_env.clone())
@@ -1311,8 +1313,7 @@ async fn serve_release_handler(
         .collect::<Vec<_>>();
 
     let resolved_config_builder = context.iter().fold(
-        state
-            .superposition_client
+        superposition_client
             .get_resolved_config()
             .workspace_id(workspace_name.clone())
             .org_id(superposition_org_id_from_env.clone())
