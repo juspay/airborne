@@ -276,6 +276,22 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
         
         self.utils = AJPApplicationManagerUtils(fileUtil: self.fileUtil, tracker: self.tracker, remoteFileUtil: self.remoteFileUtil)
+
+        let majorVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let minorVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        let appVersion = "\(majorVersion).\(minorVersion)"
+
+        let storedVersion = UserDefaults.standard.string(forKey: AJPApplicationConstants.APP_VERSION_USER_DEFAULTS_KEY)
+        if let storedVersion = storedVersion, storedVersion != appVersion {
+            self.utils.cleanupManifestDirectory()
+            self.utils.cleanupPackageDirectory()
+            let cleanupLog = NSMutableDictionary()
+            cleanupLog["previous_version"] = storedVersion
+            cleanupLog["current_version"] = appVersion
+            self.tracker.trackInfo("app_version_changed_cleanup", value: cleanupLog)
+        }
+
+        UserDefaults.standard.set(appVersion, forKey: AJPApplicationConstants.APP_VERSION_USER_DEFAULTS_KEY)
         
         // Handle if any previously downloaded packages are available.
         self.handleTempPackageInstallation()

@@ -246,4 +246,22 @@ import Foundation
         let path = fullPathInStorageForFilePath(fileName, inFolder: folder)
         try FileManager.default.removeItem(atPath: path)
     }
+
+    /// Removes an entire top-level directory from the application's Library folder.
+    /// Unlike workspace-scoped deletions, this does not insert the workspace segment.
+    /// - Parameter dirName: The name of the directory to remove (e.g. "JuspayManifests").
+    @objc public func cleanupEntireDirectory(_ dirName: String) {
+        let paths = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true)
+        guard var rootPath = paths.first else { return }
+
+        let subPaths = dirName.components(separatedBy: "/")
+        for subPath in subPaths {
+            rootPath = (rootPath as NSString).appendingPathComponent(subPath)
+        }
+
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: rootPath) {
+            try? fileManager.removeItem(atPath: rootPath)
+        }
+    }
 }
