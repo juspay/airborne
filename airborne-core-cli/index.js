@@ -666,10 +666,13 @@ program
 Usage 1 - Individual options:
   $ airborne-core-cli CreateRelease \\
      --config <config> \\
+     --package_id <package_id> \\
+     --package <package> \\
+     --resources <resources> \\
      --organisation <organisation> \\
      --application <application> \\
      --token <string> \\
-     [--package_id <package_id>]
+     [--sub_packages <sub_packages>]
 
 Usage 2 - JSON file:
   airborne-core-cli CreateRelease @file.json
@@ -682,8 +685,8 @@ Parameters:
         release_config_timeout <integer> (required) : Timeout for the release config in seconds
         boot_timeout <integer> (required) : Timeout for the package in seconds
         properties <document> (required) : Properties of the config in Stringified JSON format
-    --package_id <string> (optional) : Package ID for the release
-    --package (optional) : Package details for the release
+    --package_id <string> (required) : Package ID for the release
+    --package (required) : Package details for the release
         properties <document> (optional) : Properties of the package in Stringified JSON format or a file attachment
         important [<string>] (optional) : Important files in the package
         lazy [<string>] (optional) : Lazy files in the package
@@ -691,7 +694,7 @@ Parameters:
     --dimensions (optional) : Dimensions for the release in key-value format
         key <string> : Dimension name
         value <document> : Dimension value
-    --resources [<string>] (optional) : Resources for the release
+    --resources [<string>] (required) : Resources for the release
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
     --token <string> (required) : Bearer token for authentication
@@ -704,10 +707,13 @@ Examples:
 1. Using individual options:
    $ airborne-core-cli CreateRelease \\
      --config <config> \\
+     --package_id <package_id> \\
+     --package <package> \\
+     --resources <resources> \\
      --organisation <organisation> \\
      --application <application> \\
      --token <string> \\
-     [--package_id <package_id>]
+     [--sub_packages <sub_packages>]
 
 2. Using JSON file:
    $ airborne-core-cli CreateRelease @params.json

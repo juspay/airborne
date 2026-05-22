@@ -2625,13 +2625,15 @@
                 "package_id": {
                     "target": "smithy.api#String",
                     "traits": {
-                        "smithy.api#documentation": "Package ID for the release"
+                        "smithy.api#documentation": "Package ID for the release",
+                        "smithy.api#required": {}
                     }
                 },
                 "package": {
                     "target": "io.airborne.server#CreateReleaseRequestPackage",
                     "traits": {
-                        "smithy.api#documentation": "Package details for the release"
+                        "smithy.api#documentation": "Package details for the release",
+                        "smithy.api#required": {}
                     }
                 },
                 "sub_packages": {
@@ -2649,7 +2651,8 @@
                 "resources": {
                     "target": "io.airborne.server#StringList",
                     "traits": {
-                        "smithy.api#documentation": "Resources for the release"
+                        "smithy.api#documentation": "Resources for the release",
+                        "smithy.api#required": {}
                     }
                 },
                 "organisation": {

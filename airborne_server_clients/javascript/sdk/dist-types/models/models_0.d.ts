@@ -516,12 +516,12 @@ export interface CreateReleaseRequest {
      * Package ID for the release
      * @public
      */
-    package_id?: string | undefined;
+    package_id: string | undefined;
     /**
      * Package details for the release
      * @public
      */
-    package?: CreateReleaseRequestPackage | undefined;
+    package: CreateReleaseRequestPackage | undefined;
     /**
      * Sub-packages from non-primary groups (format: "groupid@version")
      * @public
@@ -536,7 +536,7 @@ export interface CreateReleaseRequest {
      * Resources for the release
      * @public
      */
-    resources?: (string)[] | undefined;
+    resources: (string)[] | undefined;
     /**
      * Name of the organisation
      * @public

@@ -49,6 +49,7 @@ pub struct PackageV2 {
     pub version: i32,
     pub files: Vec<String>,
     pub package_group_id: uuid::Uuid,
+    pub metadata: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,4 +57,5 @@ pub struct CreatePackageInputV2 {
     pub index: Option<String>,
     pub tag: Option<String>,
     pub files: Vec<String>,
+    pub metadata: Option<serde_json::Value>,
 }

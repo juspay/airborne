@@ -1,3 +1,11 @@
+-- Remove packages in non-primary groups first to avoid unique index conflicts
+-- and to ensure "index" SET NOT NULL doesn't fail on rows with NULL index
+DELETE FROM hyperotaserver.packages_v2 WHERE package_group_id IN (
+  SELECT id FROM hyperotaserver.package_groups WHERE is_primary = FALSE
+);
+
+DELETE FROM hyperotaserver.package_groups WHERE is_primary = FALSE;
+
 ALTER TABLE hyperotaserver.packages_v2
   ALTER COLUMN "index" SET NOT NULL;
 
@@ -20,6 +28,9 @@ ALTER TABLE hyperotaserver.packages_v2
 
 ALTER TABLE hyperotaserver.packages_v2
   DROP COLUMN IF EXISTS package_group_id;
+
+ALTER TABLE hyperotaserver.packages_v2
+  DROP COLUMN IF EXISTS metadata;
 
 
 DROP INDEX IF EXISTS hyperotaserver.package_groups_one_primary_per_org_app_idx;

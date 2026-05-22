@@ -119,9 +119,11 @@ structure CreateReleaseRequest {
     config: CreateReleaseRequestConfig
 
     /// Package ID for the release
+    @required
     package_id: String
 
     /// Package details for the release
+    @required
     package: CreateReleaseRequestPackage
 
     /// Sub-packages from non-primary groups (format: "groupid@version")
@@ -131,6 +133,7 @@ structure CreateReleaseRequest {
     dimensions: DimensionsMap
 
     /// Resources for the release
+    @required
     resources: StringList
 
     /// Name of the organisation

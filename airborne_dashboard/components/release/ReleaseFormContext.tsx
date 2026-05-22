@@ -130,7 +130,10 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     apiFetch<Pkg>("/packages", { query: { package_key: `version:${targetVersion}` } }, { token, org, app })
       .then((pkg) => {
         if (pkg) {
-          setSelectedPackage(pkg);
+          setSelectedPackage({
+            ...pkg,
+            package_group_id: pkg.package_group_id || initialState.selectedPackage?.package_group_id,
+          });
         }
       })
       .catch((error) => {

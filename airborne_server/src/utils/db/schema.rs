@@ -144,6 +144,7 @@ pub mod hyperotaserver {
             tag -> Nullable<Text>,
             created_at -> Timestamptz,
             package_group_id -> Uuid,
+            metadata -> Jsonb,
         }
     }
 
@@ -183,6 +184,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.validation_functions (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            function_code -> Text,
+            created_at -> Timestamptz,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.workspace_names (id) {
             id -> Int4,
             organization_id -> Text,
@@ -205,6 +217,7 @@ pub mod hyperotaserver {
         release_views,
         releases,
         user_credentials,
+        validation_functions,
         workspace_names,
     );
 }

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use crate::utils::db::models::{FileEntry, PackageV2Entry};
+use crate::utils::db::models::{FileEntry, PackageGroupsEntry, PackageV2Entry};
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -10,25 +10,25 @@ use superposition_sdk::types::ExperimentStatusType;
 #[derive(Debug, Deserialize)]
 pub struct CreateReleaseRequest {
     pub config: ConfigRequest,
-    pub package_id: Option<String>,
-    pub package: Option<PackageRequest>,
+    pub package_id: String,
+    pub package: PackageRequest,
     pub sub_packages: Option<Vec<String>>,
     pub dimensions: Option<HashMap<String, serde_json::Value>>,
-    pub resources: Option<Vec<String>>,
+    pub resources: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigRequest {
     pub boot_timeout: u64,
     pub release_config_timeout: u64,
-    pub properties: Option<BTreeMap<String, serde_json::Value>>,
+    pub properties: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PackageRequest {
     pub properties: Option<serde_json::Value>,
-    pub important: Option<Vec<String>>,
-    pub lazy: Option<Vec<String>>,
+    pub important: Vec<String>,
+    pub lazy: Vec<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -190,19 +190,40 @@ pub struct ServeReleaseQueryParams {
 }
 
 pub struct BuildOverrides {
-    pub final_important: Option<Vec<String>>,
+    pub final_important: Vec<String>,
     pub package_data: PackageV2Entry,
     pub is_first_release: bool,
-    pub final_lazy: Option<Vec<String>>,
-    pub final_resources: Option<Vec<String>>,
+    pub final_lazy: Vec<String>,
+    pub final_resources: Vec<String>,
     pub config_version: String,
     pub config_properties: BTreeMap<String, aws_smithy_types::Document>,
     pub pkg_version: i32,
     pub files: Vec<FileEntry>,
-    pub final_properties: Option<Value>,
+    pub final_properties: Value,
     pub control_overrides: HashMap<String, Document>,
     pub experimental_overrides: HashMap<String, Document>,
     pub sub_packages: Vec<String>,
+    pub validation_context: serde_json::Value,
+}
+
+pub struct PackageInfo {
+    pub known_version: Option<i32>,
+    pub is_first_release: bool,
+}
+
+pub struct PackageDbData {
+    pub pkg_version: i32,
+    pub primary_group: PackageGroupsEntry,
+    pub package_data: PackageV2Entry,
+    pub sub_packages_data: Vec<PackageV2Entry>,
+    pub sub_package_names: Vec<String>,
+}
+
+pub struct OverrideMaps {
+    pub config_version: String,
+    pub config_properties: BTreeMap<String, Document>,
+    pub control_overrides: HashMap<String, Document>,
+    pub experimental_overrides: HashMap<String, Document>,
 }
 
 pub struct ListExperimentsQuery {

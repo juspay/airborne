@@ -24,7 +24,8 @@ ON CONFLICT DO NOTHING;
 
 
 ALTER TABLE hyperotaserver.packages_v2
-  ADD COLUMN package_group_id UUID;
+  ADD COLUMN package_group_id UUID,
+  ADD COLUMN metadata JSONB;
 
 
 UPDATE hyperotaserver.packages_v2 p
@@ -34,9 +35,13 @@ WHERE p.org_id = pg.org_id
   AND p.app_id = pg.app_id
   AND pg.is_primary = TRUE;
 
+UPDATE hyperotaserver.packages_v2
+SET metadata = '{}'::jsonb;
+
 
 ALTER TABLE hyperotaserver.packages_v2
-  ALTER COLUMN package_group_id SET NOT NULL;
+  ALTER COLUMN package_group_id SET NOT NULL,
+  ALTER COLUMN metadata SET NOT NULL;
 
 
 ALTER TABLE hyperotaserver.packages_v2

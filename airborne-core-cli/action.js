@@ -304,7 +304,7 @@ export async function CreatePackageV2Action(paramsFile, options){
 
 export async function CreateReleaseAction(paramsFile, options){
   let finalOptions = {};
-  const requiredParams = ["config","config.release_config_timeout","config.boot_timeout","config.properties","organisation","application","token"];
+  const requiredParams = ["config","config.release_config_timeout","config.boot_timeout","config.properties","package_id","package","resources","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
     const jsonFilePath = paramsFile.slice(1); 

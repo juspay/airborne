@@ -193,6 +193,7 @@ async fn create_package(
                 .iter()
                 .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
                 .collect(),
+            metadata: serde_json::Value::Object(Default::default()),
         };
 
         let result = diesel::insert_into(packages_table)
@@ -872,6 +873,9 @@ async fn create_packages_v2(
                 .iter()
                 .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
                 .collect(),
+            metadata: request
+                .metadata
+                .unwrap_or(serde_json::Value::Object(Default::default())),
         };
 
         let result = diesel::insert_into(packages_table)
