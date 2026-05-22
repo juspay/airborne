@@ -48,7 +48,15 @@ class AJPApplicationManagerUtils {
             try? fileManager.removeItem(atPath: tempDirPath)
         }
     }
-    
+
+    func cleanupPackageDirectory() {
+        fileUtil.cleanupEntireDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+    }
+
+    func cleanupManifestDirectory() {
+        fileUtil.cleanupEntireDirectory(AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+    }
+
     // MARK: - File System Helpers
     
     func getAllFilesInDirectory(_ directory: String, subFolder: String, includeSubfolders: Bool) -> [String] {

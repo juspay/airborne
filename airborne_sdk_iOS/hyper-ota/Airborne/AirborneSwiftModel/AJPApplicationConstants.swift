@@ -35,6 +35,9 @@ import Foundation
     public static let RELEASE_CONFIG_TIMEOUT_NOTIFICATION = Notification.Name("AJPReleaseConfigTimeoutNotification")
     public static let LAZY_PACKAGE_NOTIFICATION = Notification.Name("AJPLazyPackageNotification")
 
+    // MARK: - UserDefaults Keys
+    public static let APP_VERSION_USER_DEFAULTS_KEY = "in.juspay.airborne.appVersion"
+
     // MARK: - Misc
     public static let APPL_MANAGER_SUB_CAT = "hyperota"
 }

@@ -1,8 +1,6 @@
 #import "AirborneReact.h"
 #import "Airborne.h"
 #import <React/RCTLog.h>
-#import <Airborne/AJPLoggerDelegate.h>
-#import <Airborne/AJPApplicationManager.h>
 #import <Airborne/Airborne-Swift.h>
 
 @implementation AirborneReact

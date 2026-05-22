@@ -1,6 +1,8 @@
 package `in`.juspay.airborneplugin
 
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.annotation.Keep
 import `in`.juspay.airborne.HyperOTAServices
 import `in`.juspay.airborne.LazyDownloadCallback
@@ -46,14 +48,31 @@ class Airborne(
         }
     }
 
-    private val hyperOTAServices = HyperOTAServices(
-        context,
-        airborneInterface.getNamespace(),
-        "",
-        releaseConfigUrl,
-        trackerCallback,
-        this::bootComplete
-    )
+    private val hyperOTAServices = run {
+        val appVersion = try {
+            val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    PackageManager.PackageInfoFlags.of(0)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            packageInfo.versionName ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+
+        HyperOTAServices(
+            context,
+            airborneInterface.getNamespace(),
+            appVersion,
+            releaseConfigUrl,
+            trackerCallback,
+            this::bootComplete
+        )
+    }
 
     private val applicationManager = hyperOTAServices.createApplicationManager(airborneInterface.getDimensions())
 
