@@ -203,6 +203,7 @@ pub struct BuildOverrides {
     pub control_overrides: HashMap<String, Document>,
     pub experimental_overrides: HashMap<String, Document>,
     pub sub_packages: Vec<String>,
+    pub validation_context: serde_json::Value,
 }
 
 pub struct ListExperimentsQuery {

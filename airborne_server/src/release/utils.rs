@@ -576,7 +576,7 @@ pub async fn build_overrides(
         }
     };
 
-    let package_data = {
+    let (primary_group, package_data) = {
         let pool = state.db_pool.clone();
         let org = organisation.clone();
         let app = application.clone();
@@ -590,7 +590,7 @@ pub async fn build_overrides(
                 .select(PackageGroupsEntry::as_select())
                 .first::<PackageGroupsEntry>(&mut conn)?;
 
-            packages_dsl::packages_v2
+            let package_data = packages_dsl::packages_v2
                 .filter(
                     packages_dsl::org_id
                         .eq(&org)
@@ -605,7 +605,8 @@ pub async fn build_overrides(
                         "Package version {} not found in primary group",
                         pkg_version
                     ))
-                })
+                })?;
+            Ok((primary_group, package_data))
         })?
     };
 
@@ -619,7 +620,11 @@ pub async fn build_overrides(
     };
 
     // Fetch and validate sub-packages from non-primary groups
-    let sub_packages_data: Vec<PackageV2Entry> = if let Some(ref sub_pkgs) = final_sub_packages {
+    let (sub_packages_data, sub_package_names): (Vec<PackageV2Entry>, Vec<String>) = if let Some(
+        ref sub_pkgs,
+    ) =
+        final_sub_packages
+    {
         let pool = state.db_pool.clone();
         let org = organisation.clone();
         let app = application.clone();
@@ -639,6 +644,7 @@ pub async fn build_overrides(
         run_blocking!({
             let mut conn = pool.get()?;
             let mut sub_packages_entries: Vec<PackageV2Entry> = Vec::new();
+            let mut sub_package_names: Vec<String> = Vec::new();
 
             for (group_id, version) in &parsed_sub_packages {
                 // Fetch the package directly using package_group_id
@@ -683,13 +689,14 @@ pub async fn build_overrides(
                     )));
                 }
 
+                sub_package_names.push(group.name.clone());
                 sub_packages_entries.push(sub_pkg);
             }
 
-            Ok(sub_packages_entries)
+            Ok((sub_packages_entries, sub_package_names))
         })?
     } else {
-        vec![]
+        (vec![], vec![])
     };
 
     // Collect all files from sub-packages
@@ -828,23 +835,109 @@ pub async fn build_overrides(
         ABError::InternalServerError("Primary package must have an index file".to_string())
     })?;
 
-    let mut seen_paths = HashSet::new();
-    let combined_files: Vec<String> = package_data
-        .files
-        .iter()
-        .filter_map(|f| f.as_ref().cloned())
+    // Validate mutual exclusivity: index, important, lazy, resources must not share file paths
+    {
+        let index_path = {
+            let (path, _, _) = parse_file_key(&primary_index);
+            path
+        };
+
+        let mut path_sets: Vec<(&str, HashSet<String>)> = vec![];
+        path_sets.push(("index", [index_path].into_iter().collect()));
+
+        if let Some(ref imp) = final_important {
+            let paths: HashSet<String> = imp
+                .iter()
+                .map(|k| {
+                    let (p, _, _) = parse_file_key(k);
+                    p
+                })
+                .collect();
+            path_sets.push(("important", paths));
+        }
+        if let Some(ref lazy) = final_lazy {
+            let paths: HashSet<String> = lazy
+                .iter()
+                .map(|k| {
+                    let (p, _, _) = parse_file_key(k);
+                    p
+                })
+                .collect();
+            path_sets.push(("lazy", paths));
+        }
+        if let Some(ref res) = final_resources {
+            let paths: HashSet<String> = res
+                .iter()
+                .map(|k| {
+                    let (p, _, _) = parse_file_key(k);
+                    p
+                })
+                .collect();
+            path_sets.push(("resources", paths));
+        }
+
+        for i in 0..path_sets.len() {
+            for j in (i + 1)..path_sets.len() {
+                let (name_a, set_a) = &path_sets[i];
+                let (name_b, set_b) = &path_sets[j];
+                let overlap: Vec<&String> = set_a.intersection(set_b).collect();
+                if !overlap.is_empty() {
+                    return Err(ABError::BadRequest(format!(
+                        "File(s) {:?} appear in both '{}' and '{}'",
+                        overlap, name_a, name_b
+                    )));
+                }
+            }
+        }
+    }
+
+    // Ensure all package files (primary + sub-packages) are exactly covered by important + lazy
+    {
+        let package_paths: HashSet<String> = package_data
+            .files
+            .iter()
+            .filter_map(|f| {
+                f.as_ref().map(|key| {
+                    let (path, _, _) = parse_file_key(key);
+                    path
+                })
+            })
+            .chain(sub_package_file_keys.iter().map(|key| {
+                let (path, _, _) = parse_file_key(key);
+                path
+            }))
+            .collect();
+
+        let split_paths: HashSet<String> = final_important
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .chain(final_lazy.clone().unwrap_or_default())
+            .map(|key| {
+                let (path, _, _) = parse_file_key(&key);
+                path
+            })
+            .collect();
+
+        if package_paths != split_paths {
+            let missing_from_splits: Vec<String> =
+                package_paths.difference(&split_paths).cloned().collect();
+            let extra_in_splits: Vec<String> =
+                split_paths.difference(&package_paths).cloned().collect();
+            return Err(ABError::BadRequest(format!(
+                "Package files must exactly match important + lazy. Missing from splits: {:?}, Extra in splits: {:?}",
+                missing_from_splits, extra_in_splits
+            )));
+        }
+    }
+
+    let combined_files: Vec<String> = final_important
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .chain(final_lazy.clone().unwrap_or_default())
         .chain(final_resources.clone().unwrap_or_default())
         .chain(vec![primary_index.clone()])
-        .chain(sub_package_file_keys.clone())
-        .filter(|file_key| {
-            let (file_path, _, _) = parse_file_key(file_key);
-            if seen_paths.contains(&file_path) {
-                false
-            } else {
-                seen_paths.insert(file_path);
-                true
-            }
-        })
         .collect();
 
     let files = get_files_by_file_keys_async(
@@ -997,6 +1090,13 @@ pub async fn build_overrides(
         experimental_overrides.insert("sub_packages".to_string(), Document::Array(vec![]));
     }
 
+    let mut validation_map = serde_json::Map::new();
+    validation_map.insert(primary_group.name.clone(), package_data.metadata.clone());
+    for (sub_pkg, name) in sub_packages_data.iter().zip(sub_package_names.iter()) {
+        validation_map.insert(name.clone(), sub_pkg.metadata.clone());
+    }
+    let validation_context = serde_json::Value::Object(validation_map);
+
     info!("Control overrides: {:?}", control_overrides);
     info!("Experimental overrides: {:?}", experimental_overrides);
 
@@ -1014,6 +1114,7 @@ pub async fn build_overrides(
         control_overrides,
         experimental_overrides,
         sub_packages: final_sub_packages.unwrap_or_default(),
+        validation_context,
     })
 }
 

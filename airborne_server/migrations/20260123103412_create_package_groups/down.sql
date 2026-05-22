@@ -21,6 +21,9 @@ ALTER TABLE hyperotaserver.packages_v2
 ALTER TABLE hyperotaserver.packages_v2
   DROP COLUMN IF EXISTS package_group_id;
 
+ALTER TABLE hyperotaserver.packages_v2
+  DROP COLUMN IF EXISTS metadata;
+
 
 DROP INDEX IF EXISTS hyperotaserver.package_groups_one_primary_per_org_app_idx;
 

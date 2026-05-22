@@ -16,7 +16,7 @@ const nextConfig = {
       },
       {
         source:
-          "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz|package-groups)/:path*",
+          "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz|package-groups|validation-functions)/:path*",
         destination: `${backend}/api/:api/:path*`,
       },
       {

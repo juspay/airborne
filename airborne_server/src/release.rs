@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::utils::db::{
+    models::ValidationFunction, schema::hyperotaserver::validation_functions as vf_table,
+};
 use crate::{
     file::utils::parse_file_key,
     middleware::auth::{require_org_and_app, Auth, AuthResponse},
+    organisation::application::validation_functions::{
+        execute_validation_function, DEFAULT_VALIDATION_FUNCTION,
+    },
     release::types::*,
-    types as airborne_types,
+    run_blocking, types as airborne_types,
     types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
@@ -28,6 +34,7 @@ use actix_web::{
 use airborne_authz_macros::authz;
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
+use diesel::prelude::*;
 use http::{HeaderValue, StatusCode};
 use log::info;
 use serde_json::Value;
@@ -414,6 +421,7 @@ async fn create_release(
         control_overrides,
         experimental_overrides,
         sub_packages,
+        validation_context,
     } = utils::build_overrides(
         &req,
         superposition_org_id_from_env.clone(),
@@ -424,6 +432,33 @@ async fn create_release(
         workspace_name.clone(),
     )
     .await?;
+
+    info!("validation context: {:?}", validation_context);
+
+    // Execute validation function
+    let pool = state.db_pool.clone();
+    let org = organisation.clone();
+    let app = application.clone();
+    let is_valid = run_blocking!({
+        let mut conn = pool.get()?;
+        let result: Option<ValidationFunction> = vf_table::table
+            .filter(vf_table::org_id.eq(&org))
+            .filter(vf_table::app_id.eq(&app))
+            .first(&mut conn)
+            .optional()?;
+
+        let function_code = match result {
+            Some(vf) => vf.function_code,
+            None => DEFAULT_VALIDATION_FUNCTION.to_string(),
+        };
+        execute_validation_function(&function_code, &validation_context)
+    })?;
+
+    if !is_valid {
+        return Err(ABError::BadRequest(
+            "Release validation failed: validation function returned false".to_string(),
+        ));
+    }
 
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
@@ -1578,6 +1613,7 @@ async fn update_release(
         control_overrides,
         experimental_overrides,
         sub_packages,
+        validation_context: _,
     } = utils::build_overrides(
         &req,
         superposition_org_id_from_env.clone(),

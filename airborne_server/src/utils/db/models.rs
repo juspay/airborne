@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
     authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, files, package_groups,
-    packages, packages_v2, release_views, releases, user_credentials, workspace_names,
+    packages, packages_v2, release_views, releases, user_credentials, validation_functions,
+    workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -139,6 +140,8 @@ pub struct PackageV2Entry {
     pub files: Vec<Option<String>>,
     pub created_at: DateTime<Utc>,
     pub package_group_id: uuid::Uuid,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub metadata: serde_json::Value,
 }
 
 #[derive(Insertable)]
@@ -151,6 +154,8 @@ pub struct NewPackageV2Entry {
     pub tag: Option<String>,
     pub files: Vec<Option<String>>,
     pub package_group_id: uuid::Uuid,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub metadata: serde_json::Value,
 }
 
 #[derive(Queryable, Insertable, Debug, Selectable)]
@@ -225,6 +230,26 @@ pub struct NewAuthzMembershipEntry {
     pub application: String,
     pub role_key: String,
     pub role_level: i32,
+}
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]
+#[diesel(table_name = validation_functions)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct ValidationFunction {
+    pub id: uuid::Uuid,
+    pub org_id: String,
+    pub app_id: String,
+    pub function_code: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = validation_functions)]
+pub struct NewValidationFunction<'a> {
+    pub org_id: &'a str,
+    pub app_id: &'a str,
+    pub function_code: &'a str,
 }
 
 #[derive(Queryable, Insertable, Debug, Selectable, Clone)]

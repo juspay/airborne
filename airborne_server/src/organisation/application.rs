@@ -33,8 +33,12 @@ use crate::{
     types::{self as airborne_types, ABError, AppState},
     utils::{
         db::{
-            models::{NewPackageGroupEntry, NewWorkspaceName, WorkspaceName},
-            schema::hyperotaserver::{package_groups, workspace_names},
+            models::{
+                NewPackageGroupEntry, NewValidationFunction, NewWorkspaceName, WorkspaceName,
+            },
+            schema::hyperotaserver::{
+                package_groups, validation_functions as validation_functions_table, workspace_names,
+            },
         },
         document::schema_doc_to_hashmap,
         migrations::{migrate_superposition_workspace, SuperpositionMigrationStrategy},
@@ -46,6 +50,7 @@ mod dimension;
 mod properties;
 pub mod types;
 pub mod user;
+pub mod validation_functions;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -59,6 +64,7 @@ pub fn add_routes() -> Scope {
         .service(Scope::new("/dimension").service(dimension::add_routes()))
         .service(Scope::new("/user").service(user::add_routes()))
         .service(Scope::new("/properties").service(properties::add_routes()))
+        .service(Scope::new("/validation-functions").service(validation_functions::add_routes()))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -250,6 +256,39 @@ async fn add_application(
 
     info!(
         "Created primary package group for application: {}",
+        application
+    );
+
+    // Create default validation function
+    let org_for_vf = organisation.clone();
+    let app_for_vf = application.clone();
+    let pool = state.db_pool.clone();
+    if let Err(e) = run_blocking!({
+        let mut conn = pool.get()?;
+        let new_vf = NewValidationFunction {
+            org_id: &org_for_vf,
+            app_id: &app_for_vf,
+            function_code: validation_functions::DEFAULT_VALIDATION_FUNCTION,
+        };
+        diesel::insert_into(validation_functions_table::table)
+            .values(&new_vf)
+            .execute(&mut conn)
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to create default validation function: {}",
+                    e
+                ))
+            })?;
+        Ok(())
+    }) {
+        info!("Failed to create default validation function: {}", e);
+        return Err(ABError::InternalServerError(
+            "Failed to create default validation function".to_string(),
+        ));
+    }
+
+    info!(
+        "Created default validation function for application: {}",
         application
     );
 

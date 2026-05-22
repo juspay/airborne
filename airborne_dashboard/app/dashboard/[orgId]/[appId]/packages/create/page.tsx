@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, FileText, Rocket, ChevronRight, Check, File, Package2, Crown, Info } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
@@ -49,6 +50,7 @@ export default function CreatePackagePage() {
 
   const [selectedPackageFiles, setSelectedPackageFiles] = useState<SelectedFile[]>([]);
 
+  const [metadata, setMetadata] = useState("{}");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
@@ -126,6 +128,18 @@ export default function CreatePackagePage() {
           ? `${selectedIndexFile.file_path}@version:${selectedIndexFile.version}`
           : undefined;
 
+      const trimmedMetadata = metadata.trim();
+      let parsedMetadata: unknown | undefined;
+      if (trimmedMetadata) {
+        try {
+          parsedMetadata = JSON.parse(trimmedMetadata);
+        } catch {
+          toastWarning("Invalid Metadata", "Metadata must be valid JSON");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       await apiFetch(
         `/package-groups/${selectedGroup.id}/packages`,
         {
@@ -134,6 +148,7 @@ export default function CreatePackagePage() {
             ...(indexPath ? { index: indexPath } : {}),
             tag: tag || undefined,
             files: filteredFileIds,
+            ...(parsedMetadata ? { metadata: parsedMetadata } : {}),
           },
         },
         { token, org, app: appId }
@@ -226,6 +241,17 @@ export default function CreatePackagePage() {
                     onChange={(e) => setTag(e.target.value)}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="metadata">Metadata (JSON)</Label>
+                  <Textarea
+                    id="metadata"
+                    placeholder='e.g., {"key": "value"}'
+                    value={metadata}
+                    onChange={(e) => setMetadata(e.target.value)}
+                    rows={3}
+                    className="font-mono text-sm"
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -279,6 +305,17 @@ export default function CreatePackagePage() {
                       placeholder="e.g., latest, v1.0, production"
                       value={tag}
                       onChange={(e) => setTag(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="metadata">Metadata (JSON)</Label>
+                    <Textarea
+                      id="metadata"
+                      placeholder='e.g., {"key": "value"}'
+                      value={metadata}
+                      onChange={(e) => setMetadata(e.target.value)}
+                      rows={3}
+                      className="font-mono text-sm"
                     />
                   </div>
                   <Alert>
