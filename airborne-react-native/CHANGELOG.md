@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.3.7 - 2026-05-23
+#### Bug Fixes
+- update airborne sdk ios version - (a2e2db2) - Yash Rajput
+
+- - -
+
 ## airborne_react_native-v0.3.6 - 2026-05-23
 #### Bug Fixes
 - add cleanup after native update - (9ec317b) - Yash Rajput
