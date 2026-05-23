@@ -2,6 +2,36 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.5.1 - 2026-05-23
+#### Bug Fixes
+- add cleanup after native update - (9ec317b) - Yash Rajput
+
+- - -
+
+## v0.36.0 - 2026-05-23
+#### Miscellaneous Chores
+- **(version)** v0.36.0 [skip ci] - (487e711) - Airborne Bot
+
+- - -
+
+## v0.35.0 - 2026-05-23
+#### Miscellaneous Chores
+- **(version)** v0.35.0 [skip ci] - (7a62afa) - Airborne Bot
+
+- - -
+
+## v0.34.2 - 2026-05-23
+#### Miscellaneous Chores
+- **(version)** v0.34.2 [skip ci] - (da14a3e) - Airborne Bot
+
+- - -
+
+## v0.34.1 - 2026-05-23
+#### Miscellaneous Chores
+- **(version)** v0.34.1 [skip ci] - (0bbc8f3) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.5.0 - 2026-05-06
 #### Features
 - Migrating ApplicationManifest & ApplicationManager to Swift - (92b7ed0) - Balaganesh S
