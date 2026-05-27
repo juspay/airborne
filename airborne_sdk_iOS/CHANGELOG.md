@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.5.2 - 2026-05-27
+#### Bug Fixes
+- do cleanup on nil version - (5a9b1b4) - Yash Rajput
+
+- - -
+
+## v0.36.2 - 2026-05-27
+#### Miscellaneous Chores
+- **(version)** v0.36.2 [skip ci] - (8dbcdfc) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.5.1 - 2026-05-23
 #### Bug Fixes
 - add cleanup after native update - (9ec317b) - Yash Rajput
