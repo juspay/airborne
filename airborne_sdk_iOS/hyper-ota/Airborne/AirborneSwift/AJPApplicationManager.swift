@@ -282,11 +282,17 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         let appVersion = "\(majorVersion).\(minorVersion)"
 
         let storedVersion = UserDefaults.standard.string(forKey: AJPApplicationConstants.APP_VERSION_USER_DEFAULTS_KEY)
-        if let storedVersion = storedVersion, storedVersion != appVersion {
+        let storedVersionLog = NSMutableDictionary()
+        storedVersionLog["stored_version"] = storedVersion ?? "nil"
+        storedVersionLog["current_version"] = appVersion
+        self.tracker.trackInfo("app_version", value: storedVersionLog)
+
+        if storedVersion != appVersion {
             self.utils.cleanupManifestDirectory()
             self.utils.cleanupPackageDirectory()
+
             let cleanupLog = NSMutableDictionary()
-            cleanupLog["previous_version"] = storedVersion
+            cleanupLog["previous_version"] = storedVersion ?? "nil"
             cleanupLog["current_version"] = appVersion
             self.tracker.trackInfo("app_version_changed_cleanup", value: cleanupLog)
         }
