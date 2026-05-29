@@ -16,5 +16,5 @@ Our primary focus is to provide robust, easy-to-use SDKs and plugins that stream
   s.source       = { :http => "https://public.releases.juspay.in/release/ios/airborne/#{s.version}/Airborne.zip" }
   
   s.ios.vendored_frameworks = "Airborne.xcframework"
-  s.platform     = :ios, "12.0"
+  s.platform     = :ios, "13.0"
 end
