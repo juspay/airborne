@@ -46,6 +46,17 @@ import AirborneSwiftModel
     @objc optional func bundle() -> Bundle
     
     /**
+     * Returns the name of the index bundle file to use as the entry point.
+     *
+     * This is used when resolving the fallback bundle path for the index file
+     * when OTA-downloaded files are not available.
+     *
+     * @return The resource name of the index bundle file.
+     *         If not implemented, defaults to "main.jsbundle".
+     */
+    @objc optional func indexBundleName() -> String
+    
+    /**
      * Returns custom dimensions/metadata to include with release configuration requests.
      *
      * These dimensions are sent as HTTP headers when fetching the release configuration
@@ -257,11 +268,16 @@ extension AirborneServices {
      * @note Call this method after `startApp` for the most up-to-date bundle.
      */
     @objc public func getIndexBundlePath() -> URL {
+        let indexBundleName = delegate?.indexBundleName?() ?? "main.jsbundle"
+        
         guard
             let indexFilePath = (self.applicationManager?.getCurrentApplicationManifest() as? AJPApplicationManifest)?.package.index.filePath,
             !indexFilePath.isEmpty
         else {
-            return bundlePath.url(forResource: "main", withExtension: "jsBundle") ?? bundlePath.bundleURL.appendingPathComponent("main.jsBundle")
+            let components = indexBundleName.split(separator: ".", maxSplits: 1)
+            let name = components.first.map(String.init) ?? indexBundleName
+            let ext = components.dropFirst().first.map(String.init) ?? ""
+            return bundlePath.url(forResource: name, withExtension: ext) ?? bundlePath.bundleURL.appendingPathComponent(indexBundleName)
         }
             
         guard
