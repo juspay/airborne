@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.19.1 - 2026-05-29
+#### Bug Fixes
+- add index_bundle_path delegate method - (2842344) - Yash Rajput
+
+- - -
+
 ## airborne_server-v0.19.0 - 2026-05-11
 #### Features
 - casbin - (1232b11) - yuvrajjsingh0
