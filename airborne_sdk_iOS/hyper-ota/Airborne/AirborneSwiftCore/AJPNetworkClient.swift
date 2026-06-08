@@ -141,7 +141,7 @@ public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [
                     category: "api_call",
                     subcategory: "network"
                 )
-                responseBlock(urlResponse, data, ["error": error.localizedDescription])
+                responseBlock(urlResponse, data, ["error": error])
             } else if let data = data {
                 responseBlock(urlResponse, data, nil)
             } else {
