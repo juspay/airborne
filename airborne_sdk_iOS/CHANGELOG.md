@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.5.4 - 2026-06-09
+#### Bug Fixes
+- pass error object in api call client - (2c326ec) - Naman Agarwal
+
+- - -
+
 ## airborne_sdk_ios-v0.5.3 - 2026-05-29
 #### Bug Fixes
 - add index_bundle_path delegate method - (2842344) - Yash Rajput
