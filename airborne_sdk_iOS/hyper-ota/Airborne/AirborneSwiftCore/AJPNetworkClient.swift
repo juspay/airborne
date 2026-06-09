@@ -21,6 +21,53 @@ import Foundation
 ///   - error: An error dictionary if something went wrong, or nil on success.
 public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [String: Any]?) -> Void
 
+/// A callback block invoked each time the server issues an HTTP redirect.
+/// - Parameters:
+///   - response: The redirect response (contains the 3xx status code and headers).
+///   - newRequest: The new request that will be used to follow the redirect.
+public typealias AJPRedirectionBlock = @convention(block) (HTTPURLResponse, URLRequest) -> Void
+
+// MARK: - Redirect-tracking session delegate
+
+/// A URLSessionTaskDelegate that intercepts HTTP redirects so callers can observe
+/// every redirect hop. Any other delegate calls are forwarded to an optional
+/// `forwardingDelegate`, which allows composition with SSL-pinning delegates.
+private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
+
+    private let redirectionBlock: AJPRedirectionBlock
+    /// An existing delegate (e.g. SSL-pinning) whose non-redirect calls we forward.
+    private let forwardingDelegate: URLSessionDelegate?
+
+    init(redirectionBlock: @escaping AJPRedirectionBlock, forwardingDelegate: URLSessionDelegate?) {
+        self.redirectionBlock = redirectionBlock
+        self.forwardingDelegate = forwardingDelegate
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        redirectionBlock(response, request)
+        completionHandler(request)
+    }
+
+    // Forward all other URLSessionDelegate calls to the wrapped delegate.
+    override func responds(to aSelector: Selector!) -> Bool {
+        if super.responds(to: aSelector) { return true }
+        return forwardingDelegate?.responds(to: aSelector) ?? false
+    }
+
+    override func forwardingTarget(for aSelector: Selector!) -> Any? {
+        if forwardingDelegate?.responds(to: aSelector) == true {
+            return forwardingDelegate
+        }
+        return super.forwardingTarget(for: aSelector)
+    }
+}
+
 /// A networking client responsible for making HTTP requests.
 /// Manages shared URL sessions, default headers, and request body construction.
 @objc open class AJPNetworkClient: NSObject {
@@ -53,6 +100,9 @@ public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [
     ///   - options: Configuration options like `connectionTimeout` and `readTimeout` (in milliseconds).
     ///   - responseBlock: A callback invoked when the request completes.
     ///   - sessionDelegate: An optional NSURLSessionDelegate for custom behavior like SSL pinning.
+    ///   - redirectionBlock: An optional callback invoked for every HTTP redirect (3xx). Receives
+    ///     the redirect response and the new request that will be followed. Use this to log redirect
+    ///     chains without interrupting the request flow.
     @objc public func apiCall(
         for url: String,
         requestType: AJPRequestType,
@@ -60,7 +110,8 @@ public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [
         header headers: NSDictionary?,
         options: NSDictionary?,
         responseBlock: @escaping AJPAPIResponseBlock,
-        sessionDelegate: URLSessionDelegate?
+        sessionDelegate: URLSessionDelegate?,
+        redirectionBlock: AJPRedirectionBlock? = nil
     ) {
         var connectionTimeout: Int = -1
         var readTimeout: Int = -1
@@ -74,16 +125,23 @@ public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [
             }
         }
 
-        // Reuse the shared session when no custom delegate or resource timeout is needed.
-        // Create a new session only when a sessionDelegate is provided (e.g. SSL pinning)
-        // or when a custom readTimeout requires a different session configuration.
+         // Reuse the shared session when no custom delegate, redirect tracking, or resource timeout
+        // is needed. Create a new session otherwise so our delegate receives the necessary callbacks.
         let session: URLSession
-        if sessionDelegate != nil || readTimeout != -1 {
+        if sessionDelegate != nil || redirectionBlock != nil || readTimeout != -1 {
             let config = URLSessionConfiguration.default
             if readTimeout != -1 {
                 config.timeoutIntervalForResource = Double(readTimeout) / 1000.0
             }
-            session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
+           // Wrap with AJPRedirectHandler when redirect tracking is requested so we capture every
+            // 3xx hop while still forwarding other callbacks (e.g. SSL pinning) to sessionDelegate.
+            let delegate: URLSessionDelegate?
+            if let redirectionBlock = redirectionBlock {
+                delegate = AJPRedirectHandler(redirectionBlock: redirectionBlock, forwardingDelegate: sessionDelegate)
+            } else {
+                delegate = sessionDelegate
+            }
+            session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         } else {
             session = sharedSession
         }
