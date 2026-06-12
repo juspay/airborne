@@ -109,6 +109,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.package_groups (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            name -> Text,
+            is_primary -> Bool,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.packages (id) {
             id -> Uuid,
             version -> Int4,
@@ -128,10 +139,12 @@ pub mod hyperotaserver {
             version -> Int4,
             app_id -> Text,
             org_id -> Text,
-            index -> Text,
+            index -> Nullable<Text>,
             files -> Array<Nullable<Text>>,
             tag -> Nullable<Text>,
             created_at -> Timestamptz,
+            package_group_id -> Uuid,
+            metadata -> Jsonb,
         }
     }
 
@@ -171,6 +184,17 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.validation_functions (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            function_code -> Text,
+            created_at -> Timestamptz,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.workspace_names (id) {
             id -> Int4,
             organization_id -> Text,
@@ -187,11 +211,13 @@ pub mod hyperotaserver {
         configs,
         files,
         organisation_invites,
+        package_groups,
         packages,
         packages_v2,
         release_views,
         releases,
         user_credentials,
+        validation_functions,
         workspace_names,
     );
 }
