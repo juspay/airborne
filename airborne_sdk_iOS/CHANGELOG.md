@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.6.0 - 2026-06-12
+#### Features
+- QR-6991: SMV Added Redirection Logs - (06d4ef6) - vaishnavi.mohadkar@juspay.in
+
+- - -
+
 ## airborne_sdk_ios-v0.5.4 - 2026-06-09
 #### Bug Fixes
 - pass error object in api call client - (2c326ec) - Naman Agarwal
