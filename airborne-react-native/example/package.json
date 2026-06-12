@@ -16,7 +16,8 @@
   "dependencies": {
     "airborne-react-native": "*",
     "react": "19.0.0",
-    "react-native": "0.79.2"
+    "react-native": "0.79.2",
+    "turbo": "^2.9.14"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
