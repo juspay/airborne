@@ -19,7 +19,11 @@ use std::{
 use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
-use diesel::{pg::Pg, prelude::*, sql_types::Bool, BoxableExpression};
+use diesel::{
+    prelude::*,
+    sql_query,
+    sql_types::{Array, Integer, Text},
+};
 use http::{uri::PathAndQuery, Uri};
 use log::{debug, info};
 use serde_json::Value;
@@ -35,14 +39,7 @@ use crate::{
     release::types::*,
     run_blocking, types as airborne_types,
     types::{ABError, AppState},
-    utils::db::{
-        models::FileEntry,
-        schema::hyperotaserver::files::{
-            app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id,
-            table as files_table, tag as file_dsl_tag, version as file_dsl_version,
-        },
-        DbPool,
-    },
+    utils::db::{models::FileEntry, DbPool},
     utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
     utils::redis::RedisCache,
 };
@@ -226,37 +223,47 @@ pub async fn get_files_by_file_keys_async(
         let db_result = run_blocking!({
             let mut conn = pool.get()?;
 
-            let mut file_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> = Vec::new();
-
+            // Partition the keys by lookup kind so each set joins against its own
+            // composite index: (org_id, app_id, file_path, version) for versioned keys
+            // and the partial (org_id, app_id, file_path, tag) WHERE tag IS NOT NULL for
+            // tagged keys. The parallel `*_paths` / value vectors are kept in lockstep so
+            // they can be zipped back together via unnest() in SQL.
+            let mut version_paths: Vec<String> = Vec::new();
+            let mut version_numbers: Vec<i32> = Vec::new();
+            let mut tag_paths: Vec<String> = Vec::new();
+            let mut tag_values: Vec<String> = Vec::new();
             for file_id in &missing_file_keys {
-                let (fp, ver_opt, tag_opt) = parse_file_key(&file_id.clone());
-
+                let (fp, ver_opt, tag_opt) = parse_file_key(file_id);
                 if let Some(v) = ver_opt {
-                    file_conds.push(Box::new(
-                        file_dsl_path.eq(fp.clone()).and(file_dsl_version.eq(v)),
-                    ));
+                    version_paths.push(fp);
+                    version_numbers.push(v);
                 } else if let Some(t) = tag_opt {
-                    file_conds.push(Box::new(
-                        file_dsl_path
-                            .eq(fp.clone())
-                            .and(file_dsl_tag.is_not_distinct_from(t.clone())),
-                    ));
+                    tag_paths.push(fp);
+                    tag_values.push(t);
                 } else {
                     return Err(ABError::BadRequest("Invalid file key format".to_string()));
                 }
             }
 
-            let combined = file_conds
-                .into_iter()
-                .reduce(|a, b| Box::new(a.or(b)))
-                .unwrap_or(Box::new(file_dsl_path.eq("")));
-
-            let files: Vec<FileEntry> = files_table
-                .into_boxed::<Pg>()
-                .filter(file_dsl_org_id.eq(&org_clone))
-                .filter(file_dsl_app_id.eq(&app_clone))
-                .filter(combined)
-                .load(&mut conn)?;
+            // Build a SQL Query that joins the files table against the unnest() of the versioned and tagged keys.
+            let files: Vec<FileEntry> = sql_query(
+                "SELECT f.* FROM hyperotaserver.files f \
+                 JOIN unnest($1::text[], $2::int4[]) AS k(file_path, version) \
+                   ON f.file_path = k.file_path AND f.version = k.version \
+                 WHERE f.org_id = $5 AND f.app_id = $6 \
+                 UNION \
+                 SELECT f.* FROM hyperotaserver.files f \
+                 JOIN unnest($3::text[], $4::text[]) AS k(file_path, tag) \
+                   ON f.file_path = k.file_path AND f.tag = k.tag \
+                 WHERE f.org_id = $5 AND f.app_id = $6",
+            )
+            .bind::<Array<Text>, _>(&version_paths)
+            .bind::<Array<Integer>, _>(&version_numbers)
+            .bind::<Array<Text>, _>(&tag_paths)
+            .bind::<Array<Text>, _>(&tag_values)
+            .bind::<Text, _>(&org_clone)
+            .bind::<Text, _>(&app_clone)
+            .load(&mut conn)?;
 
             Ok(files)
         })?;
