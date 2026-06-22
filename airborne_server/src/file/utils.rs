@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose, Engine as _};
+use http::HeaderValue;
 use log::info;
 use sha2::{Digest, Sha256 as checksum_algorithm};
 
@@ -87,4 +88,29 @@ pub fn base64_to_hex(value: &str) -> String {
         Ok(bytes) => hex::encode(bytes),
         Err(_) => String::new(), // return empty string on invalid base64
     }
+}
+
+pub fn validate_content_encoding(
+    header: Option<&HeaderValue>,
+) -> airborne_types::Result<Option<String>> {
+    const ALLOWED_ENCODINGS: [&str; 4] = ["gzip", "br", "zstd", "deflate"];
+
+    let encoding = header
+        .map(|v| v.to_str())
+        .transpose()
+        .map_err(|_| ABError::BadRequest("Invalid Content-Encoding header".to_string()))?
+        .map(|v| v.trim().to_ascii_lowercase())
+        .filter(|v| !v.is_empty());
+
+    if let Some(encoding) = &encoding {
+        if !ALLOWED_ENCODINGS.contains(&encoding.as_str()) {
+            return Err(ABError::BadRequest(format!(
+                "Unsupported Content-Encoding '{}'. Allowed values: {}",
+                encoding,
+                ALLOWED_ENCODINGS.join(", ")
+            )));
+        }
+    }
+
+    Ok(encoding)
 }

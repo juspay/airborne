@@ -717,6 +717,10 @@ async fn upload_file(
         .map_err(|_| ABError::BadRequest("Invalid x-checksum header".to_string()))?
         .to_string();
 
+    let content_encoding = utils::validate_content_encoding(
+        req.headers().get(actix_web::http::header::CONTENT_ENCODING),
+    )?;
+
     if file_path_str.is_empty() {
         info!("Rejected upload: empty file_path");
         return Err(ABError::BadRequest("File path cannot be empty".to_string()));
@@ -869,6 +873,7 @@ async fn upload_file(
             s3_path_clone,
             file_size,
             b64_fc.clone(),
+            content_encoding,
         )
         .await
     });
