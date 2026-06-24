@@ -663,6 +663,9 @@ impl CasbinAuthzProvider {
     ) -> airborne_types::Result<()> {
         let normalized_subject = normalize_subject(subject)?;
         let normalized_role = validate_org_role(role)?;
+        // Custom roles are namespaced per organisation; system roles stay global.
+        let stored_role_key =
+            encode_role_key(POLICY_SCOPE_ORG, organisation, "*", &normalized_role);
         let mut guard = self.enforcer.write().await;
         Self::remove_policies_for_filter_in_guard(
             &mut guard,
@@ -681,7 +684,7 @@ impl CasbinAuthzProvider {
                     scope: POLICY_SCOPE_ORG.to_string(),
                     organisation: organisation.to_string(),
                     application: "*".to_string(),
-                    action: normalized_role.clone(),
+                    action: stored_role_key.clone(),
                 }
                 .as_vec(),
             )
@@ -696,7 +699,7 @@ impl CasbinAuthzProvider {
             POLICY_SCOPE_ORG,
             organisation,
             "*",
-            &normalized_role,
+            &stored_role_key,
         )
         .await?;
         Ok(())
@@ -711,6 +714,13 @@ impl CasbinAuthzProvider {
     ) -> airborne_types::Result<()> {
         let normalized_subject = normalize_subject(subject)?;
         let normalized_role = validate_app_role(role)?;
+        // Custom roles are namespaced per org/application; system roles stay global.
+        let stored_role_key = encode_role_key(
+            POLICY_SCOPE_APP,
+            organisation,
+            application,
+            &normalized_role,
+        );
         let mut guard = self.enforcer.write().await;
         Self::remove_policies_for_filter_in_guard(
             &mut guard,
@@ -730,7 +740,7 @@ impl CasbinAuthzProvider {
                     scope: POLICY_SCOPE_APP.to_string(),
                     organisation: organisation.to_string(),
                     application: application.to_string(),
-                    action: normalized_role.clone(),
+                    action: stored_role_key.clone(),
                 }
                 .as_vec(),
             )
@@ -745,7 +755,7 @@ impl CasbinAuthzProvider {
             POLICY_SCOPE_APP,
             organisation,
             application,
-            &normalized_role,
+            &stored_role_key,
         )
         .await?;
         Ok(())
@@ -919,6 +929,57 @@ impl CasbinAuthzProvider {
                 .load::<AuthzRoleBindingEntry>(&mut conn)?;
             Ok(rows)
         })
+    }
+
+    /// Returns true if a custom role with the given namespaced key has at least
+    /// one permission binding for the scope, i.e. it is actually defined. Used to
+    /// reject assigning a custom role that does not belong to this org/app.
+    async fn custom_role_is_defined(
+        &self,
+        scope: &str,
+        stored_role_key: &str,
+    ) -> airborne_types::Result<bool> {
+        let scope = scope.to_string();
+        let key = stored_role_key.to_string();
+        let pool = self.db_pool.clone();
+        run_blocking!({
+            let mut conn = pool.get()?;
+            let existing = authz_role_bindings::table
+                .filter(authz_role_bindings::scope.eq(&scope))
+                .filter(authz_role_bindings::role_key.eq(&key))
+                .select(authz_role_bindings::role_key)
+                .first::<String>(&mut conn)
+                .optional()?;
+            Ok(existing.is_some())
+        })
+    }
+
+    /// Validates that `role` is assignable in the given org/app: system roles are
+    /// always allowed, custom roles must already be defined for that exact
+    /// org/app (which also prevents assigning another org/app's custom role).
+    async fn ensure_role_assignable(
+        &self,
+        scope: &str,
+        organisation: &str,
+        application: &str,
+        role: &str,
+    ) -> airborne_types::Result<()> {
+        if canonical_system_role(role).is_some() {
+            return Ok(());
+        }
+        let stored_role_key = encode_role_key(scope, organisation, application, role);
+        if self.custom_role_is_defined(scope, &stored_role_key).await? {
+            Ok(())
+        } else {
+            let location = if scope == POLICY_SCOPE_APP {
+                format!("application {organisation}/{application}")
+            } else {
+                format!("organisation {organisation}")
+            };
+            Err(ABError::BadRequest(format!(
+                "Custom role '{role}' is not defined in {location}"
+            )))
+        }
     }
 
     async fn ensure_actor_can_manage_org_roles(
@@ -1170,16 +1231,28 @@ impl AuthZProvider for CasbinAuthzProvider {
         for policy in policies {
             match policy.scope.as_str() {
                 POLICY_SCOPE_ORG => {
+                    let role = display_role_name(
+                        POLICY_SCOPE_ORG,
+                        &policy.organisation,
+                        &policy.application,
+                        &policy.role_key,
+                    );
                     org_roles
                         .entry(policy.organisation)
                         .or_default()
-                        .insert(policy.role_key);
+                        .insert(role);
                 }
                 POLICY_SCOPE_APP => {
+                    let role = display_role_name(
+                        POLICY_SCOPE_APP,
+                        &policy.organisation,
+                        &policy.application,
+                        &policy.role_key,
+                    );
                     app_roles
                         .entry((policy.organisation, policy.application))
                         .or_default()
-                        .insert(policy.role_key);
+                        .insert(role);
                 }
                 _ => {}
             }
@@ -1310,10 +1383,8 @@ impl AuthZProvider for CasbinAuthzProvider {
 
         let mut users: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for policy in policies {
-            users
-                .entry(policy.subject)
-                .or_default()
-                .insert(policy.role_key);
+            let role = display_role_name(POLICY_SCOPE_ORG, organisation, "*", &policy.role_key);
+            users.entry(policy.subject).or_default().insert(role);
         }
 
         let mut response = Vec::new();
@@ -1369,6 +1440,9 @@ impl AuthZProvider for CasbinAuthzProvider {
                 ));
             }
         }
+
+        self.ensure_role_assignable(POLICY_SCOPE_ORG, organisation, "*", &normalized_role)
+            .await?;
 
         self.set_org_role(&normalized_target, organisation, &normalized_role)
             .await?;
@@ -1439,6 +1513,9 @@ impl AuthZProvider for CasbinAuthzProvider {
                 "Cannot modify the last owner. Add another owner first.".to_string(),
             ));
         }
+
+        self.ensure_role_assignable(POLICY_SCOPE_ORG, organisation, "*", &normalized_role)
+            .await?;
 
         self.set_org_role(&normalized_target, organisation, &normalized_role)
             .await?;
@@ -1563,10 +1640,13 @@ impl AuthZProvider for CasbinAuthzProvider {
 
         let mut users: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for policy in policies {
-            users
-                .entry(policy.subject)
-                .or_default()
-                .insert(policy.role_key);
+            let role = display_role_name(
+                POLICY_SCOPE_APP,
+                organisation,
+                application,
+                &policy.role_key,
+            );
+            users.entry(policy.subject).or_default().insert(role);
         }
 
         let mut response = Vec::new();
@@ -1605,11 +1685,11 @@ impl AuthZProvider for CasbinAuthzProvider {
         )
         .await?;
 
-        let target_org_level = self
-            .highest_org_access_level(&normalized_target, organisation)
+        let target_is_org_member = self
+            .organisation_user_role(&normalized_target, organisation)
             .await?
-            .unwrap_or_default();
-        if target_org_level == 0 {
+            .is_some();
+        if !target_is_org_member {
             return Err(ABError::BadRequest("User not found in org".to_string()));
         }
 
@@ -1633,6 +1713,14 @@ impl AuthZProvider for CasbinAuthzProvider {
                 ));
             }
         }
+
+        self.ensure_role_assignable(
+            POLICY_SCOPE_APP,
+            organisation,
+            application,
+            &normalized_role,
+        )
+        .await?;
 
         self.set_application_role(
             &normalized_target,
@@ -1711,6 +1799,14 @@ impl AuthZProvider for CasbinAuthzProvider {
                 ));
             }
         }
+
+        self.ensure_role_assignable(
+            POLICY_SCOPE_APP,
+            organisation,
+            application,
+            &normalized_role,
+        )
+        .await?;
 
         self.set_application_role(
             &normalized_target,
@@ -1799,11 +1895,26 @@ impl AuthZProvider for CasbinAuthzProvider {
         };
 
         let bindings = self.list_role_bindings(scope).await?;
+        // Custom roles are stored under an org/app-namespaced key; only this
+        // org/app's custom roles share this prefix. System roles stay global.
+        let custom_prefix = if scope == POLICY_SCOPE_APP {
+            format!("{}:{}:", organisation, application.unwrap_or("*"))
+        } else {
+            format!("{}:", organisation)
+        };
         let mut role_map: BTreeMap<String, Vec<AuthzPermissionAttribute>> = BTreeMap::new();
         for binding in bindings {
-            if canonical_system_role(&binding.role_key).is_none()
-                && is_reserved_role_management_permission(&binding.resource)
-            {
+            let is_system = canonical_system_role(&binding.role_key).is_some();
+            let role_name = if is_system {
+                binding.role_key.clone()
+            } else if let Some(name) = binding.role_key.strip_prefix(&custom_prefix) {
+                // Custom role belonging to this org/app: show the bare name.
+                name.to_string()
+            } else {
+                // Custom role owned by a different org/app: not visible here.
+                continue;
+            };
+            if !is_system && is_reserved_role_management_permission(&binding.resource) {
                 continue;
             }
             let permission = AuthzPermissionAttribute {
@@ -1811,10 +1922,7 @@ impl AuthZProvider for CasbinAuthzProvider {
                 resource: binding.resource,
                 action: binding.action,
             };
-            role_map
-                .entry(binding.role_key)
-                .or_default()
-                .push(permission);
+            role_map.entry(role_name).or_default().push(permission);
         }
 
         let default_roles: Vec<&str> = if scope == POLICY_SCOPE_ORG {
@@ -1968,7 +2076,16 @@ impl AuthZProvider for CasbinAuthzProvider {
             }
         }
 
-        self.upsert_role_bindings(scope, &normalized_role, &parsed_permissions)
+        // Persist the custom role under its org/app-namespaced key so it is scoped
+        // to this organisation/application and cannot collide with or be assigned
+        // by other orgs/apps.
+        let stored_role_key = encode_role_key(
+            scope,
+            organisation,
+            application.unwrap_or("*"),
+            &normalized_role,
+        );
+        self.upsert_role_bindings(scope, &stored_role_key, &parsed_permissions)
             .await
     }
 
@@ -2211,6 +2328,38 @@ fn canonical_system_role(role_key: &str) -> Option<String> {
         return None;
     };
     Some(value.to_string())
+}
+
+/// Namespaces a custom role's storage key with its organisation (and application
+/// for app-scope roles) so that the same custom role name is a distinct identity
+/// per org/app across Casbin grouping policies, role bindings and memberships.
+fn encode_role_key(scope: &str, organisation: &str, application: &str, role: &str) -> String {
+    if canonical_system_role(role).is_some() {
+        return role.to_string();
+    }
+    if scope == POLICY_SCOPE_APP {
+        format!("{organisation}:{application}:{role}")
+    } else {
+        format!("{organisation}:{role}")
+    }
+}
+
+/// Inverse of [`encode_role_key`]: strips the org/app namespace prefix from a
+/// stored role key to recover the bare role name shown to clients. System roles
+/// and any key without the expected prefix are returned unchanged.
+fn display_role_name(scope: &str, organisation: &str, application: &str, role_key: &str) -> String {
+    if canonical_system_role(role_key).is_some() {
+        return role_key.to_string();
+    }
+    let prefix = if scope == POLICY_SCOPE_APP {
+        format!("{organisation}:{application}:")
+    } else {
+        format!("{organisation}:")
+    };
+    role_key
+        .strip_prefix(&prefix)
+        .unwrap_or(role_key)
+        .to_string()
 }
 
 fn is_valid_custom_role_name(role: &str) -> bool {
