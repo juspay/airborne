@@ -2,6 +2,49 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.14.1 - 2026-06-25
+#### Bug Fixes
+- builds failing due to invalid package.lock - (9b08047) - yuvrajjsingh0
+
+- - -
+
+## v0.37.0 - 2026-06-25
+#### Miscellaneous Chores
+- **(version)** v0.37.0 [skip ci] - (c2ab543) - Airborne Bot
+
+- - -
+
+## v0.36.5 - 2026-06-25
+#### Miscellaneous Chores
+- **(version)** v0.36.5 [skip ci] - (bcfe497) - Airborne Bot
+
+- - -
+
+## v0.36.4 - 2026-06-25
+#### Miscellaneous Chores
+- **(version)** v0.36.4 [skip ci] - (f721fe4) - Airborne Bot
+
+- - -
+
+## v0.36.3 - 2026-06-25
+#### Miscellaneous Chores
+- **(version)** v0.36.3 [skip ci] - (36389a6) - Airborne Bot
+
+- - -
+
+## v0.36.2 - 2026-06-25
+#### Miscellaneous Chores
+- **(version)** v0.36.2 [skip ci] - (8dbcdfc) - Airborne Bot
+
+- - -
+
+## v0.36.1 - 2026-06-25
+#### Miscellaneous Chores
+- **(version)** v0.36.1 [skip ci] - (e6a48ac) - Airborne Bot
+- update nextJS - (ed77681) - yuvrajjsingh0
+
+- - -
+
 ## airborne_dashboard-v0.14.0 - 2026-05-11
 #### Features
 - casbin - (1232b11) - yuvrajjsingh0
