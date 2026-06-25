@@ -95,7 +95,7 @@ export default function LandingPage() {
             <Link href="#features" className="text-sm hover:text-primary transition-colors">
               Features
             </Link>
-            <Link href="/docs/home" target="_blank" className="text-sm hover:text-primary transition-colors">
+            <Link href="/docs" target="_blank" className="text-sm hover:text-primary transition-colors">
               Docs
             </Link>
             <Link href="https://juspay.io" target="_blank" className="text-sm hover:text-primary transition-colors">
@@ -344,7 +344,7 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4">Resources</h4>
               <div className="space-y-2 text-sm">
-                <Link href="/docs/home" target="_blank" className="block text-muted-foreground hover:text-foreground">
+                <Link href="/docs" target="_blank" className="block text-muted-foreground hover:text-foreground">
                   Documentation
                 </Link>
                 {/* <Link href="#" className="block text-muted-foreground hover:text-foreground">
