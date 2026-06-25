@@ -1,0 +1,140 @@
+---
+title: Integrate Airborne in React Native
+description: End-to-end — add the Airborne SDK to a bare React Native app, wire up the CLI, and ship your first over-the-air release from the dashboard.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+This guide takes a **bare React Native app** from zero to a live over-the-air release. You'll install the SDK, do the native wiring on Android and iOS, set up your project with the CLI, and cut your first release in the dashboard. Using Expo? Follow [Integrate Airborne in Expo](/docs/guides/integrate-react-native-expo) instead — the release steps are identical.
+
+:::info[What you'll end up with]
+A React Native app that boots from an Airborne-managed bundle, plus a release you can ramp and roll back from the dashboard — no app-store round-trip for JS and asset updates.
+:::
+
+## Prerequisites
+
+- A React Native app (this guide assumes the bare workflow, not Expo).
+- Node.js and npm, plus the usual Android (JDK + Android SDK) and iOS (Xcode + CocoaPods) toolchains.
+- An Airborne account. Create an organisation and application in the [dashboard](/docs/dashboard/organisations), and generate an [access token](/docs/dashboard/access-tokens) (client ID + secret) for the CLI.
+
+## Step 1 — Install the SDK
+
+Add the package to your app:
+
+```bash
+npm install airborne-react-native@^0.37.0
+cd ios && pod install && cd ..
+```
+
+Add the Airborne Maven repository to your Android Gradle config (`android/build.gradle` or `android/settings.gradle`):
+
+```groovy
+maven { url "https://maven.juspay.in/jp-build-packages/hyper-sdk/" }
+```
+
+Full details: [Install the SDK](/docs/react-native-sdk/integration/install).
+
+## Step 2 — Wire up the native side
+
+Airborne boots **before** React Native so it can hand React the right bundle path. That wiring lives in your native modules.
+
+- **Android** — swap in `AirborneReactActivityDelegate`, `AirborneReactNativeHost`, and an `initializeAirborne()` call in `MainApplication`. Walkthrough: [Android setup](/docs/react-native-sdk/integration/android-setup).
+- **iOS** — add a bridging header, initialize Airborne in `AppDelegate`, and implement the `AirborneDelegate` extension. Walkthrough: [iOS setup](/docs/react-native-sdk/integration/ios-setup).
+
+When you create the Airborne instance you point it at your release config URL and provide a namespace and dimensions:
+
+```kotlin
+airborneInstance = Airborne(
+    this.applicationContext,
+    "https://airborne.juspay.in/release/<organisation-name>/<application-name>",
+    object : AirborneInterface() {
+        override fun getNamespace(): String = "<application-name>"
+        override fun getDimensions(): HashMap<String, String> = HashMap()
+        // onEvent(...) and startApp(indexPath) — see the Android setup page
+    }
+)
+```
+
+:::tip[Namespace must match]
+The `getNamespace()` value must match the namespace segment of your release URL. A mismatch is the most common reason a bundle fails to load — see [Verify the integration](/docs/react-native-sdk/integration/verify).
+:::
+
+## Step 3 — Set up your project with the CLI
+
+The [React Native CLI](/docs/react-native-cli/getting-started) (`airborne-devkit`) scaffolds local config, bundles your app, uploads files, and cuts packages.
+
+Authenticate with the client ID and secret from your [access token](/docs/dashboard/access-tokens):
+
+```bash
+npx airborne-devkit login --client_id <client-id> --client_secret <client-secret>
+```
+
+Create the local Airborne config (interactive — it asks for your organisation, namespace, entry files, and whether you use Expo):
+
+```bash
+npx airborne-devkit create-local-airborne-config
+```
+
+Then create the release config and bundle for a platform, register the files, and cut a package:
+
+```bash
+# Create a platform release config (boot/release timeouts)
+npx airborne-devkit create-local-release-config -p android
+
+# Bundle your JS (your normal RN bundle step), then register + upload the files
+npx airborne-devkit create-remote-files -p android --upload -t "v1.0.0"
+
+# Assemble a deployable package from the local release config
+npx airborne-devkit create-remote-package -p android -t "v1.0.0"
+```
+
+See [Local configuration](/docs/react-native-cli/local-configuration) and [Remote files & packages](/docs/react-native-cli/remote-files-and-packages) for every flag.
+
+## Step 4 — Create a release in the dashboard
+
+With files and a package on the server, open the dashboard and create a release. (You can also do this entirely from the CLI with [`CreateRelease`](/docs/core-cli/command-reference) — the dashboard is the visual path.)
+
+If this is a brand-new account, you'll first create an organisation:
+
+<Screenshot name="onboarding-create-first-org" caption="First run: name your organisation. Then create an application inside it." />
+
+Open **Releases → Create Release**. Step 1 sets the boot and release-config timeouts:
+
+<Screenshot name="release-wizard-1-configure" caption="Step 1 — Configure: boot timeout and release-config timeout (milliseconds)." />
+
+Skip targeting for your **first** release (it goes to all users — see the [targeting guide](/docs/guides/create-and-target-a-release) for later releases), then pick the package you just created:
+
+<Screenshot name="release-wizard-4-package" caption="Step 4 — pick the package version to ship." />
+
+Review the generated release config and confirm:
+
+<Screenshot name="release-wizard-confirm" caption="The confirmation dialog shows the exact release config that will be created." width="760px" />
+
+Your release now appears in the list:
+
+<Screenshot name="releases-list" caption="The Releases list, filterable by status." />
+
+The full wizard (remote config, file priorities, resources) is documented in [Dashboard → Releases](/docs/dashboard/releases).
+
+## Step 5 — Verify and roll out
+
+Open the release to watch it. A first release is served to everyone; later releases run as experiments you ramp from here.
+
+<Screenshot name="release-detail" caption="The release detail page: status, traffic, downloads, errors, and the rollout progress bar." />
+
+On the device, confirm Airborne booted from the downloaded bundle by watching the SDK's lifecycle events (`onEvent`) or reading the bundle path from JS:
+
+```tsx
+import { getBundlePath } from 'airborne-react-native';
+
+const path = await getBundlePath('<application-name>');
+console.log('Booted from', path);
+```
+
+Details and troubleshooting: [Verify the integration](/docs/react-native-sdk/integration/verify) and the [SDK events reference](/docs/react-native-sdk/reference/callbacks-and-events).
+
+## Next steps
+
+- [Create & target a release](/docs/guides/create-and-target-a-release) — dimensions, version cohorts, checkpoints, and ramping.
+- [JavaScript API](/docs/react-native-sdk/reference/javascript-api) — `readReleaseConfig`, `getBundlePath`, `getFileContent`.
+- [Bundling the release config](/docs/react-native-sdk/integration/bundling-release-config) — the first-boot fallback shipped in your binary.

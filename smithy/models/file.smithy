@@ -25,11 +25,11 @@ structure UpdateFileRequest {
 }
 
 
-/// Update file operation
+/// Update the tag of an existing file, identified by its file key in the path (a file path with a version or tag, e.g. "path/to/file@version:3" or "path/to/file@tag:prod"). Pass the organisation and application in the x-organisation and x-application headers. Returns the updated file. Requires a bearer token.
+@tags(["Files"])
 @http(method: "PATCH", uri: "/api/file/{file_key}")
 @requiresauth
 operation UpdateFile {
-    /// The file key in the path (e.g., "$file_path@version:$version_number" or "$file_path@tag:$tag")
     input: UpdateFileRequest,
     output: CreateFileResponse,
     errors: [
@@ -205,7 +205,8 @@ structure UploadFileRequest {
     application: String
 }
 
-/// Create file request operation
+/// Register a file by URL, recording its metadata and assigning it a version. Pass the organisation and application in the x-organisation and x-application headers. Use this when the file is already hosted somewhere the server can reach; to upload the bytes directly, use UploadFile instead. Requires a bearer token.
+@tags(["Files"])
 @http(method: "POST", uri: "/api/file")
 @requiresauth
 operation CreateFile {
@@ -217,7 +218,8 @@ operation CreateFile {
     ]
 }
 
-/// List files request operation
+/// List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
 @http(method: "GET", uri: "/api/file/list")
 @requiresauth
 @readonly
@@ -230,7 +232,8 @@ operation ListFiles {
     ]
 }
 
-/// Upload file request operation
+/// Upload a file's bytes directly as the request body and register it in one step. Send the raw file as the payload, with its Base64-encoded SHA-256 digest in the x-checksum header and the organisation and application in the x-organisation and x-application headers. Returns the created file. Requires a bearer token.
+@tags(["Files"])
 @http(method: "POST", uri: "/api/file/upload")
 @requiresauth
 operation UploadFile {
@@ -435,7 +438,8 @@ structure ListFileGroupsResponse {
     count: Integer
 }
 
-/// List file groups operation
+/// List files grouped by path, so that all versions and tags of a file appear together. Supports pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
 @http(method: "GET", uri: "/api/file/groups")
 @requiresauth
 @readonly

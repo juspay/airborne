@@ -1,0 +1,16 @@
+# gitleaks configuration for the Airborne repo.
+# Extends the default ruleset and allowlists known false positives.
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+The generated OpenAPI reference pages (docusaurus-plugin-openapi-docs) embed a
+compressed, base64-encoded "api:" blob of the operation's OpenAPI metadata. It is
+high-entropy and trips the generic-api-key rule, but contains no secrets — it is
+gzipped OpenAPI data regenerated from smithy/models at build time. These files are
+git-ignored and not committed; this entry covers any transient/local scans.
+"""
+paths = [
+  '''airborne_docs/docs/api-reference/endpoints/.*''',
+]

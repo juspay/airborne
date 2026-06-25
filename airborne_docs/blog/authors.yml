@@ -1,0 +1,9 @@
+# Blog authors. Reference these keys from a post's `authors:` front matter.
+# See https://docusaurus.io/docs/blog#global-authors
+airborne:
+  name: The Airborne Team
+  title: Juspay
+  url: https://github.com/juspay/airborne
+  page: true
+  socials:
+    github: juspay

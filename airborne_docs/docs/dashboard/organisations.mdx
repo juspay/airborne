@@ -1,0 +1,50 @@
+---
+title: Organisations
+description: Create and switch between organisations, read the organisation overview, and create applications from it.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+An **organisation** is the top-level workspace in Airborne. It owns your [applications](/docs/dashboard/applications) and the [users](/docs/dashboard/users-and-roles) who can access them. You always work inside one organisation at a time, and you can belong to several.
+
+<Screenshot name="org-overview" caption="The organisation overview lists every application and is where you create new ones." />
+
+## Selecting and switching organisations
+
+The current organisation is shown in the **organisation switcher** at the top-left of the header. Click it to:
+
+- Switch to another organisation you belong to, or
+- Choose **`+ Create Organisation`** to make a new one.
+
+Selecting an organisation takes you to its overview.
+
+## Creating an organisation
+
+Choose **`+ Create Organisation`** from the switcher (or create your first one during [onboarding](/docs/dashboard/authentication-and-onboarding)). In the **Create Organisation** dialog, enter an **Organisation name** (up to 64 characters, for example `acme_corp`) and choose **Create**.
+
+:::note
+If your deployment restricts organisation creation, the option becomes **`+ Request Organisation`**. Fill in the form — organisation name, your name, email, and optional store links — and an administrator will provision the organisation for you.
+:::
+
+## The organisation overview
+
+The overview is the home page for an organisation. It is titled **Organization Overview** and lets you:
+
+- See every **application** in the organisation as a card. Use the **Search applications…** box to filter by name.
+- Open an application with its **Open** button to jump into the [application overview](/docs/dashboard/applications).
+- Create a new application with **`+ Create Application`** (see below).
+
+At the organisation level the left sidebar shows just two items: **Overview** and **Users**. To manage who belongs to the organisation and what they can do, see [Users & roles](/docs/dashboard/users-and-roles).
+
+## Creating an application from the organisation
+
+Choose **`+ Create Application`** on the overview. In the **Create New Application** dialog enter:
+
+- **Application name** (required, up to 64 characters), and
+- an optional **Description**.
+
+Choose **Create Application** and the new app appears as a card. See [Applications](/docs/dashboard/applications) for what to do next.
+
+:::tip
+Use a separate application per shippable target — for example one app per platform — since files, packages, releases, and tokens are all scoped to a single application.
+:::
