@@ -15,6 +15,10 @@ target/
 node_modules/
 **/node_modules/
 
+# Exclude Docusaurus build output & cache (regenerated inside the image)
+airborne_docs/build/
+airborne_docs/.docusaurus/
+
 # Exclude environment files
 .env*
 

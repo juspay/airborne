@@ -1,0 +1,137 @@
+/**
+ * Airborne documentation theme.
+ * Matches the Airborne dashboard: violet (#605ACA) primary, Space Grotesk type,
+ * and a purple-tinted dark mode.
+ */
+
+:root {
+  --ifm-color-primary: #605aca;
+  --ifm-color-primary-dark: #4c46bb;
+  --ifm-color-primary-darker: #4742b1;
+  --ifm-color-primary-darkest: #3b3792;
+  --ifm-color-primary-light: #7873d3;
+  --ifm-color-primary-lighter: #8884d8;
+  --ifm-color-primary-lightest: #aaa6e4;
+
+  --ifm-font-family-base: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ifm-heading-font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --ifm-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  --ifm-code-font-size: 92%;
+  --ifm-heading-font-weight: 600;
+  --ifm-navbar-item-padding-horizontal: 0.9rem;
+  --ifm-global-radius: 0.6rem;
+
+  --docusaurus-highlighted-code-line-bg: rgba(96, 90, 202, 0.12);
+
+  --ab-surface: #f7f7fb;
+  --ab-border: #e7e7ef;
+}
+
+/* Brighter primary for contrast on dark surfaces, matching the dashboard. */
+[data-theme="dark"] {
+  --ifm-color-primary: #908be6;
+  --ifm-color-primary-dark: #7a73e0;
+  --ifm-color-primary-darker: #6f68dd;
+  --ifm-color-primary-darkest: #5650c9;
+  --ifm-color-primary-light: #a6a2ec;
+  --ifm-color-primary-lighter: #b1adef;
+  --ifm-color-primary-lightest: #d2cff6;
+
+  --ifm-background-color: #161519;
+  --ifm-background-surface-color: #1d1c22;
+  --ifm-navbar-background-color: #1a191f;
+  --ifm-footer-background-color: #121116;
+  --ifm-card-background-color: #1d1c22;
+  --docusaurus-highlighted-code-line-bg: rgba(144, 139, 230, 0.16);
+
+  --ab-surface: #1d1c22;
+  --ab-border: #2a2932;
+}
+
+/* Slightly tighter, more "product" heading scale. */
+.markdown h1:first-child {
+  --ifm-h1-font-size: 2.4rem;
+  letter-spacing: -0.02em;
+}
+.markdown h2 {
+  letter-spacing: -0.01em;
+  margin-top: 2.4rem;
+}
+
+/* Navbar polish */
+.navbar {
+  border-bottom: 1px solid var(--ab-border);
+  backdrop-filter: saturate(140%) blur(6px);
+}
+.navbar__logo {
+  height: 1.9rem;
+}
+.navbar__link--active {
+  color: var(--ifm-color-primary);
+}
+
+/* Cards used on the landing page and inside docs. */
+.ab-card {
+  display: block;
+  height: 100%;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid var(--ab-border);
+  border-radius: 14px;
+  background: var(--ifm-card-background-color, #fff);
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.ab-card:hover {
+  border-color: var(--ifm-color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(96, 90, 202, 0.16);
+  text-decoration: none;
+}
+.ab-card h3 {
+  margin-bottom: 0.35rem;
+}
+
+/* Themed screenshots (rendered by the <Screenshot/> component). */
+.ab-shot {
+  margin: 1.4rem 0;
+}
+.ab-shot img {
+  width: 100%;
+  border: 1px solid var(--ab-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(20, 18, 40, 0.1);
+}
+[data-theme="dark"] .ab-shot img {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.ab-shot figcaption {
+  margin-top: 0.55rem;
+  text-align: center;
+  font-size: 0.86rem;
+  color: var(--ifm-color-emphasis-600);
+}
+
+/* Step badges for "how to" guides. */
+.ab-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--ifm-color-primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-right: 0.5rem;
+}
+
+/* Tables a touch denser & cleaner. */
+.markdown table th {
+  background: var(--ab-surface);
+}
+
+/* Code block tweaks */
+.theme-code-block {
+  border-radius: 12px;
+}

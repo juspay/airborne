@@ -1,0 +1,11 @@
+# Blog tags. Reference these keys from a post's `tags:` front matter.
+# See https://docusaurus.io/docs/blog#global-tags
+announcements:
+  label: Announcements
+  permalink: /announcements
+  description: Product announcements and release notes for Airborne.
+
+engineering:
+  label: Engineering
+  permalink: /engineering
+  description: Engineering notes and deep dives into how Airborne works.

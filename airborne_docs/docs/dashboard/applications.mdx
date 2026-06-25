@@ -1,0 +1,61 @@
+---
+title: Applications
+description: Create an application, read the application overview, and find your way around the app-level navigation.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+An **application** lives inside an [organisation](/docs/dashboard/organisations) and is the unit you ship updates to — typically one app per platform. Files, packages, releases, dimensions, cohorts, remote configs, views, and tokens are all scoped to a single application.
+
+## Creating an application
+
+From the [organisation overview](/docs/dashboard/organisations), choose **`+ Create Application`**.
+
+<Screenshot name="org-overview" caption="Applications appear as cards on the organisation overview. Use + Create Application to add one." />
+
+In the **Create New Application** dialog, enter:
+
+- **Application name** (required, up to 64 characters), and
+- an optional **Description**.
+
+Choose **Create Application**. The app appears as a card on the organisation overview — choose **Open** to enter it.
+
+:::note
+On a brand-new organisation with no apps yet, the dashboard prompts you with **Create your first Application** directly. Enter a name and choose **Create Application** to get started.
+:::
+
+## The application overview
+
+Opening an application lands you on its overview — the home page for everything you do with that app.
+
+<Screenshot name="app-overview" caption="The application overview shows headline stats and your most recent releases." />
+
+It shows:
+
+- **Total Releases** — how many releases the app has.
+- **Last Deploy** — when the most recent release went out.
+- **Recent Releases** — a table of the latest releases with their `ID`, `Package` version, `Status`, and `Created` time. Click any row to open the [release detail](/docs/dashboard/releases).
+- A **Create Release** button to jump straight into the [release wizard](/docs/dashboard/releases).
+
+## The application navigation
+
+Inside an application the left sidebar lists every feature, in this order:
+
+| Item | What it does |
+| --- | --- |
+| **Overview** | The stats and recent-releases home page. |
+| **Files** | Register and version the [files](/docs/dashboard/files) your app downloads. |
+| **Packages** | Bundle files into [packages](/docs/dashboard/packages). |
+| **Releases** | Create and manage [releases](/docs/dashboard/releases). |
+| **Views** | Saved dimension filters — see [Views](/docs/dashboard/views). |
+| **Dimensions** | Targeting [dimensions](/docs/dashboard/dimensions). |
+| **Users** | App-level [users & roles](/docs/dashboard/users-and-roles). |
+| **Tokens** | Personal [access tokens](/docs/dashboard/access-tokens) for the CLIs. |
+| **Remote Configs** | The [remote-config](/docs/dashboard/remote-configs) schema builder. |
+| **Cohorts** | User [cohorts](/docs/dashboard/cohorts) for segmentation. |
+
+Use the **application switcher** at the top of the sidebar to move between apps in the same organisation.
+
+:::tip
+The header's global **`+ Create`** menu is a shortcut to `Create File`, `Create Package`, and `New Release` for the application you are currently in.
+:::

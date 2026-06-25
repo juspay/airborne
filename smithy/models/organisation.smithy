@@ -24,6 +24,7 @@ list Organisations {
 
 /// Organisation creation request
 structure CreateOrganisationRequest {
+    /// Name for the new organisation.
     @required
     name: String
 }
@@ -73,7 +74,8 @@ structure RequestOrganisationResponse {
     message: String
 }
 
-/// Create organisation request operation
+/// Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.
+@tags(["Organisations"])
 @http(method: "POST", uri: "/api/organisations/create")
 @requiresauth
 operation CreateOrganisation {
@@ -85,7 +87,8 @@ operation CreateOrganisation {
     ]
 }
 
-/// Request organisation request operation
+/// Submit a request to have an organisation provisioned (for onboarding flows that require manual approval), including contact details and store links. Returns a confirmation message. Requires a bearer token.
+@tags(["Organisations"])
 @http(method: "POST", uri: "/api/organisations/request")
 @requiresauth
 operation RequestOrganisation {
@@ -97,7 +100,8 @@ operation RequestOrganisation {
     ]
 }
 
-/// List organisations request operation
+/// List all organisations the authenticated user belongs to, along with their applications and the caller's access level in each. Requires a bearer token.
+@tags(["Organisations"])
 @http(method: "GET", uri: "/api/organisations/")
 @readonly
 @requiresauth

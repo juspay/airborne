@@ -1,0 +1,9 @@
+# GitGuardian (ggshield) configuration.
+# The generated OpenAPI reference pages embed a base64 "api:" blob (compressed
+# OpenAPI metadata) that trips the generic high-entropy / generic-api-key
+# detector. It contains no secrets and the files are git-ignored (regenerated
+# from smithy/models at build time). Ignore that path so scans don't false-alarm.
+version: 2
+secret:
+  ignored-paths:
+    - "airborne_docs/docs/api-reference/endpoints/**"

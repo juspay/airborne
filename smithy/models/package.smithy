@@ -8,6 +8,7 @@ structure CreatePackageRequest {
     @required
     index: String
 
+    /// Optional tag to identify the package.
     tag: String
 
     /// Space Separated file ids to be included in the package
@@ -27,14 +28,18 @@ structure CreatePackageRequest {
 
 /// Package information
 structure Package {
+    /// Optional tag identifying the package.
     tag: String
 
+    /// Version number assigned to the package.
     @required
     version: Integer
 
+    /// File id of the package's index (entry) file.
     @required
     index: String
 
+    /// File ids included in the package.
     @required
     files: StringList
 }
@@ -88,7 +93,8 @@ structure ListPackagesResponse {
     total_items: Integer
 }
 
-/// Create package request operation
+/// Create a package: an index file plus the set of files that make up an OTA bundle. Pass the organisation and application in the x-organisation and x-application headers. Returns the created package with its assigned version. Requires a bearer token.
+@tags(["Packages"])
 @http(method: "POST", uri: "/api/packages")
 @requiresauth
 operation CreatePackage {
@@ -100,7 +106,8 @@ operation CreatePackage {
     ]
 }
 
-/// List packages request operation
+/// List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Packages"])
 @http(method: "GET", uri: "/api/packages/list")
 @requiresauth
 @readonly

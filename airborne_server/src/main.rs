@@ -19,7 +19,6 @@ mod authz;
 mod build;
 mod config;
 mod dashboard;
-mod docs;
 mod file;
 mod middleware;
 mod organisation;
@@ -506,7 +505,6 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::JsonConfig::default().error_handler(middleware::json_error_handler))
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())
-            .service(docs::add_routes())
             .service(web::scope("/release").service(release::add_public_routes()))
             .service(web::scope("/build").service(build::add_routes()))
             .service(

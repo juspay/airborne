@@ -1,0 +1,58 @@
+---
+title: Dashboard Overview
+description: A tour of the Airborne dashboard — the Organisation and Application model, the navigation, and where each feature lives.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+The Airborne dashboard is the web console for managing over-the-air updates. From here you register the files your app downloads, bundle them into packages, ship them as targeted releases, and watch each rollout's traffic, downloads, and errors in real time — all without an app store review.
+
+<Screenshot name="app-overview" caption="The application overview is your starting point: recent releases, deploy stats, and quick access to every feature." />
+
+## The Organisation and Application model
+
+Everything in Airborne lives inside two levels of hierarchy:
+
+- An **Organisation** is the top-level workspace for a team or company. It owns applications and a roster of users.
+- An **Application** lives inside an organisation and is the unit you actually ship to — for example one mobile app per platform. Files, packages, releases, dimensions, cohorts, remote configs, views, and tokens are all scoped to a single application.
+
+You always operate "inside" one organisation and (usually) one application at a time. The header shows your current organisation and application and lets you switch between them.
+
+<Screenshot name="org-overview" caption="The organisation overview lists every application in the org and is where you create new ones." />
+
+## Navigating the dashboard
+
+The **header** (across the top) stays visible everywhere and contains:
+
+- The **organisation switcher** on the left — click it to jump between organisations or to `+ Create Organisation`.
+- The **application switcher** in the left sidebar — switch between apps in the current organisation.
+- A global **`+ Create`** menu — a shortcut to `Create File`, `Create Package`, or `New Release` for the current app.
+- The **theme toggle** (light/dark) and a **sign-out** menu.
+
+The **left sidebar** changes depending on where you are:
+
+- **At the organisation level** it shows `Overview` and `Users`.
+- **At the application level** it shows, in order: `Overview`, `Files`, `Packages`, `Releases`, `Views`, `Dimensions`, `Users`, `Tokens`, `Remote Configs`, and `Cohorts`.
+
+## Feature tour
+
+Use these pages to go deeper on each area of the dashboard:
+
+| Page | What it covers |
+| --- | --- |
+| [Authentication & onboarding](/docs/dashboard/authentication-and-onboarding) | Signing in, registering, OIDC, and creating your first organisation. |
+| [Organisations](/docs/dashboard/organisations) | Creating and switching organisations and the org overview. |
+| [Applications](/docs/dashboard/applications) | Creating an application and reading the app overview. |
+| [Users & roles](/docs/dashboard/users-and-roles) | Inviting users and the RBAC permission model. |
+| [Files](/docs/dashboard/files) | Registering files, version history, and tags. |
+| [Packages](/docs/dashboard/packages) | Bundling an index file plus other files into a package. |
+| [Releases](/docs/dashboard/releases) | The 6-step release wizard, rollout lifecycle, and analytics. |
+| [Dimensions](/docs/dashboard/dimensions) | Targeting dimensions and their priority order. |
+| [Cohorts](/docs/dashboard/cohorts) | Segmenting users with checkpoints and groups. |
+| [Remote configs](/docs/dashboard/remote-configs) | The JSON schema builder for remote configuration. |
+| [Views](/docs/dashboard/views) | Saved dimension filters for slicing releases. |
+| [Access tokens](/docs/dashboard/access-tokens) | Personal access tokens for the CLIs. |
+
+:::tip
+If you just want to ship something end to end, follow the [Create & target a release guide](/docs/guides/create-and-target-a-release). It walks through files → package → release in one sitting.
+:::
