@@ -17,7 +17,6 @@ use actix_web::{
     http::{header::HeaderMap, StatusCode},
     HttpRequest, HttpResponse, Responder,
 };
-use std::sync::Arc;
 
 use diesel::result::{DatabaseErrorKind, Error as DieselErr};
 use google_sheets4::{hyper_rustls, hyper_util, Sheets};
@@ -33,10 +32,8 @@ use thiserror::Error;
 use crate::{
     provider::{authn::AuthNProvider, authz::AuthZProvider},
     utils::{
-        db,
-        migrations::SuperpositionDefaultConfig,
-        redis::RedisCache,
-        superposition_provider::{ProviderRegistry, RegistryError},
+        db, migrations::SuperpositionDefaultConfig, redis::RedisCache,
+        superposition_provider::ProviderRegistry,
     },
 };
 
@@ -287,17 +284,6 @@ impl From<jsonwebtoken::errors::Error> for ABError {
             }
             kind => {
                 error!("JWT Error kind: {:?}", kind);
-                ABError::InternalServerError("service error".into())
-            }
-        }
-    }
-}
-
-impl From<RegistryError> for ABError {
-    fn from(err: RegistryError) -> Self {
-        match err {
-            RegistryError::ProviderInitFailed(e) => {
-                error!("{:?}", e);
                 ABError::InternalServerError("service error".into())
             }
         }

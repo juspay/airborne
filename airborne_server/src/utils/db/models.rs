@@ -9,13 +9,6 @@ use crate::utils::db::schema::hyperotaserver::{
 };
 use crate::utils::semver::SemVer;
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct File {
-    pub url: String,
-    #[serde(alias = "filePath")]
-    pub file_path: String,
-}
-
 #[derive(Insertable, Debug)]
 #[diesel(table_name = packages)]
 pub struct PackageEntry {

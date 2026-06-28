@@ -27,13 +27,6 @@ pub struct TokenResponse {
     pub id_token: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct OAuthState {
-    pub state: String,
-    pub code_verifier: String,
-    pub redirect_uri: String,
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct OAuthRequest {
     pub code: String,

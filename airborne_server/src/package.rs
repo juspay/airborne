@@ -21,7 +21,6 @@ use actix_web::{
 use airborne_authz_macros::authz;
 
 use crate::{
-    file::utils::parse_file_key,
     middleware::auth::{require_org_and_app, AuthResponse},
     types as airborne_types,
     types::AppState,

@@ -156,18 +156,6 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to build AppConfig");
 
-    // Needed for provider registry to authenticate with Superposition and manage providers
-    let superposition_token = if app_config.enable_authenticated_superposition {
-        app_config.superposition_token.clone().expect(
-            "SUPERPOSITION_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true to use provider registry features",
-        )
-    } else {
-        String::new()
-    };
-
-    let superposition_migration_strategy =
-        SuperpositionMigrationStrategy::from(app_config.superposition_migration_strategy.clone());
-
     let migrations_to_run_on_boot: Vec<String> = app_config
         .migrations_to_run_on_boot
         .split(',')
@@ -178,7 +166,6 @@ async fn main() -> std::io::Result<()> {
     let superposition_migration_strategy =
         SuperpositionMigrationStrategy::from(app_config.superposition_migration_strategy.clone());
 
-    let force_path_style = app_config.aws_endpoint_url.is_some();
     // Push metrics to Victoria Metrics
     if !app_config.victoria_metrics_url.is_empty() {
         info!("Starting Victoria Metrics push task");
