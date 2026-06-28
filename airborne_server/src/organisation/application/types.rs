@@ -6,8 +6,3 @@ pub struct Application {
     pub organisation: String,
     pub access: Vec<String>,
 }
-
-#[derive(Serialize, Deserialize)]
-pub struct ApplicationCreateRequest {
-    pub application: String,
-}

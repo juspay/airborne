@@ -33,7 +33,7 @@ use log::info;
 use open_feature::EvaluationContext;
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc};
-use superposition_provider::SuperpositionProvider;
+use superposition_provider::{AllFeatureProvider, SuperpositionAPIProvider};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
@@ -1245,11 +1245,11 @@ async fn serve_release_v2(
 }
 
 async fn get_release_config_from_provider(
-    provider: &Arc<SuperpositionProvider>,
+    provider: &Arc<SuperpositionAPIProvider>,
     evaluation_context: &EvaluationContext,
 ) -> Result<OpenFeatureReleaseConfig, ABError> {
     let config = provider
-        .resolve_full_config(evaluation_context)
+        .resolve_all_features(evaluation_context.clone())
         .await
         .map_err(|e| {
             log::error!("Error getting superposition keys: {:?}", e);
@@ -1318,7 +1318,7 @@ async fn serve_release_handler(
     );
     info!("Context for serving release: {:?}", context);
 
-    let workspace_handle = state.provider_registry.get_or_init(&workspace_name).await?;
+    let workspace_handle = state.provider_registry.get_or_init(&workspace_name).await;
 
     let provider = workspace_handle.provider.clone();
 

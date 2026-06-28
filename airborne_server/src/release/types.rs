@@ -127,13 +127,6 @@ pub struct ListReleaseQuery {
     pub status: Option<ReleaseStatus>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FileResource {
-    pub url: String,
-    #[serde(rename = "filePath")]
-    pub file_path: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct RampReleaseRequest {
     pub traffic_percentage: u8,

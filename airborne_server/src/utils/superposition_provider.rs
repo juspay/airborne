@@ -1,39 +1,17 @@
 use dashmap::DashMap;
-use futures::TryFutureExt;
 use std::{
-    fmt,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tokio::sync::OnceCell;
 
-use open_feature::{
-    provider::FeatureProvider, EvaluationContext, EvaluationResult, OpenFeature, StructValue,
-};
-use superposition_provider::{
-    PollingStrategy, ProviderMetadata, RefreshStrategy, ResolutionDetails, SuperpositionProvider,
-    SuperpositionProviderOptions,
-};
+use open_feature::{provider::FeatureProvider, EvaluationContext};
+use superposition_provider::{SuperpositionAPIProvider, SuperpositionOptions};
 
 type WorkspaceId = String;
 
-#[derive(Debug)]
-pub enum RegistryError {
-    ProviderInitFailed(String),
-}
-
-impl fmt::Display for RegistryError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RegistryError::ProviderInitFailed(e) => write!(f, "Provider init failed: {}", e),
-        }
-    }
-}
-
-type Result<T> = std::result::Result<T, RegistryError>;
-
 pub struct WorkspaceHandle {
-    pub provider: Arc<SuperpositionProvider>,
+    pub provider: Arc<SuperpositionAPIProvider>,
     last_access: Mutex<Instant>,
 }
 
@@ -64,7 +42,7 @@ impl ProviderRegistry {
         }
     }
 
-    pub async fn get_or_init(&self, ws: &str) -> Result<Arc<WorkspaceHandle>> {
+    pub async fn get_or_init(&self, ws: &str) -> Arc<WorkspaceHandle> {
         let cell = self
             .inner
             .entry(ws.to_string())
@@ -73,45 +51,31 @@ impl ProviderRegistry {
 
         let ws_owned = ws.to_string();
         let handle = cell
-            .get_or_try_init(|| async move {
-                let mut of = OpenFeature::singleton_mut().await;
+            .get_or_init(|| async move {
+                let options = SuperpositionOptions::new(
+                    self.endpoint.clone(),
+                    self.api_token.clone(),
+                    self.organisation_id.clone(),
+                    ws_owned,
+                );
 
-                let options = SuperpositionProviderOptions {
-                    endpoint: self.endpoint.clone(),
-                    token: self.api_token.clone(),
-                    org_id: self.organisation_id.clone(),
-                    workspace_id: ws_owned.clone(),
-                    fallback_config: None,
-                    evaluation_cache: None,
-                    refresh_strategy: RefreshStrategy::Polling(PollingStrategy {
-                        interval: 60,
-                        timeout: Some(30),
-                    }),
-                    experimentation_options: None,
-                };
+                // The remote provider resolves config against the Superposition API on
+                // every call, so it holds only a lightweight SDK client and performs no
+                // network I/O here. `initialize` simply marks the provider Ready; the
+                // per-request evaluation context is supplied at resolve time.
+                let mut provider = SuperpositionAPIProvider::new(options);
+                provider.initialize(&EvaluationContext::default()).await;
 
-                let provider = SuperpositionProvider::new(options);
-                provider
-                    .init()
-                    .await
-                    .map_err(|e| format!("Provider init error: {:?}", e))?;
-
-                let provider_arc = Arc::new(provider);
-                let provider_wrapper = ProviderWrapper(provider_arc.clone());
-                of.set_named_provider(&ws_owned.clone(), provider_wrapper)
-                    .await;
-
-                Ok(Arc::new(WorkspaceHandle {
-                    provider: provider_arc.clone(),
+                Arc::new(WorkspaceHandle {
+                    provider: Arc::new(provider),
                     last_access: Mutex::new(Instant::now()),
-                }))
+                })
             })
-            .map_err(RegistryError::ProviderInitFailed)
-            .await?
+            .await
             .clone();
 
         handle.touch();
-        Ok(handle)
+        handle
     }
 
     pub async fn run_ttl_eviction(self: Arc<Self>, ttl: Duration, tick: Duration) {
@@ -139,145 +103,8 @@ impl ProviderRegistry {
             }
 
             for k in to_remove {
-                let mut api = OpenFeature::singleton_mut().await;
-                api.set_named_provider(&k, open_feature::provider::NoOpProvider::default())
-                    .await;
                 self.inner.remove(&k);
             }
         }
-    }
-}
-
-// Need this to share a single provider using Arc across airborne and open feature
-struct ProviderWrapper(Arc<SuperpositionProvider>);
-
-impl FeatureProvider for ProviderWrapper {
-    fn metadata(&self) -> &ProviderMetadata {
-        self.0.metadata()
-    }
-
-    #[allow(
-        mismatched_lifetime_syntaxes,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds
-    )]
-    fn resolve_bool_value<'life0, 'life1, 'life2, 'async_trait>(
-        &'life0 self,
-        flag_key: &'life1 str,
-        evaluation_context: &'life2 EvaluationContext,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = EvaluationResult<ResolutionDetails<bool>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        'life2: 'async_trait,
-        Self: 'async_trait,
-    {
-        self.0.resolve_bool_value(flag_key, evaluation_context)
-    }
-
-    #[allow(
-        mismatched_lifetime_syntaxes,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds
-    )]
-    fn resolve_int_value<'life0, 'life1, 'life2, 'async_trait>(
-        &'life0 self,
-        flag_key: &'life1 str,
-        evaluation_context: &'life2 EvaluationContext,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = EvaluationResult<ResolutionDetails<i64>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        'life2: 'async_trait,
-        Self: 'async_trait,
-    {
-        self.0.resolve_int_value(flag_key, evaluation_context)
-    }
-
-    #[allow(
-        mismatched_lifetime_syntaxes,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds
-    )]
-    fn resolve_float_value<'life0, 'life1, 'life2, 'async_trait>(
-        &'life0 self,
-        flag_key: &'life1 str,
-        evaluation_context: &'life2 EvaluationContext,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = EvaluationResult<ResolutionDetails<f64>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        'life2: 'async_trait,
-        Self: 'async_trait,
-    {
-        self.0.resolve_float_value(flag_key, evaluation_context)
-    }
-
-    #[allow(
-        mismatched_lifetime_syntaxes,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds
-    )]
-    fn resolve_string_value<'life0, 'life1, 'life2, 'async_trait>(
-        &'life0 self,
-        flag_key: &'life1 str,
-        evaluation_context: &'life2 EvaluationContext,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = EvaluationResult<ResolutionDetails<String>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        'life2: 'async_trait,
-        Self: 'async_trait,
-    {
-        self.0.resolve_string_value(flag_key, evaluation_context)
-    }
-
-    #[allow(
-        mismatched_lifetime_syntaxes,
-        clippy::type_complexity,
-        clippy::type_repetition_in_bounds
-    )]
-    fn resolve_struct_value<'life0, 'life1, 'life2, 'async_trait>(
-        &'life0 self,
-        flag_key: &'life1 str,
-        evaluation_context: &'life2 EvaluationContext,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<Output = EvaluationResult<ResolutionDetails<StructValue>>>
-                + ::core::marker::Send
-                + 'async_trait,
-        >,
-    >
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        'life2: 'async_trait,
-        Self: 'async_trait,
-    {
-        self.0.resolve_struct_value(flag_key, evaluation_context)
     }
 }
