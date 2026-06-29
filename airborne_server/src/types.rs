@@ -65,6 +65,7 @@ pub struct Environment {
     pub superposition_org_id: String,
     pub enabled_oidc_idps: Vec<String>,
     pub organisation_creation_disabled: bool,
+    pub use_legacy_build_packages: bool,
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
     pub default_configs: Vec<SuperpositionDefaultConfig>,

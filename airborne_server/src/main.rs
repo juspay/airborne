@@ -319,6 +319,7 @@ async fn main() -> std::io::Result<()> {
         superposition_org_id: app_config.superposition_org_id.clone(),
         enabled_oidc_idps: app_config.enabled_oidc_idps.clone(),
         organisation_creation_disabled: app_config.organisation_creation_disabled,
+        use_legacy_build_packages: app_config.use_legacy_build_packages,
         google_spreadsheet_id: spreadsheet_id.clone().unwrap_or_default(),
         cloudfront_distribution_id: app_config.cloudfront_distribution_id.clone(),
         default_configs: get_default_configs_from_file()

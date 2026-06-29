@@ -46,36 +46,103 @@ struct BuildResponse {
     version: SemVer,
 }
 
-fn get_android_root_path(prefix: &String, org: &String, app: &String) -> String {
-    format!("builds/{0}/{1}/{2}-airborne-assets/", prefix, org, app)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PackageLayout {
+    /// format: groupId = `{org}`, artifactId = `{app}-airborne-assets`,
+    /// path `builds/{prefix}/{org}/{app}-airborne-assets/...`.
+    New,
+    /// format: groupId = `{org}.{app}`, artifactId = `airborne-assets`,
+    /// path `builds/{prefix}/{org}/{app}/airborne-assets/...`.
+    Legacy,
 }
 
-fn get_aar_path(prefix: &String, org: &String, app: &String, new_build_version: &SemVer) -> String {
-    format!(
-        "{0}{1}/{2}-airborne-assets-{1}.aar",
-        get_android_root_path(prefix, org, app),
-        new_build_version,
-        app
-    )
+impl PackageLayout {
+    fn group_id(&self, org: &str, app: &str) -> String {
+        match self {
+            PackageLayout::New => org.to_string(),
+            PackageLayout::Legacy => format!("{}.{}", org, app),
+        }
+    }
+
+    fn artifact_id(&self, app: &str) -> String {
+        match self {
+            PackageLayout::New => format!("{}-airborne-assets", app),
+            PackageLayout::Legacy => "airborne-assets".to_string(),
+        }
+    }
 }
 
-fn get_pom_path(prefix: &String, org: &String, app: &String, new_build_version: &SemVer) -> String {
-    format!(
-        "{0}{1}/{2}-airborne-assets-{1}.pom",
-        get_android_root_path(prefix, org, app),
-        new_build_version,
-        app
-    )
+fn active_layouts(state: &web::Data<AppState>) -> Vec<PackageLayout> {
+    if state.env.use_legacy_build_packages {
+        vec![PackageLayout::New, PackageLayout::Legacy]
+    } else {
+        vec![PackageLayout::New]
+    }
 }
 
-fn get_maven_metadata_path(prefix: &String, org: &String, app: &String) -> String {
+fn get_android_root_path(
+    layout: PackageLayout,
+    prefix: &String,
+    org: &String,
+    app: &String,
+) -> String {
+    match layout {
+        PackageLayout::New => format!("builds/{0}/{1}/{2}-airborne-assets/", prefix, org, app),
+        PackageLayout::Legacy => format!("builds/{0}/{1}/{2}/airborne-assets/", prefix, org, app),
+    }
+}
+
+fn get_aar_path(
+    layout: PackageLayout,
+    prefix: &String,
+    org: &String,
+    app: &String,
+    new_build_version: &SemVer,
+) -> String {
+    let root = get_android_root_path(layout, prefix, org, app);
+    match layout {
+        PackageLayout::New => {
+            format!(
+                "{0}{1}/{2}-airborne-assets-{1}.aar",
+                root, new_build_version, app
+            )
+        }
+        PackageLayout::Legacy => format!("{0}{1}/airborne-assets-{1}.aar", root, new_build_version),
+    }
+}
+
+fn get_pom_path(
+    layout: PackageLayout,
+    prefix: &String,
+    org: &String,
+    app: &String,
+    new_build_version: &SemVer,
+) -> String {
+    let root = get_android_root_path(layout, prefix, org, app);
+    match layout {
+        PackageLayout::New => {
+            format!(
+                "{0}{1}/{2}-airborne-assets-{1}.pom",
+                root, new_build_version, app
+            )
+        }
+        PackageLayout::Legacy => format!("{0}{1}/airborne-assets-{1}.pom", root, new_build_version),
+    }
+}
+
+fn get_maven_metadata_path(
+    layout: PackageLayout,
+    prefix: &String,
+    org: &String,
+    app: &String,
+) -> String {
     format!(
         "{}maven-metadata.xml",
-        get_android_root_path(prefix, org, app)
+        get_android_root_path(layout, prefix, org, app)
     )
 }
 
-fn generate_pom_content(org: &String, app: &String, version: &SemVer) -> String {
+fn generate_pom_content(layout: PackageLayout, org: &str, app: &str, version: &SemVer) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -83,13 +150,17 @@ fn generate_pom_content(org: &String, app: &String, version: &SemVer) -> String 
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>{0}</groupId>
-    <artifactId>{1}-airborne-assets</artifactId>
+    <artifactId>{1}</artifactId>
     <version>{2}</version>
     <packaging>aar</packaging>
     <name>Airborne Assets</name>
-    <description>Airborne assets package for {0}/{1}</description>
+    <description>Airborne assets package for {3}/{4}</description>
 </project>"#,
-        org, app, version
+        layout.group_id(org, app),
+        layout.artifact_id(app),
+        version,
+        org,
+        app
     )
 }
 
@@ -120,7 +191,12 @@ fn parse_existing_maven_metadata(metadata_content: &str) -> airborne_types::Resu
     Ok(versions)
 }
 
-fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<SemVer>) -> String {
+fn generate_maven_metadata_content(
+    layout: PackageLayout,
+    org: &str,
+    app: &str,
+    versions: Vec<SemVer>,
+) -> String {
     let default_version = SemVer::default();
     let latest_version = versions.last().unwrap_or(&default_version);
     let versions_xml = versions
@@ -142,7 +218,7 @@ fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<Sem
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <metadata>
     <groupId>{}</groupId>
-    <artifactId>{}-airborne-assets</artifactId>
+    <artifactId>{}</artifactId>
     <versioning>
         <latest>{}</latest>
         <release>{}</release>
@@ -152,7 +228,12 @@ fn generate_maven_metadata_content(org: &String, app: &String, versions: Vec<Sem
         <lastUpdated>{}</lastUpdated>
     </versioning>
 </metadata>"#,
-        org, app, latest_version, latest_version, versions_xml, timestamp
+        layout.group_id(org, app),
+        layout.artifact_id(app),
+        latest_version,
+        latest_version,
+        versions_xml,
+        timestamp
     )
 }
 
@@ -462,43 +543,73 @@ async fn create_and_upload_build(
             ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
         })?;
 
-        let aar_path = get_aar_path(&String::from("hyper-sdk"), &org, &app, new_build_version);
-        push_file_byte_arr(
-            &state.s3_client,
-            state.env.bucket_name.clone(),
-            aar_data,
-            aar_path,
-        )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
-        })?;
+        for layout in active_layouts(&state) {
+            let aar_path = get_aar_path(
+                layout,
+                &String::from("hyper-sdk"),
+                &org,
+                &app,
+                new_build_version,
+            );
+            push_file_byte_arr(
+                &state.s3_client,
+                state.env.bucket_name.clone(),
+                aar_data.clone(),
+                aar_path,
+            )
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to upload build to S3: {}", e))
+            })?;
 
-        // Generate and upload POM file
-        let pom_content = generate_pom_content(&org, &app, new_build_version);
-        let pom_path = get_pom_path(&String::from("hyper-sdk"), &org, &app, new_build_version);
-        push_file_byte_arr(
-            &state.s3_client,
-            state.env.bucket_name.clone(),
-            pom_content.into_bytes(),
-            pom_path,
-        )
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to upload POM to S3: {}", e)))?;
+            // Generate and upload POM file
+            let pom_content = generate_pom_content(layout, &org, &app, new_build_version);
+            let pom_path = get_pom_path(
+                layout,
+                &String::from("hyper-sdk"),
+                &org,
+                &app,
+                new_build_version,
+            );
+            push_file_byte_arr(
+                &state.s3_client,
+                state.env.bucket_name.clone(),
+                pom_content.into_bytes(),
+                pom_path,
+            )
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to upload POM to S3: {}", e))
+            })?;
+        }
     }
 
     Ok(())
 }
 
-/// Update maven-metadata.xml in S3.
+/// Update maven-metadata.xml in S3 for every active package layout.
 async fn update_maven_metadata(
     org: &String,
     app: &String,
     new_build_version: &SemVer,
     state: &web::Data<AppState>,
 ) -> airborne_types::Result<()> {
+    for layout in active_layouts(state) {
+        update_one_metadata(layout, org, app, new_build_version, state).await?;
+    }
+    Ok(())
+}
+
+/// Update the maven-metadata.xml for a single package layout.
+async fn update_one_metadata(
+    layout: PackageLayout,
+    org: &String,
+    app: &String,
+    new_build_version: &SemVer,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<()> {
     // Get existing Maven metadata from S3 and merge with new version
-    let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), org, app);
+    let maven_metadata_path = get_maven_metadata_path(layout, &String::from("hyper-sdk"), org, app);
     let existing_versions = match state
         .s3_client
         .get_object()
@@ -546,8 +657,8 @@ async fn update_maven_metadata(
     }
 
     // Generate and upload Maven metadata
-    let maven_metadata_content = generate_maven_metadata_content(org, app, versions);
-    let maven_metadata_path = get_maven_metadata_path(&String::from("hyper-sdk"), org, app);
+    let maven_metadata_content = generate_maven_metadata_content(layout, org, app, versions);
+    let maven_metadata_path = get_maven_metadata_path(layout, &String::from("hyper-sdk"), org, app);
     push_file_byte_arr(
         &state.s3_client,
         state.env.bucket_name.clone(),
@@ -827,7 +938,12 @@ async fn build(
     )
     .await;
 
-    if file_upload_result.is_err() {
+    if let Err(upload_err) = &file_upload_result {
+        // Log the real cause — otherwise the generic message below hides it.
+        error!(
+            "create_and_upload_build failed for {}/{} (release {}): {}",
+            org, app, release_id, upload_err
+        );
         // Upload failed → delete the BUILDING row so the version slot is freed
         let pool = state.db_pool.clone();
         let org_cleanup = org.clone();
@@ -855,9 +971,10 @@ async fn build(
             error!("Failed to clean up build after upload failure: {}", e);
         }
 
-        return Err(ABError::InternalServerError(
-            "Failed to create and upload build artifacts".to_string(),
-        ));
+        return Err(ABError::InternalServerError(format!(
+            "Failed to create and upload build artifacts: {}",
+            upload_err
+        )));
     }
 
     // --- Step 3: Mark build as READY ---
@@ -1300,6 +1417,7 @@ async fn serve_aar(
     let build_response = generate(_args, state.clone()).await?;
 
     let aar_path = get_aar_path(
+        PackageLayout::New,
         &String::from("hyper-sdk"),
         &org_id,
         &app_id,
@@ -1345,4 +1463,101 @@ async fn serve_aar(
             })?,
         )
         .status(actix_web::http::StatusCode::OK))
+}
+
+#[cfg(test)]
+mod package_layout_tests {
+    use super::*;
+
+    fn ver() -> SemVer {
+        SemVer::from_str("1.2.3").unwrap()
+    }
+    fn org() -> String {
+        "acme".to_string()
+    }
+    fn app() -> String {
+        "checkout".to_string()
+    }
+    fn prefix() -> String {
+        "hyper-sdk".to_string()
+    }
+
+    #[test]
+    fn new_layout_paths_match_current_format() {
+        assert_eq!(
+            get_android_root_path(PackageLayout::New, &prefix(), &org(), &app()),
+            "builds/hyper-sdk/acme/checkout-airborne-assets/"
+        );
+        assert_eq!(
+            get_aar_path(PackageLayout::New, &prefix(), &org(), &app(), &ver()),
+            "builds/hyper-sdk/acme/checkout-airborne-assets/1.2.3/checkout-airborne-assets-1.2.3.aar"
+        );
+        assert_eq!(
+            get_pom_path(PackageLayout::New, &prefix(), &org(), &app(), &ver()),
+            "builds/hyper-sdk/acme/checkout-airborne-assets/1.2.3/checkout-airborne-assets-1.2.3.pom"
+        );
+        assert_eq!(
+            get_maven_metadata_path(PackageLayout::New, &prefix(), &org(), &app()),
+            "builds/hyper-sdk/acme/checkout-airborne-assets/maven-metadata.xml"
+        );
+    }
+
+    #[test]
+    fn legacy_layout_paths_match_pre_6c1f553_format() {
+        assert_eq!(
+            get_android_root_path(PackageLayout::Legacy, &prefix(), &org(), &app()),
+            "builds/hyper-sdk/acme/checkout/airborne-assets/"
+        );
+        assert_eq!(
+            get_aar_path(PackageLayout::Legacy, &prefix(), &org(), &app(), &ver()),
+            "builds/hyper-sdk/acme/checkout/airborne-assets/1.2.3/airborne-assets-1.2.3.aar"
+        );
+        assert_eq!(
+            get_pom_path(PackageLayout::Legacy, &prefix(), &org(), &app(), &ver()),
+            "builds/hyper-sdk/acme/checkout/airborne-assets/1.2.3/airborne-assets-1.2.3.pom"
+        );
+        assert_eq!(
+            get_maven_metadata_path(PackageLayout::Legacy, &prefix(), &org(), &app()),
+            "builds/hyper-sdk/acme/checkout/airborne-assets/maven-metadata.xml"
+        );
+    }
+
+    #[test]
+    fn new_pom_and_metadata_use_new_coordinates() {
+        let pom = generate_pom_content(PackageLayout::New, &org(), &app(), &ver());
+        assert!(pom.contains("<groupId>acme</groupId>"), "{pom}");
+        assert!(
+            pom.contains("<artifactId>checkout-airborne-assets</artifactId>"),
+            "{pom}"
+        );
+        assert!(pom.contains("<version>1.2.3</version>"), "{pom}");
+
+        let md = generate_maven_metadata_content(PackageLayout::New, &org(), &app(), vec![ver()]);
+        assert!(md.contains("<groupId>acme</groupId>"), "{md}");
+        assert!(
+            md.contains("<artifactId>checkout-airborne-assets</artifactId>"),
+            "{md}"
+        );
+        assert!(md.contains("<version>1.2.3</version>"), "{md}");
+    }
+
+    #[test]
+    fn legacy_pom_and_metadata_use_legacy_coordinates() {
+        let pom = generate_pom_content(PackageLayout::Legacy, &org(), &app(), &ver());
+        assert!(pom.contains("<groupId>acme.checkout</groupId>"), "{pom}");
+        assert!(
+            pom.contains("<artifactId>airborne-assets</artifactId>"),
+            "{pom}"
+        );
+        // The legacy POM must NOT carry the new artifactId.
+        assert!(!pom.contains("checkout-airborne-assets"), "{pom}");
+
+        let md =
+            generate_maven_metadata_content(PackageLayout::Legacy, &org(), &app(), vec![ver()]);
+        assert!(md.contains("<groupId>acme.checkout</groupId>"), "{md}");
+        assert!(
+            md.contains("<artifactId>airborne-assets</artifactId>"),
+            "{md}"
+        );
+    }
 }

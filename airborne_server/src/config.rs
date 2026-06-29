@@ -71,6 +71,7 @@ pub struct AppConfig {
     // Feature flags
     pub enabled_oidc_idps: Vec<String>,
     pub organisation_creation_disabled: bool,
+    pub use_legacy_build_packages: bool,
 
     // Google Sheets
     pub google_spreadsheet_id: Option<String>,
@@ -213,6 +214,7 @@ impl AppConfig {
             // Feature flags
             enabled_oidc_idps,
             organisation_creation_disabled: parse_env("ORGANISATION_CREATION_DISABLED", false),
+            use_legacy_build_packages: parse_env("USE_LEGACY_BUILD_PACKAGES", false),
 
             // Google Sheets
             google_spreadsheet_id: get_optional("GOOGLE_SPREADSHEET_ID"),
