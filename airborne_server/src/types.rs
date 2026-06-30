@@ -24,8 +24,10 @@ use keycloak::KeycloakError;
 use log::error;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use superposition_sdk::Client;
 use thiserror::Error;
+use tokio::sync::Semaphore;
 
 use crate::{
     provider::{authn::AuthNProvider, authz::AuthZProvider},
@@ -44,6 +46,7 @@ pub struct AppState {
     pub sheets_hub: Option<
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
+    pub validation_semaphore: Arc<Semaphore>,
 }
 
 #[derive(Clone, Debug)]
@@ -69,6 +72,11 @@ pub struct Environment {
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
     pub default_configs: Vec<SuperpositionDefaultConfig>,
+
+    // Validation function settings
+    pub validation_execution_timeout: Duration,
+    pub validation_max_heap_size: usize,
+    pub validation_queue_timeout: Duration,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -199,6 +207,9 @@ pub enum ABError {
     #[error("{0}")]
     Conflict(String),
 
+    #[error("{0}")]
+    ServiceUnavailable(String),
+
     #[error("R2D2 error: {0}")]
     R2D2Error(#[from] r2d2::Error),
 }
@@ -292,6 +303,7 @@ impl AppError for ABError {
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
             ABError::Conflict(_) => ABErrorCodes::Conflict.label(),
+            ABError::ServiceUnavailable(_) => ABErrorCodes::ServiceUnavailable.label(),
             ABError::R2D2Error(_) => ABErrorCodes::InternalServerError.label(),
         }
     }
@@ -304,6 +316,7 @@ impl AppError for ABError {
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
             ABError::Conflict(_) => StatusCode::CONFLICT,
+            ABError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             ABError::R2D2Error(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -356,6 +369,7 @@ pub enum ABErrorCodes {
     BadRequest,
     Forbidden,
     Conflict,
+    ServiceUnavailable,
 }
 
 impl HasLabel for ABErrorCodes {
@@ -367,6 +381,7 @@ impl HasLabel for ABErrorCodes {
             ABErrorCodes::BadRequest => "AB_005",
             ABErrorCodes::Forbidden => "AB_006",
             ABErrorCodes::Conflict => "AB_007",
+            ABErrorCodes::ServiceUnavailable => "AB_008",
         }
     }
 }

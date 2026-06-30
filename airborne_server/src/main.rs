@@ -50,8 +50,10 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
     str::FromStr,
     sync::Arc,
+    time::Duration,
 };
 use superposition_sdk::config::Config as SrsConfig;
+use tokio::sync::Semaphore;
 use tracing_actix_web::TracingLogger;
 use utils::db;
 
@@ -325,6 +327,11 @@ async fn main() -> std::io::Result<()> {
         default_configs: get_default_configs_from_file()
             .await
             .expect("Failed to load superposition default configs from file"),
+        validation_execution_timeout: Duration::from_millis(
+            app_config.validation_execution_timeout_ms,
+        ),
+        validation_max_heap_size: app_config.validation_max_heap_size_mb * 1024 * 1024,
+        validation_queue_timeout: Duration::from_millis(app_config.validation_queue_timeout_ms),
     };
 
     // Create an S3 client with path-style enforced (for localstack)
@@ -409,6 +416,9 @@ async fn main() -> std::io::Result<()> {
         cf_client: aws_cloudfront_client,
         superposition_client,
         sheets_hub: hub,
+        validation_semaphore: Arc::new(Semaphore::new(
+            app_config.validation_max_concurrency.max(1),
+        )),
     });
     app_state
         .authz_provider
@@ -483,6 +493,11 @@ async fn main() -> std::io::Result<()> {
                         web::scope("/packages")
                             .wrap(Auth)
                             .service(package::add_routes()),
+                    )
+                    .service(
+                        web::scope("/package-groups")
+                            .wrap(Auth)
+                            .service(package::add_package_group_routes()),
                     )
                     .service(release::add_routes("releases")),
             )

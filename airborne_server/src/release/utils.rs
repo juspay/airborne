@@ -35,16 +35,35 @@ use crate::{
     release::types::*,
     run_blocking, types as airborne_types,
     types::{ABError, AppState},
+    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
     utils::db::{
-        models::FileEntry,
-        schema::hyperotaserver::files::{
-            app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id,
-            table as files_table, tag as file_dsl_tag, version as file_dsl_version,
+        models::{FileEntry, PackageGroupsEntry},
+        schema::hyperotaserver::{
+            files::{
+                app_id as file_dsl_app_id, file_path as file_dsl_path, org_id as file_dsl_org_id,
+                table as files_table, tag as file_dsl_tag, version as file_dsl_version,
+            },
+            package_groups::{
+                app_id as package_group_app_id, id as pkg_group_id,
+                is_primary as package_group_is_primary, org_id as package_group_org_id,
+                table as package_groups_table,
+            },
         },
         DbPool,
     },
-    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
 };
+
+/// Parses a sub-package key in the format "groupid@version"
+/// Returns (group_id, version) if valid, or None if parsing fails
+pub fn parse_sub_package_key(spec: &str) -> Option<(uuid::Uuid, i32)> {
+    if let Some((group_id_str, version_str)) = spec.split_once('@') {
+        let group_id = uuid::Uuid::parse_str(group_id_str).ok()?;
+        let version = version_str.parse::<i32>().ok()?;
+        Some((group_id, version))
+    } else {
+        None
+    }
+}
 
 pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<Vec<String>> {
     opt_obj.as_ref().and_then(|doc| {
@@ -97,7 +116,7 @@ where
         .unwrap_or_default()
 }
 
-pub fn extract_files_from_experiment(
+pub fn extract_vector_from_experiment(
     experimental_variant: &Option<&Variant>,
     key: &str,
 ) -> Vec<String> {
@@ -439,34 +458,39 @@ pub async fn check_non_concluded_releases(
     Ok(non_concluded_exists)
 }
 
-pub async fn build_overrides(
-    req: &Json<CreateReleaseRequest>,
-    superposition_org_id: String,
-    application: String,
-    organisation: String,
-    dims: HashMap<String, Value>,
-    state: web::Data<AppState>,
-    workspace: String,
-) -> airborne_types::Result<BuildOverrides> {
-    let resolved_config_builder = dims.iter().fold(
-        state
-            .superposition_client
-            .get_resolved_config()
-            .workspace_id(workspace.clone())
-            .org_id(superposition_org_id.clone())
-            .context("variantIds", vec![].into()),
-        |builder, (key, value)| {
-            builder.context(
-                key.clone(),
-                Document::String(value.as_str().unwrap_or("").to_string()),
-            )
-        },
-    );
+// --- Helper structs for build_overrides decomposition ---
 
-    let resolved_config = resolved_config_builder.send().await;
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
+
+async fn fetch_config(
+    state: &web::Data<AppState>,
+    workspace: &str,
+    superposition_org_id: &str,
+    dims: &HashMap<String, Value>,
+) -> Option<Document> {
+    let resolved_config = dims
+        .iter()
+        .fold(
+            state
+                .superposition_client
+                .get_resolved_config()
+                .workspace_id(workspace.to_string())
+                .org_id(superposition_org_id.to_string())
+                .context("variantIds", vec![].into()),
+            |builder, (key, value)| {
+                builder.context(
+                    key.clone(),
+                    Document::String(value.as_str().unwrap_or("").to_string()),
+                )
+            },
+        )
+        .send()
+        .await;
     info!("resolved config result: {:?}", resolved_config);
 
-    let config_document = match resolved_config {
+    match resolved_config {
         Ok(config) => {
             info!("config from superposition: {:?}", config);
             Some(config.config)
@@ -475,283 +499,409 @@ pub async fn build_overrides(
             info!("Failed to get resolved config: {}", e);
             None
         }
-    };
+    }
+}
 
-    let imp_from_configs = extract_files_from_configs(&config_document, "package.important");
-    let lazy_from_configs = extract_files_from_configs(&config_document, "package.lazy");
-    let resources_from_configs = extract_files_from_configs(&config_document, "resources");
+fn parse_sub_package_keys(specs: &[String]) -> airborne_types::Result<Vec<(uuid::Uuid, i32)>> {
+    let parsed: Vec<_> = specs
+        .iter()
+        .filter_map(|s| parse_sub_package_key(s))
+        .collect();
+    if parsed.len() != specs.len() {
+        return Err(ABError::BadRequest(
+            "Invalid sub_package format. Expected format: 'groupid@version'".to_string(),
+        ));
+    }
+    Ok(parsed)
+}
 
-    // If you give me package_id -> I'll expect you to provide me complete important and lazy splits
-    // If you just want to PATCH the important or lazy blocks -> DO NOT provide me the package_id
-    //
-    let mut package_update = false;
-    let mut is_first_release = false;
-    let opt_pkg_version_from_config = &config_document.as_ref().and_then(|doc| {
+fn resolve_package_info(
+    req: &Json<CreateReleaseRequest>,
+    config_document: &Option<Document>,
+) -> airborne_types::Result<PackageInfo> {
+    let opt_pkg_version_from_config: Option<i32> = config_document.as_ref().and_then(|doc| {
         if let Document::Object(obj) = doc {
-            obj.get("package.version").and_then(document_to_value)
+            obj.get("package.version")
+                .and_then(document_to_value)
+                .and_then(|v| v.as_i64().map(|v| v as i32))
         } else {
             None
         }
     });
-    if let Some(pkg_version_from_config) = opt_pkg_version_from_config {
-        is_first_release = pkg_version_from_config == 0;
-    }
-    let pkg_version = if let Some(package_id) = &req.package_id {
-        package_update = true;
-        let (version_opt, _) = parse_package_key(package_id);
-        version_opt.ok_or_else(|| {
-            ABError::InternalServerError(format!(
-                "Package ID should contain version: {}",
-                package_id
-            ))
-        })?
-    } else {
-        if is_first_release {
-            return Err(ABError::BadRequest(
-                "First release must provide package_id".to_string(),
-            ));
-        }
-        if !opt_pkg_version_from_config.is_some() {
-            let pool = state.db_pool.clone();
-            let org = organisation.clone();
-            let app = application.clone();
+    let is_first_release = opt_pkg_version_from_config == Some(0);
 
-            run_blocking!({
-                let mut conn = pool.get()?;
-                packages_dsl::packages_v2
+    let (version_opt, _) = parse_package_key(&req.package_id);
+    let known_version = Some(version_opt.ok_or_else(|| {
+        ABError::InternalServerError(format!(
+            "Package ID should contain version: {}",
+            req.package_id
+        ))
+    })?);
+
+    Ok(PackageInfo {
+        known_version,
+        is_first_release,
+    })
+}
+
+async fn fetch_package_db(
+    state: &web::Data<AppState>,
+    organisation: &str,
+    application: &str,
+    known_version: Option<i32>,
+    parsed_sub_packages: Vec<(uuid::Uuid, i32)>,
+) -> airborne_types::Result<PackageDbData> {
+    let pool = state.db_pool.clone();
+    let org = organisation.to_string();
+    let app = application.to_string();
+
+    let (pkg_version, primary_group, package_data, sub_packages_data, sub_package_names) = run_blocking!(
+        {
+            let mut conn = pool.get()?;
+
+            let primary_group: PackageGroupsEntry = package_groups_table
+                .filter(package_group_org_id.eq(&org))
+                .filter(package_group_app_id.eq(&app))
+                .filter(package_group_is_primary.eq(true))
+                .select(PackageGroupsEntry::as_select())
+                .first::<PackageGroupsEntry>(&mut conn)?;
+
+            let version = match known_version {
+                Some(v) => v,
+                None => packages_dsl::packages_v2
                     .filter(
                         packages_dsl::org_id
                             .eq(&org)
-                            .and(packages_dsl::app_id.eq(&app)),
+                            .and(packages_dsl::app_id.eq(&app))
+                            .and(packages_dsl::package_group_id.eq(&primary_group.id)),
                     )
                     .order_by(packages_dsl::version.desc())
                     .select(packages_dsl::version)
                     .first::<i32>(&mut conn)
                     .map_err(|_| {
                         ABError::NotFound("No packages found for this application".to_string())
-                    })
-            })?
-        } else {
-            let version = opt_pkg_version_from_config
-                .as_ref()
-                .and_then(|v| v.as_i64())
-                .map(|v| v as i32)
-                .ok_or_else(|| {
-                    ABError::BadRequest("Could not extract package version from config".to_string())
-                })?;
-            version
-        }
-    };
+                    })?,
+            };
 
-    let package_data = {
-        let pool = state.db_pool.clone();
-        let org = organisation.clone();
-        let app = application.clone();
-
-        run_blocking!({
-            let mut conn = pool.get()?;
-            packages_dsl::packages_v2
+            let package_data = packages_dsl::packages_v2
                 .filter(
                     packages_dsl::org_id
                         .eq(&org)
                         .and(packages_dsl::app_id.eq(&app))
-                        .and(packages_dsl::version.eq(pkg_version)),
+                        .and(packages_dsl::package_group_id.eq(&primary_group.id))
+                        .and(packages_dsl::version.eq(version)),
                 )
                 .select(PackageV2Entry::as_select())
                 .first::<PackageV2Entry>(&mut conn)
                 .map_err(|_| {
-                    ABError::NotFound(format!("Package version {} not found", pkg_version))
-                })
-        })?
-    };
+                    ABError::NotFound(format!(
+                        "Package version {} not found in primary group",
+                        version
+                    ))
+                })?;
 
-    // check any resources don't overlap with important or lazy
-    let check_resource_duplicacy = |resources: &Vec<String>| -> bool {
-        for resource in resources {
-            if package_data.files.contains(&Some(resource.clone())) {
-                return true;
-            }
+            let (sub_entries, sub_names) = if parsed_sub_packages.is_empty() {
+                (vec![], vec![])
+            } else {
+                let mut pkg_conds: Vec<Box<dyn BoxableExpression<_, Pg, SqlType = Bool>>> =
+                    Vec::new();
+                for (gid, ver) in &parsed_sub_packages {
+                    pkg_conds.push(Box::new(
+                        packages_dsl::package_group_id
+                            .eq(gid)
+                            .and(packages_dsl::version.eq(*ver)),
+                    ));
+                }
+                let combined_pkg = pkg_conds
+                    .into_iter()
+                    .reduce(|a, b| Box::new(a.or(b)))
+                    .unwrap();
+
+                let entries: Vec<PackageV2Entry> = packages_dsl::packages_v2
+                    .filter(packages_dsl::org_id.eq(&org))
+                    .filter(packages_dsl::app_id.eq(&app))
+                    .filter(combined_pkg)
+                    .select(PackageV2Entry::as_select())
+                    .load(&mut conn)?;
+
+                if entries.len() != parsed_sub_packages.len() {
+                    for (gid, ver) in &parsed_sub_packages {
+                        let found = entries
+                            .iter()
+                            .any(|e| e.package_group_id == *gid && e.version == *ver);
+                        if !found {
+                            return Err(ABError::NotFound(format!(
+                                "Sub-package version {} not found in group {}",
+                                ver, gid
+                            )));
+                        }
+                    }
+                }
+
+                let group_ids: Vec<uuid::Uuid> =
+                    parsed_sub_packages.iter().map(|(gid, _)| *gid).collect();
+                let groups: Vec<PackageGroupsEntry> = package_groups_table
+                    .filter(pkg_group_id.eq_any(group_ids))
+                    .select(PackageGroupsEntry::as_select())
+                    .load(&mut conn)?;
+
+                let group_map: HashMap<uuid::Uuid, &PackageGroupsEntry> =
+                    groups.iter().map(|g| (g.id, g)).collect();
+
+                let mut names = Vec::with_capacity(parsed_sub_packages.len());
+                for (gid, ver) in &parsed_sub_packages {
+                    let group = group_map.get(gid).ok_or_else(|| {
+                        ABError::NotFound(format!("Package group {} not found", gid))
+                    })?;
+
+                    if group.is_primary {
+                        return Err(ABError::BadRequest(format!(
+                            "Sub-package group {} is a primary group. Sub-packages must come from non-primary groups.",
+                            gid
+                        )));
+                    }
+
+                    let sub_pkg = entries
+                        .iter()
+                        .find(|e| e.package_group_id == *gid && e.version == *ver)
+                        .unwrap();
+                    if sub_pkg.index.is_some() {
+                        return Err(ABError::BadRequest(format!(
+                            "Sub-package {}@{} has an index file. Sub-packages should not have index files.",
+                            gid, ver
+                        )));
+                    }
+
+                    names.push(group.name.clone());
+                }
+
+                (entries, names)
+            };
+
+            Ok((version, primary_group, package_data, sub_entries, sub_names))
         }
-        false
-    };
+    )?;
 
-    // check if a file group exists in package  -> returns (exists, file_that_does_not_exist)
-    let check_file_group_exists_in_package = |file_paths: &Vec<String>| -> (bool, Option<String>) {
-        for file_path in file_paths {
-            if !package_data.files.contains(&Some(file_path.clone())) {
-                return (false, Some(file_path.clone()));
-            }
-        }
-        (true, None)
-    };
+    Ok(PackageDbData {
+        pkg_version,
+        primary_group,
+        package_data,
+        sub_packages_data,
+        sub_package_names,
+    })
+}
 
-    let (final_important, final_lazy, final_resources, final_properties) =
-        if let Some(package_req) = &req.package {
-            // case where package_id is provided -> Expect to get important and lazy : package_update is true
-            // case where package_id is not provided and package block is provided -> Use whatever is in request package and others from config : package_update is false
-            let mut f_imp: Option<Vec<String>> = if package_update {
-                Some(vec![])
-            } else {
-                imp_from_configs
-            };
-            let mut f_lazy: Option<Vec<String>> = if package_update {
-                Some(vec![])
-            } else {
-                lazy_from_configs
-            };
+fn validate_file_groups(
+    req: &Json<CreateReleaseRequest>,
+    package_data: &PackageV2Entry,
+    sub_packages_data: &[PackageV2Entry],
+    pkg_version: i32,
+) -> airborne_types::Result<String> {
+    let sub_package_file_keys: Vec<String> = sub_packages_data
+        .iter()
+        .flat_map(|pkg| pkg.files.iter().filter_map(|f| f.clone()))
+        .collect();
 
-            if let Some(req_imp) = &package_req.important {
-                let (exists, file_that_does_not_exist) =
-                    check_file_group_exists_in_package(req_imp);
-                if !exists {
-                    return Err(ABError::BadRequest(format!(
-                        "Important file '{}' not found in package {}",
-                        file_that_does_not_exist.unwrap_or_default(),
-                        pkg_version
-                    )));
-                }
-                f_imp = Some(req_imp.clone());
-            }
-
-            if let Some(req_lazy) = &package_req.lazy {
-                let (exists, file_that_does_not_exist) =
-                    check_file_group_exists_in_package(req_lazy);
-                if !exists {
-                    return Err(ABError::BadRequest(format!(
-                        "Lazy file '{}' not found in package {}",
-                        file_that_does_not_exist.unwrap_or_default(),
-                        pkg_version
-                    )));
-                }
-                f_lazy = Some(req_lazy.clone());
-            }
-            if let (Some(important), Some(lazy)) = (&package_req.important, &package_req.lazy) {
-                let important_set: HashSet<&String> = important.iter().collect();
-                let lazy_set: HashSet<&String> = lazy.iter().collect();
-                let overlap: Vec<&String> =
-                    important_set.intersection(&lazy_set).cloned().collect();
-                if !overlap.is_empty() {
-                    return Err(ABError::BadRequest(format!(
-                        "Files cannot be in both important and lazy splits: {:?}",
-                        overlap
-                    )));
-                }
-            }
-
-            let f_resources = if let Some(resources) = &req.resources {
-                if check_resource_duplicacy(resources) {
-                    return Err(ABError::BadRequest(format!(
-                        "Resource cannot be a file in package {}",
-                        pkg_version
-                    )));
-                }
-                req.resources.clone()
-            } else {
-                if resources_from_configs.is_some()
-                    && check_resource_duplicacy(&resources_from_configs.clone().unwrap_or_default())
-                {
-                    return Err(ABError::BadRequest(format!(
-                        "Resource cannot be a file in package {}",
-                        pkg_version
-                    )));
-                }
-                resources_from_configs
-            };
-
-            (f_imp, f_lazy, f_resources, package_req.properties.clone())
-        } else {
-            // handle if package id is provided but package block was not provided
-            if req.package_id.is_some() {
-                return Err(ABError::BadRequest(
-                    "Package ID provided but no package block in request".to_string(),
-                ));
-            }
-
-            (
-                imp_from_configs,
-                lazy_from_configs,
-                resources_from_configs,
-                None,
-            )
-        };
-
-    info!(
-        "Final: {:?}",
-        (
-            final_important.clone(),
-            final_lazy.clone(),
-            final_resources.clone()
-        )
-    );
-
-    let combined_files = package_data
+    let all_package_files: HashSet<String> = package_data
         .files
         .iter()
-        .filter_map(|f| f.as_ref().cloned())
-        .chain(final_resources.clone().unwrap_or_default())
-        .chain(vec![package_data.index.clone()])
-        .collect::<Vec<String>>();
+        .filter_map(|f| f.clone())
+        .chain(sub_package_file_keys.iter().cloned())
+        .collect();
+
+    let parse_path = |key: &str| {
+        let (p, _, _) = parse_file_key(key);
+        p
+    };
+
+    for file in &req.package.important {
+        if !all_package_files.contains(file) {
+            return Err(ABError::BadRequest(format!(
+                "Important file '{}' not found in package or sub-packages",
+                file
+            )));
+        }
+    }
+
+    for file in &req.package.lazy {
+        if !all_package_files.contains(file) {
+            return Err(ABError::BadRequest(format!(
+                "Lazy file '{}' not found in package or sub-packages",
+                file
+            )));
+        }
+    }
+
+    {
+        let imp_set: HashSet<&String> = req.package.important.iter().collect();
+        let lazy_set: HashSet<&String> = req.package.lazy.iter().collect();
+        let overlap: Vec<&&String> = imp_set.intersection(&lazy_set).collect();
+        if !overlap.is_empty() {
+            return Err(ABError::BadRequest(format!(
+                "Files cannot be in both important and lazy splits: {:?}",
+                overlap
+            )));
+        }
+    }
+
+    for res in &req.resources {
+        if all_package_files.contains(res) {
+            return Err(ABError::BadRequest(format!(
+                "Resource cannot be a file in package {}",
+                pkg_version
+            )));
+        }
+    }
+
+    let primary_index = package_data.index.clone().ok_or_else(|| {
+        ABError::InternalServerError("Primary package must have an index file".to_string())
+    })?;
+
+    // Mutual exclusivity: index, important, lazy, resources must not share file paths
+    {
+        let mut entries: Vec<(&str, Vec<String>)> =
+            vec![("index", vec![parse_path(&primary_index)])];
+        entries.push((
+            "important",
+            req.package
+                .important
+                .iter()
+                .map(|k| parse_path(k))
+                .collect(),
+        ));
+        entries.push((
+            "lazy",
+            req.package.lazy.iter().map(|k| parse_path(k)).collect(),
+        ));
+        entries.push((
+            "resources",
+            req.resources.iter().map(|k| parse_path(k)).collect(),
+        ));
+
+        for i in 0..entries.len() {
+            for j in (i + 1)..entries.len() {
+                let set_a: HashSet<&String> = entries[i].1.iter().collect();
+                let set_b: HashSet<&String> = entries[j].1.iter().collect();
+                let overlap: Vec<&&String> = set_a.intersection(&set_b).collect();
+                if !overlap.is_empty() {
+                    return Err(ABError::BadRequest(format!(
+                        "File(s) {:?} appear in both '{}' and '{}'",
+                        overlap, entries[i].0, entries[j].0
+                    )));
+                }
+            }
+        }
+    }
+
+    // Coverage: package files (primary + sub-packages) must exactly match important + lazy
+    {
+        let package_paths: HashSet<String> = package_data
+            .files
+            .iter()
+            .filter_map(|f| f.as_ref().map(|key| parse_path(key)))
+            .chain(sub_package_file_keys.iter().map(|key| parse_path(key)))
+            .collect();
+
+        let split_paths: HashSet<String> = req
+            .package
+            .important
+            .iter()
+            .chain(req.package.lazy.iter())
+            .map(|key| parse_path(key))
+            .collect();
+
+        if package_paths != split_paths {
+            let missing: Vec<&String> = package_paths.difference(&split_paths).collect();
+            let extra: Vec<&String> = split_paths.difference(&package_paths).collect();
+            return Err(ABError::BadRequest(format!(
+                "Package files must exactly match important + lazy. Missing from splits: {:?}, Extra in splits: {:?}",
+                missing, extra
+            )));
+        }
+    }
+
+    Ok(primary_index)
+}
+
+async fn fetch_release_files(
+    state: &web::Data<AppState>,
+    organisation: &str,
+    application: &str,
+    important: &[String],
+    lazy: &[String],
+    resources: &[String],
+    primary_index: &str,
+) -> airborne_types::Result<Vec<FileEntry>> {
+    let total_expected: usize = important.len() + lazy.len() + resources.len() + 1;
+
+    let combined_files: Vec<String> = important
+        .iter()
+        .cloned()
+        .chain(lazy.iter().cloned())
+        .chain(resources.iter().cloned())
+        .chain(std::iter::once(primary_index.to_string()))
+        .collect();
 
     let files = get_files_by_file_keys_async(
         state.db_pool.clone(),
-        organisation.clone(),
-        application.clone(),
-        combined_files.clone(),
+        organisation.to_string(),
+        application.to_string(),
+        combined_files,
     )
     .await
     .map_err(|e| ABError::InternalServerError(format!("Failed to get files by keys: {}", e)))?;
 
-    if files.len() != combined_files.len() {
+    if files.len() != total_expected {
         return Err(ABError::InternalServerError(
             "Some files were missing in DB".to_string(),
         ));
     }
 
+    Ok(files)
+}
+
+struct OverrideInputs<'a> {
+    important: &'a [String],
+    lazy: &'a [String],
+    resources: &'a [String],
+    sub_packages: &'a [String],
+    properties: &'a Option<Value>,
+}
+
+fn build_override_maps(
+    req: &Json<CreateReleaseRequest>,
+    config_document: &Option<Document>,
+    pkg_version: i32,
+    application: &str,
+    package_data: &PackageV2Entry,
+    primary_index: &str,
+    inputs: OverrideInputs<'_>,
+) -> airborne_types::Result<OverrideMaps> {
     let config_version = uuid::Uuid::new_v4().to_string();
 
-    let mut control_overrides = std::collections::HashMap::new();
+    let OverrideInputs {
+        important,
+        lazy,
+        resources,
+        sub_packages,
+        properties,
+    } = inputs;
+
+    let mut control_overrides = HashMap::new();
     control_overrides.insert(
         "package.version".to_string(),
         Document::Number(aws_smithy_types::Number::PosInt(pkg_version as u64)),
     );
+    control_overrides.insert(
+        "package.group_id".to_string(),
+        Document::String(package_data.package_group_id.to_string()),
+    );
 
-    let put_config_props_in_experiment = |properties: &BTreeMap<String, Document>,
-                                          overrides_map: &mut HashMap<String, Document>|
-     -> () {
-        for (key, value) in properties {
-            overrides_map.insert(format!("config.properties.{}", key), value.clone());
-        }
-    };
-
-    let opt_old_config_props = config_document.as_ref().and_then(|doc| {
-        if let Document::Object(obj) = doc {
-            Some(
-                obj.iter()
-                    .filter_map(|(k, v)| {
-                        if k.starts_with("config.properties.") {
-                            Some((
-                                k.strip_prefix("config.properties.").unwrap().to_string(),
-                                v.clone(),
-                            ))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<BTreeMap<_, _>>(),
-            )
-        } else {
-            None
-        }
-    });
-    let opt_old_config_props_cloned = opt_old_config_props.clone();
-
-    if let Some(Document::Object(obj)) = &config_document {
+    if let Some(Document::Object(obj)) = config_document {
         for (key, value) in obj {
-            // Skip build-tracking keys that are not part of release experiments
-            if key.starts_with("build.") {
-                continue;
+            if !key.starts_with("build.") {
+                control_overrides.insert(key.clone(), value.clone());
             }
-            control_overrides.insert(key.clone(), value.clone());
         }
     } else {
         return Err(ABError::InternalServerError(
@@ -759,8 +909,7 @@ pub async fn build_overrides(
         ));
     }
 
-    let mut experimental_overrides: std::collections::HashMap<String, Document> =
-        std::collections::HashMap::new();
+    let mut experimental_overrides = HashMap::new();
     experimental_overrides.insert(
         "config.version".to_string(),
         Document::String(config_version.clone()),
@@ -777,22 +926,22 @@ pub async fn build_overrides(
     );
     experimental_overrides.insert(
         "config.properties".to_string(),
-        Document::Object(std::collections::HashMap::new()),
+        Document::Object(HashMap::new()),
     );
-    let config_properties: BTreeMap<String, aws_smithy_types::Document> =
-        if let Some(ref props) = req.config.properties {
-            props
-                .iter()
-                .map(|(k, v)| (k.clone(), value_to_document(v)))
-                .collect()
-        } else {
-            opt_old_config_props_cloned.unwrap_or_default()
-        };
 
-    put_config_props_in_experiment(&config_properties, &mut experimental_overrides);
+    let config_properties: BTreeMap<String, Document> = req
+        .config
+        .properties
+        .iter()
+        .map(|(k, v)| (k.clone(), value_to_document(v)))
+        .collect();
+
+    for (key, value) in &config_properties {
+        experimental_overrides.insert(format!("config.properties.{}", key), value.clone());
+    }
     experimental_overrides.insert(
         "package.name".to_string(),
-        Document::String(application.clone()),
+        Document::String(application.to_string()),
     );
     experimental_overrides.insert(
         "package.version".to_string(),
@@ -800,49 +949,139 @@ pub async fn build_overrides(
     );
     experimental_overrides.insert(
         "package.index".to_string(),
-        Document::String(package_data.index.clone()),
+        Document::String(primary_index.to_string()),
+    );
+    experimental_overrides.insert(
+        "package.group_id".to_string(),
+        Document::String(package_data.package_group_id.to_string()),
     );
 
-    if let Some(ref properties) = final_properties {
-        experimental_overrides.insert(
-            "package.properties".to_string(),
-            value_to_document(properties),
-        );
-    } else {
-        experimental_overrides.insert(
-            "package.properties".to_string(),
-            Document::Object(std::collections::HashMap::new()),
-        );
-    }
-    if let Some(ref imp_vec) = final_important {
-        let imp_docs: Vec<Document> = imp_vec.iter().cloned().map(Document::String).collect();
-        experimental_overrides.insert("package.important".to_string(), Document::Array(imp_docs));
-    }
-    if let Some(ref lazy_vec) = final_lazy {
-        let lazy_docs: Vec<Document> = lazy_vec.iter().cloned().map(Document::String).collect();
-        experimental_overrides.insert("package.lazy".to_string(), Document::Array(lazy_docs));
-    }
-    if let Some(ref resources) = final_resources {
-        let res_docs: Vec<Document> = resources.iter().cloned().map(Document::String).collect();
-        experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
-    }
+    experimental_overrides.insert(
+        "package.properties".to_string(),
+        properties
+            .as_ref()
+            .map(value_to_document)
+            .unwrap_or_else(|| Document::Object(HashMap::new())),
+    );
 
-    info!("Control overrides: {:?}", control_overrides);
-    info!("Experimental overrides: {:?}", experimental_overrides);
+    let imp_docs: Vec<Document> = important.iter().cloned().map(Document::String).collect();
+    experimental_overrides.insert("package.important".to_string(), Document::Array(imp_docs));
 
-    Ok(BuildOverrides {
-        final_important,
-        package_data,
-        is_first_release,
-        final_lazy,
-        final_resources,
+    let lazy_docs: Vec<Document> = lazy.iter().cloned().map(Document::String).collect();
+    experimental_overrides.insert("package.lazy".to_string(), Document::Array(lazy_docs));
+
+    let res_docs: Vec<Document> = resources.iter().cloned().map(Document::String).collect();
+    experimental_overrides.insert("resources".to_string(), Document::Array(res_docs));
+
+    let sub_pkg_docs: Vec<Document> = sub_packages.iter().cloned().map(Document::String).collect();
+    experimental_overrides.insert("sub_packages".to_string(), Document::Array(sub_pkg_docs));
+
+    Ok(OverrideMaps {
         config_version,
         config_properties,
-        pkg_version,
-        files,
-        final_properties,
         control_overrides,
         experimental_overrides,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Main entry point
+// ---------------------------------------------------------------------------
+
+pub async fn build_overrides(
+    req: &Json<CreateReleaseRequest>,
+    superposition_org_id: String,
+    application: String,
+    organisation: String,
+    dims: HashMap<String, Value>,
+    state: web::Data<AppState>,
+    workspace: String,
+) -> airborne_types::Result<BuildOverrides> {
+    let config_document = fetch_config(&state, &workspace, &superposition_org_id, &dims).await;
+    let sub_packages = &req.sub_packages.clone().unwrap_or_default();
+
+    let info = resolve_package_info(req, &config_document)?;
+    let parsed_sub_packages = parse_sub_package_keys(sub_packages)?;
+
+    let db_data = fetch_package_db(
+        &state,
+        &organisation,
+        &application,
+        info.known_version,
+        parsed_sub_packages,
+    )
+    .await?;
+
+    let primary_index = validate_file_groups(
+        req,
+        &db_data.package_data,
+        &db_data.sub_packages_data,
+        db_data.pkg_version,
+    )?;
+
+    let files = fetch_release_files(
+        &state,
+        &organisation,
+        &application,
+        &req.package.important,
+        &req.package.lazy,
+        &req.resources,
+        &primary_index,
+    )
+    .await?;
+
+    let inputs = OverrideInputs {
+        important: &req.package.important,
+        lazy: &req.package.lazy,
+        resources: &req.resources,
+        sub_packages,
+        properties: &req.package.properties,
+    };
+    let overrides = build_override_maps(
+        req,
+        &config_document,
+        db_data.pkg_version,
+        &application,
+        &db_data.package_data,
+        &primary_index,
+        inputs,
+    )?;
+
+    let mut validation_map = serde_json::Map::new();
+    validation_map.insert(
+        db_data.primary_group.name.clone(),
+        db_data.package_data.metadata.clone(),
+    );
+    for (sub_pkg, name) in db_data
+        .sub_packages_data
+        .iter()
+        .zip(db_data.sub_package_names.iter())
+    {
+        validation_map.insert(name.clone(), sub_pkg.metadata.clone());
+    }
+    let validation_context = serde_json::Value::Object(validation_map);
+
+    info!("Control overrides: {:?}", overrides.control_overrides);
+    info!(
+        "Experimental overrides: {:?}",
+        overrides.experimental_overrides
+    );
+
+    Ok(BuildOverrides {
+        final_important: req.package.important.clone(),
+        package_data: db_data.package_data,
+        is_first_release: info.is_first_release,
+        final_lazy: req.package.lazy.clone(),
+        final_resources: req.resources.clone(),
+        config_version: overrides.config_version,
+        config_properties: overrides.config_properties,
+        pkg_version: db_data.pkg_version,
+        files,
+        final_properties: req.package.properties.clone().unwrap_or_default(),
+        control_overrides: overrides.control_overrides,
+        experimental_overrides: overrides.experimental_overrides,
+        sub_packages: sub_packages.clone(),
+        validation_context,
     })
 }
 

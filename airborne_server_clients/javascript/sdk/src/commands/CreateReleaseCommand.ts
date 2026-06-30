@@ -48,7 +48,7 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  *     boot_timeout: Number("int"), // required
  *     properties: "DOCUMENT_VALUE", // required
  *   },
- *   package_id: "STRING_VALUE",
+ *   package_id: "STRING_VALUE", // required
  *   package: { // CreateReleaseRequestPackage
  *     properties: "DOCUMENT_VALUE",
  *     important: [ // StringList
@@ -58,10 +58,13 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  *       "STRING_VALUE",
  *     ],
  *   },
+ *   sub_packages: [
+ *     "STRING_VALUE",
+ *   ],
  *   dimensions: { // DimensionsMap
  *     "<keys>": "DOCUMENT_VALUE",
  *   },
- *   resources: [
+ *   resources: [ // required
  *     "STRING_VALUE",
  *   ],
  *   organisation: "STRING_VALUE", // required
@@ -104,6 +107,16 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  * //       },
  * //     ],
  * //   },
+ * //   resources: [ // required
+ * //     {
+ * //       file_path: "STRING_VALUE",
+ * //       url: "STRING_VALUE",
+ * //       checksum: "STRING_VALUE",
+ * //     },
+ * //   ],
+ * //   sub_packages: [ // StringList // required
+ * //     "STRING_VALUE",
+ * //   ],
  * //   experiment: { // ReleaseExperiment
  * //     experiment_id: "STRING_VALUE",
  * //     package_version: Number("int"),

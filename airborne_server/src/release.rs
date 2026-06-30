@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::utils::db::{
+    models::ValidationFunction, schema::hyperotaserver::validation_functions as vf_table,
+};
 use crate::{
     file::utils::parse_file_key,
     middleware::auth::{require_org_and_app, Auth, AuthResponse},
+    organisation::application::validation_functions::{
+        execute_validation_function, DEFAULT_VALIDATION_FUNCTION,
+    },
     release::types::*,
-    types as airborne_types,
+    run_blocking, types as airborne_types,
     types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
@@ -28,6 +34,7 @@ use actix_web::{
 use airborne_authz_macros::authz;
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
+use diesel::prelude::*;
 use http::{HeaderValue, StatusCode};
 use log::info;
 use serde_json::Value;
@@ -173,11 +180,13 @@ async fn get_release(
         .unwrap_or_default();
 
     let rc_package_important =
-        utils::extract_files_from_experiment(&experimental_variant, "package.important");
+        utils::extract_vector_from_experiment(&experimental_variant, "package.important");
     let rc_package_lazy =
-        utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
-    let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
+        utils::extract_vector_from_experiment(&experimental_variant, "package.lazy");
+    let rc_resources = utils::extract_vector_from_experiment(&experimental_variant, "resources");
     let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
+    let rc_package_group_id =
+        utils::extract_file_from_experiment(&experimental_variant, "package.group_id");
     let rc_version = utils::extract_string_from_experiment(&experimental_variant, "config.version");
     let rc_boot_timeout =
         utils::extract_integer_from_experiment::<i64>(&experimental_variant, "config.boot_timeout");
@@ -185,6 +194,8 @@ async fn get_release(
         &experimental_variant,
         "config.release_config_timeout",
     );
+    let rc_sub_packages =
+        utils::extract_vector_from_experiment(&experimental_variant, "sub_packages");
 
     let (index_file, important_files, lazy_files, resource_files) = {
         let all_files = rc_package_important
@@ -306,14 +317,16 @@ async fn get_release(
             version: rc_version,
             properties: Some(nested_config_props_response),
         },
-        package: ServePackage {
+        package: GetReleasePackage {
             name: application.clone(),
             version: package_version.to_string(),
             index: index_file,
             properties: package_properties,
             important: important_files,
             lazy: lazy_files,
+            group_id: rc_package_group_id,
         },
+        sub_packages: rc_sub_packages,
         resources: resource_files,
         experiment: Some(ReleaseExperiment {
             experiment_id: release_key,
@@ -407,6 +420,8 @@ async fn create_release(
         final_properties,
         control_overrides,
         experimental_overrides,
+        sub_packages,
+        validation_context,
     } = utils::build_overrides(
         &req,
         superposition_org_id_from_env.clone(),
@@ -417,6 +432,35 @@ async fn create_release(
         workspace_name.clone(),
     )
     .await?;
+
+    info!("validation context: {:?}", validation_context);
+
+    // Execute validation function
+    let pool = state.db_pool.clone();
+    let org = organisation.clone();
+    let app = application.clone();
+    let function_code = run_blocking!({
+        let mut conn = pool.get()?;
+        let result: Option<ValidationFunction> = vf_table::table
+            .filter(vf_table::org_id.eq(&org))
+            .filter(vf_table::app_id.eq(&app))
+            .first(&mut conn)
+            .optional()?;
+
+        let function_code = match result {
+            Some(vf) => vf.function_code,
+            None => DEFAULT_VALIDATION_FUNCTION.to_string(),
+        };
+        Ok(function_code)
+    })?;
+    let is_valid =
+        execute_validation_function(state.get_ref(), function_code, validation_context).await?;
+
+    if !is_valid {
+        return Err(ABError::BadRequest(
+            "Release validation failed: validation function returned false".to_string(),
+        ));
+    }
 
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
@@ -468,13 +512,7 @@ async fn create_release(
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
 
-    let response_important = final_important.unwrap_or_else(|| {
-        package_data
-            .files
-            .iter()
-            .filter_map(|f| f.as_ref().cloned())
-            .collect()
-    });
+    let response_important = final_important;
 
     if is_first_release {
         // For first ever release -> Directly conclude the experiment to make it live
@@ -508,9 +546,9 @@ async fn create_release(
             });
     }
 
-    let response_lazy = final_lazy.unwrap_or_default();
+    let response_lazy = final_lazy;
 
-    let response_resources = final_resources.unwrap_or_default();
+    let response_resources = final_resources;
 
     let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
 
@@ -543,11 +581,13 @@ async fn create_release(
             version: config_version.clone(),
             properties: Some(nested_config_props_response),
         },
+        sub_packages,
         package: ServePackage {
             name: application.clone(),
             version: pkg_version.to_string(),
             index: {
-                let (file_path, _, _) = parse_file_key(&package_data.index);
+                let primary_index = package_data.index.clone().unwrap_or_default();
+                let (file_path, _, _) = parse_file_key(&primary_index);
                 files
                     .iter()
                     .find(|file| file.file_path == file_path.clone())
@@ -562,7 +602,7 @@ async fn create_release(
                         checksum: "".to_string(),
                     })
             },
-            properties: final_properties.unwrap_or_default(),
+            properties: final_properties,
             important: response_important
                 .iter()
                 .filter_map(|file_key| {
@@ -723,10 +763,11 @@ async fn list_releases(
             .collect();
 
         let rc_package_important =
-            utils::extract_files_from_experiment(&experimental_variant, "package.important");
+            utils::extract_vector_from_experiment(&experimental_variant, "package.important");
         let rc_package_lazy =
-            utils::extract_files_from_experiment(&experimental_variant, "package.lazy");
-        let rc_resources = utils::extract_files_from_experiment(&experimental_variant, "resources");
+            utils::extract_vector_from_experiment(&experimental_variant, "package.lazy");
+        let rc_resources =
+            utils::extract_vector_from_experiment(&experimental_variant, "resources");
         let rc_index = utils::extract_file_from_experiment(&experimental_variant, "package.index");
         let rc_version =
             utils::extract_string_from_experiment(&experimental_variant, "config.version");
@@ -738,6 +779,9 @@ async fn list_releases(
             &experimental_variant,
             "config.release_config_timeout",
         );
+        let rc_sub_packages =
+            utils::extract_vector_from_experiment(&experimental_variant, "sub_packages");
+
         let rc_config_properties = experimental_variant
             .map(|v| &v.overrides)
             .map(|obj| {
@@ -893,6 +937,7 @@ async fn list_releases(
                 important: important_files,
                 lazy: lazy_files,
             },
+            sub_packages: rc_sub_packages,
             resources: resource_files,
             dimensions,
             experiment: Some(utils::build_release_experiment_from_experiment(
@@ -1563,6 +1608,8 @@ async fn update_release(
         final_properties,
         control_overrides,
         experimental_overrides,
+        sub_packages,
+        validation_context,
     } = utils::build_overrides(
         &req,
         superposition_org_id_from_env.clone(),
@@ -1573,6 +1620,32 @@ async fn update_release(
         workspace_name.clone(),
     )
     .await?;
+
+    let pool = state.db_pool.clone();
+    let org = organisation.clone();
+    let app = application.clone();
+    let function_code = run_blocking!({
+        let mut conn = pool.get()?;
+        let result: Option<ValidationFunction> = vf_table::table
+            .filter(vf_table::org_id.eq(&org))
+            .filter(vf_table::app_id.eq(&app))
+            .first(&mut conn)
+            .optional()?;
+
+        let function_code = match result {
+            Some(vf) => vf.function_code,
+            None => DEFAULT_VALIDATION_FUNCTION.to_string(),
+        };
+        Ok(function_code)
+    })?;
+    let is_valid =
+        execute_validation_function(state.get_ref(), function_code, validation_context).await?;
+
+    if !is_valid {
+        return Err(ABError::BadRequest(
+            "Release validation failed: validation function returned false".to_string(),
+        ));
+    }
 
     let experiment_details = state
         .superposition_client
@@ -1639,15 +1712,9 @@ async fn update_release(
         ABError::InternalServerError("Failed to update experiment in Superposition".to_string())
     })?;
 
-    let response_important = final_important.unwrap_or_else(|| {
-        package_data
-            .files
-            .iter()
-            .filter_map(|f| f.as_ref().cloned())
-            .collect()
-    });
-    let response_resources = final_resources.unwrap_or_default();
-    let response_lazy = final_lazy.unwrap_or_default();
+    let response_important = final_important;
+    let response_resources = final_resources;
+    let response_lazy = final_lazy;
     let millis = updated_experiment_response
         .created_at
         .to_millis()
@@ -1673,11 +1740,13 @@ async fn update_release(
             version: config_version.clone(),
             properties: Some(nested_config_props_response),
         },
+        sub_packages,
         package: ServePackage {
             name: application.clone(),
             version: pkg_version.to_string(),
             index: {
-                let (file_path, _, _) = parse_file_key(&package_data.index);
+                let primary_index = package_data.index.clone().unwrap_or_default();
+                let (file_path, _, _) = parse_file_key(&primary_index);
                 files
                     .iter()
                     .find(|file| file.file_path == file_path.clone())
@@ -1692,7 +1761,7 @@ async fn update_release(
                         checksum: "".to_string(),
                     })
             },
-            properties: final_properties.unwrap_or_default(),
+            properties: final_properties,
             important: response_important
                 .iter()
                 .filter_map(|file_key| {

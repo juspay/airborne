@@ -65,7 +65,6 @@ interface ChecksummedFile {
   url: string;
   checksum: string;
 }
-
 interface ReleaseConfig {
   boot_timeout: number;
   release_config_timeout: number;
@@ -111,10 +110,14 @@ export interface ReleasePayload {
 function toServeReleaseConfig(payload: ReleasePayload): ServeReleaseConfig {
   const { config, resources, package: pkg } = payload;
   const { version, properties, index, important, lazy } = pkg;
-
+  const filteredResources = resources.map((res) => ({
+    file_path: res.file_path,
+    url: res.url,
+    checksum: res.checksum,
+  }));
   return {
     config,
-    resources,
+    resources: filteredResources,
     package: { version, properties, index, important, lazy },
   };
 }
