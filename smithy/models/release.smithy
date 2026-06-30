@@ -19,6 +19,8 @@ structure ServeFile {
 
     /// Checksum used to verify the downloaded file.
     checksum: String
+    /// Size of the file in bytes
+    size: Long
 }
 
 /// List of files served to the SDK.
