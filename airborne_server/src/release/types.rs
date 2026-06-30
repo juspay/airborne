@@ -35,6 +35,7 @@ pub struct ServeFile {
     pub file_path: String,
     pub url: String,
     pub checksum: String,
+    pub size: i64,
 }
 
 #[derive(Serialize)]
@@ -83,6 +84,7 @@ pub struct Resource {
     pub file_path: String,
     pub url: String,
     pub checksum: String,
+    pub size: i64,
 }
 
 #[derive(Serialize, Debug)]
