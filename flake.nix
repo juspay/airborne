@@ -19,7 +19,37 @@
         # ./nix/rust.nix
       ];
 
-      perSystem = { self', pkgs, config, ... }: {
+      perSystem = { self', pkgs, config, ... }:
+        let
+          v8Target = if pkgs.stdenv.isDarwin then "aarch64-apple-darwin" else "x86_64-unknown-linux-gnu";
+          v8_lib = pkgs.fetchurl {
+            url = "https://github.com/denoland/rusty_v8/releases/download/v137.3.0/librusty_v8_release_${v8Target}.a.gz";
+            sha256 =
+              if pkgs.stdenv.isDarwin then
+                "0w70ykqip4a84z3cb5vibdqw91lywwahl9pc05mw8lp54ikksl30"
+              else
+                "0rv5nl4gcbvdpk3mdwbqvw180nfx2wk173q1cqrvv2h1agg1ys52";
+          };
+          v8_binding = pkgs.fetchurl {
+            url = "https://github.com/denoland/rusty_v8/releases/download/v137.3.0/src_binding_release_${v8Target}.rs";
+            sha256 =
+              if pkgs.stdenv.isDarwin then
+                "14mb5dly52wjnbzv5arv0mhkqm4162ah2wln5dzrz2w6diyryy26"
+              else
+                "1gjqymsz7zc4d61cb6h02l90z1hpff4haagc81ixlk9ipg7p73ng";
+          };
+          v8_mirror = pkgs.linkFarm "v8-mirror" [
+            {
+              name = "v137.3.0/librusty_v8_release_${v8Target}.a.gz";
+              path = v8_lib;
+            }
+            {
+              name = "v137.3.0/src_binding_release_${v8Target}.rs";
+              path = v8_binding;
+            }
+          ];
+        in
+        {
         rust-project.src =
           pkgs.lib.cleanSourceWith {
             src = inputs.self;
@@ -36,6 +66,8 @@
         rust-project.crates.airborne_server.crane.args = {
           buildInputs = [ pkgs.postgresql_15 pkgs.openssl ];
           nativeBuildInputs = [ pkgs.pkg-config ];
+          RUSTY_V8_MIRROR = v8_mirror;
+          RUSTY_V8_SRC_BINDING_PATH = "${v8_mirror}/v137.3.0/src_binding_release_${v8Target}.rs";
         };
         formatter = pkgs.nixpkgs-fmt;
         devShells.default = pkgs.mkShell {

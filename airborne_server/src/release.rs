@@ -439,7 +439,7 @@ async fn create_release(
     let pool = state.db_pool.clone();
     let org = organisation.clone();
     let app = application.clone();
-    let is_valid = run_blocking!({
+    let function_code = run_blocking!({
         let mut conn = pool.get()?;
         let result: Option<ValidationFunction> = vf_table::table
             .filter(vf_table::org_id.eq(&org))
@@ -451,8 +451,10 @@ async fn create_release(
             Some(vf) => vf.function_code,
             None => DEFAULT_VALIDATION_FUNCTION.to_string(),
         };
-        execute_validation_function(&function_code, &validation_context)
+        Ok(function_code)
     })?;
+    let is_valid =
+        execute_validation_function(state.get_ref(), function_code, validation_context).await?;
 
     if !is_valid {
         return Err(ABError::BadRequest(
@@ -1622,7 +1624,7 @@ async fn update_release(
     let pool = state.db_pool.clone();
     let org = organisation.clone();
     let app = application.clone();
-    let is_valid = run_blocking!({
+    let function_code = run_blocking!({
         let mut conn = pool.get()?;
         let result: Option<ValidationFunction> = vf_table::table
             .filter(vf_table::org_id.eq(&org))
@@ -1634,8 +1636,10 @@ async fn update_release(
             Some(vf) => vf.function_code,
             None => DEFAULT_VALIDATION_FUNCTION.to_string(),
         };
-        execute_validation_function(&function_code, &validation_context)
+        Ok(function_code)
     })?;
+    let is_valid =
+        execute_validation_function(state.get_ref(), function_code, validation_context).await?;
 
     if !is_valid {
         return Err(ABError::BadRequest(

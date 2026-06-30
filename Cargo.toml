@@ -17,7 +17,7 @@ members = [
 chrono = { version = "0.4.41" }
 dotenv = { version = "0.15" }
 futures = { version = "0.3" }
-reqwest = { version = "^0.12.5" }
+reqwest = { version = "=0.12.8" }
 serde = { version = "=1.0.221", features = ["derive"] }
 serde_json = { version = "1" }
 thiserror = { version = "2.0.12" }

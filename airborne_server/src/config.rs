@@ -87,6 +87,12 @@ pub struct AppConfig {
     // Migration settings
     pub superposition_migration_strategy: String,
     pub migrations_to_run_on_boot: String,
+
+    // Validation function settings
+    pub validation_execution_timeout_ms: u64,
+    pub validation_max_heap_size_mb: usize,
+    pub validation_max_concurrency: usize,
+    pub validation_queue_timeout_ms: u64,
 }
 
 impl AppConfig {
@@ -233,6 +239,12 @@ impl AppConfig {
                 Some("PATCH"),
             )?,
             migrations_to_run_on_boot: get_env("MIGRATIONS_TO_RUN_ON_BOOT", Some(""))?,
+
+            // Validation function settings
+            validation_execution_timeout_ms: parse_env("VALIDATION_EXECUTION_TIMEOUT_MS", 750),
+            validation_max_heap_size_mb: parse_env("VALIDATION_MAX_HEAP_SIZE_MB", 8),
+            validation_max_concurrency: parse_env("VALIDATION_MAX_CONCURRENCY", 4),
+            validation_queue_timeout_ms: parse_env("VALIDATION_QUEUE_TIMEOUT_MS", 30_000),
         })
     }
 }
