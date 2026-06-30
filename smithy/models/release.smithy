@@ -12,6 +12,8 @@ structure ServeFile {
     file_path: String
     url: String
     checksum: String
+    /// Size of the file in bytes
+    size: Long
 }
 
 list ServeFileList {

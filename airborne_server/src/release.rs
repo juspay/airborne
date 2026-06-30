@@ -215,6 +215,7 @@ async fn get_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect();
@@ -231,6 +232,7 @@ async fn get_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect();
@@ -248,6 +250,7 @@ async fn get_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect();
@@ -261,11 +264,13 @@ async fn get_release(
                         file_path: file.file_path.clone(),
                         url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
+                        size: file.size,
                     })
                     .unwrap_or_else(|| ServeFile {
                         file_path: file_path.clone(),
                         url: String::new(),
                         checksum: String::new(),
+                        size: 0,
                     })
             };
 
@@ -278,6 +283,7 @@ async fn get_release(
                     file_path: String::new(),
                     url: String::new(),
                     checksum: String::new(),
+                    size: 0,
                 },
                 Vec::new(),
                 Vec::new(),
@@ -555,11 +561,13 @@ async fn create_release(
                         file_path: file.file_path.clone(),
                         url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
+                        size: file.size,
                     })
                     .unwrap_or_else(|| ServeFile {
                         file_path: file_path.clone(),
                         url: "".to_string(),
                         checksum: "".to_string(),
+                        size: 0,
                     })
             },
             properties: final_properties.unwrap_or_default(),
@@ -574,6 +582,7 @@ async fn create_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect(),
@@ -588,6 +597,7 @@ async fn create_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect(),
@@ -603,6 +613,7 @@ async fn create_release(
                         file_path: file.file_path.clone(),
                         url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
+                        size: file.size,
                     })
             })
             .collect(),
@@ -789,6 +800,7 @@ async fn list_releases(
                                 file_path: file.file_path.clone(),
                                 url: encode_url_path(&file.url),
                                 checksum: file.checksum.clone(),
+                                size: file.size,
                             })
                     })
                     .collect();
@@ -805,6 +817,7 @@ async fn list_releases(
                                 file_path: file.file_path.clone(),
                                 url: encode_url_path(&file.url),
                                 checksum: file.checksum.clone(),
+                                size: file.size,
                             })
                     })
                     .collect();
@@ -820,6 +833,7 @@ async fn list_releases(
                                 file_path: file.file_path.clone(),
                                 url: encode_url_path(&file.url),
                                 checksum: file.checksum.clone(),
+                                size: file.size,
                             })
                     })
                     .collect();
@@ -833,11 +847,13 @@ async fn list_releases(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                         .unwrap_or_else(|| ServeFile {
                             file_path: file_path.clone(),
                             url: String::new(),
                             checksum: String::new(),
+                            size: 0,
                         })
                 };
 
@@ -850,6 +866,7 @@ async fn list_releases(
                         file_path: String::new(),
                         url: String::new(),
                         checksum: String::new(),
+                        size: 0,
                     },
                     Vec::new(),
                     Vec::new(),
@@ -1397,6 +1414,7 @@ async fn serve_release_handler(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect();
@@ -1412,6 +1430,7 @@ async fn serve_release_handler(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect();
@@ -1427,6 +1446,7 @@ async fn serve_release_handler(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect();
@@ -1440,11 +1460,13 @@ async fn serve_release_handler(
                         file_path: file.file_path.clone(),
                         url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
+                        size: file.size,
                     })
                     .unwrap_or_else(|| ServeFile {
                         file_path: file_path.clone(),
                         url: String::new(),
                         checksum: String::new(),
+                        size: 0,
                     })
             };
 
@@ -1455,6 +1477,7 @@ async fn serve_release_handler(
                     file_path: String::new(),
                     url: String::new(),
                     checksum: String::new(),
+                    size: 0,
                 },
                 Vec::new(),
                 Vec::new(),
@@ -1685,11 +1708,13 @@ async fn update_release(
                         file_path: file.file_path.clone(),
                         url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
+                        size: file.size,
                     })
                     .unwrap_or_else(|| ServeFile {
                         file_path: file_path.clone(),
                         url: "".to_string(),
                         checksum: "".to_string(),
+                        size: 0,
                     })
             },
             properties: final_properties.unwrap_or_default(),
@@ -1704,6 +1729,7 @@ async fn update_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect(),
@@ -1718,6 +1744,7 @@ async fn update_release(
                             file_path: file.file_path.clone(),
                             url: encode_url_path(&file.url),
                             checksum: file.checksum.clone(),
+                            size: file.size,
                         })
                 })
                 .collect(),
@@ -1733,6 +1760,7 @@ async fn update_release(
                         file_path: file.file_path.clone(),
                         url: encode_url_path(&file.url),
                         checksum: file.checksum.clone(),
+                        size: file.size,
                     })
             })
             .collect(),
