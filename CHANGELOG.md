@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.37.2 - 1970-01-01
+### Package updates
+- airborne_server bumped to airborne_server-v0.19.3
+### Global changes
+
+- - -
+
 ## v0.37.1 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.19.2

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.19.3 - 2026-06-30
+#### Bug Fixes
+- backwards compat for builds - (96a603f) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.19.2 - 2026-06-25
 #### Bug Fixes
 - org, app scopes in roles - (c286161) - yuvrajjsingh0
