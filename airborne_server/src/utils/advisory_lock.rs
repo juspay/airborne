@@ -18,10 +18,18 @@
 //! They are useful for coordinating between multiple application instances (e.g., pods)
 //! to ensure only one instance performs a particular operation at a time.
 
-use diesel::{sql_query, sql_types::BigInt, QueryableByName, RunQueryDsl};
+use diesel::{
+    pg::PgConnection,
+    r2d2::{ConnectionManager, PooledConnection},
+    sql_query,
+    sql_types::BigInt,
+    QueryableByName, RunQueryDsl,
+};
 use xxhash_rust::xxh64::xxh64;
 
 use crate::{run_blocking, types::ABError, utils::db::DbPool};
+
+type PooledPgConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// Result of attempting to acquire an advisory lock
 #[derive(QueryableByName, Debug)]
@@ -65,15 +73,15 @@ pub fn generate_lock_id(namespace: LockNamespace, key: &str) -> i64 {
 /// This ensures locks are always released, even if an error occurs.
 pub struct AdvisoryLockGuard {
     lock_id: i64,
-    db_pool: DbPool,
+    conn: Option<PooledPgConnection>,
     released: bool,
 }
 
 impl AdvisoryLockGuard {
-    fn new(lock_id: i64, db_pool: DbPool) -> Self {
+    fn new(lock_id: i64, conn: PooledPgConnection) -> Self {
         Self {
             lock_id,
-            db_pool,
+            conn: Some(conn),
             released: false,
         }
     }
@@ -89,16 +97,16 @@ impl AdvisoryLockGuard {
             return Ok(());
         }
 
-        let pool = self.db_pool.clone();
         let lock_id = self.lock_id;
 
-        run_blocking!({
-            let mut conn = pool.get()?;
-            sql_query("SELECT pg_advisory_unlock($1)")
-                .bind::<BigInt, _>(lock_id)
-                .execute(&mut conn)?;
-            Ok(())
-        })?;
+        if let Some(mut conn) = self.conn.take() {
+            run_blocking!({
+                sql_query("SELECT pg_advisory_unlock($1)")
+                    .bind::<BigInt, _>(lock_id)
+                    .execute(&mut conn)?;
+                Ok(())
+            })?;
+        }
 
         self.released = true;
         log::debug!("Released advisory lock with ID: {}", self.lock_id);
@@ -108,23 +116,17 @@ impl AdvisoryLockGuard {
 
 impl Drop for AdvisoryLockGuard {
     fn drop(&mut self) {
-        if !self.released {
-            // We can't do async in drop, so we need to use a blocking approach
-            // This is a best-effort cleanup
-            if let Ok(mut conn) = self.db_pool.get() {
-                let _ = sql_query("SELECT pg_advisory_unlock($1)")
-                    .bind::<BigInt, _>(self.lock_id)
-                    .execute(&mut conn);
-                log::debug!(
-                    "Released advisory lock with ID: {} (via drop)",
-                    self.lock_id
-                );
-            } else {
-                log::warn!(
-                    "Failed to release advisory lock with ID: {} (could not get connection)",
-                    self.lock_id
-                );
-            }
+        if self.released {
+            return;
+        }
+        if let Some(mut conn) = self.conn.take() {
+            let _ = sql_query("SELECT pg_advisory_unlock($1)")
+                .bind::<BigInt, _>(self.lock_id)
+                .execute(&mut conn);
+            log::debug!(
+                "Released advisory lock with ID: {} (via drop)",
+                self.lock_id
+            );
         }
     }
 }
@@ -156,21 +158,24 @@ pub async fn try_acquire_lock(
     let lock_id = generate_lock_id(namespace, key);
     let pool = db_pool.clone();
 
-    let result: LockResult = run_blocking!({
+    // Acquire on a dedicated connection and hand it to the guard, so the matching
+    // pg_advisory_unlock later runs on the same session that holds the lock.
+    let (acquired, conn) = run_blocking!({
         let mut conn = pool.get()?;
-        Ok(sql_query("SELECT pg_try_advisory_lock($1) as acquired")
+        let result: LockResult = sql_query("SELECT pg_try_advisory_lock($1) as acquired")
             .bind::<BigInt, _>(lock_id)
-            .get_result(&mut conn)?)
+            .get_result(&mut conn)?;
+        Ok((result.acquired, conn))
     })?;
 
-    if result.acquired {
+    if acquired {
         log::debug!(
             "Acquired advisory lock for namespace {:?}, key '{}' (ID: {})",
             namespace,
             key,
             lock_id
         );
-        Ok(Some(AdvisoryLockGuard::new(lock_id, db_pool.clone())))
+        Ok(Some(AdvisoryLockGuard::new(lock_id, conn)))
     } else {
         log::debug!(
             "Failed to acquire advisory lock for namespace {:?}, key '{}' (ID: {}) - already held",

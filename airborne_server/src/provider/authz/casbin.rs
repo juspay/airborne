@@ -170,25 +170,38 @@ impl CasbinAuthzProvider {
         if !apply {
             return Ok(normalized.len());
         }
-        let mut guard = self.enforcer.write().await;
         let mut applied = 0usize;
-        for entry in normalized {
-            let desired = entry.as_vec();
-            // Upsert keyed on (subject, scope, organisation, application): if the
-            // exact grant already exists, leave it untouched; otherwise replace
-            // whatever is there (a stale/lower role, or leftover duplicate rows)
-            // with exactly this grant. Keeps the import idempotent and never piles
-            // up duplicate or conflicting policy rows.
-            let key = desired[..4].to_vec();
-            let existing = guard.get_filtered_policy(0, key.clone());
-            if existing.len() == 1 && existing[0] == desired {
-                continue;
+        {
+            let mut guard = self.enforcer.write().await;
+            for entry in normalized {
+                let desired = entry.as_vec();
+                let key = desired[..4].to_vec();
+                let existing = guard.get_filtered_policy(0, key);
+                if existing.len() == 1 && existing[0] == desired {
+                    continue;
+                }
+                let superseded: Vec<Vec<String>> = existing
+                    .into_iter()
+                    .filter(|rule| rule != &desired)
+                    .collect();
+                guard.add_policy(desired).await.map_err(|error| {
+                    ABError::InternalServerError(format!("Failed to import policy: {error}"))
+                })?;
+                for rule in superseded {
+                    guard
+                        .remove_filtered_policy(0, rule)
+                        .await
+                        .map_err(|error| {
+                            ABError::InternalServerError(format!(
+                                "Failed to remove superseded policy: {error}"
+                            ))
+                        })?;
+                }
+                applied += 1;
             }
-            Self::remove_policies_for_filter_in_guard(&mut guard, 0, key).await?;
-            guard.add_policy(desired).await.map_err(|error| {
-                ABError::InternalServerError(format!("Failed to import policy: {error}"))
-            })?;
-            applied += 1;
+        }
+        if applied > 0 {
+            self.refresh_membership_cache_from_casbin().await?;
         }
         Ok(applied)
     }

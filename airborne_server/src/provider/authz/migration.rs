@@ -250,7 +250,7 @@ pub async fn import_keycloak_authz_to_casbin(
                     )
                     .await
                     .map_err(|error| {
-                        format!("Failed to fetch groups for user '{subject}': {error}")
+                        format!("Failed to fetch groups for user {user_id}: {error}")
                     })?;
                 let group_page_len = group_page.len() as i32;
 
