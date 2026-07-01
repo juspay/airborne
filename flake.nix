@@ -32,12 +32,13 @@
               || (pkgs.lib.hasInfix "migrations" path && pkgs.lib.hasSuffix ".sql" path);
           };
         rust-project.crates.airborne_analytics_server.crane.args = {
-          buildInputs = [ pkgs.openssl pkgs.cyrus_sasl ];
+          buildInputs = [ pkgs.openssl pkgs.cyrus_sasl pkgs.curl ];
           nativeBuildInputs = [ pkgs.pkg-config pkgs.cmake ];
         };
         rust-project.crates.airborne_server.crane.args = {
           buildInputs = [ pkgs.postgresql_15 pkgs.openssl ];
           nativeBuildInputs = [ pkgs.pkg-config ];
+          DOCS_RS = "1";
         };
         formatter = pkgs.nixpkgs-fmt;
         devShells.default = pkgs.mkShell {
