@@ -142,51 +142,6 @@ pub struct OtaEventIngestRequest {
     pub payload: Option<Value>,
 }
 
-/// Analytics query request for querying events
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AnalyticsQuery {
-    pub org_id: Option<String>,
-    pub app_id: Option<String>,
-    pub device_id: Option<String>,
-    pub event_type: Option<OtaEventType>,
-    pub release_id: Option<String>,
-    pub start_time: Option<DateTime<Utc>>,
-    pub end_time: Option<DateTime<Utc>>,
-    pub limit: Option<u64>,
-    pub offset: Option<u64>,
-}
-
-impl Default for AnalyticsQuery {
-    fn default() -> Self {
-        Self {
-            org_id: None,
-            app_id: None,
-            device_id: None,
-            event_type: None,
-            release_id: None,
-            start_time: None,
-            end_time: None,
-            limit: Some(100),
-            offset: Some(0),
-        }
-    }
-}
-
-/// Response structure for analytics queries
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AnalyticsQueryResult {
-    pub events: Vec<Value>,
-    pub total_count: usize,
-    pub page_info: PageInfo,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PageInfo {
-    pub limit: u64,
-    pub offset: u64,
-    pub has_next_page: bool,
-}
-
 /// Adoption metrics response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AdoptionMetrics {
@@ -361,11 +316,4 @@ pub struct PerformanceMetrics {
     pub avg_download_time_ms: f64,
     pub avg_apply_time_ms: f64,
     pub avg_download_size_bytes: f64,
-}
-
-// Generic analytics response wrapper
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AnalyticsResponse<T> {
-    pub data: T,
-    pub timestamp: DateTime<Utc>,
 }
