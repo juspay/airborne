@@ -36,6 +36,8 @@ struct LockResult {
 pub enum LockNamespace {
     /// Locks for superposition migration operations
     SuperpositionMigration = 1,
+    /// Lock for the Keycloak -> Casbin authz import
+    KeycloakToCasbinMigration = 2,
 }
 
 impl LockNamespace {

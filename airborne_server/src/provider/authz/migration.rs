@@ -13,7 +13,12 @@ use url::Url;
 use crate::{
     config::AppConfig,
     provider::authz::casbin::{CasbinAuthzProvider, PolicyEntry},
+    utils::advisory_lock::{try_acquire_lock, LockNamespace},
 };
+
+/// Keycloak admin list endpoints default to a `max` of 100 results when it is
+/// omitted, so we page through in blocks of this size to fetch every record.
+const KEYCLOAK_PAGE_SIZE: i32 = 100;
 
 fn trim_trailing_slash(value: &str) -> String {
     value.trim_end_matches('/').to_string()
@@ -170,55 +175,104 @@ pub async fn import_keycloak_authz_to_casbin(
         .as_ref()
         .ok_or_else(|| "AUTH_ADMIN_ISSUER must be set for Keycloak import".to_string())?;
     let (keycloak_url, realm) = parse_keycloak_admin_issuer(auth_admin_issuer)?;
+
+    let _lock_guard = if apply {
+        match try_acquire_lock(&db_pool, LockNamespace::KeycloakToCasbinMigration, &realm)
+            .await
+            .map_err(|error| {
+                format!("Failed to acquire Keycloak -> Casbin migration lock: {error}")
+            })? {
+            Some(guard) => Some(guard),
+            None => {
+                info!(
+                    "Skipping Keycloak -> Casbin import for realm '{realm}' - another instance is already running it"
+                );
+                return Ok(());
+            }
+        }
+    } else {
+        None
+    };
+
     let admin_token = fetch_admin_token_from_config(app_config).await?;
     let admin = KeycloakAdmin::new(&keycloak_url, admin_token, HttpClient::new());
-
-    let users = admin
-        .realm_users_get(
-            &realm,
-            Some(true),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await
-        .map_err(|error| format!("Failed to list Keycloak users: {error}"))?;
 
     let mut entries = BTreeSet::new();
     let mut ignored_groups = 0usize;
     let mut skipped_users = 0usize;
 
-    for user in users {
-        let Some(user_id) = user.id.as_ref() else {
-            skipped_users += 1;
-            continue;
-        };
-        let Some(subject) = subject_from_user(&user) else {
-            skipped_users += 1;
-            continue;
-        };
-
-        let groups = admin
-            .realm_users_with_user_id_groups_get(&realm, user_id, None, None, None, None)
+    // Page through all users (and each user's groups). Without this, Keycloak's
+    // default 100-result cap would silently drop every user past the first page.
+    let mut user_offset: i32 = 0;
+    loop {
+        let user_page = admin
+            .realm_users_get(
+                &realm,
+                Some(true),               // brief_representation
+                None,                     // email
+                None,                     // email_verified
+                None,                     // enabled
+                None,                     // exact
+                Some(user_offset),        // first (offset)
+                None,                     // first_name
+                None,                     // idp_alias
+                None,                     // idp_user_id
+                None,                     // last_name
+                Some(KEYCLOAK_PAGE_SIZE), // max (page size)
+                None,                     // q
+                None,                     // search
+                None,                     // username
+            )
             .await
-            .map_err(|error| format!("Failed to fetch groups for user '{subject}': {error}"))?;
-        for group in groups {
-            if let Some(entry) = map_group_path_to_policy(&subject, &group) {
-                entries.insert(entry);
-            } else {
-                ignored_groups += 1;
+            .map_err(|error| format!("Failed to list Keycloak users: {error}"))?;
+        let user_page_len = user_page.len() as i32;
+
+        for user in user_page {
+            let Some(user_id) = user.id.as_ref() else {
+                skipped_users += 1;
+                continue;
+            };
+            let Some(subject) = subject_from_user(&user) else {
+                skipped_users += 1;
+                continue;
+            };
+
+            let mut group_offset: i32 = 0;
+            loop {
+                let group_page = admin
+                    .realm_users_with_user_id_groups_get(
+                        &realm,
+                        user_id,
+                        None,                     // brief_representation
+                        Some(group_offset),       // first (offset)
+                        Some(KEYCLOAK_PAGE_SIZE), // max (page size)
+                        None,                     // search
+                    )
+                    .await
+                    .map_err(|error| {
+                        format!("Failed to fetch groups for user '{subject}': {error}")
+                    })?;
+                let group_page_len = group_page.len() as i32;
+
+                for group in group_page {
+                    if let Some(entry) = map_group_path_to_policy(&subject, &group) {
+                        entries.insert(entry);
+                    } else {
+                        ignored_groups += 1;
+                    }
+                }
+
+                if group_page_len < KEYCLOAK_PAGE_SIZE {
+                    break;
+                }
+                group_offset += KEYCLOAK_PAGE_SIZE;
             }
         }
+
+        if user_page_len < KEYCLOAK_PAGE_SIZE {
+            break;
+        }
+        user_offset += KEYCLOAK_PAGE_SIZE;
     }
 
     let casbin_provider = CasbinAuthzProvider::new(Vec::new(), db_pool.clone(), None)
