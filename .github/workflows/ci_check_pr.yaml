@@ -59,10 +59,10 @@ jobs:
       #       git tag "abc_tag" ${{github.event.pull_request.head.sha}}
       #       git tag
 
-      - name: Install libsasl2
+      - name: Install libsasl2 and libcurl
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsasl2-dev
+          sudo apt-get install -y libsasl2-dev libcurl4-openssl-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master

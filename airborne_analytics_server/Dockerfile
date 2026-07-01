@@ -4,7 +4,7 @@ COPY . .
 RUN echo "Building with cargo" && ls -la
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config libsasl2-dev cmake && \
+    apt-get install -y --no-install-recommends pkg-config libsasl2-dev libcurl4-openssl-dev cmake && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/airborne_analytics_server
