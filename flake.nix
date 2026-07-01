@@ -4,7 +4,9 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     systems.url = "github:nix-systems/default";
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+    rust-overlay.url = "github:oxalica/rust-overlay";
     rust-flake.url = "github:juspay/rust-flake";
+    rust-flake.inputs.rust-overlay.follows = "rust-overlay";
   };
 
   outputs = inputs:
