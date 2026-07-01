@@ -15,6 +15,7 @@ use airborne_authz_macros::authz;
 use aws_sdk_s3::primitives::ByteStream;
 use chrono::Utc;
 use diesel::prelude::*;
+use diesel::AggregateExpressionMethods;
 use futures_util::StreamExt;
 use http::HeaderValue;
 use log::info;
@@ -571,10 +572,10 @@ async fn list_file_tags(
         let total_items: i64 = match &search_term {
             Some(search) => base_query()
                 .filter(tag.ilike(format!("%{}%", search)))
-                .select(diesel::dsl::count_distinct(tag))
+                .select(diesel::dsl::count(tag).aggregate_distinct())
                 .first(&mut conn)?,
             None => base_query()
-                .select(diesel::dsl::count_distinct(tag))
+                .select(diesel::dsl::count(tag).aggregate_distinct())
                 .first(&mut conn)?,
         };
 

@@ -6,6 +6,7 @@ use actix_web::{
 };
 use airborne_authz_macros::authz;
 use diesel::prelude::*;
+use diesel::AggregateExpressionMethods;
 
 use crate::{
     file::groups::types::*,
@@ -84,7 +85,7 @@ async fn list_file_groups(
             }
 
             count_query
-                .select(diesel::dsl::count_distinct(file_path))
+                .select(diesel::dsl::count(file_path).aggregate_distinct())
                 .first(&mut conn)?
         };
 
