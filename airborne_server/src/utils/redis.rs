@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     types::ABError,
-    utils::metrics::{CACHE_FAILS, CACHE_HITS, CACHE_MISSES, INSTANCE_ID},
+    utils::metrics::{CACHE_FAILS, CACHE_HITS, CACHE_KEY_LEVELS, CACHE_MISSES, INSTANCE_ID},
 };
 
 #[derive(Debug)]
@@ -56,14 +56,14 @@ impl RedisCache {
             k.push_str(p);
         }
 
-        let mut labels = Vec::with_capacity(9);
+        let mut labels = Vec::with_capacity(4 + CACHE_KEY_LEVELS);
         labels.push(INSTANCE_ID.clone());
         labels.push(self.prefix.clone());
         labels.push(organisation.to_string());
         labels.push(application.to_string());
 
-        // Fill up to 5 levels, pad with "none"
-        for i in 0..5 {
+        // Fill up to CACHE_KEY_LEVELS levels, pad with "none"
+        for i in 0..CACHE_KEY_LEVELS {
             if let Some(p) = parts.get(i) {
                 labels.push((*p).to_string());
             } else {
@@ -72,6 +72,24 @@ impl RedisCache {
         }
 
         RedisKey { key: k, labels }
+    }
+
+    /// Like [`key`](Self::key), but records **constant** metric labels: the
+    /// key-hierarchy levels are reported as `"none"` instead of the actual
+    /// `parts`.
+    ///
+    /// Use this when a `parts` value is high-cardinality or secret (e.g. an
+    /// OAuth state). The value still goes into the Redis key so lookups work,
+    /// but it never becomes a metric label value — avoiding a cardinality
+    /// explosion and keeping secrets out of the metrics backend. Note the value
+    /// can still appear in the key string that is logged, so callers should
+    /// pass a non-secret token (e.g. a hash) rather than the raw secret.
+    pub fn key_unlabeled(&self, organisation: &str, application: &str, parts: &[&str]) -> RedisKey {
+        let mut redis_key = self.key(organisation, application, parts);
+        for level in redis_key.labels.iter_mut().skip(4) {
+            *level = "none".to_string();
+        }
+        redis_key
     }
 
     /// GET and JSON-deserialize into T. Returns Ok(None) on cache miss.
@@ -83,6 +101,38 @@ impl RedisCache {
         let key = redis_key.key.clone();
         let bytes: Option<Vec<u8>> = r.get(&key).await.map_err(|e| {
             error!("Failed to GET {key}: {e}");
+            CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        match bytes {
+            None => {
+                CACHE_MISSES.with_label_values(&redis_key.labels).inc();
+                Ok(None)
+            }
+            Some(b) => {
+                let val = serde_json::from_slice::<T>(&b).map_err(|e| {
+                    CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+                    error!("Failed to decode cache {key}: {e}");
+                    ABError::InternalServerError("service error".to_string())
+                })?;
+                info!("Cache hit for key {:?}", redis_key);
+                CACHE_HITS.with_label_values(&redis_key.labels).inc();
+                Ok(Some(val))
+            }
+        }
+    }
+
+    /// Atomically GET and DELETE (Redis `GETDEL`), JSON-deserializing into T.
+    /// Returns `Ok(None)` if the key was absent.
+    pub async fn get_del<T: DeserializeOwned>(
+        &self,
+        redis_key: &RedisKey,
+    ) -> Result<Option<T>, ABError> {
+        let mut r = (*self.conn).clone();
+        let key = redis_key.key.clone();
+        let bytes: Option<Vec<u8>> = r.get_del(&key).await.map_err(|e| {
+            error!("Failed to GETDEL {key}: {e}");
             CACHE_FAILS.with_label_values(&redis_key.labels).inc();
             ABError::InternalServerError("service error".to_string())
         })?;
