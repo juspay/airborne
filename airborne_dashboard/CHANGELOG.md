@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.14.2 - 2026-07-02
+#### Bug Fixes
+- Bulk file query - (4d6be91) - yuvrajjsingh0
+
+- - -
+
+## v0.38.1 - 2026-07-02
+#### Miscellaneous Chores
+- **(version)** v0.38.1 [skip ci] - (e1da6be) - Airborne Bot
+
+- - -
+
+## v0.38.0 - 2026-07-02
+#### Miscellaneous Chores
+- **(version)** v0.38.0 [skip ci] - (72c7726) - Airborne Bot
+
+- - -
+
+## v0.37.2 - 2026-07-02
+#### Miscellaneous Chores
+- **(version)** v0.37.2 [skip ci] - (4ca949f) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.14.1 - 2026-06-25
 #### Bug Fixes
 - builds failing due to invalid package.lock - (9b08047) - yuvrajjsingh0
