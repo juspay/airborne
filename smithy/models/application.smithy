@@ -34,7 +34,8 @@ structure CreateApplicationRequest {
     organisation: String
 }
 
-/// Create application request operation
+/// Create a new application inside an organisation. Pass the target organisation in the x-organisation header. Returns the created application and the caller's access levels. Requires a bearer token.
+@tags(["Applications"])
 @http(method: "POST", uri: "/api/organisations/applications/create")
 @requiresauth
 operation CreateApplication {

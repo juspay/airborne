@@ -1,0 +1,3741 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Airborne",
+        "version": "",
+        "description": "Service for managing OTA updates and configurations"
+    },
+    "paths": {
+        "/api/file": {
+            "post": {
+                "description": "Register a file by URL, recording its metadata and assigning it a version. Pass the organisation and application in the x-organisation and x-application headers. Use this when the file is already hosted somewhere the server can reach; to upload the bytes directly, use UploadFile instead. Requires a bearer token.",
+                "operationId": "CreateFile",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateFileRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateFile 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateFileResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Files"
+                ]
+            }
+        },
+        "/api/file/groups": {
+            "get": {
+                "description": "List files grouped by path, so that all versions and tags of a file appear together. Supports pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "ListFileGroups",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination",
+                        "schema": {
+                            "type": "number",
+                            "description": "Page number for pagination"
+                        }
+                    },
+                    {
+                        "name": "count",
+                        "in": "query",
+                        "description": "Number of groups per page",
+                        "schema": {
+                            "type": "number",
+                            "description": "Number of groups per page"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search query to filter files by path",
+                        "schema": {
+                            "type": "string",
+                            "description": "Search query to filter files by path"
+                        }
+                    },
+                    {
+                        "name": "tags",
+                        "in": "query",
+                        "description": "Tags to filter files by (comma-separated for multiple values)",
+                        "schema": {
+                            "type": "string",
+                            "description": "Tags to filter files by (comma-separated for multiple values)"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListFileGroups 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListFileGroupsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Files"
+                ]
+            }
+        },
+        "/api/file/list": {
+            "get": {
+                "description": "List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "ListFiles",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination",
+                        "schema": {
+                            "type": "number",
+                            "description": "Page number for pagination"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of files per page",
+                        "schema": {
+                            "type": "number",
+                            "description": "Number of files per page"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search query to filter files",
+                        "schema": {
+                            "type": "string",
+                            "description": "Search query to filter files"
+                        }
+                    },
+                    {
+                        "name": "tags",
+                        "in": "query",
+                        "description": "Tags to filter files by (comma-separated for multiple values, e.g., \"prod,dev,staging\")",
+                        "schema": {
+                            "type": "string",
+                            "description": "Tags to filter files by (comma-separated for multiple values, e.g., \"prod,dev,staging\")"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListFiles 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListFilesResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Files"
+                ]
+            }
+        },
+        "/api/file/upload": {
+            "post": {
+                "description": "Upload a file's bytes directly as the request body and register it in one step. Send the raw file as the payload, with its Base64-encoded SHA-256 digest in the x-checksum header and the organisation and application in the x-organisation and x-application headers. Returns the created file. Requires a bearer token.",
+                "operationId": "UploadFile",
+                "requestBody": {
+                    "content": {
+                        "application/octet-stream": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UploadFileInputPayload"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "file_path",
+                        "in": "query",
+                        "description": "Path where the file will be stored on sdk",
+                        "schema": {
+                            "type": "string",
+                            "description": "Path where the file will be stored on sdk"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "tag",
+                        "in": "query",
+                        "description": "tag to identify the file",
+                        "schema": {
+                            "type": "string",
+                            "description": "tag to identify the file"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-checksum",
+                        "in": "header",
+                        "description": "SHA-256 digest of the file, encoded in Base64, used by the server to verify the integrity of the uploaded file",
+                        "schema": {
+                            "type": "string",
+                            "description": "SHA-256 digest of the file, encoded in Base64, used by the server to verify the integrity of the uploaded file"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UploadFile 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UploadFileResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Files"
+                ]
+            }
+        },
+        "/api/file/{file_key}": {
+            "patch": {
+                "description": "Update the tag of an existing file, identified by its file key in the path (a file path with a version or tag, e.g. \"path/to/file@version:3\" or \"path/to/file@tag:prod\"). Pass the organisation and application in the x-organisation and x-application headers. Returns the updated file. Requires a bearer token.",
+                "operationId": "UpdateFile",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateFileRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "file_key",
+                        "in": "path",
+                        "description": "The file key in the path (e.g., \"$file_path@version:$version_number\" or \"$file_path@tag:$tag\")",
+                        "schema": {
+                            "type": "string",
+                            "description": "The file key in the path (e.g., \"$file_path@version:$version_number\" or \"$file_path@tag:$tag\")"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UpdateFile 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateFileResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Files"
+                ]
+            }
+        },
+        "/api/organisations/": {
+            "get": {
+                "description": "List all organisations the authenticated user belongs to, along with their applications and the caller's access level in each. Requires a bearer token.",
+                "operationId": "ListOrganisations",
+                "responses": {
+                    "200": {
+                        "description": "ListOrganisations 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListOrganisationsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Organisations"
+                ]
+            }
+        },
+        "/api/organisations/applications/create": {
+            "post": {
+                "description": "Create a new application inside an organisation. Pass the target organisation in the x-organisation header. Returns the created application and the caller's access levels. Requires a bearer token.",
+                "operationId": "CreateApplication",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateApplicationRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateApplication 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateApplicationResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Applications"
+                ]
+            }
+        },
+        "/api/organisations/applications/dimension/create": {
+            "post": {
+                "description": "Create a targeting dimension (standard or cohort) that releases can be targeted against. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "CreateDimension",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateDimensionRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateDimension 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateDimensionResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Dimensions"
+                ]
+            }
+        },
+        "/api/organisations/applications/dimension/list": {
+            "get": {
+                "description": "List the targeting dimensions defined for an application, in priority order, with pagination. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "ListDimensions",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination.",
+                        "schema": {
+                            "type": "number",
+                            "description": "Page number for pagination."
+                        }
+                    },
+                    {
+                        "name": "count",
+                        "in": "query",
+                        "description": "Number of dimensions per page.",
+                        "schema": {
+                            "type": "number",
+                            "description": "Number of dimensions per page."
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListDimensions 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListDimensionsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Dimensions"
+                ]
+            }
+        },
+        "/api/organisations/applications/dimension/{dimension}": {
+            "delete": {
+                "description": "Delete a dimension by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "DeleteDimension",
+                "parameters": [
+                    {
+                        "name": "dimension",
+                        "in": "path",
+                        "description": "Name of the dimension",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the dimension"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "DeleteDimension 200 response"
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Dimensions"
+                ]
+            },
+            "put": {
+                "description": "Update a dimension, identified by name in the path — for example to change its priority position. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "UpdateDimension",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateDimensionRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "dimension",
+                        "in": "path",
+                        "description": "Name of the dimension",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the dimension"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UpdateDimension 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateDimensionResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Dimensions"
+                ]
+            }
+        },
+        "/api/organisations/create": {
+            "post": {
+                "description": "Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.",
+                "operationId": "CreateOrganisation",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateOrganisationRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "CreateOrganisation 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateOrganisationResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Organisations"
+                ]
+            }
+        },
+        "/api/organisations/request": {
+            "post": {
+                "description": "Submit a request to have an organisation provisioned (for onboarding flows that require manual approval), including contact details and store links. Returns a confirmation message. Requires a bearer token.",
+                "operationId": "RequestOrganisation",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RequestOrganisationRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "RequestOrganisation 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RequestOrganisationResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Organisations"
+                ]
+            }
+        },
+        "/api/packages": {
+            "post": {
+                "description": "Create a package: an index file plus the set of files that make up an OTA bundle. Pass the organisation and application in the x-organisation and x-application headers. Returns the created package with its assigned version. Requires a bearer token.",
+                "operationId": "CreatePackage",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePackageRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreatePackage 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreatePackageResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Packages"
+                ]
+            }
+        },
+        "/api/packages/list": {
+            "get": {
+                "description": "List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "ListPackages",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Offset for pagination (default: 1)",
+                        "schema": {
+                            "type": "number",
+                            "description": "Offset for pagination (default: 1)"
+                        }
+                    },
+                    {
+                        "name": "count",
+                        "in": "query",
+                        "description": "Limit for pagination (default: 50)",
+                        "schema": {
+                            "type": "number",
+                            "description": "Limit for pagination (default: 50)"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search term for filtering packages using index file path",
+                        "schema": {
+                            "type": "string",
+                            "description": "Search term for filtering packages using index file path"
+                        }
+                    },
+                    {
+                        "name": "all",
+                        "in": "query",
+                        "description": "If true, fetch all packages without pagination",
+                        "schema": {
+                            "type": "boolean",
+                            "description": "If true, fetch all packages without pagination"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListPackages 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListPackagesResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Packages"
+                ]
+            }
+        },
+        "/api/releases": {
+            "post": {
+                "description": "Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.",
+                "operationId": "CreateRelease",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateReleaseRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/releases/list": {
+            "get": {
+                "description": "List releases for an application, with pagination and optional filtering by status or targeting dimension. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "ListReleases",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination (default: 1)",
+                        "schema": {
+                            "type": "number",
+                            "description": "Page number for pagination (default: 1)"
+                        }
+                    },
+                    {
+                        "name": "count",
+                        "in": "query",
+                        "description": "Count of releases per page for pagination (default: 50)",
+                        "schema": {
+                            "type": "number",
+                            "description": "Count of releases per page for pagination (default: 50)"
+                        }
+                    },
+                    {
+                        "name": "all",
+                        "in": "query",
+                        "description": "If true, fetch all releases without pagination",
+                        "schema": {
+                            "type": "boolean",
+                            "description": "If true, fetch all releases without pagination"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Status to filter releases",
+                        "schema": {
+                            "type": "string",
+                            "description": "Status to filter releases"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-dimension",
+                        "in": "header",
+                        "description": "dimension to filter releases in format key1=value1;key2=value2",
+                        "schema": {
+                            "type": "string",
+                            "description": "dimension to filter releases in format key1=value1;key2=value2"
+                        }
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListReleases 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListReleasesResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/releases/{releaseId}": {
+            "get": {
+                "description": "Get a single release by its id, including its config, package, resources, targeting dimensions, and experiment details. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "GetRelease",
+                "parameters": [
+                    {
+                        "name": "releaseId",
+                        "in": "path",
+                        "description": "ID of the release",
+                        "schema": {
+                            "type": "string",
+                            "description": "ID of the release"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/token/issue": {
+            "post": {
+                "description": "Exchange user credentials (client_id and client_secret) for an access token and a refresh token. Public — no auth token required. Call this first, then send the returned access token as a bearer token on subsequent requests.",
+                "operationId": "PostLogin",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PostLoginRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "PostLogin 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PostLoginResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [],
+                "tags": [
+                    "Authentication"
+                ]
+            }
+        },
+        "/api/users": {
+            "get": {
+                "description": "Get the authenticated user's profile, including the organisations they belong to and the caller's access level in each. Requires a bearer token.",
+                "operationId": "GetUser",
+                "responses": {
+                    "200": {
+                        "description": "GetUser 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetUserResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/release/v2/{organisation}/{application}": {
+            "get": {
+                "description": "Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.",
+                "operationId": "ServeReleaseV2",
+                "parameters": [
+                    {
+                        "name": "organisation",
+                        "in": "path",
+                        "description": "Name of the organisation.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "application",
+                        "in": "path",
+                        "description": "Name of the application.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application."
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ServeReleaseV2 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServeReleaseV2ResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Release serving"
+                ]
+            }
+        },
+        "/release/{organisation}/{application}": {
+            "get": {
+                "description": "Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.",
+                "operationId": "ServeRelease",
+                "parameters": [
+                    {
+                        "name": "organisation",
+                        "in": "path",
+                        "description": "Name of the organisation.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "application",
+                        "in": "path",
+                        "description": "Name of the application.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application."
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ServeRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServeReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Release serving"
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Application": {
+                "type": "object",
+                "description": "Application information",
+                "properties": {
+                    "application": {
+                        "type": "string",
+                        "description": "Name of the application"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "access": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Access levels of the user for the organisation"
+                    }
+                },
+                "required": [
+                    "access",
+                    "application",
+                    "organisation"
+                ]
+            },
+            "BadRequestErrorResponseContent": {
+                "type": "object",
+                "description": "Bad request error",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "ConfigProperties": {
+                "type": "object",
+                "description": "Configuration properties",
+                "properties": {
+                    "tenant_info": {
+                        "description": "Tenant-specific configuration, as a JSON document."
+                    }
+                },
+                "required": [
+                    "tenant_info"
+                ]
+            },
+            "CreateApplicationRequestContent": {
+                "type": "object",
+                "description": "Create application request",
+                "properties": {
+                    "application": {
+                        "type": "string",
+                        "description": "Name of the application"
+                    }
+                },
+                "required": [
+                    "application"
+                ]
+            },
+            "CreateApplicationResponseContent": {
+                "type": "object",
+                "description": "Application information",
+                "properties": {
+                    "application": {
+                        "type": "string",
+                        "description": "Name of the application"
+                    },
+                    "organisation": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "access": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Access levels of the user for the organisation"
+                    }
+                },
+                "required": [
+                    "access",
+                    "application",
+                    "organisation"
+                ]
+            },
+            "CreateDimensionRequestContent": {
+                "type": "object",
+                "description": "Create dimension request type",
+                "properties": {
+                    "dimension": {
+                        "type": "string",
+                        "description": "Name of the dimension"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the dimension"
+                    },
+                    "dimension_type": {
+                        "$ref": "#/components/schemas/DimensionType"
+                    },
+                    "depends_on": {
+                        "type": "string",
+                        "description": "Identifier of the dimension this depends on (required for cohort dimensions, ignored for standard dimensions)"
+                    }
+                },
+                "required": [
+                    "description",
+                    "dimension",
+                    "dimension_type"
+                ]
+            },
+            "CreateDimensionResponseContent": {
+                "type": "object",
+                "description": "A created dimension.",
+                "properties": {
+                    "dimension": {
+                        "type": "string",
+                        "description": "Name of the dimension"
+                    },
+                    "description": {
+                        "description": "Description of the dimension"
+                    },
+                    "position": {
+                        "type": "number",
+                        "description": "Position of the dimension"
+                    },
+                    "schema": {
+                        "description": "Schema of the dimension"
+                    },
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Reason for the change"
+                    }
+                },
+                "required": [
+                    "change_reason",
+                    "description",
+                    "dimension",
+                    "position"
+                ]
+            },
+            "CreateFileRequestContent": {
+                "type": "object",
+                "description": "Create file request",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path where the file will be stored on sdk"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL from where the file can be downloaded"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Tag to identify the file"
+                    },
+                    "metadata": {
+                        "description": "Metadata associated with the file in Stringified JSON format or a file attachment"
+                    }
+                },
+                "required": [
+                    "file_path",
+                    "url"
+                ]
+            },
+            "CreateFileResponse": {
+                "type": "object",
+                "description": "Create file response",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "id of the file"
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path where the file is stored on sdk"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL from where the file can be downloaded"
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "Version of the file"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Tag associated with the file"
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
+                    },
+                    "checksum": {
+                        "type": "string",
+                        "description": "Checksum of the file"
+                    },
+                    "metadata": {
+                        "description": "Metadata associated with the file"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Status of the file"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Date of creation of the file"
+                    }
+                },
+                "required": [
+                    "checksum",
+                    "created_at",
+                    "file_path",
+                    "id",
+                    "metadata",
+                    "size",
+                    "status",
+                    "url",
+                    "version"
+                ]
+            },
+            "CreateFileResponseContent": {
+                "type": "object",
+                "description": "Create file response",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "id of the file"
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path where the file is stored on sdk"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL from where the file can be downloaded"
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "Version of the file"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Tag associated with the file"
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
+                    },
+                    "checksum": {
+                        "type": "string",
+                        "description": "Checksum of the file"
+                    },
+                    "metadata": {
+                        "description": "Metadata associated with the file"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Status of the file"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Date of creation of the file"
+                    }
+                },
+                "required": [
+                    "checksum",
+                    "created_at",
+                    "file_path",
+                    "id",
+                    "metadata",
+                    "size",
+                    "status",
+                    "url",
+                    "version"
+                ]
+            },
+            "CreateOrganisationRequestContent": {
+                "type": "object",
+                "description": "Organisation creation request",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name for the new organisation."
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "CreateOrganisationResponseContent": {
+                "type": "object",
+                "description": "Organisation information",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "applications": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Application"
+                        },
+                        "description": "List of applications under the organisation"
+                    },
+                    "access": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Access levels of the user for the organisation"
+                    }
+                },
+                "required": [
+                    "access",
+                    "applications",
+                    "name"
+                ]
+            },
+            "CreatePackageRequestContent": {
+                "type": "object",
+                "description": "Create package request",
+                "properties": {
+                    "index": {
+                        "type": "string",
+                        "description": "Index file id"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Optional tag to identify the package."
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Space Separated file ids to be included in the package"
+                    }
+                },
+                "required": [
+                    "files",
+                    "index"
+                ]
+            },
+            "CreatePackageResponseContent": {
+                "type": "object",
+                "description": "Package information",
+                "properties": {
+                    "tag": {
+                        "type": "string",
+                        "description": "Optional tag identifying the package."
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "Version number assigned to the package."
+                    },
+                    "index": {
+                        "type": "string",
+                        "description": "File id of the package's index (entry) file."
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "File ids included in the package."
+                    }
+                },
+                "required": [
+                    "files",
+                    "index",
+                    "version"
+                ]
+            },
+            "CreateReleaseRequestConfig": {
+                "type": "object",
+                "description": "Create release request config",
+                "properties": {
+                    "release_config_timeout": {
+                        "type": "number",
+                        "description": "Timeout for the release config in seconds"
+                    },
+                    "boot_timeout": {
+                        "type": "number",
+                        "description": "Timeout for the package in seconds"
+                    },
+                    "properties": {
+                        "description": "Properties of the config in Stringified JSON format"
+                    }
+                },
+                "required": [
+                    "boot_timeout",
+                    "properties",
+                    "release_config_timeout"
+                ]
+            },
+            "CreateReleaseRequestContent": {
+                "type": "object",
+                "description": "Request body for creating a release.",
+                "properties": {
+                    "config": {
+                        "$ref": "#/components/schemas/CreateReleaseRequestConfig"
+                    },
+                    "package_id": {
+                        "type": "string",
+                        "description": "Package ID for the release"
+                    },
+                    "package": {
+                        "$ref": "#/components/schemas/CreateReleaseRequestPackage"
+                    },
+                    "dimensions": {
+                        "$ref": "#/components/schemas/DimensionsMap"
+                    },
+                    "resources": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Resources for the release"
+                    }
+                },
+                "required": [
+                    "config"
+                ]
+            },
+            "CreateReleaseRequestPackage": {
+                "type": "object",
+                "description": "Create release request package",
+                "properties": {
+                    "properties": {
+                        "description": "Properties of the package in Stringified JSON format or a file attachment"
+                    },
+                    "important": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Important files in the package"
+                    },
+                    "lazy": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Lazy files in the package"
+                    }
+                }
+            },
+            "CreateReleaseResponseContent": {
+                "type": "object",
+                "description": "A created release.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "ID of the release"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Creation time of the release"
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/GetReleaseConfig"
+                    },
+                    "package": {
+                        "$ref": "#/components/schemas/ServePackage"
+                    },
+                    "experiment": {
+                        "$ref": "#/components/schemas/ReleaseExperiment"
+                    },
+                    "dimensions": {
+                        "$ref": "#/components/schemas/DimensionsMap"
+                    }
+                },
+                "required": [
+                    "config",
+                    "created_at",
+                    "dimensions",
+                    "id",
+                    "package"
+                ]
+            },
+            "DimensionResponse": {
+                "type": "object",
+                "description": "A targeting dimension.",
+                "properties": {
+                    "dimension": {
+                        "type": "string",
+                        "description": "Name of the dimension"
+                    },
+                    "description": {
+                        "description": "Description of the dimension"
+                    },
+                    "position": {
+                        "type": "number",
+                        "description": "Position of the dimension"
+                    },
+                    "schema": {
+                        "description": "Schema of the dimension"
+                    },
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Reason for the change"
+                    },
+                    "mandatory": {
+                        "type": "boolean",
+                        "description": "Whether a value for this dimension is required when targeting."
+                    }
+                },
+                "required": [
+                    "change_reason",
+                    "description",
+                    "dimension",
+                    "position"
+                ]
+            },
+            "DimensionType": {
+                "type": "string",
+                "description": "Kind of targeting dimension.",
+                "enum": [
+                    "standard",
+                    "cohort"
+                ]
+            },
+            "DimensionsMap": {
+                "type": "object",
+                "additionalProperties": {
+                    "description": "Dimension value"
+                },
+                "description": "Map of dimension name to value."
+            },
+            "FileGroup": {
+                "type": "object",
+                "description": "Represents a group of file versions",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The file path (unique identifier for the group)"
+                    },
+                    "total_versions": {
+                        "type": "number",
+                        "description": "Total number of versions for this file"
+                    },
+                    "versions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FileGroupVersion"
+                        },
+                        "description": "List of all versions"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FileGroupTag"
+                        },
+                        "description": "List of tags associated with versions"
+                    }
+                },
+                "required": [
+                    "file_path",
+                    "tags",
+                    "total_versions",
+                    "versions"
+                ]
+            },
+            "FileGroupTag": {
+                "type": "object",
+                "description": "Represents a tag associated with a specific version",
+                "properties": {
+                    "tag": {
+                        "type": "string",
+                        "description": "The tag value"
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "The version this tag is associated with"
+                    }
+                },
+                "required": [
+                    "tag",
+                    "version"
+                ]
+            },
+            "FileGroupVersion": {
+                "type": "object",
+                "description": "Represents a version within a file group",
+                "properties": {
+                    "version": {
+                        "type": "number",
+                        "description": "The version number"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL from where the file can be downloaded"
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Date when this version was created"
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "size",
+                    "url",
+                    "version"
+                ]
+            },
+            "ForbiddenErrorResponseContent": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "GetReleaseConfig": {
+                "type": "object",
+                "description": "Resolved release configuration returned to callers.",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "description": "Version identifier of the config."
+                    },
+                    "release_config_timeout": {
+                        "type": "number",
+                        "description": "Time allowed for fetching the release config, in seconds."
+                    },
+                    "boot_timeout": {
+                        "type": "number",
+                        "description": "Time allowed for the app to boot, in seconds."
+                    },
+                    "properties": {
+                        "$ref": "#/components/schemas/ConfigProperties"
+                    }
+                },
+                "required": [
+                    "boot_timeout",
+                    "properties",
+                    "release_config_timeout",
+                    "version"
+                ]
+            },
+            "GetReleaseResponse": {
+                "type": "object",
+                "description": "A release with its full details.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "ID of the release."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the release was created."
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/GetReleaseConfig"
+                    },
+                    "package": {
+                        "$ref": "#/components/schemas/ServePackage"
+                    },
+                    "resources": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServeFile"
+                        },
+                        "description": "Additional resources served with the release."
+                    },
+                    "experiment": {
+                        "$ref": "#/components/schemas/ReleaseExperiment"
+                    },
+                    "dimensions": {
+                        "$ref": "#/components/schemas/DimensionsMap"
+                    }
+                }
+            },
+            "GetReleaseResponseContent": {
+                "type": "object",
+                "description": "A release with its full details.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "ID of the release."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the release was created."
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/GetReleaseConfig"
+                    },
+                    "package": {
+                        "$ref": "#/components/schemas/ServePackage"
+                    },
+                    "resources": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServeFile"
+                        },
+                        "description": "Additional resources served with the release."
+                    },
+                    "experiment": {
+                        "$ref": "#/components/schemas/ReleaseExperiment"
+                    },
+                    "dimensions": {
+                        "$ref": "#/components/schemas/DimensionsMap"
+                    }
+                }
+            },
+            "GetUserResponseContent": {
+                "type": "object",
+                "description": "Information about the authenticated user.",
+                "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "description": "Unique identifier of the user."
+                    },
+                    "organisations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Organisation"
+                        },
+                        "description": "Organisations the user belongs to, with the user's access level in each."
+                    },
+                    "user_token": {
+                        "$ref": "#/components/schemas/UserToken"
+                    }
+                },
+                "required": [
+                    "organisations",
+                    "user_id"
+                ]
+            },
+            "InternalServerErrorResponseContent": {
+                "type": "object",
+                "description": "Internal server error",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "ListDimensionsResponseContent": {
+                "type": "object",
+                "description": "Paginated list of dimensions.",
+                "properties": {
+                    "total_pages": {
+                        "type": "number",
+                        "description": "Total number of pages."
+                    },
+                    "total_items": {
+                        "type": "number",
+                        "description": "Total number of dimensions."
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DimensionResponse"
+                        },
+                        "description": "Dimensions on this page."
+                    }
+                }
+            },
+            "ListFileGroupsResponseContent": {
+                "type": "object",
+                "description": "List file groups response",
+                "properties": {
+                    "groups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FileGroup"
+                        },
+                        "description": "List of file groups"
+                    },
+                    "total_items": {
+                        "type": "number",
+                        "description": "Total number of groups matching the query"
+                    },
+                    "total_pages": {
+                        "type": "number",
+                        "description": "Total number of pages"
+                    },
+                    "page": {
+                        "type": "number",
+                        "description": "Current page number"
+                    },
+                    "count": {
+                        "type": "number",
+                        "description": "Number of groups per page"
+                    }
+                },
+                "required": [
+                    "count",
+                    "groups",
+                    "page",
+                    "total_items",
+                    "total_pages"
+                ]
+            },
+            "ListFilesResponseContent": {
+                "type": "object",
+                "description": "List files response",
+                "properties": {
+                    "organisation": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "application": {
+                        "type": "string",
+                        "description": "Name of the application"
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CreateFileResponse"
+                        },
+                        "description": "List of files"
+                    },
+                    "total": {
+                        "type": "number",
+                        "description": "Total number of files"
+                    },
+                    "page": {
+                        "type": "number",
+                        "description": "Current page number"
+                    },
+                    "per_page": {
+                        "type": "number",
+                        "description": "Number of files per page"
+                    }
+                },
+                "required": [
+                    "application",
+                    "files",
+                    "organisation",
+                    "page",
+                    "per_page",
+                    "total"
+                ]
+            },
+            "ListOrganisationsResponseContent": {
+                "type": "object",
+                "description": "List organisations response",
+                "properties": {
+                    "organisations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Organisation"
+                        },
+                        "description": "List of organisations"
+                    }
+                },
+                "required": [
+                    "organisations"
+                ]
+            },
+            "ListPackagesResponseContent": {
+                "type": "object",
+                "description": "List packages response",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Package"
+                        },
+                        "description": "List of packages"
+                    },
+                    "total_pages": {
+                        "type": "number",
+                        "description": "Total number of pages"
+                    },
+                    "total_items": {
+                        "type": "number",
+                        "description": "Total number of items"
+                    }
+                },
+                "required": [
+                    "data",
+                    "total_items",
+                    "total_pages"
+                ]
+            },
+            "ListReleasesResponseContent": {
+                "type": "object",
+                "description": "Paginated list of releases.",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/GetReleaseResponse"
+                        },
+                        "description": "List of releases"
+                    },
+                    "total_pages": {
+                        "type": "number",
+                        "description": "Total number of pages"
+                    },
+                    "total_items": {
+                        "type": "number",
+                        "description": "Total number of items"
+                    }
+                },
+                "required": [
+                    "data",
+                    "total_items",
+                    "total_pages"
+                ]
+            },
+            "NotFoundErrorResponseContent": {
+                "type": "object",
+                "description": "Not found error",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "Organisation": {
+                "type": "object",
+                "description": "Organisation information",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "applications": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Application"
+                        },
+                        "description": "List of applications under the organisation"
+                    },
+                    "access": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Access levels of the user for the organisation"
+                    }
+                },
+                "required": [
+                    "access",
+                    "applications",
+                    "name"
+                ]
+            },
+            "Package": {
+                "type": "object",
+                "description": "Package information",
+                "properties": {
+                    "tag": {
+                        "type": "string",
+                        "description": "Optional tag identifying the package."
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "Version number assigned to the package."
+                    },
+                    "index": {
+                        "type": "string",
+                        "description": "File id of the package's index (entry) file."
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "File ids included in the package."
+                    }
+                },
+                "required": [
+                    "files",
+                    "index",
+                    "version"
+                ]
+            },
+            "PostLoginRequestContent": {
+                "type": "object",
+                "description": "User credentials for login",
+                "properties": {
+                    "client_id": {
+                        "type": "string",
+                        "description": "Gmail of the user"
+                    },
+                    "client_secret": {
+                        "type": "string",
+                        "description": "Password of the user"
+                    }
+                },
+                "required": [
+                    "client_id",
+                    "client_secret"
+                ]
+            },
+            "PostLoginResponseContent": {
+                "type": "object",
+                "description": "Tokens returned after a successful login.",
+                "properties": {
+                    "access_token": {
+                        "type": "string",
+                        "description": "Bearer token to send in the Authorization header on authenticated requests."
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "description": "Type of the token (e.g. \"Bearer\")."
+                    },
+                    "expires_in": {
+                        "type": "number",
+                        "description": "Lifetime of the access token, in seconds."
+                    },
+                    "refresh_token": {
+                        "type": "string",
+                        "description": "Token used to obtain a new access token once the current one expires."
+                    },
+                    "refresh_expires_in": {
+                        "type": "number",
+                        "description": "Lifetime of the refresh token, in seconds."
+                    }
+                },
+                "required": [
+                    "access_token",
+                    "expires_in",
+                    "refresh_expires_in",
+                    "refresh_token",
+                    "token_type"
+                ]
+            },
+            "ReleaseExperiment": {
+                "type": "object",
+                "description": "Details of the experiment backing a release, used to ramp it out gradually.",
+                "properties": {
+                    "experiment_id": {
+                        "type": "string",
+                        "description": "Identifier of the experiment."
+                    },
+                    "package_version": {
+                        "type": "number",
+                        "description": "Package version served by the experiment."
+                    },
+                    "config_version": {
+                        "type": "string",
+                        "description": "Config version served by the experiment."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the experiment was created."
+                    },
+                    "traffic_percentage": {
+                        "type": "number",
+                        "description": "Percentage of traffic currently routed to this release."
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Current status of the experiment."
+                    }
+                }
+            },
+            "RequestOrganisationRequestContent": {
+                "type": "object",
+                "description": "Request organisation request",
+                "properties": {
+                    "organisation_name": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the requester"
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Email of the requester"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "Phone number of the requester"
+                    },
+                    "app_store_link": {
+                        "type": "string",
+                        "description": "App store link"
+                    },
+                    "play_store_link": {
+                        "type": "string",
+                        "description": "Play store link"
+                    }
+                },
+                "required": [
+                    "app_store_link",
+                    "email",
+                    "name",
+                    "organisation_name",
+                    "phone",
+                    "play_store_link"
+                ]
+            },
+            "RequestOrganisationResponseContent": {
+                "type": "object",
+                "description": "Request organisation response",
+                "properties": {
+                    "organisation_name": {
+                        "type": "string",
+                        "description": "Name of the organisation"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Message indicating the status of the request"
+                    }
+                },
+                "required": [
+                    "message",
+                    "organisation_name"
+                ]
+            },
+            "ServeFile": {
+                "type": "object",
+                "description": "A file as served to the SDK, with the location and checksum needed to download and verify it.",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path where the file is stored on the SDK."
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL the SDK downloads the file from."
+                    },
+                    "checksum": {
+                        "type": "string",
+                        "description": "Checksum used to verify the downloaded file."
+                    }
+                }
+            },
+            "ServePackage": {
+                "type": "object",
+                "description": "A package as served to the SDK: the index file plus the files that make up the OTA bundle.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the package."
+                    },
+                    "version": {
+                        "type": "string",
+                        "description": "Version of the package."
+                    },
+                    "index": {
+                        "$ref": "#/components/schemas/ServeFile"
+                    },
+                    "properties": {
+                        "description": "Package properties, as a JSON document."
+                    },
+                    "important": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServeFile"
+                        },
+                        "description": "Files that must be downloaded before boot."
+                    },
+                    "lazy": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServeFile"
+                        },
+                        "description": "Files that can be downloaded lazily after boot."
+                    }
+                }
+            },
+            "ServeReleaseResponseContent": {
+                "type": "object",
+                "description": "Release configuration",
+                "properties": {
+                    "config": {
+                        "$ref": "#/components/schemas/GetReleaseConfig"
+                    },
+                    "package": {
+                        "$ref": "#/components/schemas/Package"
+                    },
+                    "resources": {
+                        "description": "Additional resources for the release, as a JSON document."
+                    }
+                },
+                "required": [
+                    "config",
+                    "package",
+                    "resources"
+                ]
+            },
+            "ServeReleaseV2ResponseContent": {
+                "type": "object",
+                "description": "Release configuration",
+                "properties": {
+                    "config": {
+                        "$ref": "#/components/schemas/GetReleaseConfig"
+                    },
+                    "package": {
+                        "$ref": "#/components/schemas/Package"
+                    },
+                    "resources": {
+                        "description": "Additional resources for the release, as a JSON document."
+                    }
+                },
+                "required": [
+                    "config",
+                    "package",
+                    "resources"
+                ]
+            },
+            "UnauthorizedResponseContent": {
+                "type": "object",
+                "description": "Unauthorized error",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "UpdateDimensionRequestContent": {
+                "type": "object",
+                "properties": {
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Reason for the change"
+                    },
+                    "position": {
+                        "type": "number",
+                        "description": "New position of the dimension"
+                    }
+                },
+                "required": [
+                    "change_reason",
+                    "position"
+                ]
+            },
+            "UpdateDimensionResponseContent": {
+                "type": "object",
+                "description": "A targeting dimension.",
+                "properties": {
+                    "dimension": {
+                        "type": "string",
+                        "description": "Name of the dimension"
+                    },
+                    "description": {
+                        "description": "Description of the dimension"
+                    },
+                    "position": {
+                        "type": "number",
+                        "description": "Position of the dimension"
+                    },
+                    "schema": {
+                        "description": "Schema of the dimension"
+                    },
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Reason for the change"
+                    },
+                    "mandatory": {
+                        "type": "boolean",
+                        "description": "Whether a value for this dimension is required when targeting."
+                    }
+                },
+                "required": [
+                    "change_reason",
+                    "description",
+                    "dimension",
+                    "position"
+                ]
+            },
+            "UpdateFileRequestContent": {
+                "type": "object",
+                "description": "Update file request",
+                "properties": {
+                    "tag": {
+                        "type": "string",
+                        "description": "New tag to update the file with"
+                    }
+                },
+                "required": [
+                    "tag"
+                ]
+            },
+            "UpdateFileResponseContent": {
+                "type": "object",
+                "description": "Create file response",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "id of the file"
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path where the file is stored on sdk"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL from where the file can be downloaded"
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "Version of the file"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Tag associated with the file"
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
+                    },
+                    "checksum": {
+                        "type": "string",
+                        "description": "Checksum of the file"
+                    },
+                    "metadata": {
+                        "description": "Metadata associated with the file"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Status of the file"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Date of creation of the file"
+                    }
+                },
+                "required": [
+                    "checksum",
+                    "created_at",
+                    "file_path",
+                    "id",
+                    "metadata",
+                    "size",
+                    "status",
+                    "url",
+                    "version"
+                ]
+            },
+            "UploadFileInputPayload": {
+                "type": "string",
+                "description": "File path of file to be uploaded",
+                "format": "byte"
+            },
+            "UploadFileResponseContent": {
+                "type": "object",
+                "description": "Create file response",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "id of the file"
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path where the file is stored on sdk"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL from where the file can be downloaded"
+                    },
+                    "version": {
+                        "type": "number",
+                        "description": "Version of the file"
+                    },
+                    "tag": {
+                        "type": "string",
+                        "description": "Tag associated with the file"
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
+                    },
+                    "checksum": {
+                        "type": "string",
+                        "description": "Checksum of the file"
+                    },
+                    "metadata": {
+                        "description": "Metadata associated with the file"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Status of the file"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Date of creation of the file"
+                    }
+                },
+                "required": [
+                    "checksum",
+                    "created_at",
+                    "file_path",
+                    "id",
+                    "metadata",
+                    "size",
+                    "status",
+                    "url",
+                    "version"
+                ]
+            },
+            "UserToken": {
+                "type": "object",
+                "description": "Tokens returned after a successful login.",
+                "properties": {
+                    "access_token": {
+                        "type": "string",
+                        "description": "Bearer token to send in the Authorization header on authenticated requests."
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "description": "Type of the token (e.g. \"Bearer\")."
+                    },
+                    "expires_in": {
+                        "type": "number",
+                        "description": "Lifetime of the access token, in seconds."
+                    },
+                    "refresh_token": {
+                        "type": "string",
+                        "description": "Token used to obtain a new access token once the current one expires."
+                    },
+                    "refresh_expires_in": {
+                        "type": "number",
+                        "description": "Lifetime of the refresh token, in seconds."
+                    }
+                },
+                "required": [
+                    "access_token",
+                    "expires_in",
+                    "refresh_expires_in",
+                    "refresh_token",
+                    "token_type"
+                ]
+            }
+        },
+        "securitySchemes": {
+            "smithy.api.httpBearerAuth": {
+                "type": "http",
+                "description": "HTTP Bearer authentication",
+                "scheme": "Bearer"
+            }
+        }
+    },
+    "security": [
+        {
+            "smithy.api.httpBearerAuth": []
+        }
+    ]
+}

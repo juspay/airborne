@@ -1,0 +1,94 @@
+---
+title: Create & target a release
+description: Roll releases out to specific segments and app versions using dimensions, version cohorts, checkpoints, and traffic ramping.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+A first release goes to everyone. Real rollouts are more careful: ship to one city first, hold an update back from old native versions, or expose a change to internal beta devices only — then ramp traffic up while you watch adoption. This guide shows how Airborne's **dimensions**, **version cohorts**, and **checkpoints** make that precise, and how to ramp and monitor a release safely.
+
+:::info[The mental model]
+A **release** is targeted by matching the **dimensions** sent by each device against the release's targeting rules. Dimensions are evaluated in **priority order**, and rules are **AND-ed** together. A **cohort** dimension turns a raw value (like an app version) into named segments (like "v2 and above"). You then ramp the matched audience between a control and experiment, and conclude to make it 100%.
+:::
+
+## Step 1 — Create the dimensions you'll target on
+
+Open **Dimensions**. Each dimension has a **Weight** (priority) and a **type**: **Standard** (a raw attribute like `city`, `os`, or `app_version`) or **Cohort** (segments derived from a standard dimension).
+
+<Screenshot name="dimensions-list" caption="The Dimensions page. Weight sets evaluation priority; drag the arrows to reorder." />
+
+Click **Create Dimension**, give it a key, pick the type, and describe it. Your app must send a matching value in `getDimensions()` (RN/native) for targeting to apply.
+
+<Screenshot name="dimension-create-dialog" caption="Creating a standard dimension. Choose Cohort to segment an existing dimension instead." width="720px" />
+
+For this guide, assume you have a standard `app_version` dimension (the native app version your SDK reports) and a standard `city`.
+
+## Step 2 — Build a version cohort with checkpoints
+
+To target by **native app version** you use a **cohort** dimension that depends on `app_version`, then define **checkpoints** — semver boundaries that become selectable segments.
+
+Open **Cohorts**, select your cohort dimension (here `version_cohort`, which depends on `app_version`), and add checkpoints on the **Checkpoints** tab. A checkpoint like `v2_and_above` with `value: 2.0.0` and a `semver_ge` comparison matches every device on 2.0.0 or newer.
+
+<Screenshot name="cohorts" caption="Version checkpoints are evaluated top-to-bottom — a device is assigned to the first matching checkpoint." />
+
+:::tip[Order matters]
+Checkpoints are a **timeline**: the first one that matches (from the top) wins. Put your most specific / highest boundaries first. New checkpoints are added at the top (highest priority). Use the **Groups** tab instead when you want an explicit membership list (for example, beta device IDs).
+:::
+
+Why a cohort instead of targeting `app_version` directly? Because checkpoints give you stable, human-named segments (`v2_and_above`, `v2_5_and_above`) that you can reuse across releases and that express *ranges*, not just exact values.
+
+## Step 3 — Create a targeted release
+
+Open **Releases → Create Release** and step through to **Targeting** (step 2). Because this isn't your first release, you can add rules. Click **Add Rule** and build a rule from three parts:
+
+<Screenshot name="release-wizard-2-targeting" caption="A targeting rule has three parts — ① the dimension, ② the operator, and ③ the value. For a cohort dimension the value is a dropdown of your checkpoints and groups." />
+
+1. **Dimension** — pick `version_cohort` (or any dimension).
+2. **Operator** — `Equals`, `Not equals`, or a comparison.
+3. **Value** — for a cohort dimension this is a dropdown of your checkpoints/groups (for example `v2_and_above`); for a standard dimension it's free text (for example `city = Bengaluru`).
+
+Add more rules to narrow further — for example `version_cohort = v2_and_above` **and** `city = Bengaluru`. All rules must match for a device to receive the release. Leaving targeting empty sends the release to everyone.
+
+:::caution[The first release can't be targeted]
+Your application's very first release always goes to all users. Targeting becomes available from the second release onward.
+:::
+
+Finish the wizard (pick the package, set file priorities, add resources) and confirm. See [Dashboard → Releases](/dashboard/releases) for every step.
+
+## Step 4 — Ramp traffic
+
+A targeted release starts as an **experiment**: matched devices are split between the **control** (the previous release) and the **experiment** (this one). You control what fraction sees the experiment.
+
+<Screenshot name="release-detail" caption="An in-progress release. Traffic %, affected users, downloads, and errors update as it ramps." />
+
+Click **Ramp** and raise the traffic percentage. Traffic is capped at **50%** while a release is an experiment — that keeps a 50/50 control split so you can compare. When you're confident, **Conclude** to take it to 100% for the whole matched audience.
+
+<Screenshot name="release-ramp-dialog" caption="Ramp dialog — increase the share of the targeted audience that gets the experiment." width="640px" />
+
+- **Conclude** — promote the experiment to 100% of the matched audience.
+- **Revert / Discard** — stop the rollout and fall back to the control.
+
+## Step 5 — Monitor adoption
+
+The **Analytics** tab tracks how the rollout is going — adoption over time, download performance, and errors — so you can decide whether to keep ramping or revert.
+
+<Screenshot name="release-analytics" caption="The Analytics tab — adoption, performance, and errors for the release." />
+
+You can also confirm what's being served to a slice of users with the **Targeting** tab and with [Views](/dashboard/views) (saved dimension filters).
+
+<Screenshot name="release-targeting-tab" caption="The Targeting tab shows the dimension rules applied to this release." />
+
+## Putting it together
+
+A safe rollout usually looks like:
+
+1. Define dimensions (`app_version`, `city`) and a `version_cohort` with checkpoints.
+2. Create a release targeting `version_cohort = v2_and_above` (don't break older native versions).
+3. Ramp to 10%, watch [analytics](/dashboard/releases), ramp to 25%, then 50%.
+4. **Conclude** to reach 100% — or **Revert** if errors climb.
+
+## Related
+
+- [Dashboard → Dimensions](/dashboard/dimensions) and [Cohorts](/dashboard/cohorts) — the full feature reference.
+- [Dashboard → Releases](/dashboard/releases) — the complete wizard and lifecycle.
+- [Core CLI](/core-cli/command-reference) — create dimensions and releases (`CreateDimension`, `CreateRelease`) from scripts/CI.

@@ -135,8 +135,8 @@ help:
 	@echo "$(YELLOW)Frontend Build Commands:$(NC)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "node-dependencies" "Install Node.js dependencies for React apps"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "dashboard" "Build the dashboard React app"
-	@printf "  $(GREEN)%-20s$(NC) %s\n" "docs" "Build the docs React app"
-	@printf "  $(GREEN)%-20s$(NC) %s\n" "home" "Build the home React app"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "docs" "Start the docs (Docusaurus) dev server on :3001"
+	@printf "  $(GREEN)%-20s$(NC) %s\n" "docs-build" "Build the docs site (static files served at /docs)"
 	@echo ""
 	@echo "$(YELLOW)Analytics Development:$(NC)"
 	@printf "  $(GREEN)%-20s$(NC) %s\n" "run-kafka-clickhouse" "Run analytics with Kafka + ClickHouse stack"
@@ -470,13 +470,19 @@ endif
 
 node-dependencies:
 	cd airborne_dashboard && npm ci
-	cd airborne_server/docs_react && npm ci
+	cd airborne_docs && npm ci
 
 dashboard:
 	cd airborne_dashboard && npm run dev
 
+# Local docs: Docusaurus dev server with hot reload (served at http://localhost:3001/docs/).
+# Runs on 3001 to avoid clashing with the dashboard dev server on 3000.
 docs:
-	cd airborne_server/docs_react && npm run build:dev
+	cd airborne_docs && npm start -- --port 3001 --host 0.0.0.0
+
+# Production build of the docs (static files the server serves at /docs).
+docs-build:
+	cd airborne_docs && npm run build
 
 # Parse USE_ENCRYPTED_SECRETS from command line: make setup USE_ENCRYPTED_SECRETS=true/false
 USE_ENCRYPTED_SECRETS ?= true
@@ -555,7 +561,7 @@ run: kill redis redis-insight db superposition keycloak-db keycloak localstack
 	trap 'kill 0' INT TERM; \
 	$(MAKE) dashboard & \
 	$(MAKE) docs & \
-	cargo watch -w airborne_server/src -w airborne_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd airborne_server && USE_ENCRYPTED_SECRETS='$$ENCRYPTION_MODE' ../target/debug/airborne_server' & \
+	cargo watch -w airborne_server/src -w airborne_server/Cargo.toml -w Cargo.toml -w Cargo.lock -s '$(MAKE) airborne-server && cd airborne_server && USE_ENCRYPTED_SECRETS='$$ENCRYPTION_MODE' DOCS_DIR=../airborne_docs/build ../target/debug/airborne_server' & \
 	wait
 
 stop:
@@ -599,25 +605,22 @@ status:
 frontend-check:
 	@echo "$(YELLOW)🔍 Checking frontend code quality...$(NC)"
 	@cd airborne_dashboard && npm run check
-	@cd airborne_server/docs_react && npm run check
+	@cd airborne_docs && npm run typecheck
 	@echo "$(GREEN)Frontend checks completed$(NC)"
 
 frontend-lint:
 	@echo "$(YELLOW)🔍 Linting frontend code...$(NC)"
 	@cd airborne_dashboard && npm run lint
-	@cd airborne_server/docs_react && npm run lint
 	@echo "$(GREEN)Frontend linting completed$(NC)"
 
 frontend-lint-fix:
 	@echo "$(YELLOW)🔧 Fixing frontend lint issues...$(NC)"
 	@cd airborne_dashboard && npm run lint:fix
-	@cd airborne_server/docs_react && npm run lint:fix
 	@echo "$(GREEN)Frontend lint fixes completed$(NC)"
 
 frontend-format:
 	@echo "$(YELLOW)✨ Formatting frontend code...$(NC)"
 	@cd airborne_dashboard && npm run format
-	@cd airborne_server/docs_react && npm run format
 	@echo "$(GREEN)Frontend formatting completed$(NC)"
 
 lint-fix: LINT_FLAGS += --fix --allow-dirty --allow-staged

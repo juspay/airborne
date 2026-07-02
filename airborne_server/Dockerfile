@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build frontend
+# Build the documentation site (Docusaurus -> static files served at /docs)
 FROM node:22 as frontend-builder
-WORKDIR /app
-COPY airborne_server/docs_react/package*.json ./docs_react/
-WORKDIR /app/docs_react
+WORKDIR /app/airborne_docs
+COPY airborne_docs/package*.json ./
 RUN npm ci
-COPY airborne_server/docs_react/ ./
+COPY airborne_docs/ ./
 
-# Run the build
+# Run the build (produces ./build with baseUrl "/docs/")
 RUN npm run build
 # Make sure the build succeeded
-RUN ls -la dist || echo "dist folder was not created!"
+RUN ls -la build || (echo "Docusaurus build folder was not created!" && exit 1)
 
 # Production build stage
 FROM rust:1.89-bookworm as builder
@@ -46,6 +45,6 @@ RUN apt-get update && \
 WORKDIR /app
 COPY --from=builder /app/target/release/airborne_server /app/airborne_server
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
-COPY --from=frontend-builder /app/docs_react/dist /app/docs_react/dist
+COPY --from=frontend-builder /app/airborne_docs/build /app/docs_dist
 COPY airborne_server/superposition-default-configs.json /app/superposition-default-configs.json
 CMD ["/app/airborne_server"]
