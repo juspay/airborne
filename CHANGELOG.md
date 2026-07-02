@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.38.0 - 2026-07-02
+### Package updates
+- airborne_server bumped to airborne_server-v0.20.0
+### Global changes
+#### Features
+- Use superposition provider for serving release - (667d3f4) - yuvrajjsingh0
+- Remote provider - (6c24498) - yuvrajjsingh0
+#### Miscellaneous Chores
+- fix CI - (067433a) - yuvrajjsingh0
+- remove dead and deprecated code failing lint checks - (e98960f) - yuvrajjsingh0
+- nix flake update for rust 1.91.1 - (a92d80a) - yuvrajjsingh0
+- update nix flake - (3016357) - yuvrajjsingh0
+
+- - -
+
 ## v0.37.2 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.19.3

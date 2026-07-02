@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.20.0 - 2026-07-02
+#### Features
+- Remote provider - (6c24498) - yuvrajjsingh0
+- Use superposition provider for serving release - (667d3f4) - yuvrajjsingh0
+#### Miscellaneous Chores
+- remove dead and deprecated code failing lint checks - (e98960f) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.19.3 - 2026-06-30
 #### Bug Fixes
 - backwards compat for builds - (96a603f) - yuvrajjsingh0

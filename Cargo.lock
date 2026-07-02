@@ -319,7 +319,7 @@ dependencies = [
 
 [[package]]
 name = "airborne_analytics_server"
-version = "0.37.2"
+version = "0.38.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -346,7 +346,7 @@ dependencies = [
 
 [[package]]
 name = "airborne_authz_macros"
-version = "0.37.2"
+version = "0.38.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -355,7 +355,7 @@ dependencies = [
 
 [[package]]
 name = "airborne_server"
-version = "0.37.2"
+version = "0.38.0"
 dependencies = [
  "actix-files",
  "actix-multipart",
