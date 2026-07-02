@@ -15,12 +15,14 @@ use openidconnect::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 
 use crate::{
     types as airborne_types,
     types::{ABError, AppState, AuthnProviderKind, Environment},
     user::types::{LoginFailure, TokenResponse, UserCredentials, UserToken},
+    utils::redis::{RedisCache, RedisKey},
 };
 
 pub mod auth0;
@@ -57,10 +59,10 @@ struct CachedOidcData {
     jwks: JsonWebKeySet,
 }
 
-#[derive(Clone)]
-struct CachedPkceData {
-    created_at: Instant,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct OAuthFlowState {
     code_verifier: String,
+    nonce: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -78,15 +80,10 @@ struct JsonWebKey {
 }
 
 static OIDC_CACHE: OnceLock<RwLock<HashMap<String, CachedOidcData>>> = OnceLock::new();
-static OAUTH_PKCE_CACHE: OnceLock<RwLock<HashMap<String, CachedPkceData>>> = OnceLock::new();
 static OIDC_HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 
 fn oidc_cache() -> &'static RwLock<HashMap<String, CachedOidcData>> {
     OIDC_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
-}
-
-fn oauth_pkce_cache() -> &'static RwLock<HashMap<String, CachedPkceData>> {
-    OAUTH_PKCE_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
 fn oidc_http_client() -> &'static Client {
@@ -127,38 +124,66 @@ fn map_configuration_error(context: &str, error: ConfigurationError) -> ABError 
     ABError::InternalServerError(format!("{context}: {error}"))
 }
 
-fn purge_expired_pkce_entries(cache: &mut HashMap<String, CachedPkceData>) {
-    cache.retain(|_, value| value.created_at.elapsed() <= OAUTH_PKCE_STATE_TTL);
+/// Redis key under which an in-flight OAuth login's PKCE verifier + nonce is
+/// stored, namespaced by the CSRF `state`.
+///
+/// The state is a secret CSRF token, so it is SHA-256 hashed before use: the
+/// raw token never lands in the Redis key string (which gets logged), and
+/// `key_unlabeled` keeps it out of the metric labels (both to avoid leaking it
+/// and to prevent per-login label cardinality blow-up).
+fn oauth_state_key(cache: &RedisCache, oauth_state: &str) -> RedisKey {
+    let mut hasher = Sha256::new();
+    hasher.update(oauth_state.as_bytes());
+    let state_hash = hex::encode(hasher.finalize());
+    cache.key_unlabeled("global", "oauth", &[&state_hash])
 }
 
-async fn save_pkce_verifier(oauth_state: String, code_verifier: String) {
-    let cache = oauth_pkce_cache();
-    let mut write_guard = cache.write().await;
-    purge_expired_pkce_entries(&mut write_guard);
-    write_guard.insert(
-        oauth_state,
-        CachedPkceData {
-            created_at: Instant::now(),
-            code_verifier,
-        },
-    );
+/// Persist the PKCE verifier + nonce for this login, keyed by `oauth_state`.
+async fn save_oauth_flow_state(
+    cache: &RedisCache,
+    oauth_state: &str,
+    code_verifier: String,
+    nonce: String,
+) -> airborne_types::Result<()> {
+    let key = oauth_state_key(cache, oauth_state);
+    cache
+        .set_ex(
+            &key,
+            &OAuthFlowState {
+                code_verifier,
+                nonce,
+            },
+            OAUTH_PKCE_STATE_TTL.as_secs() as usize,
+        )
+        .await
 }
 
-async fn consume_pkce_verifier(oauth_state: Option<&str>) -> airborne_types::Result<String> {
+/// Retrieve (and delete, for one-time use) the stored PKCE verifier + nonce for
+/// `oauth_state`.
+async fn consume_oauth_flow_state(
+    state: &AppState,
+    oauth_state: Option<&str>,
+) -> airborne_types::Result<Option<OAuthFlowState>> {
+    let Some(cache) = &state.redis_cache else {
+        return Ok(None);
+    };
+
     let oauth_state = oauth_state
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| ABError::BadRequest("Missing OAuth state parameter".to_string()))?;
 
-    let cache = oauth_pkce_cache();
-    let mut write_guard = cache.write().await;
-    purge_expired_pkce_entries(&mut write_guard);
-
-    let pkce_entry = write_guard
-        .remove(oauth_state)
+    let key = oauth_state_key(cache, oauth_state);
+    // Atomic read-and-delete (GETDEL) enforces one-time use: if two callbacks
+    // race with the same state, only the first sees `Some`; the rest get `None`
+    // and are rejected below. A failed delete can no longer leave the state
+    // replayable, since the delete is part of the same operation.
+    let flow_state = cache
+        .get_del::<OAuthFlowState>(&key)
+        .await?
         .ok_or_else(|| ABError::Unauthorized("Invalid or expired OAuth state".to_string()))?;
 
-    Ok(pkce_entry.code_verifier)
+    Ok(Some(flow_state))
 }
 
 async fn fetch_oidc_data(
@@ -525,14 +550,19 @@ pub async fn build_oauth_url_common(
         Some(ClientSecret::new(state.env.authn_client_secret.clone())),
     )
     .set_redirect_uri(oidc_redirect_url(state)?);
-    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
     let mut authorization_request = client.authorize_url(
         CoreAuthenticationFlow::AuthorizationCode,
         CsrfToken::new_random,
         Nonce::new_random,
     );
-    authorization_request = authorization_request.set_pkce_challenge(pkce_challenge);
+
+    let pkce_verifier = if state.redis_cache.is_some() {
+        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+        authorization_request = authorization_request.set_pkce_challenge(pkce_challenge);
+        Some(pkce_verifier)
+    } else {
+        None
+    };
 
     for scope in additional_scopes {
         authorization_request = authorization_request.add_scope(Scope::new((*scope).to_string()));
@@ -546,14 +576,23 @@ pub async fn build_oauth_url_common(
         authorization_request =
             authorization_request.add_extra_param((*key).to_string(), (*value).to_string());
     }
-    let (auth_url, csrf_state, _nonce) = authorization_request.url();
+    let (auth_url, csrf_state, nonce) = authorization_request.url();
     let external_auth_url = rewrite_to_external_endpoint(
         auth_url.as_str(),
         &state.env.authn_issuer_url,
         &state.env.authn_external_issuer_url,
     );
     let oauth_state = csrf_state.secret().to_string();
-    save_pkce_verifier(oauth_state.clone(), pkce_verifier.secret().to_string()).await;
+
+    if let (Some(cache), Some(pkce_verifier)) = (&state.redis_cache, pkce_verifier) {
+        save_oauth_flow_state(
+            cache,
+            &oauth_state,
+            pkce_verifier.secret().to_string(),
+            nonce.secret().to_string(),
+        )
+        .await?;
+    }
 
     Ok(OAuthUrlResponse {
         auth_url: external_auth_url,
@@ -566,7 +605,8 @@ pub async fn exchange_code_for_token_common(
     code: &str,
     oauth_state: Option<&str>,
 ) -> airborne_types::Result<TokenResponse> {
-    let pkce_verifier = consume_pkce_verifier(oauth_state).await?;
+    // `Some` only when Redis is configured; `None` means PKCE/nonce are skipped.
+    let flow_state = consume_oauth_flow_state(state, oauth_state).await?;
     let oidc_data = fetch_oidc_data(&state.env, false).await?;
     let client = CoreClient::from_provider_metadata(
         oidc_data.provider_metadata,
@@ -575,18 +615,36 @@ pub async fn exchange_code_for_token_common(
     )
     .set_redirect_uri(oidc_redirect_url(state)?);
 
-    let token_response = client
+    let mut code_exchange = client
         .exchange_code(AuthorizationCode::new(code.to_string()))
         .map_err(|error| {
             map_configuration_error(
                 "OIDC client is missing token endpoint for code exchange",
                 error,
             )
-        })?
-        .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier))
+        })?;
+    if let Some(flow_state) = &flow_state {
+        code_exchange = code_exchange
+            .set_pkce_verifier(PkceCodeVerifier::new(flow_state.code_verifier.clone()));
+    }
+
+    let token_response = code_exchange
         .request_async(oidc_http_client())
         .await
         .map_err(|error| ABError::Unauthorized(format!("Token exchange failed: {error}")))?;
+
+    if let Some(flow_state) = &flow_state {
+        let id_token = token_response.id_token().ok_or_else(|| {
+            ABError::Unauthorized("Authentication response is missing an ID token".to_string())
+        })?;
+        let id_token_verifier = client.id_token_verifier();
+        let expected_nonce = Nonce::new(flow_state.nonce.clone());
+        id_token
+            .claims(&id_token_verifier, &expected_nonce)
+            .map_err(|error| {
+                ABError::Unauthorized(format!("OAuth ID token verification failed: {error}"))
+            })?;
+    }
 
     Ok(to_public_token_response(&token_response))
 }

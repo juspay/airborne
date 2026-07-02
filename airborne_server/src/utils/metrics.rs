@@ -5,33 +5,38 @@ use reqwest::Client;
 use std::time::Duration;
 use tokio::time::interval;
 
+/// Number of key-hierarchy levels (`level_1..level_N`) captured as cache metric
+/// labels. This is a compile-time invariant, not a runtime setting: it must
+/// equal the number of `level_*` entries in [`CACHE_METRIC_LABELS`] (the sized
+/// array below enforces that), and `RedisCache` emits exactly this many level
+/// label values per key.
+pub const CACHE_KEY_LEVELS: usize = 5;
+
+/// Ordered label set shared by every cache counter: four fixed dimensions
+/// followed by [`CACHE_KEY_LEVELS`] key-hierarchy levels. `RedisCache::key`
+/// builds label *values* in exactly this order and arity.
+pub const CACHE_METRIC_LABELS: [&str; 4 + CACHE_KEY_LEVELS] = [
+    "instance", "prefix", "org", "app", "level_1", "level_2", "level_3", "level_4", "level_5",
+];
+
 lazy_static! {
     pub static ref INSTANCE_ID: String = uuid::Uuid::new_v4().to_string();
     pub static ref CACHE_HITS: IntCounterVec = register_int_counter_vec!(
         "redis_cache_hits_total",
         "Number of cache hits by prefix and key hierarchy (pod-specific)",
-        &[
-            "instance", "prefix", "org", "app", "level_1", "level_2", "level_3", "level_4",
-            "level_5"
-        ]
+        &CACHE_METRIC_LABELS
     )
     .unwrap();
     pub static ref CACHE_MISSES: IntCounterVec = register_int_counter_vec!(
         "redis_cache_misses_total",
         "Number of cache misses by prefix and key hierarchy (pod-specific)",
-        &[
-            "instance", "prefix", "org", "app", "level_1", "level_2", "level_3", "level_4",
-            "level_5"
-        ]
+        &CACHE_METRIC_LABELS
     )
     .unwrap();
     pub static ref CACHE_FAILS: IntCounterVec = register_int_counter_vec!(
         "redis_cache_fails_total",
         "Number of cache fails by prefix and key hierarchy (pod-specific)",
-        &[
-            "instance", "prefix", "org", "app", "level_1", "level_2", "level_3", "level_4",
-            "level_5"
-        ]
+        &CACHE_METRIC_LABELS
     )
     .unwrap();
 }
