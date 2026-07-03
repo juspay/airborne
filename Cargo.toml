@@ -11,6 +11,7 @@ members = [
     "airborne_server",
     "airborne_analytics_server",
     "airborne_authz_macros",
+    "diesel-shim",
 ]
 
 [workspace.dependencies]
@@ -29,3 +30,11 @@ uuid = { version = "1.16.0", features = ["serde", "v7", "v4"] }
 [workspace.lints.clippy]
 mod_module_files = "warn"
 manual_range_contains = "allow"
+
+# Redirect the crates.io `diesel` (pulled in only by the casbin diesel-adapter)
+# onto Juspay's fork via the local `diesel-shim` crate, which re-exports
+# `juspay_diesel` under the name `diesel`. This keeps the whole graph on a single
+# diesel, so the adapter shares airborne's pool and inherits the rds-proxy
+# behaviour. `[patch]` can't rename a crate, hence the shim. See diesel-shim/.
+[patch.crates-io]
+diesel = { path = "diesel-shim" }
