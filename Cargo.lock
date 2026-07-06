@@ -3382,14 +3382,9 @@ dependencies = [
  "diesel_derives",
  "downcast-rs",
  "itoa",
- "libsqlite3-sys",
- "mysqlclient-sys",
- "percent-encoding",
  "pq-sys",
  "r2d2",
  "serde_json",
- "time",
- "url",
  "uuid",
 ]
 
@@ -3740,17 +3735,6 @@ name = "mutually_exclusive_features"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e94e1e6445d314f972ff7395df2de295fe51b71821694f0b0e1e79c4f12c8577"
-
-[[package]]
-name = "mysqlclient-sys"
-version = "0.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86a34a2bdec189f1060343ba712983e14cad7e87515cfd9ac4653e207535b6b1"
-dependencies = [
- "pkg-config",
- "semver",
- "vcpkg",
-]
 
 [[package]]
 name = "native-tls"
