@@ -11,7 +11,6 @@ members = [
     "airborne_server",
     "airborne_analytics_server",
     "airborne_authz_macros",
-    "diesel-shim",
 ]
 
 [workspace.dependencies]
