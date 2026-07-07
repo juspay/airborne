@@ -2,6 +2,138 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## smithy-v0.5.0 - 2026-07-07
+#### Features
+- airborne documentation end-to-end - (b895096) - yuvrajjsingh0
+
+- - -
+
+## v0.39.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.39.0 [skip ci] - (34d7ecc) - Airborne Bot
+
+- - -
+
+## v0.38.2 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.38.2 [skip ci] - (85d265a) - Airborne Bot
+
+- - -
+
+## v0.38.1 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.38.1 [skip ci] - (e1da6be) - Airborne Bot
+
+- - -
+
+## v0.38.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.38.0 [skip ci] - (72c7726) - Airborne Bot
+
+- - -
+
+## v0.37.2 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.37.2 [skip ci] - (4ca949f) - Airborne Bot
+
+- - -
+
+## v0.37.1 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.37.1 [skip ci] - (8d2dd58) - Airborne Bot
+
+- - -
+
+## v0.37.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.37.0 [skip ci] - (c2ab543) - Airborne Bot
+
+- - -
+
+## v0.36.5 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.36.5 [skip ci] - (bcfe497) - Airborne Bot
+
+- - -
+
+## v0.36.4 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.36.4 [skip ci] - (f721fe4) - Airborne Bot
+
+- - -
+
+## v0.36.3 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.36.3 [skip ci] - (36389a6) - Airborne Bot
+
+- - -
+
+## v0.36.2 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.36.2 [skip ci] - (8dbcdfc) - Airborne Bot
+
+- - -
+
+## v0.36.1 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.36.1 [skip ci] - (e6a48ac) - Airborne Bot
+
+- - -
+
+## v0.36.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.36.0 [skip ci] - (487e711) - Airborne Bot
+
+- - -
+
+## v0.35.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.35.0 [skip ci] - (7a62afa) - Airborne Bot
+
+- - -
+
+## v0.34.2 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.34.2 [skip ci] - (da14a3e) - Airborne Bot
+
+- - -
+
+## v0.34.1 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.34.1 [skip ci] - (0bbc8f3) - Airborne Bot
+
+- - -
+
+## v0.34.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.34.0 [skip ci] - (0c761ce) - Airborne Bot
+
+- - -
+
+## v0.33.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.33.0 [skip ci] - (41d1b1c) - Airborne Bot
+
+- - -
+
+## v0.32.0 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.32.0 [skip ci] - (6fcfb70) - Airborne Bot
+
+- - -
+
+## v0.31.2 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.31.2 [skip ci] - (1776935) - Airborne Bot
+
+- - -
+
+## v0.31.1 - 2026-07-07
+#### Miscellaneous Chores
+- **(version)** v0.31.1 [skip ci] - (fd3e886) - Airborne Bot
+
+- - -
+
 ## smithy-v0.4.0 - 2026-04-07
 #### Features
 - add update files route in smithy - (0e31956) - Yash Rajput

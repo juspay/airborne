@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.40.0 - 2026-07-07
+### Package updates
+- smithy bumped to smithy-v0.5.0
+- airborne_dashboard bumped to airborne_dashboard-v0.15.0
+- airborne_server bumped to airborne_server-v0.22.0
+### Global changes
+#### Features
+- airborne documentation end-to-end - (b895096) - yuvrajjsingh0
+
+- - -
+
 ## v0.39.0 - 1970-01-01
 ### Package updates
 - airborne_server bumped to airborne_server-v0.21.0

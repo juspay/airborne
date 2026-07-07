@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.22.0 - 2026-07-07
+#### Features
+- airborne documentation end-to-end - (b895096) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.21.0 - 2026-07-02
 #### Features
 - use redis for storing pkce/nonce for authentication requests - (1621cc0) - yuvrajjsingh0
