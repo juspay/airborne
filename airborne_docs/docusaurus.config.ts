@@ -1,13 +1,75 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import * as fs from "fs";
+import * as path from "path";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+
+function docsStaticAssetsPlugin() {
+  return {
+    name: "docs-static-assets",
+    configureWebpack(config: any, isServer: boolean) {
+      // Only relocate for the production client build
+      if (isServer || config.mode !== "production") return {};
+      // The CSS extractor is CssExtractRspackPlugin (with @docusaurus/faster) or
+      // MiniCssExtractPlugin (plain webpack) — both names contain "CssExtract".
+      for (const plugin of config.plugins ?? []) {
+        if (plugin?.constructor?.name?.includes("CssExtract") && plugin.options) {
+          plugin.options.filename = "docs_static/assets/css/[name].[contenthash:8].css";
+          plugin.options.chunkFilename = "docs_static/assets/css/[name].[contenthash:8].css";
+        }
+      }
+      return {
+        output: {
+          filename: "docs_static/assets/js/[name].[contenthash:8].js",
+          chunkFilename: "docs_static/assets/js/[name].[contenthash:8].js",
+          assetModuleFilename: "docs_static/assets/[name].[contenthash:8][ext]",
+        },
+      };
+    },
+  };
+}
+
+// This plugin is to keep the redirect from foo to foo/ under our own
+// control, this emits a small `foo.html` stub at each no-slash path that redirects to the
+// canonical `/foo/` with a root-relative URL (resolves on airborne.juspay.in, never the
+// origin). Because `foo.html` exists, GitHub Pages serves it directly and never issues its
+// own leaking redirect.
+function noSlashRedirectStubsPlugin() {
+  return {
+    name: "no-slash-redirect-stubs",
+    async postBuild({ outDir }: { outDir: string }) {
+      const indexFiles: string[] = [];
+      (function collect(dir: string) {
+        for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) collect(full);
+          else if (e.name === "index.html") indexFiles.push(full);
+        }
+      })(outDir);
+      for (const file of indexFiles) {
+        const relDir = path.relative(outDir, path.dirname(file));
+        if (relDir === "") continue;
+        const urlPath = "/" + relDir.split(path.sep).join("/") + "/";
+        const stub = path.join(outDir, relDir + ".html");
+        if (fs.existsSync(stub)) continue;
+        fs.writeFileSync(
+          stub,
+          `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
+            `<meta http-equiv="refresh" content="0; url=${urlPath}">` +
+            `<title>Redirecting…</title></head>` +
+            `<body>Redirecting to <a href="${urlPath}">${urlPath}</a>…</body></html>\n`,
+        );
+      }
+    },
+  };
+}
 
 const config: Config = {
   title: "Airborne",
   tagline: "Over-the-air updates for React Native, Android, and iOS",
-  favicon: "img/favicon.ico",
+  favicon: "docs_static/img/favicon.ico",
 
   future: {
     v4: true,
@@ -90,6 +152,8 @@ const config: Config = {
   ],
 
   plugins: [
+    docsStaticAssetsPlugin,
+    noSlashRedirectStubsPlugin,
     "docusaurus-plugin-sass",
     // Generates /llms.txt and /llms-full.txt at build time for LLM consumers.
     [
@@ -122,7 +186,7 @@ const config: Config = {
   themes: ["docusaurus-theme-openapi-docs", "@docusaurus/theme-mermaid"],
 
   themeConfig: {
-    image: "img/airborne-social-card.png",
+    image: "docs_static/img/airborne-social-card.png",
     mermaid: {
       theme: { light: "neutral", dark: "dark" },
     },
@@ -140,8 +204,8 @@ const config: Config = {
       title: "",
       logo: {
         alt: "Airborne",
-        src: "img/airborne-logo-light.svg",
-        srcDark: "img/airborne-logo-dark.svg",
+        src: "docs_static/img/airborne-logo-light.svg",
+        srcDark: "docs_static/img/airborne-logo-dark.svg",
         href: "/docs",
         width: 132,
       },

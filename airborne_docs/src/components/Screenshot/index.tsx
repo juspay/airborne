@@ -3,7 +3,7 @@ import ThemedImage from "@theme/ThemedImage";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 
 type ScreenshotProps = {
-  /** File name (without extension) under static/img/screenshots/{light,dark}/ */
+  /** File name (without extension) under static/docs_static/img/screenshots/{light,dark}/ */
   name: string;
   /** Accessible alt text. Falls back to the caption or name. */
   alt?: string;
@@ -18,8 +18,8 @@ type ScreenshotProps = {
  * the dark capture in dark mode, both captured from the live Airborne dashboard.
  */
 export default function Screenshot({ name, alt, caption, width }: ScreenshotProps): React.JSX.Element {
-  const light = useBaseUrl(`/img/screenshots/light/${name}.png`);
-  const dark = useBaseUrl(`/img/screenshots/dark/${name}.png`);
+  const light = useBaseUrl(`/docs_static/img/screenshots/light/${name}.png`);
+  const dark = useBaseUrl(`/docs_static/img/screenshots/dark/${name}.png`);
   const altText = alt ?? (typeof caption === "string" ? caption : name);
 
   return (
