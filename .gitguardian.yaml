@@ -7,3 +7,4 @@ version: 2
 secret:
   ignored-paths:
     - "airborne_docs/docs/api-reference/endpoints/**"
+    - "airborne_docs/docusaurus.config.ts"
