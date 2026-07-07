@@ -4,7 +4,7 @@ import Link from "@docusaurus/Link";
 import useBaseUrl from "@docusaurus/useBaseUrl";
 
 export default function Home(): React.JSX.Element {
-  // Trailing slash matches trailingSlash: true (avoids a redirect hop to /docs/).
+  // Trailing slash matches trailingSlash: true (the canonical /docs/ form).
   const docsUrl = useBaseUrl("/docs/");
   return (
     <>

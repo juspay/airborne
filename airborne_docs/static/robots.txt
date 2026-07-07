@@ -1,0 +1,6 @@
+# Airborne documentation — https://airborne.juspay.in
+# Served at the site root (/robots.txt); route /robots.txt to the docs origin in CloudFront.
+User-agent: *
+Allow: /
+
+Sitemap: https://airborne.juspay.in/sitemap.xml
