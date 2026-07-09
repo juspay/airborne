@@ -35,10 +35,13 @@ futures = { workspace = true }
 futures-util = "0.3"
 google-sheets4 = "=6.0.0"
 hex = "0.4"
+hmac = "0.12"
 http = "0.2.12"
 http-body = "1.0.1"
 jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
+kronos-common = { git = "https://github.com/juspay/kronos.git", rev = "b14c6f005024ac7d4cd106a1bb728697ee545c9c" }
+kronos-worker = { git = "https://github.com/juspay/kronos.git", rev = "b14c6f005024ac7d4cd106a1bb728697ee545c9c" }
 lazy_static = "=1.5.0"
 log = "0.4.27"
 openidconnect = "4.0.1"

@@ -180,9 +180,22 @@ help:
 env-file:
 	@echo "$(YELLOW)🔧 Checking environment file...$(NC)"
 	@if ! [ -e airborne_server/.env ]; then \
-		echo "$(YELLOW).env missing, copying .env.example as .env$(NC)" && \
+		echo "$(YELLOW).env missing, copying .env.example as .env$(NC)"; \
 		cp airborne_server/.env.example airborne_server/.env; \
 		cat airborne_server/.env.docker.extra >> airborne_server/.env; \
+	else \
+		added=0; \
+		for src in airborne_server/.env.example airborne_server/.env.docker.extra; do \
+			while IFS= read -r line || [ -n "$$line" ]; do \
+				case "$$line" in [A-Za-z_]*=*) ;; *) continue ;; esac; \
+				key="$${line%%=*}"; \
+				if grep -qE "^[[:space:]]*$${key}=" airborne_server/.env; then continue; fi; \
+				if [ "$$added" -eq 0 ]; then printf '\n# ---- Backfilled by "make env-file" (new keys from templates) ----\n' >> airborne_server/.env; added=1; fi; \
+				printf '%s\n' "$$line" >> airborne_server/.env; \
+				echo "$(YELLOW)  + $$key (backfilled)$(NC)"; \
+			done < "$$src"; \
+		done; \
+		if [ "$$added" -eq 0 ]; then echo "$(GREEN).env already up to date with templates$(NC)"; fi; \
 	fi
 	@echo "$(GREEN)✅ Environment file ready$(NC)"
 
@@ -546,7 +559,7 @@ kill:
 	-@pkill -f airborne_server/target/debug/airborne_server 2>/dev/null || true
 	@echo "$(GREEN)✅ Process cleanup completed$(NC)"
 
-run: kill redis redis-insight db superposition keycloak-db keycloak localstack
+run: kill env-file redis redis-insight db superposition keycloak-db keycloak localstack
 	@echo "$(YELLOW)🚀 Starting Airborne server...$(NC)"
 	@ENCRYPTION_MODE=$$(grep -E '^USE_ENCRYPTED_SECRETS=' airborne_server/.env 2>/dev/null | cut -d'=' -f2 || echo "$(USE_ENCRYPTED_SECRETS)"); \
 	echo "$(YELLOW)Encryption mode: $$ENCRYPTION_MODE$(NC)"; \

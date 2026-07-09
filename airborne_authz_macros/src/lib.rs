@@ -158,6 +158,7 @@ pub fn authz(args: TokenStream, item: TokenStream) -> TokenStream {
             #allow_app,
         )
         .await?;
+        crate::webhook::record_event(#resource, #action);
         #original_block
     }));
 

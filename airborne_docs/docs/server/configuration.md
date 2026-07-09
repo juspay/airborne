@@ -264,6 +264,33 @@ The Airborne server can **push** its own Prometheus metrics to a [Victoria Metri
 
 Today the exported metrics are the Redis cache counters — `redis_cache_hits_total`, `redis_cache_misses_total`, and `redis_cache_fails_total` — labelled by instance, key prefix, organisation, application, and key-hierarchy level (useful for gauging cache effectiveness). There is no scrape endpoint; delivery is push-only.
 
+## Webhooks (Kronos)
+
+Airborne can deliver **signed HTTP webhooks** when things happen in an application (a release concluded, a package or cohort changed, …) or in an organisation (an application created, a member's role changed, …). Delivery is powered by [Kronos](https://github.com/juspay/kronos), a durable delayed-job engine, which runs **embedded in-process by default** — there is **nothing extra to deploy**. Set `KRONOS_URL` to use a separately-deployed Kronos instead. See the [Webhooks guide](/docs/guides/webhooks) for the user-facing flow.
+
+| Variable | Required | Default / Example | Purpose |
+| --- | --- | --- | --- |
+| `KRONOS_ENABLED` | No | `true` | Master switch for the shared Kronos client/worker. When `false`, no Kronos client/worker is started, so webhooks (its only consumer today) are inert. |
+| `KRONOS_URL` | No | _(empty)_ | When set, use a **remote** (service-mode) Kronos over HTTP at this URL. When empty (default), Kronos runs **embedded** in-process against Airborne's own Postgres. |
+| `KRONOS_API_KEY` | No | `dev-api-key` | Bearer token for a remote Kronos (service mode only). Participates in secret encryption. |
+| `KRONOS_ORG_ID` | No | `airborne` | Kronos organization id (service mode). |
+| `KRONOS_WORKSPACE` | No | `airborne_webhooks` | Kronos workspace. In embedded mode this is the Postgres schema Kronos creates its `kronos_*` tables in. |
+| `KRONOS_ENCRYPTION_KEY` | No | 64 zeros | Embedded mode: key Kronos uses to encrypt the secrets it stores. |
+| `KRONOS_DB_POOL_SIZE` | No | `2` | Embedded mode: size of Kronos's dedicated DB connection pool. |
+| `KRONOS_TABLE_PREFIX` | No | `kronos_` | Embedded mode: prefix for Kronos's own tables. |
+| `KRONOS_DATABASE_URL` | No | _(the migration DB URL)_ | Embedded mode: DB URL Kronos connects with. Defaults to the migration URL, which has the DDL rights needed to create its schema/tables. |
+| `WEBHOOK_CALLBACK_BASE_URL` | No | `http://localhost:8081` | Base URL the Kronos worker calls back into Airborne on (`{base}/internal/webhooks/dispatch`). Must be reachable from the worker. |
+| `WEBHOOK_INTERNAL_SECRET` | **Yes (prod)** | `airborne-internal-dev-secret` | Bearer secret guarding the internal dispatch callback. **Change in production.** |
+| `WEBHOOK_OUTBOUND_TIMEOUT_SEC` | No | `10` | Per-delivery HTTP timeout when calling a customer URL. |
+| `WEBHOOK_MAX_RETRIES` | No | `5` | Default (and cap) for delivery attempts per webhook. |
+| `WEBHOOK_CONCLUDE_DELAY_SECONDS` | No | `60` | Delay before the `release.conclude` webhook fires, so downstream propagation completes first. |
+| `WEBHOOK_DELIVERY_RETENTION_DAYS` | No | `7` | Days of delivery/attempt history to keep. Older rows are deleted by `POST /internal/webhooks/maintenance`, which a recurring Kronos job calls (a plain `DELETE`; attempts cascade). |
+| `WEBHOOK_ALLOW_INSECURE` | No | `false` | **Dev only.** Allow `http`/loopback/private webhook URLs by disabling the SSRF host checks. Leave `false` in production. |
+
+:::info[Embedded mode uses Airborne's Postgres]
+In the default embedded mode, Kronos creates a small set of `kronos_*` tables in the `KRONOS_WORKSPACE` schema of Airborne's database and runs its worker as an in-process background task (an ~200 ms poll loop — no `pg_cron` required). The DB user must be able to create that schema and those tables; `KRONOS_DATABASE_URL` defaults to the migration user's URL for exactly this reason.
+:::
+
 ## Analytics server
 
 The analytics server (`airborne_analytics_server`) is an **optional, separate** service that ingests OTA events. It has its own configuration, parsed in `airborne_analytics_server/src/common/config.rs`. It supports two backends selected by `LOGGING_INFRASTRUCTURE`: **Kafka + ClickHouse** or **Victoria Metrics + Grafana**.

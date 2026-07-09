@@ -26,6 +26,7 @@ import {
   Users2,
   Settings,
   Users,
+  Webhook,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -197,10 +198,20 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           icon: Users,
           label: "Cohorts",
         },
+        {
+          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/webhooks",
+          icon: Webhook,
+          label: "Webhooks",
+        },
       ]
     : [
         { href: "/dashboard/" + encodeURIComponent(org || ""), icon: Activity, label: "Overview" },
         { href: "/dashboard/" + encodeURIComponent(org || "") + "/users", icon: Users2, label: "Users" },
+        {
+          href: "/dashboard/" + encodeURIComponent(org || "") + "/webhooks",
+          icon: Webhook,
+          label: "Webhooks",
+        },
       ];
 
   function useIsActive(items: NavItem[]) {
