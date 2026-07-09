@@ -33,7 +33,7 @@ make setup
 
 What happens:
 
-- **`env-file`** — if `airborne_server/.env` does not exist, it copies `airborne_server/.env.example` to `.env` and appends `airborne_server/.env.docker.extra` (which adds the Postgres/Keycloak/LocalStack/Superposition container settings and ports).
+- **`env-file`** — if `airborne_server/.env` does not exist, it copies `airborne_server/.env.example` to `.env` and appends `airborne_server/.env.docker.extra` (which adds the Postgres/Keycloak/LocalStack/Superposition container settings and ports). If `.env` **already** exists it is preserved as-is, and any keys present in those templates but missing from your `.env` are appended with their template defaults — so pulling changes that introduce new settings (for example the webhook/Kronos variables) backfills them without overwriting your existing values.
 - **`db` / `keycloak-db`** — starts the two Postgres containers and waits for them to accept connections.
 - **`superposition`** — starts Superposition and waits for its `/health` to return `200`.
 - **`keycloak`** — builds and starts Keycloak (with the realm imported) and waits for it to be healthy.
@@ -53,7 +53,7 @@ make setup USE_ENCRYPTED_SECRETS=false
 
 ## Run the server
 
-`make run` is the development loop. It kills any stale server process, ensures the dependency containers are up, runs the init scripts, then starts the dashboard, the docs, and the server under `cargo watch`:
+`make run` is the development loop. It kills any stale server process, refreshes `.env` with any new template keys (the `env-file` target above), ensures the dependency containers are up, runs the init scripts, then starts the dashboard, the docs, and the server under `cargo watch`:
 
 ```bash
 make run

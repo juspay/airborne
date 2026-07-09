@@ -23,6 +23,7 @@ const sidebars: SidebarsConfig = {
         "guides/integrate-react-native",
         "guides/integrate-react-native-expo",
         "guides/create-and-target-a-release",
+        "guides/webhooks",
       ],
     },
     {
@@ -133,6 +134,7 @@ const sidebars: SidebarsConfig = {
             "dashboard/remote-configs",
             "dashboard/views",
             "dashboard/access-tokens",
+            "dashboard/webhooks",
           ],
         },
       ],

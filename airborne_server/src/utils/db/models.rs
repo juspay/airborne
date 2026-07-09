@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
     authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, files, packages,
-    packages_v2, release_views, releases, user_credentials, workspace_names,
+    packages_v2, release_views, releases, user_credentials, webhook_deliveries, webhooks,
+    workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -236,4 +237,113 @@ pub struct NewAuthzRoleBindingEntry {
     pub role_key: String,
     pub resource: String,
     pub action: String,
+}
+
+// ---- Webhooks ----
+
+/// A webhook configuration row. Not `Serialize` — it carries `secret_encrypted`,
+/// which must never leak into an API response. Map to a response DTO instead.
+#[derive(Queryable, Selectable, Debug, Clone)]
+#[diesel(table_name = webhooks)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct WebhookEntry {
+    pub id: uuid::Uuid,
+    // Selected by `as_select()` for table-completeness but never read in Rust: a webhook
+    // is always queried already scoped by org, so this is not surfaced.
+    #[allow(dead_code)]
+    pub org_id: String,
+    /// `None` => organisation-scoped (fires for every app in the org).
+    pub app_id: Option<String>,
+    pub name: String,
+    pub description: String,
+    pub url: String,
+    pub method: String,
+    pub events: serde_json::Value,
+    pub secret_encrypted: Option<String>,
+    pub custom_headers: serde_json::Value,
+    pub enabled: bool,
+    pub payload_version: String,
+    pub max_retries: i32,
+    pub created_at: DateTime<Utc>,
+    pub created_by: String,
+    pub updated_at: DateTime<Utc>,
+    pub updated_by: String,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = webhooks)]
+pub struct NewWebhookEntry {
+    pub org_id: String,
+    /// `None` => organisation-scoped.
+    pub app_id: Option<String>,
+    pub name: String,
+    pub description: String,
+    pub url: String,
+    pub method: String,
+    pub events: serde_json::Value,
+    pub secret_encrypted: Option<String>,
+    pub custom_headers: serde_json::Value,
+    pub enabled: bool,
+    pub payload_version: String,
+    pub max_retries: i32,
+    pub created_by: String,
+    pub updated_by: String,
+}
+
+#[derive(AsChangeset, Default)]
+#[diesel(table_name = webhooks)]
+pub struct WebhookChangeset {
+    pub description: Option<String>,
+    pub url: Option<String>,
+    pub method: Option<String>,
+    pub events: Option<serde_json::Value>,
+    pub custom_headers: Option<serde_json::Value>,
+    pub enabled: Option<bool>,
+    pub max_retries: Option<i32>,
+    pub secret_encrypted: Option<Option<String>>,
+    pub updated_by: Option<String>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Queryable, Selectable, Debug, Clone, Serialize)]
+#[diesel(table_name = webhook_deliveries)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct WebhookDeliveryEntry {
+    pub id: uuid::Uuid,
+    pub webhook_id: uuid::Uuid,
+    pub org_id: String,
+    /// The app whose event triggered this delivery — not the webhook's scope. An
+    /// org-scoped webhook's deliveries carry the triggering app here.
+    pub app_id: Option<String>,
+    pub event: String,
+    pub payload: serde_json::Value,
+    pub status: String,
+    pub kronos_job_id: Option<String>,
+    pub scheduled_for: DateTime<Utc>,
+    pub attempt_count: i32,
+    pub max_attempts: i32,
+    pub last_status_code: Option<i32>,
+    pub is_test: bool,
+    pub idempotency_key: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    /// Array of attempt objects (see `webhook::types::WebhookAttempt`).
+    pub attempts: serde_json::Value,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = webhook_deliveries)]
+pub struct NewWebhookDeliveryEntry {
+    pub id: uuid::Uuid,
+    pub webhook_id: uuid::Uuid,
+    pub org_id: String,
+    pub app_id: Option<String>,
+    pub event: String,
+    pub payload: serde_json::Value,
+    pub status: String,
+    pub kronos_job_id: Option<String>,
+    pub scheduled_for: DateTime<Utc>,
+    pub max_attempts: i32,
+    pub is_test: bool,
+    pub idempotency_key: String,
 }
