@@ -98,6 +98,9 @@ export default function LandingPage() {
             <Link href="/docs" target="_blank" className="text-sm hover:text-primary transition-colors">
               Docs
             </Link>
+            <Link href="/blog" target="_blank" className="text-sm hover:text-primary transition-colors">
+              Blog
+            </Link>
             <Link href="https://juspay.io" target="_blank" className="text-sm hover:text-primary transition-colors">
               Company
             </Link>
