@@ -206,7 +206,8 @@ const config: Config = {
         alt: "Airborne",
         src: "docs_static/img/airborne-logo-light.svg",
         srcDark: "docs_static/img/airborne-logo-dark.svg",
-        href: "/docs",
+        href: "https://airborne.juspay.in/",
+        target: "_self",
         width: 132,
       },
       items: [
