@@ -5,11 +5,18 @@
 //  Copyright © Juspay Technologies. All rights reserved.
 //
 
+#if SWIFT_PACKAGE
+// Must precede AJPApplicationTracker.h: that header declares <AJPLoggerDelegate> against a bare
+// forward declaration. Without the real definition in scope, the class records no conformance and
+// `[logger conformsToProtocol:@protocol(AJPLoggerDelegate)]` below always answers NO, silently
+// dropping every event.
+@import AirborneSwiftCore;
+@import AirborneSwiftModel;
+#endif
+
 #import "AJPApplicationTracker.h"
 #import "AJPHelpers.h"
-#if SWIFT_PACKAGE
-@import AirborneSwiftModel;
-#else
+#if !SWIFT_PACKAGE
 #import <Airborne/Airborne-Swift.h>
 #endif
 

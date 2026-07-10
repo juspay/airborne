@@ -1231,6 +1231,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 map["failed_downloads"] = Array(failedDownloads)
                 map["all_successful"] = failedDownloads.isEmpty
                 map["time_taken"] = NSNumber(value: (Date().timeIntervalSince1970 * 1000) - startTime)
+                // The package is on disk but was not installed this boot; it is staged for the next
+                // Airborne init. Integrators prompt for a reload on this event.
+                map["package_version"] = newManifest.version
+                map["current_package_version"] = currentManifest.version
                 self.tracker.trackInfo("downloads_completed_after_timeout", value: map)
                 
                 resultDownloadFailed = false
