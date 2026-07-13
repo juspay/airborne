@@ -105,6 +105,21 @@ import AirborneSwiftModel
      * @note Use this for logging, analytics, debugging, and monitoring OTA performance.
      */
     @objc optional func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String) -> Void
+
+    /**
+     * Called when a new package's important splits have finished downloading.
+     *
+     * Raised regardless of whether the boot timeout elapsed:
+     * - Timed out: the package is staged and will be installed on the next Airborne
+     *   initialization. Prompt the user to reload to apply it now.
+     * - Did not time out: the package was installed and is already in use on this run.
+     *
+     * @param oldVersion The package version the app is currently running.
+     * @param newVersion The package version that was just downloaded.
+     *
+     * @note Called on a background queue. Dispatch UI updates to the main queue if needed.
+     */
+    @objc optional func onPackageDownloaded(oldVersion: String, newVersion: String) -> Void
     
     /**
      * Called when an individual lazy package download completes (either successfully or with failure).
@@ -363,6 +378,16 @@ extension AirborneServices: AJPApplicationManagerDelegate {
      */
     public func getReleaseConfigHeaders() -> [String : String] {
         self.dimensions
+    }
+
+    /**
+     * Forwards the package-downloaded callback from the application manager to the delegate.
+     */
+    public func onPackageDownloaded(oldVersion: String, newVersion: String) {
+        self.delegate?.onPackageDownloaded?(
+            oldVersion: oldVersion,
+            newVersion: newVersion
+        )
     }
 }
 
