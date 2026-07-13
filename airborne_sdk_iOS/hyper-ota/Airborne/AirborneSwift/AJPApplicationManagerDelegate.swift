@@ -119,4 +119,18 @@ import AirborneSwiftCore
      *       AJPRemoteFileUtil implementation.
      */
     @objc optional func getRemoteFileUtil() -> AJPRemoteFileUtil
+
+    /**
+     * Called when a new package's important splits have finished downloading.
+     *
+     * Raised regardless of whether the boot timeout elapsed: when it did, the package is staged
+     * and installs on the next Airborne initialization; when it did not, it is installed and
+     * applied on this run.
+     *
+     * @param oldVersion The package version the app is currently running.
+     * @param newVersion The package version that was just downloaded.
+     *
+     * @note Called on a background queue. Dispatch UI updates to the main queue.
+     */
+    @objc optional func onPackageDownloaded(oldVersion: String, newVersion: String)
 }

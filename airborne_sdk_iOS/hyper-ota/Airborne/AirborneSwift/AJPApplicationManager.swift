@@ -886,6 +886,20 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
     }
     
+    /**
+     * Raised alongside the `downloads_completed_after_timeout` event: the package finished
+     * downloading after the boot timeout elapsed, so it is staged and installs on the next Airborne
+     * initialization. The app is still running `oldVersion` — prompt for a reload to apply it.
+     *
+     * Not raised when the package installs within the boot timeout; there is nothing to reload for.
+     */
+    private func notifyPackageDownloaded(oldVersion: String, newVersion: String) {
+        self.delegate?.onPackageDownloaded?(
+            oldVersion: oldVersion,
+            newVersion: newVersion
+        )
+    }
+
     private func tryDownloadingUpdate() {
         guard let downloadedManifest = self.downloadedApplicationManifest else { return }
         
@@ -901,8 +915,12 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                     self.downloadedLazy = downloadedManifest.package.lazy
                 }
                 
+                // Captured before the download call, which installs the new package (and so
+                // overwrites self.package) when the boot timeout has not elapsed.
+                let currentPackageVersion = self.package.version
+
                 let (downloadFailed, timedOut) = await self.downloadImportantPackagesWithNewManifest(downloadedManifest.package, currentManifest: self.package)
-                
+
                 if !downloadFailed { // Important packages downloaded successfully/No updates.
                     self.didFinishImportantPackageWithLazyDownloadComplete(timedOut)
                     
@@ -1236,6 +1254,11 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 map["package_version"] = newManifest.version
                 map["current_package_version"] = currentManifest.version
                 self.tracker.trackInfo("downloads_completed_after_timeout", value: map)
+
+                self.notifyPackageDownloaded(
+                    oldVersion: currentManifest.version,
+                    newVersion: newManifest.version
+                )
                 
                 resultDownloadFailed = false
                 resultTimedOut = true
