@@ -34,6 +34,7 @@ import Foundation
     public static let RELEASE_CONFIG_NOTIFICATION = Notification.Name("AJPReleaseConfigNotification")
     public static let RELEASE_CONFIG_TIMEOUT_NOTIFICATION = Notification.Name("AJPReleaseConfigTimeoutNotification")
     public static let LAZY_PACKAGE_NOTIFICATION = Notification.Name("AJPLazyPackageNotification")
+    public static let DOWNLOAD_PROGRESS_NOTIFICATION = Notification.Name("AJPDownloadProgressNotification")
 
     // MARK: - UserDefaults Keys
     public static let APP_VERSION_USER_DEFAULTS_KEY = "in.juspay.airborne.appVersion"

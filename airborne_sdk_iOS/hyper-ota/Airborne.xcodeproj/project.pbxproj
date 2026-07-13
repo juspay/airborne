@@ -35,6 +35,7 @@
 		DC3A44912F91FC8F00E8F78D /* AJPHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A44882F91FC8F00E8F78D /* AJPHelpers.swift */; };
 		DC3A44AF2F92009000E8F78D /* AJPLoggerDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A44AE2F92009000E8F78D /* AJPLoggerDelegate.swift */; };
 		DC63767E2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC63767D2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift */; };
+		DCA1B2C42FB100010000AAA2 /* AJPDownloadProgressTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA1B2C32FB100010000AAA1 /* AJPDownloadProgressTracker.swift */; };
 		DC63767F2F9F2F7E00BE5CD4 /* AJPApplicationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC63767C2F9F2F7E00BE5CD4 /* AJPApplicationManager.swift */; };
 		DC6376812F9F316A00BE5CD4 /* AJPApplicationTracker.h in Headers */ = {isa = PBXBuildFile; fileRef = DC6376802F9F316A00BE5CD4 /* AJPApplicationTracker.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DC6376832F9F327200BE5CD4 /* AJPApplicationConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC6376822F9F327200BE5CD4 /* AJPApplicationConstants.swift */; };
@@ -94,6 +95,7 @@
 		DC3A44AE2F92009000E8F78D /* AJPLoggerDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPLoggerDelegate.swift; sourceTree = "<group>"; };
 		DC63767C2F9F2F7E00BE5CD4 /* AJPApplicationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationManager.swift; sourceTree = "<group>"; };
 		DC63767D2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationManagerUtils.swift; sourceTree = "<group>"; };
+		DCA1B2C32FB100010000AAA1 /* AJPDownloadProgressTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPDownloadProgressTracker.swift; sourceTree = "<group>"; };
 		DC6376802F9F316A00BE5CD4 /* AJPApplicationTracker.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPApplicationTracker.h; sourceTree = "<group>"; };
 		DC6376822F9F327200BE5CD4 /* AJPApplicationConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationConstants.swift; sourceTree = "<group>"; };
 		DC6A9D3A2F8E286700FE7DF0 /* AirborneTestApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AirborneTestApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -222,6 +224,7 @@
 				DC0904B22FAB031000BD532E /* AJPApplicationManagerDelegate.swift */,
 				DC63767C2F9F2F7E00BE5CD4 /* AJPApplicationManager.swift */,
 				DC63767D2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift */,
+				DCA1B2C32FB100010000AAA1 /* AJPDownloadProgressTracker.swift */,
 				DC2400C92E8BD5C50071EE0E /* Airborne.swift */,
 			);
 			path = AirborneSwift;
@@ -486,6 +489,7 @@
 				DC3A44AF2F92009000E8F78D /* AJPLoggerDelegate.swift in Sources */,
 				DCD493C32F98DD2E000534A0 /* AJPResource.swift in Sources */,
 				DC63767E2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift in Sources */,
+				DCA1B2C42FB100010000AAA2 /* AJPDownloadProgressTracker.swift in Sources */,
 				DC63767F2F9F2F7E00BE5CD4 /* AJPApplicationManager.swift in Sources */,
 				DC6A9D862F8E540300FE7DF0 /* AJPHelpers.m in Sources */,
 				DC0637042F9B74D700CF0345 /* AJPApplicationManifest.swift in Sources */,

@@ -121,6 +121,25 @@ import AirborneSwiftModel
      * @note To get individual package results, use `onLazyPackageDownloadComplete` callback.
      */
     @objc optional func onAllLazyPackageDownloadsComplete() -> Void
+
+    /**
+     * Reports byte-level download progress of the OTA update's blocking set — the index
+     * split, the important splits and the resources that gate boot. Lazy splits are excluded.
+     *
+     * Only files whose release config declares a `size` are counted. A server that omits it
+     * produces no callbacks at all, rather than a misleading progress bar.
+     *
+     * @param bytesDownloaded Bytes downloaded so far across the blocking set.
+     * @param totalBytes Total expected bytes across the blocking set.
+     * @param percent `bytesDownloaded` as a percentage of `totalBytes`, in the range 0...100.
+     *
+     * @note Delivered on a background thread and never decreases. Dispatch to the main queue
+     *       before touching UI.
+     * @note When the update finishes before boot, these all fire before `startApp` — so the
+     *       callback is mainly useful on the boot-timeout path, where the app boots on the
+     *       previous package while the new one keeps downloading in the background.
+     */
+    @objc optional func onDownloadProgress(bytesDownloaded: Int64, totalBytes: Int64, percent: Int) -> Void
 }
 
 // MARK: - AirborneServices Class
@@ -164,6 +183,12 @@ import AirborneSwiftModel
     private weak var delegate: AirborneDelegate?
     private var applicationManager: AJPApplicationManager?
     private var lazyPackageObserver: NSObjectProtocol?
+    private var downloadProgressObserver: NSObjectProtocol?
+
+    /// Guards `lastReportedPercent`, which enforces a non-decreasing sequence of progress
+    /// callbacks regardless of the order the tracker's notifications arrive in.
+    private let progressLock = NSLock()
+    private var lastReportedPercent = -1
     
     // MARK: - Initialization
     
@@ -184,6 +209,7 @@ import AirborneSwiftModel
         self.delegate = delegate
         super.init()
         self.setupLazyPackageNotifications()
+        self.setupDownloadProgressNotifications()
         self.startApplicationManager()
     }
     
@@ -195,8 +221,11 @@ import AirborneSwiftModel
         if let observer = lazyPackageObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = downloadProgressObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
-    
+
     // MARK: - Private Methods
     
     private func startApplicationManager() {
@@ -223,6 +252,50 @@ import AirborneSwiftModel
         }
     }
     
+    private func setupDownloadProgressNotifications() {
+        // Only observe if the delegate wants progress.
+        guard delegate?.onDownloadProgress != nil else {
+            return
+        }
+
+        // Serial, so the delegate is never called concurrently with itself.
+        let progressQueue = OperationQueue()
+        progressQueue.maxConcurrentOperationCount = 1
+
+        downloadProgressObserver = NotificationCenter.default.addObserver(
+            forName: AJPApplicationConstants.DOWNLOAD_PROGRESS_NOTIFICATION,
+            object: nil,
+            queue: progressQueue
+        ) { [weak self] notification in
+            guard
+                let self = self,
+                let userInfo = notification.userInfo,
+                let bytesDownloaded = (userInfo["bytesDownloaded"] as? NSNumber)?.int64Value,
+                let totalBytes = (userInfo["totalBytes"] as? NSNumber)?.int64Value,
+                let percent = (userInfo["percent"] as? NSNumber)?.intValue
+            else {
+                return
+            }
+
+            // The tracker generates percentages monotonically but delivers them off-lock, so
+            // two concurrent downloads can hand them over out of order. Drop anything that
+            // isn't an advance, which is what makes `onDownloadProgress` non-decreasing.
+            guard self.progressLock.withLock({
+                guard percent > self.lastReportedPercent else { return false }
+                self.lastReportedPercent = percent
+                return true
+            }) else {
+                return
+            }
+
+            self.delegate?.onDownloadProgress?(
+                bytesDownloaded: bytesDownloaded,
+                totalBytes: totalBytes,
+                percent: percent
+            )
+        }
+    }
+
     private func handleLazyPackageNotification(_ notification: Notification) {
         guard let userInfo = notification.userInfo else { return }
         

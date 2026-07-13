@@ -390,12 +390,31 @@ class AJPApplicationManagerUtils {
 
     // MARK: - Networking
 
-    func downloadFileFromURL(_ resourceURL: URL, andSaveInFilePath filePath: String, inFolder folderName: String, checksum: String?) async throws {
+    /// Downloads a file into the workspace, optionally feeding a progress tracker.
+    ///
+    /// - Parameters:
+    ///   - progress: When supplied together with `progressID`, byte counts are reported to
+    ///     the tracker as they arrive and the file is marked complete on success. The caller
+    ///     is responsible for having already registered `progressID` with the tracker, since
+    ///     only it knows whether the download will actually be attempted.
+    ///   - progressID: The tracker key for this file, conventionally its `filePath`.
+    func downloadFileFromURL(_ resourceURL: URL, andSaveInFilePath filePath: String, inFolder folderName: String, checksum: String?, progress: AJPDownloadProgressTracker? = nil, progressID: String? = nil) async throws {
         let startTime = Date().timeIntervalSince1970 * 1000
         let storagePath = fileUtil.fullPathInStorageForFilePath(filePath, inFolder: folderName)
-        let (status, _, errorString, _) = await remoteFileUtil.downloadFile(from: resourceURL.absoluteString, andSaveFileAtUrl: storagePath, checksum: checksum)
-        
+
+        var onProgress: AJPBytesReceivedBlock?
+        if let progress = progress, let progressID = progressID {
+            onProgress = { received in
+                progress.update(fileID: progressID, received: received)
+            }
+        }
+
+        let (status, _, errorString, _) = await remoteFileUtil.downloadFile(from: resourceURL.absoluteString, andSaveFileAtUrl: storagePath, checksum: checksum, onProgress: onProgress)
+
         if status {
+            if let progress = progress, let progressID = progressID {
+                progress.complete(fileID: progressID)
+            }
             let logVal = NSMutableDictionary()
             logVal["url"] = resourceURL.absoluteString
             logVal["timeTaken"] = (Date().timeIntervalSince1970 * 1000) - startTime

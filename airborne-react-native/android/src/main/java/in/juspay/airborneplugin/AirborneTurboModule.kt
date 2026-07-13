@@ -26,6 +26,13 @@ class AirborneTurboModule(reactContext: ReactApplicationContext) :
     implementation.getBundlePath(nameSpace, promise)
   }
 
+  // Declared on the codegen spec so NativeEventEmitter can drive the module. Android does not
+  // emit download progress yet — the OTA SDK here lacks the progress tracker — so these are
+  // no-ops and `addDownloadProgressListener` simply never fires.
+  override fun addListener(eventName: String) {}
+
+  override fun removeListeners(count: Double) {}
+
   companion object {
     const val NAME = "AirborneReact"
   }

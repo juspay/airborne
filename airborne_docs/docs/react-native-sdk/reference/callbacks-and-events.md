@@ -13,6 +13,13 @@ The Airborne SDK reports its progress to your app through a set of callbacks and
 
 **Lazy download callback** — the SDK reports when specific lazy-downloaded files become available for use. On Android this is the `LazyDownloadCallback` (`fileInstalled`, `lazySplitsInstalled`); on iOS it is the `onLazyPackageDownloadComplete` and `onAllLazyPackageDownloadsComplete` delegate methods.
 
+**Download progress callback** — the SDK reports byte-level progress while it downloads the update's *blocking set*: the index split, the important splits, and the resources that gate boot. Lazy splits are excluded. On iOS this is the `onDownloadProgress` delegate method, also surfaced to JavaScript as [`addDownloadProgressListener`](/docs/react-native-sdk/reference/javascript-api#adddownloadprogresslistener). Not yet available on Android.
+
+Two constraints decide whether you see anything:
+
+- **Only files with a declared `size` are counted.** Against a server whose release config omits `size` on splits and resources, the totals stay empty and no progress is reported — chosen over showing a bar that can't be trusted.
+- **JavaScript only observes it after a boot timeout.** When the update completes before boot, every callback fires before `startApp`, which is what starts React Native — so no JS exists to hear them. Progress reaches JS only when the boot timeout elapses, the app boots on the previous package, and the new one keeps downloading in the background. Native code (`AppDelegate`) can observe progress in both cases.
+
 ## The onEvent payload
 
 Every event delivered to `onEvent` carries the same set of fields:

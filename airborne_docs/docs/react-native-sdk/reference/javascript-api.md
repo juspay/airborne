@@ -93,6 +93,63 @@ const handleGetFileContent = async () => {
 };
 ```
 
+## addDownloadProgressListener
+
+Subscribes to byte-level download progress for the update's **blocking set** — the index split, the important splits, and the resources that gate boot. Lazy splits are excluded.
+
+```typescript
+type DownloadProgressEvent = {
+  bytesDownloaded: number;
+  totalBytes: number;
+  percent: number;
+};
+
+function addDownloadProgressListener(
+  listener: (event: DownloadProgressEvent) => void
+): EmitterSubscription
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `bytesDownloaded` | `number` | Bytes downloaded so far across the blocking set. |
+| `totalBytes` | `number` | Total expected bytes across the blocking set. |
+| `percent` | `number` | `bytesDownloaded` as a percentage of `totalBytes`, from 0 to 100. Never decreases. |
+
+**Returns:** an `EmitterSubscription` — call `.remove()` to stop listening.
+
+```typescript
+import { useEffect, useState } from 'react';
+import { addDownloadProgressListener } from 'airborne-react-native';
+
+function UpdateBanner() {
+  const [percent, setPercent] = useState<number | null>(null);
+
+  useEffect(() => {
+    const subscription = addDownloadProgressListener(({ percent }) => {
+      setPercent(percent);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  if (percent === null) return null;
+  return <Text>Downloading update… {percent}%</Text>;
+}
+```
+
+:::caution[You only see progress after a boot timeout]
+On a fast update, the blocking set finishes downloading **before the JS bundle loads** — the native `startApp` callback is what starts React Native. There is no JavaScript running to hear those events, so a listener sees nothing.
+
+Events reach JS only on the **boot-timeout path**: the boot timeout elapses, the app boots on the previous package, and the new one continues downloading in the background. That is the window this API is for — showing "an update is downloading, restart to apply".
+
+The most recent value is replayed to each new listener, so subscribing mid-download reports the current percentage immediately rather than waiting for the next tick.
+:::
+
+:::note[iOS only, and requires `size` in the release config]
+Progress is currently emitted on **iOS only**. On Android the subscription is valid but never fires.
+
+Only files whose release config declares a `size` are counted. Against a server that omits it, no events fire at all.
+:::
+
 ## Default export
 
 The package's default export is the underlying native module. Prefer the named functions above; they are thin wrappers over `Airborne.readReleaseConfig`, `Airborne.getFileContent`, and `Airborne.getBundlePath`.

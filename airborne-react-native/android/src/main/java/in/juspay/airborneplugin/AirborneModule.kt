@@ -31,6 +31,14 @@ class AirborneModule(reactContext: ReactApplicationContext) :
     implementation.getBundlePath(namespace, promise)
   }
 
+  // Needed for NativeEventEmitter to accept this module on the old architecture. Android does
+  // not emit download progress yet, so these are no-ops.
+  @ReactMethod
+  fun addListener(eventName: String) {}
+
+  @ReactMethod
+  fun removeListeners(count: Double) {}
+
   companion object {
     const val NAME = "Airborne"
   }
