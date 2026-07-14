@@ -100,6 +100,107 @@ final class AJPResourceTests: XCTestCase {
         XCTAssertNil(serialized["checksum"])
     }
 
+    // MARK: - size Tests
+
+    func testInitParsesSize() throws {
+        let dict: NSDictionary = [
+            "url": "https://example.com/index.js",
+            "file_path": "main/index.js",
+            "size": 1_048_576
+        ]
+        let resource = try AJPResource(dictionary: dict)
+        XCTAssertEqual(resource.size, 1_048_576)
+    }
+
+    func testSizeDefaultsToZeroWhenAbsent() throws {
+        // A release config from a server that doesn't send `size` must still parse, and the
+        // resource simply opts out of progress reporting.
+        let dict: NSDictionary = [
+            "url": "https://example.com/index.js",
+            "file_path": "main/index.js"
+        ]
+        let resource = try AJPResource(dictionary: dict)
+        XCTAssertEqual(resource.size, 0)
+    }
+
+    func testSizeIgnoresNonNumericValue() throws {
+        let dict: NSDictionary = [
+            "url": "https://example.com/index.js",
+            "file_path": "main/index.js",
+            "size": "not-a-number"
+        ]
+        let resource = try AJPResource(dictionary: dict)
+        XCTAssertEqual(resource.size, 0)
+    }
+
+    func testToDictionaryIncludesSizeWhenPositive() throws {
+        let dict: NSDictionary = [
+            "url": "https://example.com/index.js",
+            "file_path": "main/index.js",
+            "size": 4096
+        ]
+        let resource = try AJPResource(dictionary: dict)
+        let serialized = resource.toDictionary()
+
+        XCTAssertEqual((serialized["size"] as? NSNumber)?.int64Value, 4096)
+    }
+
+    func testToDictionaryOmitsSizeWhenZero() throws {
+        let dict: NSDictionary = [
+            "url": "https://example.com/index.js",
+            "file_path": "main/index.js"
+        ]
+        let resource = try AJPResource(dictionary: dict)
+        XCTAssertNil(resource.toDictionary()["size"])
+    }
+
+    func testSecureCodingRoundTripPreservesSize() throws {
+        let dict: NSDictionary = [
+            "url": "https://example.com/index.js",
+            "file_path": "main/index.js",
+            "size": 987_654_321
+        ]
+        let resource = try AJPResource(dictionary: dict)
+
+        let data = try NSKeyedArchiver.archivedData(withRootObject: resource, requiringSecureCoding: true)
+        let decoded = try NSKeyedUnarchiver.unarchivedObject(ofClass: AJPResource.self, from: data)
+
+        XCTAssertEqual(decoded?.size, 987_654_321)
+    }
+
+    func testDecodingArchiveWithoutSizeYieldsZero() throws {
+        // Simulates an `app-pkg.dat` written before `size` existed: the archive simply has no
+        // "size" key, and decodeInt64(forKey:) returns 0.
+        let archiver = NSKeyedArchiver(requiringSecureCoding: true)
+        archiver.encode(URL(string: "https://example.com/index.js")! as NSURL, forKey: "url")
+        archiver.encode("main/index.js", forKey: "file_path")
+        archiver.encode("abc123", forKey: "checksum")
+        archiver.finishEncoding()
+
+        let unarchiver = try NSKeyedUnarchiver(forReadingFrom: archiver.encodedData)
+        unarchiver.requiresSecureCoding = true
+        let decoded = AJPResource(coder: unarchiver)
+
+        XCTAssertNotNil(decoded)
+        XCTAssertEqual(decoded?.filePath, "main/index.js")
+        XCTAssertEqual(decoded?.checksum, "abc123")
+        XCTAssertEqual(decoded?.size, 0)
+    }
+
+    func testLazyResourceRoundTripPreservesSize() throws {
+        // AJPLazyResource(resource:) round-trips through toDictionary(), so `size` must
+        // survive that hop.
+        let dict: NSDictionary = [
+            "url": "https://example.com/chunk.js",
+            "file_path": "main/chunk.js",
+            "size": 2048
+        ]
+        let base = try AJPResource(dictionary: dict)
+        let lazy = AJPLazyResource(resource: base)
+
+        XCTAssertEqual(lazy.size, 2048)
+    }
+
     // MARK: - NSSecureCoding Tests
 
     func testSecureCodingRoundTrip() throws {

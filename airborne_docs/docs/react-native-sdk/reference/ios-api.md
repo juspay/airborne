@@ -46,6 +46,7 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
     @objc optional func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String) -> Void
     @objc optional func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String) -> Void
     @objc optional func onAllLazyPackageDownloadsComplete() -> Void
+    @objc optional func onDownloadProgress(bytesDownloaded: Int64, totalBytes: Int64, percent: Int) -> Void
 }
 ```
 
@@ -61,6 +62,7 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 | `onEvent` | `func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String)` | Receives lifecycle and error events. See the [callbacks & events reference](/docs/react-native-sdk/reference/callbacks-and-events) for the full catalogue. |
 | `onLazyPackageDownloadComplete` | `func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String)` | Called when an individual lazy package download completes (success or failure). |
 | `onAllLazyPackageDownloadsComplete` | `func onAllLazyPackageDownloadsComplete()` | Called when all lazy package downloads have completed. Use `onLazyPackageDownloadComplete` for individual results. |
+| `onDownloadProgress` | `func onDownloadProgress(bytesDownloaded: Int64, totalBytes: Int64, percent: Int)` | Reports byte-level progress while the update's blocking set downloads. See [download progress](#download-progress) below. |
 
 #### startApp parameters
 
@@ -86,6 +88,43 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 | `downloadSuccess` | `Bool` | Whether the lazy package download succeeded. |
 | `url` | `String` | The URL of the lazy package that was downloaded. |
 | `filePath` | `String` | The file path where the package was stored. |
+
+## Download progress
+
+`onDownloadProgress` reports byte-level progress across the update's **blocking set** — the index split, the important splits, and the resources that gate boot. Lazy splits are excluded.
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `bytesDownloaded` | `Int64` | Bytes downloaded so far across the blocking set. |
+| `totalBytes` | `Int64` | Total expected bytes across the blocking set. |
+| `percent` | `Int` | `bytesDownloaded` as a percentage of `totalBytes`, from 0 to 100. |
+
+```swift
+extension AppDelegate: AirborneDelegate {
+    func onDownloadProgress(bytesDownloaded: Int64, totalBytes: Int64, percent: Int) {
+        DispatchQueue.main.async {
+            self.splashProgressBar.progress = Float(percent) / 100
+        }
+    }
+}
+```
+
+:::caution[When you actually see progress]
+When the update finishes before boot, every callback fires *before* `startApp` — so nothing that `startApp` creates (including React Native) can observe it.
+
+The callback is therefore most useful on the **boot-timeout path**: the boot timeout elapses, the app starts on the previous package, and the new one keeps downloading in the background. Progress arrives throughout that window. A native splash or in-app banner can show it; see [the JavaScript API](/docs/react-native-sdk/reference/javascript-api#adddownloadprogresslistener) for the JS equivalent.
+:::
+
+:::note[Requires `size` in the release config]
+Only files whose release config declares a `size` are counted. Against a server that omits it, the totals stay empty and **no callbacks fire at all** — a deliberate choice over reporting a misleading bar.
+:::
+
+Other behavior worth knowing:
+
+- **Delivered on a background thread.** Dispatch to the main queue before touching UI.
+- **`percent` never decreases.** More files join the denominator as their downloads begin, so the reported percentage can pause rather than fall.
+- **`percent` reaches 100 only when every tracked file has finished.** A file that fails to download leaves the bar short of 100.
+- **The percentage can jump.** A file is counted as fully received the moment its download succeeds, so a stale or approximate `size` resolves in one step rather than stalling.
 
 ## See also
 

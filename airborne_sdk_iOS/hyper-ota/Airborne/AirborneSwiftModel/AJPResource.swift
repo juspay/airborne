@@ -20,11 +20,16 @@ import Foundation
     /// An optional SHA256 checksum string for integrity verification.
     public let checksum: String?
 
+    /// The resource's size in bytes as declared by the release config, or `0` when the
+    /// release config omits it. Used as the denominator for download progress; resources
+    /// with an unknown size are excluded from progress reporting entirely.
+    public let size: Int64
+
     // MARK: - Initialization
 
     /// Initializes a resource from a manifest dictionary.
     /// Bridges to ObjC as `initWithDictionary:error:`.
-    /// - Parameter dictionary: A dictionary with `url`, `file_path`, and optionally `checksum` keys.
+    /// - Parameter dictionary: A dictionary with `url`, `file_path`, and optionally `checksum` and `size` keys.
     /// - Throws: An `NSError` if required fields are missing or invalid.
     public init(dictionary: NSDictionary) throws {
         guard let urlString = dictionary["url"] as? String,
@@ -56,15 +61,17 @@ import Foundation
         self.url = parsedURL
         self.filePath = filePath
         self.checksum = dictionary["checksum"] as? String
+        self.size = (dictionary["size"] as? NSNumber)?.int64Value ?? 0
         super.init()
     }
 
     /// Internal initializer for programmatic creation (e.g. placeholders) where a URL is already known.
     /// Not exposed to ObjC — Swift callers only.
-    internal init(url: URL, filePath: String, checksum: String? = nil) {
+    internal init(url: URL, filePath: String, checksum: String? = nil, size: Int64 = 0) {
         self.url = url
         self.filePath = filePath
         self.checksum = checksum
+        self.size = size
         super.init()
     }
 
@@ -76,6 +83,9 @@ import Foundation
         ]
         if let checksum = checksum {
             dict["checksum"] = checksum
+        }
+        if size > 0 {
+            dict["size"] = size
         }
         return dict as NSDictionary
     }
@@ -103,6 +113,9 @@ import Foundation
         }
         self.filePath = filePath
         self.checksum = coder.decodeObject(of: NSString.self, forKey: "checksum") as String?
+        // Archives written before `size` existed decode to 0, which simply opts those
+        // resources out of progress reporting.
+        self.size = coder.decodeInt64(forKey: "size")
         super.init()
     }
 
@@ -112,6 +125,7 @@ import Foundation
         if let checksum = checksum {
             coder.encode(checksum, forKey: "checksum")
         }
+        coder.encode(size, forKey: "size")
     }
 }
 

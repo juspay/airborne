@@ -124,7 +124,58 @@ public typealias AJPDownloadCallback = @convention(block) (Bool, Data?, String?,
         checksum expectedChecksum: String?
     ) async -> (Bool, Data?, String?, URLResponse?) {
         let (response, responseData, networkError) = await networkClient.fetchResourceAsync(remoteURL)
-        
+        return verifyAndWrite(
+            from: remoteURL,
+            andSaveFileAtUrl: localURL,
+            checksum: expectedChecksum,
+            response: response,
+            responseData: responseData,
+            networkError: networkError
+        )
+    }
+
+    /// Downloads a file, reporting byte-level progress as it arrives.
+    ///
+    /// Behaviourally identical to `downloadFile(from:andSaveFileAtUrl:checksum:)` — the body
+    /// is still buffered in memory, verified, then written atomically — except that
+    /// `onProgress` is called with the cumulative byte count as the download proceeds.
+    ///
+    /// - Parameters:
+    ///   - onProgress: Invoked on a background thread with the bytes received so far. When
+    ///     nil, this method forwards to `downloadFile(from:andSaveFileAtUrl:checksum:)`, so a
+    ///     subclass overriding only that method keeps control of the no-progress path.
+    open func downloadFile(
+        from remoteURL: String,
+        andSaveFileAtUrl localURL: String,
+        checksum expectedChecksum: String?,
+        onProgress: AJPBytesReceivedBlock?
+    ) async -> (Bool, Data?, String?, URLResponse?) {
+        guard let onProgress = onProgress else {
+            return await downloadFile(from: remoteURL, andSaveFileAtUrl: localURL, checksum: expectedChecksum)
+        }
+
+        let (response, responseData, networkError) = await networkClient.fetchResourceAsync(remoteURL, progressBlock: onProgress)
+        return verifyAndWrite(
+            from: remoteURL,
+            andSaveFileAtUrl: localURL,
+            checksum: expectedChecksum,
+            response: response,
+            responseData: responseData,
+            networkError: networkError
+        )
+    }
+
+    // MARK: - Private Helpers
+
+    /// Validates a completed response, verifies its checksum, and writes it to disk.
+    private func verifyAndWrite(
+        from remoteURL: String,
+        andSaveFileAtUrl localURL: String,
+        checksum expectedChecksum: String?,
+        response: URLResponse,
+        responseData: Data?,
+        networkError: [String: Any]?
+    ) -> (Bool, Data?, String?, URLResponse?) {
         if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
             return (false, nil, "HTTP error \(httpResponse.statusCode) while downloading file from \(remoteURL)", response)
         }

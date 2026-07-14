@@ -888,7 +888,21 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     
     private func tryDownloadingUpdate() {
         guard let downloadedManifest = self.downloadedApplicationManifest else { return }
-        
+
+        // One tracker for the whole update, shared by the package and resource tasks below,
+        // so a single percentage spans the blocking set. Lazy splits are excluded.
+        let progressTracker = AJPDownloadProgressTracker { bytesDownloaded, totalBytes, percent in
+            NotificationCenter.default.post(
+                name: AJPApplicationConstants.DOWNLOAD_PROGRESS_NOTIFICATION,
+                object: nil,
+                userInfo: [
+                    "bytesDownloaded": bytesDownloaded,
+                    "totalBytes": totalBytes,
+                    "percent": percent
+                ]
+            )
+        }
+
         // Package download
         Task { [weak self] in
             guard let self = self else { return }
@@ -901,7 +915,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                     self.downloadedLazy = downloadedManifest.package.lazy
                 }
                 
-                let (downloadFailed, timedOut) = await self.downloadImportantPackagesWithNewManifest(downloadedManifest.package, currentManifest: self.package)
+                let (downloadFailed, timedOut) = await self.downloadImportantPackagesWithNewManifest(downloadedManifest.package, currentManifest: self.package, progress: progressTracker)
                 
                 if !downloadFailed { // Important packages downloaded successfully/No updates.
                     self.didFinishImportantPackageWithLazyDownloadComplete(timedOut)
@@ -1001,6 +1015,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             await self.downloadResourcesWithCurrentResources(
                 self.resources.resources,
                 newResources: downloadedManifest.resources.resources,
+                progress: progressTracker,
                 singleDownloadHandler: { [weak self] key, _ in
                     self?.tracker.trackInfo("resource_download_completed", value: NSMutableDictionary(dictionary: ["resource": key]))
                 }
@@ -1135,7 +1150,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     
     // MARK: - Downloads & Moving
     
-    private func downloadImportantPackagesWithNewManifest(_ newManifest: AJPApplicationPackage, currentManifest: AJPApplicationPackage) async -> (downloadFailed: Bool, timedOut: Bool) {
+    private func downloadImportantPackagesWithNewManifest(_ newManifest: AJPApplicationPackage, currentManifest: AJPApplicationPackage, progress: AJPDownloadProgressTracker? = nil) async -> (downloadFailed: Bool, timedOut: Bool) {
         let startTime = Date().timeIntervalSince1970 * 1000
         let downloadLock = NSLock()
         var timeoutOccurred = false
@@ -1179,17 +1194,28 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         var pendingDownloads = Set(toDownload.map { $0.filePath })
         var failedDownloads = Set<String>()
-        
+
+        // Every split here is scheduled unconditionally, so seed the denominator with all of
+        // them up front. The index bundle dominates the byte count, which makes the first
+        // reported percentage meaningful rather than an artefact of which response landed first.
+        for split in toDownload {
+            progress?.register(fileID: split.filePath, expectedBytes: split.size)
+        }
+
         await withTaskGroup(of: Void.self) { group in
             for split in toDownload {
                 group.addTask { [weak self] in
                     guard let self = self else { return }
-                    
+
                     let fileName = (split.url.pathExtension == "zip") ? split.url.lastPathComponent : split.filePath
                     let tempPath = "\(AJPApplicationConstants.JUSPAY_TEMP_DIR)/\(fileName)"
-                    
+
+                    // Files with no declared size can't contribute to a percentage, so leave
+                    // them on the original download path entirely.
+                    let splitProgress = split.size > 0 ? progress : nil
+
                     do {
-                        try await self.utils.downloadFileFromURL(split.url, andSaveInFilePath: tempPath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, checksum: split.checksum)
+                        try await self.utils.downloadFileFromURL(split.url, andSaveInFilePath: tempPath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, checksum: split.checksum, progress: splitProgress, progressID: split.filePath)
                         let _ = downloadLock.withLock {
                             pendingDownloads.remove(split.filePath)
                         }
@@ -1434,7 +1460,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
     }
         
-    private func downloadResourcesWithCurrentResources(_ currentResources: [String: AJPResource], newResources: [String: AJPResource], singleDownloadHandler: @escaping (String, AJPResource) -> Void) async {
+    private func downloadResourcesWithCurrentResources(_ currentResources: [String: AJPResource], newResources: [String: AJPResource], progress: AJPDownloadProgressTracker? = nil, singleDownloadHandler: @escaping (String, AJPResource) -> Void) async {
 
         // Step 1: Handle resource file preparation (move current to old)
         utils.handleResourceFilePreparationForDownload()
@@ -1479,14 +1505,25 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 if index >= maxConcurrentTasks {
                     await group.next()
                 }
-                
+
+                progress?.register(fileID: resource.filePath, expectedBytes: resource.size)
+
                 group.addTask { [weak self] in
                     guard let self = self else { return }
-                    if self.bootTimeoutOccurred { return }
-                    
+                    if self.bootTimeoutOccurred {
+                        // Registered above but never attempted. Drop it from the denominator so
+                        // the percentage still converges to 100.
+                        progress?.cancel(fileID: resource.filePath)
+                        return
+                    }
+
+                    // Files with no declared size can't contribute to a percentage, so leave
+                    // them on the original download path entirely.
+                    let resourceProgress = resource.size > 0 ? progress : nil
+
                     do {
-                        try await self.utils.downloadFileFromURL(resource.url, andSaveInFilePath: resource.filePath, inFolder: AJPApplicationConstants.JUSPAY_RESOURCE_DIR, checksum: resource.checksum)
-                        
+                        try await self.utils.downloadFileFromURL(resource.url, andSaveInFilePath: resource.filePath, inFolder: AJPApplicationConstants.JUSPAY_RESOURCE_DIR, checksum: resource.checksum, progress: resourceProgress, progressID: resource.filePath)
+
                         if !self.bootTimeoutOccurred {
                             // Success - move to main and update available resources
                             self.moveResourceToMainAndUpdate(resource, singleDownloadHandler: singleDownloadHandler)

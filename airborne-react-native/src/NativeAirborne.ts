@@ -19,6 +19,11 @@ export interface Spec extends TurboModule {
   readReleaseConfig(nameSpace: string): Promise<string>;
   getFileContent(nameSpace: string, filePath: string): Promise<string>;
   getBundlePath(nameSpace: string): Promise<string>;
+
+  // Required for NativeEventEmitter to drive this module. The native side inherits both from
+  // RCTEventEmitter (iOS); Android implements them as no-ops until it emits progress.
+  addListener(eventName: string): void;
+  removeListeners(count: number): void;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('Airborne');

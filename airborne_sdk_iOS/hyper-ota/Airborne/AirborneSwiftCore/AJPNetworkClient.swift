@@ -27,6 +27,15 @@ public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [
 ///   - newRequest: The new request that will be used to follow the redirect.
 public typealias AJPRedirectionBlock = @convention(block) (HTTPURLResponse, URLRequest) -> Void
 
+/// A callback invoked as bytes arrive, reporting the cumulative number of bytes received so
+/// far for a single request.
+///
+/// Under `Content-Encoding: gzip` the count is of *decoded* bytes, matching the size of the
+/// `Data` ultimately handed to the response block.
+///
+/// - Note: Delivered on a background thread, potentially many times per request.
+public typealias AJPBytesReceivedBlock = (Int64) -> Void
+
 // MARK: - Redirect-tracking session delegate
 
 /// A URLSessionTaskDelegate that intercepts HTTP redirects so callers can observe
@@ -113,6 +122,35 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         sessionDelegate: URLSessionDelegate?,
         redirectionBlock: AJPRedirectionBlock? = nil
     ) {
+        perform(
+            for: url,
+            requestType: requestType,
+            params: params,
+            header: headers,
+            options: options,
+            responseBlock: responseBlock,
+            sessionDelegate: sessionDelegate,
+            redirectionBlock: redirectionBlock,
+            progressBlock: nil
+        )
+    }
+
+    // MARK: - Private Request Execution
+
+    /// The single implementation behind every request. Kept private and separate from
+    /// `apiCall` so that `progressBlock` can be added without changing `apiCall`'s
+    /// Objective-C selector.
+    private func perform(
+        for url: String,
+        requestType: AJPRequestType,
+        params: Any?,
+        header headers: NSDictionary?,
+        options: NSDictionary?,
+        responseBlock: @escaping AJPAPIResponseBlock,
+        sessionDelegate: URLSessionDelegate?,
+        redirectionBlock: AJPRedirectionBlock?,
+        progressBlock: AJPBytesReceivedBlock?
+    ) {
         var connectionTimeout: Int = -1
         var readTimeout: Int = -1
 
@@ -185,9 +223,15 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
             urlRequest.httpBody = postBody
         }
 
-        // Execute request
+        // Execute request. Assigned below, but captured here so the completion handler can
+        // tear the observation down whichever way the request ends.
+        var progressObservation: NSKeyValueObservation?
+
         let task = session.dataTask(with: urlRequest) { [weak self] data, response, error in
-            defer { if session !== self?.sharedSession { session.finishTasksAndInvalidate() } }
+            defer {
+                progressObservation?.invalidate()
+                if session !== self?.sharedSession { session.finishTasksAndInvalidate() }
+            }
             let urlResponse = response ?? URLResponse()
 
             if let error = error {
@@ -214,6 +258,13 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
                 responseBlock(urlResponse, data, ["error": "Empty response received"])
             }
         }
+
+        if let progressBlock = progressBlock {
+            progressObservation = task.observe(\.countOfBytesReceived, options: [.new]) { task, _ in
+                progressBlock(task.countOfBytesReceived)
+            }
+        }
+
         task.resume()
     }
 
@@ -243,6 +294,8 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
     ///   - headers: Additional HTTP headers.
     ///   - options: Configuration options like `connectionTimeout` and `readTimeout`.
     ///   - sessionDelegate: An optional NSURLSessionDelegate for custom behavior.
+    ///   - progressBlock: An optional callback invoked as bytes arrive. Pass nil to skip
+    ///     progress observation entirely.
     /// - Returns: A tuple of (URLResponse, optional Data, optional error dictionary).
     public func apiCallAsync(
         for url: String,
@@ -250,18 +303,20 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         params: Any? = nil,
         headers: NSDictionary? = nil,
         options: NSDictionary? = nil,
-        sessionDelegate: URLSessionDelegate? = nil
+        sessionDelegate: URLSessionDelegate? = nil,
+        progressBlock: AJPBytesReceivedBlock? = nil
     ) async -> (URLResponse, Data?, [String: Any]?) {
         return await withCheckedContinuation { continuation in
-            apiCall(for: url, requestType: requestType, params: params, header: headers, options: options, responseBlock: { response, data, error in
+            perform(for: url, requestType: requestType, params: params, header: headers, options: options, responseBlock: { response, data, error in
                 continuation.resume(returning: (response, data, error))
-            }, sessionDelegate: sessionDelegate)
+            }, sessionDelegate: sessionDelegate, redirectionBlock: nil, progressBlock: progressBlock)
         }
     }
 
     /// Async convenience for performing a GET request.
-    public func fetchResourceAsync(_ url: String) async -> (URLResponse, Data?, [String: Any]?) {
-        return await apiCallAsync(for: url, requestType: .get)
+    /// - Parameter progressBlock: An optional callback invoked as bytes arrive.
+    public func fetchResourceAsync(_ url: String, progressBlock: AJPBytesReceivedBlock? = nil) async -> (URLResponse, Data?, [String: Any]?) {
+        return await apiCallAsync(for: url, requestType: .get, progressBlock: progressBlock)
     }
 
     /// Async convenience for performing a HEAD request.
