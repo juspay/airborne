@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.23.0 - 2026-07-14
+#### Features
+- include file size in rc - (6a97b2b) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.22.0 - 2026-07-07
 #### Features
 - airborne documentation end-to-end - (b895096) - yuvrajjsingh0

@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.41.0 - 2026-07-14
+### Package updates
+- airborne_server bumped to airborne_server-v0.23.0
+- smithy bumped to smithy-v0.6.0
+### Global changes
+#### Bug Fixes
+- paths and collisions with assets - (622f926) - yuvrajjsingh0
+
+- - -
+
 ## v0.40.0 - 2026-07-07
 ### Package updates
 - smithy bumped to smithy-v0.5.0
