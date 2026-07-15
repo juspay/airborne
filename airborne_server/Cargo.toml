@@ -20,16 +20,30 @@ base64 = "0.22"
 bytes = "1"
 casbin = "2.20.0"
 chrono = { workspace = true }
+# casbin adapter. Its crates.io `diesel` dependency is redirected onto the fork
+# by `[patch.crates-io]` in the workspace root (see diesel-shim/), so it shares
+# airborne's juspay_diesel connection pool and rds-proxy behaviour.
 diesel-adapter = "1.2.0"
 dashmap = "=6.1.0"
-diesel = { version = "2.2", features = [
+# Juspay's diesel fork, published to crates.io as `juspay_diesel` and consumed as
+# `diesel` via the package rename — its lib.rs does `extern crate self as diesel`,
+# so consumers MUST import it as `diesel`. The `rds-proxy` feature skips the
+# `SET TIME ZONE`/`SET CLIENT_ENCODING` statements diesel normally runs on
+# connect, which otherwise cause RDS Proxy to pin the backend connection and
+# defeat multiplexing.
+diesel = { package = "juspay_diesel", version = "2.3.1", features = [
     "postgres",
     "r2d2",
     "uuid",
     "serde_json",
     "chrono",
+    "rds-proxy",
 ] }
-diesel_migrations = "2.2"
+# Stock crates.io diesel_migrations; its `diesel` dependency is transparently
+# redirected onto juspay_diesel by the diesel-shim [patch] in the workspace root.
+# Held at 2.2.x on purpose: 2.3.x uses `diesel::internal::migrations`, which the
+# ~2.2-based juspay_diesel doesn't expose. (The fork itself pairs with 2.2.0.)
+diesel_migrations = "~2.2"
 dotenv = { workspace = true }
 futures = { workspace = true }
 futures-util = "0.3"

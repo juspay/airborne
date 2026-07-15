@@ -1,0 +1,39 @@
+# Local shim crate literally named `diesel`. It only re-exports `juspay_diesel`
+# so that `[patch.crates-io] diesel = { path = "diesel-shim" }` (in the root
+# Cargo.toml) can redirect the crates.io `diesel` that `diesel-adapter` (casbin)
+# depends on onto Juspay's fork. Cargo's `[patch]` cannot rename a crate, so it
+# needs a replacement actually named `diesel`; this crate is that replacement.
+#
+# Net effect: the whole graph resolves to a single `juspay_diesel`, so the casbin
+# adapter shares airborne's pool and gets the same rds-proxy behaviour, with no
+# fork of diesel-adapter and no second connection pool.
+[package]
+name = "diesel"
+# Kept in the 2.2.x range so the pinned `diesel_migrations = "~2.2"` (which
+# requires `diesel ~2.2.0`) accepts this shim. juspay_diesel is API-compatible
+# with diesel 2.2.x, so this is the honest version to advertise to consumers.
+version = "2.2.0"
+edition = "2021"
+description = "Re-export shim of juspay_diesel, used only via [patch.crates-io] to point diesel-adapter at the fork."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies.juspay_diesel]
+version = "2.3.1"
+default-features = false
+
+# Mirror the diesel feature names that consumers (diesel-adapter) may request and
+# forward them to juspay_diesel. Feature unification means the fork ends up with
+# the union of these and the features airborne enables on it directly.
+[features]
+default = ["with-deprecated", "32-column-tables"]
+with-deprecated = ["juspay_diesel/with-deprecated"]
+32-column-tables = ["juspay_diesel/32-column-tables"]
+postgres = ["juspay_diesel/postgres"]
+r2d2 = ["juspay_diesel/r2d2"]
+uuid = ["juspay_diesel/uuid"]
+serde_json = ["juspay_diesel/serde_json"]
+chrono = ["juspay_diesel/chrono"]
+mysql = ["juspay_diesel/mysql"]
+sqlite = ["juspay_diesel/sqlite"]
+rds-proxy = ["juspay_diesel/rds-proxy"]
