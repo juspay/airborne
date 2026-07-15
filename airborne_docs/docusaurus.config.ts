@@ -187,6 +187,14 @@ const config: Config = {
 
   themeConfig: {
     image: "docs_static/img/airborne-social-card.png",
+    // Algolia DocSearch (bundled with preset-classic). apiKey is the public,
+    // search-only key — safe to commit. indexName must match the Algolia crawler's index.
+    algolia: {
+      appId: "QTERBQSNEQ",
+      apiKey: "41afe0ceee9e1514ed890f6584cd8247",
+      indexName: "Airborne Documentation",
+      contextualSearch: false,
+    },
     mermaid: {
       theme: { light: "neutral", dark: "dark" },
     },
