@@ -1,9 +1,16 @@
-name: Create an airborne release
+name: Create an airborne stable release
 
 on:
-  pull_request:
-    types: [closed]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: Allow dry testing from non-main branches (skips publish jobs and pushes)
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,16 +22,27 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.test_mode == 'true')
     outputs:
       version: ${{ steps.git_tag.outputs.version }}
       is_new_version: ${{ steps.git_tag.outputs.is_new_version }}
+      is_test_mode: ${{ steps.run_mode.outputs.is_test_mode }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
+
+      - name: Determine run mode
+        id: run_mode
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ] && [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            echo "is_test_mode=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_test_mode=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -93,7 +111,7 @@ jobs:
 
       - name: Push code to main
         shell: bash
-        if: steps.git_tag.outputs.is_new_version == 'true'
+        if: steps.git_tag.outputs.is_new_version == 'true' && steps.run_mode.outputs.is_test_mode != 'true'
         run: |
           git push origin main
           git push origin --tags
@@ -103,7 +121,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -146,7 +164,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -178,7 +196,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -221,7 +239,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -253,7 +271,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -296,7 +314,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -328,7 +346,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ needs.tag-release.outputs.version }}
@@ -389,7 +407,7 @@ jobs:
 
   publish-to-npm:
     needs: [tag-release]
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     permissions:
       contents: read
       id-token: write
@@ -449,7 +467,7 @@ jobs:
         publish-to-npm,
       ]
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: needs.tag-release.outputs.is_new_version == 'true' && needs.tag-release.outputs.is_test_mode != 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
