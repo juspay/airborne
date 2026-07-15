@@ -197,6 +197,61 @@ impl RedisCache {
         Ok(())
     }
 
+    /// Record `member` in the SET at `index`, so a family of cache entries can be
+    /// dropped together later. The SET is given the same TTL as its members, so a
+    /// forgotten index cannot outlive them.
+    pub async fn index_add(
+        &self,
+        index: &RedisKey,
+        member: &RedisKey,
+        ttl_secs: usize,
+    ) -> Result<(), ABError> {
+        let mut r = (*self.conn).clone();
+        let (index_key, member_key) = (index.key.clone(), member.key.clone());
+
+        let _: () = r.sadd(&index_key, &member_key).await.map_err(|e| {
+            error!("Failed to SADD {member_key} to {index_key}: {e}");
+            CACHE_FAILS.with_label_values(&index.labels).inc();
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        let _: () = r.expire(&index_key, ttl_secs as i64).await.map_err(|e| {
+            error!("Failed to EXPIRE {index_key}: {e}");
+            CACHE_FAILS.with_label_values(&index.labels).inc();
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        Ok(())
+    }
+
+    /// Delete every key recorded in the SET at `index`, then the index itself.
+    pub async fn index_drop(&self, index: &RedisKey) -> Result<(), ABError> {
+        let mut r = (*self.conn).clone();
+        let index_key = index.key.clone();
+
+        let members: Vec<String> = r.smembers(&index_key).await.map_err(|e| {
+            error!("Failed to SMEMBERS {index_key}: {e}");
+            CACHE_FAILS.with_label_values(&index.labels).inc();
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        if !members.is_empty() {
+            let _: () = r.del(members).await.map_err(|e| {
+                error!("Failed to DEL members of {index_key}: {e}");
+                CACHE_FAILS.with_label_values(&index.labels).inc();
+                ABError::InternalServerError("service error".to_string())
+            })?;
+        }
+
+        let _: () = r.del(&index_key).await.map_err(|e| {
+            error!("Failed to DEL {index_key}: {e}");
+            CACHE_FAILS.with_label_values(&index.labels).inc();
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        Ok(())
+    }
+
     /// Get the cached value, or compute it via `fetch_fn`, then cache it.
     ///
     /// - `key`: Redis key

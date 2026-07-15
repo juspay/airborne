@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
     authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, files, packages,
-    packages_v2, release_views, releases, user_credentials, workspace_names,
+    packages_v2, release_views, releases, signing_keys, user_credentials, workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -236,4 +236,39 @@ pub struct NewAuthzRoleBindingEntry {
     pub role_key: String,
     pub resource: String,
     pub action: String,
+}
+
+/// An application's ECDSA P-256 signing keypair.
+///
+/// Deliberately does not derive `Serialize`: `private_key` must never be able to
+/// reach an HTTP response by accident. API handlers map this into
+/// `signing::types::SigningKeyResponse`, which has no private-key field.
+///
+/// The internal row UUID, `org_id`, `app_id`, and `updated_at` are omitted: every
+/// query is already scoped to one application, and clients identify keys by
+/// `name`, so selecting them back would be dead weight.
+#[derive(Queryable, Selectable, Debug, Clone)]
+#[diesel(table_name = signing_keys)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct SigningKeyEntry {
+    pub name: String,
+    pub algorithm: String,
+    pub public_key: String,
+    pub private_key: String,
+    pub is_default: bool,
+    pub disabled: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Insertable, Debug)]
+#[diesel(table_name = signing_keys)]
+pub struct NewSigningKey {
+    pub id: uuid::Uuid,
+    pub org_id: String,
+    pub app_id: String,
+    pub name: String,
+    pub algorithm: String,
+    pub public_key: String,
+    pub private_key: String,
+    pub is_default: bool,
 }

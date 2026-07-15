@@ -160,6 +160,22 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.signing_keys (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            name -> Text,
+            algorithm -> Text,
+            public_key -> Text,
+            private_key -> Text,
+            is_default -> Bool,
+            disabled -> Bool,
+            created_at -> Timestamptz,
+            updated_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.user_credentials (client_id) {
             client_id -> Uuid,
             username -> Text,
@@ -191,6 +207,7 @@ pub mod hyperotaserver {
         packages_v2,
         release_views,
         releases,
+        signing_keys,
         user_credentials,
         workspace_names,
     );

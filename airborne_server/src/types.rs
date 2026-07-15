@@ -76,6 +76,7 @@ pub struct Environment {
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
     pub default_configs: Vec<SuperpositionDefaultConfig>,
+    pub rc_signature_cache_ttl: usize,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

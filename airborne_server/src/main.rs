@@ -25,6 +25,7 @@ mod organisation;
 mod package;
 mod provider;
 mod release;
+mod signing;
 mod token;
 mod types;
 mod user;
@@ -43,7 +44,7 @@ use google_sheets4::{
     yup_oauth2::{self, ServiceAccountAuthenticator},
     Sheets,
 };
-use log::info;
+use log::{error, info};
 use serde_json::json;
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
@@ -339,6 +340,7 @@ async fn main() -> std::io::Result<()> {
         default_configs: get_default_configs_from_file()
             .await
             .expect("Failed to load superposition default configs from file"),
+        rc_signature_cache_ttl: app_config.rc_signature_cache_ttl,
     };
 
     // Create an S3 client with path-style enforced (for localstack)
@@ -490,6 +492,17 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // Applications created before release-config signing existed have no signing
+    // key. Give them a default one so every application serves signed configs.
+    // Idempotent, so it is safe to leave enabled across restarts.
+    if migrations_to_run_on_boot.iter().any(|m| m == "signingkeys") {
+        if let Err(e) = signing::utils::backfill_default_keys(app_state.db_pool.clone()).await {
+            // Signing is additive: an app without a key serves unsigned configs
+            // rather than failing, so a backfill problem must not stop boot.
+            error!("Signing key backfill failed: {e}. Continuing startup.");
+        }
+    }
+
     let num_workers = app_config.num_workers;
     let keep_alive = app_config.keep_alive;
     let backlog = app_config.backlog;
@@ -537,6 +550,11 @@ async fn main() -> std::io::Result<()> {
                         web::scope("/packages")
                             .wrap(Auth)
                             .service(package::add_routes()),
+                    )
+                    .service(
+                        web::scope("/signing-keys")
+                            .wrap(Auth)
+                            .service(signing::add_routes()),
                     )
                     .service(release::add_routes("releases")),
             )
