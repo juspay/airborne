@@ -2,6 +2,61 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.7.0 - 2026-07-15
+#### Features
+- onPackageDownloaded callback - (89dea2c) - yuvrajjsingh0
+- rich download after timeout event in ios - (8976b7f) - yuvrajjsingh0
+
+- - -
+
+## v0.41.0 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.41.0 [skip ci] - (99073d5) - Airborne Bot
+
+- - -
+
+## v0.40.0 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.40.0 [skip ci] - (dc82a08) - Airborne Bot
+
+- - -
+
+## v0.39.0 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.39.0 [skip ci] - (34d7ecc) - Airborne Bot
+
+- - -
+
+## v0.38.2 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.38.2 [skip ci] - (85d265a) - Airborne Bot
+
+- - -
+
+## v0.38.1 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.38.1 [skip ci] - (e1da6be) - Airborne Bot
+
+- - -
+
+## v0.38.0 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.38.0 [skip ci] - (72c7726) - Airborne Bot
+
+- - -
+
+## v0.37.2 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.37.2 [skip ci] - (4ca949f) - Airborne Bot
+
+- - -
+
+## v0.37.1 - 2026-07-15
+#### Miscellaneous Chores
+- **(version)** v0.37.1 [skip ci] - (8d2dd58) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.6.0 - 2026-06-12
 #### Features
 - QR-6991: SMV Added Redirection Logs - (06d4ef6) - vaishnavi.mohadkar@juspay.in

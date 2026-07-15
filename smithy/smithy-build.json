@@ -18,7 +18,7 @@
   "plugins": {
     "typescript-client-codegen": {
       "package": "airborne-server-sdk",
-      "packageVersion": "0.41.0"
+      "packageVersion": "0.42.0"
     },
     "openapi": {
       "service": "io.airborne.server#Airborne",
