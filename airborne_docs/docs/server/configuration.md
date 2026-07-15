@@ -57,11 +57,13 @@ Redis is an **optional** but recommended cache. It backs two things: the OIDC lo
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
 | `REDIS_URL` | No | `redis://localhost:6379` | Redis connection string. When set, the server enables PKCE/nonce protection on the OIDC flow and caches hot reads. When unset, Redis is skipped entirely. |
+| `RC_SIGNATURE_CACHE_TTL` | No | `3600` | Time to live, in seconds, for each cached release-config signature. Only applies when `REDIS_URL` is set. |
 
 How it is used:
 
 - **Auth hardening.** When `REDIS_URL` is set, the login-initiation step generates a PKCE challenge and stores the code verifier and OIDC nonce in Redis (keyed by a hash of the OAuth `state`, 10-minute TTL, single-use). The callback consumes them to complete the PKCE exchange and verify the ID-token nonce.
 - **Read caches.** File-entry lookups (3-day TTL), package reads and workspace-name lookups (1-week TTL) are cached and invalidated on the corresponding writes.
+- **Release signatures.** Signatures are cached by signing-key selector and `config.version` for `RC_SIGNATURE_CACHE_TTL` seconds. The default is one hour.
 
 :::info[What happens without Redis]
 If `REDIS_URL` is unset, OIDC login **still works**, but PKCE and nonce verification are silently skipped and no read caching happens. For production, deploy a Redis instance and set `REDIS_URL` to keep the auth flow hardened.
@@ -249,6 +251,7 @@ Recognized tokens:
 | `db` | Runs pending **Diesel** database migrations (embedded in the binary) before serving. |
 | `superposition` | Reconciles Superposition default configs using `SUPERPOSITION_MIGRATION_STRATEGY`. Boot **panics** if this migration fails. |
 | `keycloaktocasbin` | Runs a one-time **Keycloak → Casbin** authorization import on boot (applies changes). This also triggers DB migrations first. |
+| `signingkeys` | Provisions a default [release-config signing key](/docs/guides/verify-the-release-config-signature) for every application that does not already have one. Applications created from now on get one automatically, so this only matters for applications that predate signing. Idempotent — safe to leave enabled. A failure here is logged and **does not** stop boot. |
 
 :::note
 The same Keycloak→Casbin import is also available as an explicit one-off command: run the server binary with `authz-import-keycloak --dry-run` (preview) or `authz-import-keycloak --apply` (apply). Use this instead of `keycloaktocasbin` in `MIGRATIONS_TO_RUN_ON_BOOT` when you want a controlled, out-of-band migration.

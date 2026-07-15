@@ -18,6 +18,8 @@ use std::collections::HashSet;
 use std::env;
 use std::str::FromStr;
 
+const DEFAULT_RC_SIGNATURE_CACHE_TTL_SECS: usize = 60 * 60;
+
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     // Server settings
@@ -93,6 +95,7 @@ pub struct AppConfig {
 
     // Redis
     pub redis_url: Option<String>,
+    pub rc_signature_cache_ttl: usize,
 
     // Victoria Metrics
     pub victoria_metrics_url: String,
@@ -257,6 +260,10 @@ impl AppConfig {
 
             // Redis
             redis_url: get_optional("REDIS_URL"),
+            rc_signature_cache_ttl: parse_env(
+                "RC_SIGNATURE_CACHE_TTL",
+                DEFAULT_RC_SIGNATURE_CACHE_TTL_SECS,
+            ),
 
             // Victoria Metrics
             victoria_metrics_url: get_env("VICTORIA_METRICS_INSERT_URL", Some(""))?,

@@ -1,0 +1,68 @@
+---
+title: Integrity
+description: Manage the ECDSA P-256 keys Airborne uses to sign your application's release config, and download the public key clients verify with.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+Airborne signs every [release config](/docs/guides/verify-the-release-config-signature) it serves for your application, so a client can prove the config it booted from was not tampered with. The **Integrity** page — under **Settings** for each [application](/docs/dashboard/applications) — is where you manage the keys that do the signing.
+
+Each key is an **ECDSA P-256** keypair. The **private key never leaves the server**: it cannot be downloaded and is never returned by the API. The **public key** is downloadable at any time — that is the half your apps verify with.
+
+:::info[You already have a key]
+Every application is given a keypair with the key ID `default` the moment it is created, and existing applications were backfilled with one. Signing is on out of the box; there is nothing to switch on.
+:::
+
+## The key list
+
+The page lists every key the application owns:
+
+<Screenshot name="integrity-keys" caption="Settings → Integrity. The default key signs every release config unless a request names another one." />
+
+| Column | What it means |
+| --- | --- |
+| **Key ID** | The readable identifier you choose. This is the value clients send in the `X-Signing-Key-Id` header, the `keyid` Airborne reports back in `X-Airborne-Signature`, and the downloaded PEM filename. Use the copy button next to it. |
+| **Algorithm** | `ecdsa-p256` for every key today. |
+| **Status** | **Default** — the key used when a request does not ask for a specific one. **Active** — usable, but only when named explicitly. **Disabled** — not usable for signing at all. |
+| **Created** | When the key was generated. |
+
+## Create a key
+
+**Create key** generates a fresh keypair on the server and adds it to the list. You only choose the key ID; the key material is generated for you. There is no separate generated UUID.
+
+A new key is **not** the default — it signs nothing until you promote it. That is deliberate: it gives you a window to distribute the new public key to your apps before anything starts signing with it.
+
+Key IDs must be unique within the application and are immutable. They must:
+
+- contain only lowercase letters (`a-z`), digits (`0-9`), and dashes (`-`);
+- use no consecutive dashes; and
+- neither start nor end with a dash.
+
+## Download the public key
+
+Each key's action menu offers **View**, **Copy**, and **Download** for the public key. It is a standard SPKI PEM (`BEGIN PUBLIC KEY`) that `openssl`, Java's `KeyFactory`, and Apple's CryptoKit all read directly.
+
+This is the file you ship to your apps. See [Verify the release config signature](/docs/guides/verify-the-release-config-signature) for how to check a response against it.
+
+## Set the default
+
+**Set as default** promotes a key. From that moment, every release-config response that does not name a specific key is signed with it, and the change takes effect immediately — there is no cache to wait out.
+
+Exactly one key is the default at any time; promoting a key demotes the previous one.
+
+## Enable and disable
+
+**Disable** takes a key out of service. Airborne will refuse to sign with it, and any request that names it in `X-Signing-Key-Id` is rejected with a **400**. Re-enabling restores it.
+
+Two rules keep you from locking your own apps out:
+
+- **The default key cannot be disabled.** Promote another key first. Otherwise requests that do not name a key would have nothing to sign with.
+- **A disabled key cannot be made the default.** Enable it first.
+
+:::danger[Disabling a key breaks clients that verify against it]
+A client holding only the old public key will reject configs signed by any other key — and refuse to boot the update. Disable a key only once you are confident your apps have picked up the replacement public key. The [rotation walkthrough](/docs/guides/verify-the-release-config-signature) covers the safe order.
+:::
+
+## Permissions
+
+Viewing keys needs **read** access to the application. Creating a key, promoting it, and enabling or disabling it require **application admin** — the same level as [access tokens](/docs/dashboard/access-tokens).

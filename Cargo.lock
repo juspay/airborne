@@ -367,6 +367,7 @@ dependencies = [
  "log",
  "open-feature",
  "openidconnect",
+ "p256",
  "prometheus 0.14.0",
  "r2d2",
  "redis",

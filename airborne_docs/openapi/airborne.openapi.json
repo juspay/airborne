@@ -93,6 +93,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -222,6 +232,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -347,6 +367,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -483,6 +513,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -596,6 +636,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -663,6 +713,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -756,6 +816,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -859,6 +929,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -974,6 +1054,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -1066,6 +1156,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -1181,6 +1281,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -1262,6 +1372,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -1339,6 +1459,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -1442,6 +1572,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -1575,6 +1715,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -1674,6 +1824,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -1816,6 +1976,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -1919,6 +2089,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -1932,6 +2112,578 @@
                 },
                 "tags": [
                     "Releases"
+                ]
+            }
+        },
+        "/api/signing-keys": {
+            "get": {
+                "description": "List the signing keys of an application, with the default key first. Every application\nis provisioned with a default key when it is created, so this is never empty. The\nprivate key is never returned — only the public key, which is enough to verify a\nsigned release config. Pass the organisation and application in the x-organisation and\nx-application headers. Requires a bearer token.",
+                "operationId": "ListSigningKeys",
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListSigningKeys 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListSigningKeysResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Signing keys"
+                ]
+            },
+            "post": {
+                "description": "Create a signing key for an application. The server generates an ECDSA P-256 keypair\nand keeps the private half; the response carries only the public key. The new key is\nnot used until it is made the default (see SetDefaultSigningKey) or named explicitly\nin the x-signing-key-id header — except for the very first key an application has,\nwhich becomes its default automatically. Key IDs must be unique within the\napplication; a duplicate ID is rejected with a 409. IDs may contain only lowercase\nletters, digits, and single dashes; a dash cannot be first, last, or repeated. Pass\nthe organisation and application in the x-organisation and x-application headers.\nRequires a bearer token.",
+                "operationId": "CreateSigningKey",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateSigningKeyRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "CreateSigningKey 201 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateSigningKeyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Signing keys"
+                ]
+            }
+        },
+        "/api/signing-keys/{keyId}": {
+            "patch": {
+                "description": "Enable or disable a signing key. A disabled key signs nothing, and naming it in\nx-signing-key-id is rejected. The application's default key cannot be disabled — it is\nwhat signs every release config served without an explicit key — so promote another key\nto default first (see SetDefaultSigningKey). Pass the organisation and application in\nthe x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "UpdateSigningKey",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateSigningKeyRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "keyId",
+                        "in": "path",
+                        "description": "ID of the signing key.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "description": "ID of the signing key."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UpdateSigningKey 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateSigningKeyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Signing keys"
+                ]
+            }
+        },
+        "/api/signing-keys/{keyId}/default": {
+            "post": {
+                "description": "Make a signing key the application's default: from then on it signs every release\nconfig served without an explicit x-signing-key-id header. Exactly one key per\napplication is the default, so the previous default is demoted in the same operation.\nA disabled key cannot be made the default — enable it first. This is how a key is\nrotated: create a new key, distribute its public key to your clients, then promote it.\nPass the organisation and application in the x-organisation and x-application headers.\nRequires a bearer token.",
+                "operationId": "SetDefaultSigningKey",
+                "parameters": [
+                    {
+                        "name": "keyId",
+                        "in": "path",
+                        "description": "ID of the signing key.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "description": "ID of the signing key."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SetDefaultSigningKey 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SetDefaultSigningKeyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Signing keys"
+                ]
+            }
+        },
+        "/api/signing-keys/{keyId}/public-key": {
+            "get": {
+                "description": "Download a signing key's public key as a PEM document (SPKI, \"application/x-pem-file\",\nserved as an attachment). Distribute this to whatever verifies the x-airborne-signature\nheader on a served release config. The private key is never downloadable. Pass the\norganisation and application in the x-organisation and x-application headers. Requires\na bearer token.",
+                "operationId": "GetSigningKeyPublicKey",
+                "parameters": [
+                    {
+                        "name": "keyId",
+                        "in": "path",
+                        "description": "ID of the signing key.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "description": "ID of the signing key."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetSigningKeyPublicKey 200 response",
+                        "content": {
+                            "application/x-pem-file": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetSigningKeyPublicKeyOutputPayload"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Signing keys"
                 ]
             }
         },
@@ -1996,6 +2748,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -2072,6 +2834,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -2090,7 +2862,7 @@
         },
         "/release/v2/{organisation}/{application}": {
             "get": {
-                "description": "Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.",
+                "description": "Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.\n\nThe response is signed: the x-airborne-signature response header carries an ES256 signature over the exact raw JSON response body bytes, so a client can verify the config was served by Airborne and not tampered with in transit. Send the x-signing-key-id header to choose which key signs the response; omit it to use the application's default key. See the \"Signing keys\" endpoints for managing keys and downloading the public key to verify against.",
                 "operationId": "ServeReleaseV2",
                 "parameters": [
                     {
@@ -2112,11 +2884,32 @@
                             "description": "Name of the application."
                         },
                         "required": true
+                    },
+                    {
+                        "name": "x-signing-key-id",
+                        "in": "header",
+                        "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400."
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "ServeReleaseV2 200 response",
+                        "headers": {
+                            "x-airborne-signature": {
+                                "description": "Signature over the response body, in the form\nkeyid=\"<key-id>\",alg=\"es256\",sig=\"<base64>\".\n\nThe signature is ECDSA P-256 over SHA-256 (ES256), DER-encoded and then Base64-encoded,\ncomputed over the exact raw JSON response body bytes, uncompressed. Verify it with the\npublic key of the signing key named in keyid, downloadable via GetSigningKeyPublicKey.\n\nAbsent if the application has no usable signing key.",
+                                "schema": {
+                                    "type": "string",
+                                    "description": "Signature over the response body, in the form\nkeyid=\"<key-id>\",alg=\"es256\",sig=\"<base64>\".\n\nThe signature is ECDSA P-256 over SHA-256 (ES256), DER-encoded and then Base64-encoded,\ncomputed over the exact raw JSON response body bytes, uncompressed. Verify it with the\npublic key of the signing key named in keyid, downloadable via GetSigningKeyPublicKey.\n\nAbsent if the application has no usable signing key."
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2165,6 +2958,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "InternalServerError 500 response",
                         "content": {
@@ -2183,7 +2986,7 @@
         },
         "/release/{organisation}/{application}": {
             "get": {
-                "description": "Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.",
+                "description": "Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.\n\nThe response is signed: the x-airborne-signature response header carries an ES256 signature over the exact raw JSON response body bytes, so a client can verify the config was served by Airborne and not tampered with in transit. Send the x-signing-key-id header to choose which key signs the response; omit it to use the application's default key. See the \"Signing keys\" endpoints for managing keys and downloading the public key to verify against.",
                 "operationId": "ServeRelease",
                 "parameters": [
                     {
@@ -2205,11 +3008,32 @@
                             "description": "Name of the application."
                         },
                         "required": true
+                    },
+                    {
+                        "name": "x-signing-key-id",
+                        "in": "header",
+                        "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 50,
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400."
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "ServeRelease 200 response",
+                        "headers": {
+                            "x-airborne-signature": {
+                                "description": "Signature over the response body, in the form\nkeyid=\"<key-id>\",alg=\"es256\",sig=\"<base64>\".\n\nThe signature is ECDSA P-256 over SHA-256 (ES256), DER-encoded and then Base64-encoded,\ncomputed over the exact raw JSON response body bytes, uncompressed. Verify it with the\npublic key of the signing key named in keyid, downloadable via GetSigningKeyPublicKey.\n\nAbsent if the application has no usable signing key.",
+                                "schema": {
+                                    "type": "string",
+                                    "description": "Signature over the response body, in the form\nkeyid=\"<key-id>\",alg=\"es256\",sig=\"<base64>\".\n\nThe signature is ECDSA P-256 over SHA-256 (ES256), DER-encoded and then Base64-encoded,\ncomputed over the exact raw JSON response body bytes, uncompressed. Verify it with the\npublic key of the signing key named in keyid, downloadable via GetSigningKeyPublicKey.\n\nAbsent if the application has no usable signing key."
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2254,6 +3078,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
                                 }
                             }
                         }
@@ -2325,6 +3159,18 @@
                 },
                 "required": [
                     "tenant_info"
+                ]
+            },
+            "ConflictErrorResponseContent": {
+                "type": "object",
+                "description": "Conflict error, returned when a request conflicts with the current state of the resource — for example, creating something whose name is already taken.",
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
                 ]
             },
             "CreateApplicationRequestContent": {
@@ -2763,6 +3609,64 @@
                     "package"
                 ]
             },
+            "CreateSigningKeyRequestContent": {
+                "type": "object",
+                "description": "Request body and headers for creating a signing key.",
+                "properties": {
+                    "key_id": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                        "description": "ID for the new key. Must be unique within the application. It may contain only\nlowercase letters (a-z), digits (0-9), and single dashes, and cannot start or end\nwith a dash."
+                    }
+                },
+                "required": [
+                    "key_id"
+                ]
+            },
+            "CreateSigningKeyResponseContent": {
+                "type": "object",
+                "description": "A signing key used to sign the release config an application serves to its SDKs.\n\nThe private key never leaves the server: it is not part of this shape and is not\nreturned by any endpoint. Only the public key is exposed, so that clients can verify\nthe x-airborne-signature header on a served release config.",
+                "properties": {
+                    "key_id": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                        "description": "Key ID chosen when the key is created. This is the value clients send in the\nx-signing-key-id header to have a release config signed with this key, and the\nvalue that appears in the keyid field of the x-airborne-signature response header."
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "description": "Algorithm the key signs with. Always \"ecdsa-p256\" today."
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "Public half of the keypair, PEM-encoded (SPKI). Use this to verify signatures\nproduced with this key."
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                    },
+                    "disabled": {
+                        "type": "boolean",
+                        "description": "Whether the key is disabled. A disabled key signs nothing and is rejected if it is\nnamed in x-signing-key-id. The default key cannot be disabled."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the key was created.",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "algorithm",
+                    "created_at",
+                    "disabled",
+                    "is_default",
+                    "key_id",
+                    "public_key"
+                ]
+            },
             "DimensionResponse": {
                 "type": "object",
                 "description": "A targeting dimension.",
@@ -2996,6 +3900,10 @@
                     }
                 }
             },
+            "GetSigningKeyPublicKeyOutputPayload": {
+                "type": "string",
+                "description": "The public half of the keypair, PEM-encoded (SPKI), as the raw response body."
+            },
             "GetUserResponseContent": {
                 "type": "object",
                 "description": "Information about the authenticated user.",
@@ -3196,6 +4104,22 @@
                     "data",
                     "total_items",
                     "total_pages"
+                ]
+            },
+            "ListSigningKeysResponseContent": {
+                "type": "object",
+                "description": "An application's signing keys, default first.",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SigningKey"
+                        },
+                        "description": "List of signing keys"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "NotFoundErrorResponseContent": {
@@ -3498,6 +4422,90 @@
                     "resources"
                 ]
             },
+            "SetDefaultSigningKeyResponseContent": {
+                "type": "object",
+                "description": "A signing key used to sign the release config an application serves to its SDKs.\n\nThe private key never leaves the server: it is not part of this shape and is not\nreturned by any endpoint. Only the public key is exposed, so that clients can verify\nthe x-airborne-signature header on a served release config.",
+                "properties": {
+                    "key_id": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                        "description": "Key ID chosen when the key is created. This is the value clients send in the\nx-signing-key-id header to have a release config signed with this key, and the\nvalue that appears in the keyid field of the x-airborne-signature response header."
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "description": "Algorithm the key signs with. Always \"ecdsa-p256\" today."
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "Public half of the keypair, PEM-encoded (SPKI). Use this to verify signatures\nproduced with this key."
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                    },
+                    "disabled": {
+                        "type": "boolean",
+                        "description": "Whether the key is disabled. A disabled key signs nothing and is rejected if it is\nnamed in x-signing-key-id. The default key cannot be disabled."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the key was created.",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "algorithm",
+                    "created_at",
+                    "disabled",
+                    "is_default",
+                    "key_id",
+                    "public_key"
+                ]
+            },
+            "SigningKey": {
+                "type": "object",
+                "description": "A signing key used to sign the release config an application serves to its SDKs.\n\nThe private key never leaves the server: it is not part of this shape and is not\nreturned by any endpoint. Only the public key is exposed, so that clients can verify\nthe x-airborne-signature header on a served release config.",
+                "properties": {
+                    "key_id": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                        "description": "Key ID chosen when the key is created. This is the value clients send in the\nx-signing-key-id header to have a release config signed with this key, and the\nvalue that appears in the keyid field of the x-airborne-signature response header."
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "description": "Algorithm the key signs with. Always \"ecdsa-p256\" today."
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "Public half of the keypair, PEM-encoded (SPKI). Use this to verify signatures\nproduced with this key."
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                    },
+                    "disabled": {
+                        "type": "boolean",
+                        "description": "Whether the key is disabled. A disabled key signs nothing and is rejected if it is\nnamed in x-signing-key-id. The default key cannot be disabled."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the key was created.",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "algorithm",
+                    "created_at",
+                    "disabled",
+                    "is_default",
+                    "key_id",
+                    "public_key"
+                ]
+            },
             "UnauthorizedResponseContent": {
                 "type": "object",
                 "description": "Unauthorized error",
@@ -3628,6 +4636,61 @@
                     "status",
                     "url",
                     "version"
+                ]
+            },
+            "UpdateSigningKeyRequestContent": {
+                "type": "object",
+                "description": "Path, body, and headers for updating a signing key.",
+                "properties": {
+                    "disabled": {
+                        "type": "boolean",
+                        "description": "Whether the key should be disabled. The application's default key cannot be\ndisabled — promote another key to default first."
+                    }
+                },
+                "required": [
+                    "disabled"
+                ]
+            },
+            "UpdateSigningKeyResponseContent": {
+                "type": "object",
+                "description": "A signing key used to sign the release config an application serves to its SDKs.\n\nThe private key never leaves the server: it is not part of this shape and is not\nreturned by any endpoint. Only the public key is exposed, so that clients can verify\nthe x-airborne-signature header on a served release config.",
+                "properties": {
+                    "key_id": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                        "description": "Key ID chosen when the key is created. This is the value clients send in the\nx-signing-key-id header to have a release config signed with this key, and the\nvalue that appears in the keyid field of the x-airborne-signature response header."
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "description": "Algorithm the key signs with. Always \"ecdsa-p256\" today."
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "Public half of the keypair, PEM-encoded (SPKI). Use this to verify signatures\nproduced with this key."
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                    },
+                    "disabled": {
+                        "type": "boolean",
+                        "description": "Whether the key is disabled. A disabled key signs nothing and is rejected if it is\nnamed in x-signing-key-id. The default key cannot be disabled."
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "description": "Time the key was created.",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "algorithm",
+                    "created_at",
+                    "disabled",
+                    "is_default",
+                    "key_id",
+                    "public_key"
                 ]
             },
             "UploadFileInputPayload": {
