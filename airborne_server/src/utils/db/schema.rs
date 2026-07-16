@@ -167,7 +167,7 @@ pub mod hyperotaserver {
             name -> Text,
             algorithm -> Text,
             public_key -> Text,
-            private_key -> Text,
+            private_key_encrypted -> Text,
             is_default -> Bool,
             disabled -> Bool,
             created_at -> Timestamptz,

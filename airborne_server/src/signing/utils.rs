@@ -41,6 +41,7 @@ use crate::{
         },
         DbPool,
     },
+    utils::moka::{MokaCache, MokaKey},
     utils::redis::{RedisCache, RedisKey},
 };
 
@@ -68,15 +69,11 @@ pub const SIGNATURE_HEADER: &str = "x-airborne-signature";
 const KEY_CACHE_TTL_SECS: usize = 5 * 60;
 
 /// A signing key as needed by the serve path.
-///
-/// This carries the private key, which is why it is a distinct type from the
-/// API-facing `SigningKeyResponse`: only the values that must reach the signer
-/// are ever put in a struct that has the private key on it.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ActiveSigningKey {
     pub key_id: String,
     pub algorithm: String,
-    pub private_key: String,
+    pub private_key_encrypted: String,
 }
 
 impl From<SigningKeyEntry> for ActiveSigningKey {
@@ -84,7 +81,7 @@ impl From<SigningKeyEntry> for ActiveSigningKey {
         Self {
             key_id: entry.name,
             algorithm: entry.algorithm,
-            private_key: entry.private_key,
+            private_key_encrypted: entry.private_key_encrypted,
         }
     }
 }
@@ -143,6 +140,23 @@ pub fn generate_keypair() -> Result<GeneratedKeypair, ABError> {
         private_key,
         public_key,
     })
+}
+
+/// Encrypt a private key for at-rest storage with the same master key used for
+/// encrypted environment secrets.
+async fn encrypt_private_key(plaintext: &str, key: Option<&str>) -> Result<String, ABError> {
+    match key {
+        Some(key) => crate::utils::encryption::encrypt_string(plaintext, key).await,
+        None => Ok(plaintext.to_string()),
+    }
+}
+
+/// Decrypt a private key produced by [`encrypt_private_key`].
+async fn decrypt_private_key(ciphertext: &str, key: Option<&str>) -> Result<String, ABError> {
+    match key {
+        Some(key) => crate::utils::encryption::decrypt_string(ciphertext, key).await,
+        None => Ok(ciphertext.to_string()),
+    }
 }
 
 /// Sign `payload` with ES256 (ECDSA P-256 over SHA-256) and return the
@@ -245,23 +259,18 @@ pub async fn resolve_signing_key(
                 application,
                 &["signing_key", "key_id", &key_id],
             );
-
-            match cache.get::<ActiveSigningKey>(&cache_key).await? {
-                Some(cached) => Some(cached),
-                None => {
-                    let found = fetch_key_by_id_db(
-                        pool,
-                        organisation.to_owned(),
-                        application.to_owned(),
-                        key_id,
-                    )?;
-                    // Cache hits only — see the note on this function.
-                    if let Some(key) = &found {
-                        let _ = cache.set_ex(&cache_key, key, KEY_CACHE_TTL_SECS).await;
-                    }
-                    found
-                }
-            }
+            let (org, app, db_key_id) = (
+                organisation.to_owned(),
+                application.to_owned(),
+                key_id.clone(),
+            );
+            cache
+                .get_or_try_set::<Option<ActiveSigningKey>, _, _>(
+                    &cache_key,
+                    KEY_CACHE_TTL_SECS,
+                    || async { fetch_key_by_id_db(pool, org, app, db_key_id) },
+                )
+                .await?
         }
     };
 
@@ -300,6 +309,19 @@ fn signature_cache_key(
 /// The set of signature cache keys currently held for an application.
 fn signature_index_key(cache: &RedisCache, organisation: &str, application: &str) -> RedisKey {
     cache.key(organisation, application, &["release_sig_index"])
+}
+
+fn decrypted_signing_key_cache_key(
+    cache: &MokaCache,
+    organisation: &str,
+    application: &str,
+    key_id: &str,
+) -> MokaKey {
+    cache.key(
+        organisation,
+        application,
+        &["signing_key", "decrypted", key_id],
+    )
 }
 
 fn signature_cache_selector(requested_key_id: Option<&str>) -> Result<String, ABError> {
@@ -353,7 +375,18 @@ pub async fn sign_release_config(
         return Ok(None);
     };
 
-    let signature = match sign_payload(&key.private_key, body) {
+    let decrypted_key_cache_key =
+        decrypted_signing_key_cache_key(&state.moka_cache, organisation, application, &key.key_id);
+    let encrypted_private_key = key.private_key_encrypted.clone();
+    let master_encryption_key = state.master_encryption_key.clone();
+    let private_key = state
+        .moka_cache
+        .get_or_try_set::<String, _, _>(&decrypted_key_cache_key, || async move {
+            decrypt_private_key(&encrypted_private_key, master_encryption_key.as_deref()).await
+        })
+        .await;
+
+    let signature = match private_key.and_then(|private_key| sign_payload(&private_key, body)) {
         Ok(signature) => signature,
         Err(e) => {
             error!(
@@ -390,6 +423,10 @@ pub async fn invalidate_key_cache(
     application: &str,
     key_id: &str,
 ) {
+    let decrypted_key_cache_key =
+        decrypted_signing_key_cache_key(&state.moka_cache, organisation, application, key_id);
+    state.moka_cache.del(&decrypted_key_cache_key).await;
+
     let Some(cache) = &state.redis_cache else {
         return;
     };
@@ -464,11 +501,14 @@ pub async fn get_key(
 
 pub async fn create_key(
     pool: DbPool,
+    master_encryption_key: Option<&str>,
     organisation: String,
     application: String,
     key_id: String,
 ) -> Result<SigningKeyEntry, ABError> {
     let keypair = generate_keypair()?;
+    let private_key_encrypted =
+        encrypt_private_key(&keypair.private_key, master_encryption_key).await?;
 
     run_blocking!({
         let mut conn = pool.get()?;
@@ -490,7 +530,7 @@ pub async fn create_key(
             name: key_id.clone(),
             algorithm: ALGORITHM.to_string(),
             public_key: keypair.public_key.clone(),
-            private_key: keypair.private_key.clone(),
+            private_key_encrypted: private_key_encrypted.clone(),
             is_default: !has_default,
         };
 
@@ -605,10 +645,13 @@ pub async fn set_default_key(
 /// Give an application a default keypair if it has none.
 pub async fn provision_default_key(
     pool: DbPool,
+    master_encryption_key: Option<&str>,
     organisation: String,
     application: String,
 ) -> Result<(), ABError> {
     let keypair = generate_keypair()?;
+    let private_key_encrypted =
+        encrypt_private_key(&keypair.private_key, master_encryption_key).await?;
 
     run_blocking!({
         let mut conn = pool.get()?;
@@ -632,7 +675,7 @@ pub async fn provision_default_key(
             name: DEFAULT_KEY_ID.to_string(),
             algorithm: ALGORITHM.to_string(),
             public_key: keypair.public_key.clone(),
-            private_key: keypair.private_key.clone(),
+            private_key_encrypted: private_key_encrypted.clone(),
             is_default: true,
         };
 
@@ -652,7 +695,10 @@ pub async fn provision_default_key(
 }
 
 /// Provision a default keypair for every application that does not have one.
-pub async fn backfill_default_keys(pool: DbPool) -> Result<(), ABError> {
+pub async fn backfill_default_keys(
+    pool: DbPool,
+    master_encryption_key: Option<&str>,
+) -> Result<(), ABError> {
     let backfill_pool = pool.clone();
     let missing: Vec<(String, String)> = run_blocking!({
         let mut conn = backfill_pool.get()?;
@@ -688,7 +734,14 @@ pub async fn backfill_default_keys(pool: DbPool) -> Result<(), ABError> {
 
     let mut provisioned = 0usize;
     for (organisation, application) in missing {
-        match provision_default_key(pool.clone(), organisation.clone(), application.clone()).await {
+        match provision_default_key(
+            pool.clone(),
+            master_encryption_key,
+            organisation.clone(),
+            application.clone(),
+        )
+        .await
+        {
             Ok(()) => provisioned += 1,
             // One bad application must not stop the rest of the backfill.
             Err(e) => error!(
@@ -768,6 +821,43 @@ mod tests {
         let first = sign_payload(&keypair.private_key, BODY).expect("sign");
         let second = sign_payload(&keypair.private_key, BODY).expect("sign");
         assert_eq!(first, second);
+    }
+
+    #[tokio::test]
+    async fn encrypted_private_key_can_be_decrypted_and_used() {
+        let keypair = generate_keypair().expect("keygen");
+        let master_key = BASE64.encode([42_u8; 32]);
+
+        let encrypted = encrypt_private_key(&keypair.private_key, Some(&master_key))
+            .await
+            .expect("encrypt");
+        assert_ne!(encrypted, keypair.private_key);
+        assert!(!encrypted.contains("BEGIN PRIVATE KEY"));
+
+        let decrypted = decrypt_private_key(&encrypted, Some(&master_key))
+            .await
+            .expect("decrypt");
+        let signature_b64 = sign_payload(&decrypted, BODY).expect("sign");
+
+        let verifying_key =
+            VerifyingKey::from_public_key_pem(&keypair.public_key).expect("parse public key");
+        let der = BASE64.decode(&signature_b64).expect("decode base64");
+        let signature = DerSignature::try_from(der.as_slice()).expect("parse DER signature");
+        verifying_key.verify(BODY, &signature).expect("verify");
+    }
+
+    #[tokio::test]
+    async fn encryption_disabled_preserves_plaintext_storage() {
+        let keypair = generate_keypair().expect("keygen");
+
+        let stored = encrypt_private_key(&keypair.private_key, None)
+            .await
+            .expect("store");
+        assert_eq!(stored, keypair.private_key);
+        assert_eq!(
+            decrypt_private_key(&stored, None).await.expect("load"),
+            keypair.private_key
+        );
     }
 
     #[test]
