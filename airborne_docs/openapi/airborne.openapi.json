@@ -2888,13 +2888,13 @@
                     {
                         "name": "x-signing-key-id",
                         "in": "header",
-                        "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400.",
+                        "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, or sent with an empty value,\nthe application's default signing key is used. A non-empty key ID that is\ninvalid, unknown, disabled, or belongs to another application is rejected with\na 400.",
                         "schema": {
                             "type": "string",
                             "maxLength": 50,
                             "minLength": 1,
                             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-                            "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400."
+                            "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, or sent with an empty value,\nthe application's default signing key is used. A non-empty key ID that is\ninvalid, unknown, disabled, or belongs to another application is rejected with\na 400."
                         }
                     }
                 ],
@@ -3012,13 +3012,13 @@
                     {
                         "name": "x-signing-key-id",
                         "in": "header",
-                        "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400.",
+                        "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, or sent with an empty value,\nthe application's default signing key is used. A non-empty key ID that is\ninvalid, unknown, disabled, or belongs to another application is rejected with\na 400.",
                         "schema": {
                             "type": "string",
                             "maxLength": 50,
                             "minLength": 1,
                             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-                            "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, the application's default\nsigning key is used. A key ID that is invalid, unknown, disabled, or belongs to\nanother application is rejected with a 400."
+                            "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, or sent with an empty value,\nthe application's default signing key is used. A non-empty key ID that is\ninvalid, unknown, disabled, or belongs to another application is rejected with\na 400."
                         }
                     }
                 ],

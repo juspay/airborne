@@ -123,7 +123,7 @@ Omit the header and Airborne signs with the application's **default** key. To pi
 X-Signing-Key-Id: release-signing-2026
 ```
 
-An unknown or disabled key ID — or one belonging to a different application — is rejected with **400**.
+Sending the header with an **empty** value is the same as omitting it: the default key signs. A *non-empty* key ID that is unknown or disabled — or that belongs to a different application — is rejected with **400**.
 
 Key IDs contain only lowercase letters (`a-z`), digits (`0-9`), and single dashes. They cannot start or end with a dash.
 

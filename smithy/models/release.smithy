@@ -279,9 +279,10 @@ structure GetServeReleaseInput {
     application: String
 
     /// ID of the signing key to sign the response with. This is the readable ID chosen
-    /// when the key was created. Optional — when omitted, the application's default
-    /// signing key is used. A key ID that is invalid, unknown, disabled, or belongs to
-    /// another application is rejected with a 400.
+    /// when the key was created. Optional — when omitted, or sent with an empty value,
+    /// the application's default signing key is used. A non-empty key ID that is
+    /// invalid, unknown, disabled, or belongs to another application is rejected with
+    /// a 400.
     @httpHeader("x-signing-key-id")
     signingKeyId: SigningKeyId
 }

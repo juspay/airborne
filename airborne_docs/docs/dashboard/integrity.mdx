@@ -9,8 +9,10 @@ Airborne signs every [release config](/docs/guides/verify-the-release-config-sig
 
 Each key is an **ECDSA P-256** keypair. The **private key never leaves the server**: it cannot be downloaded and is never returned by the API. The **public key** is downloadable at any time — that is the half your apps verify with.
 
-:::info[You already have a key]
-Every application is given a keypair with the key ID `default` the moment it is created, and existing applications were backfilled with one. Signing is on out of the box; there is nothing to switch on.
+:::info[New applications get a key automatically]
+Every application is given a keypair with the key ID `default` when it is created, so signing is on from the first release config it serves.
+
+Applications that **predate signing** need a one-time backfill: add `signingkeys` to [`MIGRATIONS_TO_RUN_ON_BOOT`](/docs/server/configuration#boot-time-migrations) and restart the server. It is idempotent, so it is safe to leave enabled. Until it runs, those applications serve release configs with **no** signature header — never an error in itself, but a client that requires a signature will reject them.
 :::
 
 ## The key list
@@ -32,6 +34,8 @@ The page lists every key the application owns:
 
 A new key is **not** the default — it signs nothing until you promote it. That is deliberate: it gives you a window to distribute the new public key to your apps before anything starts signing with it.
 
+The exception is an application's **first** key, which becomes the default the moment it is created — an application with keys but no default would have nothing to sign with. You only land here if the application has no keys at all, which normally means it predates signing and has not been backfilled.
+
 Key IDs must be unique within the application and are immutable. They must:
 
 - contain only lowercase letters (`a-z`), digits (`0-9`), and dashes (`-`);
@@ -46,13 +50,15 @@ This is the file you ship to your apps. See [Verify the release config signature
 
 ## Set the default
 
-**Set as default** promotes a key. From that moment, every release-config response that does not name a specific key is signed with it, and the change takes effect immediately — there is no cache to wait out.
+**Set as default** promotes a key. From that moment, every release-config response that does not name a specific key is signed with it.
+
+Airborne drops its own cached signatures and invalidates the application's release route at the CDN, so promoting a key does not leave clients on the 24-hour edge cache — they pick up the new `keyid` as soon as the invalidation propagates, usually within a minute.
 
 Exactly one key is the default at any time; promoting a key demotes the previous one.
 
 ## Enable and disable
 
-**Disable** takes a key out of service. Airborne will refuse to sign with it, and any request that names it in `X-Signing-Key-Id` is rejected with a **400**. Re-enabling restores it.
+**Disable** takes a key out of service. Airborne will refuse to sign with it, and any request that names it in `X-Signing-Key-Id` is rejected with a **400**. Disabling also invalidates the cached release configs that key signed, so responses carrying its `keyid` stop being served from the edge. Re-enabling restores it.
 
 Two rules keep you from locking your own apps out:
 
