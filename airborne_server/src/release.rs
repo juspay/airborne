@@ -526,17 +526,7 @@ async fn create_release(
 
     let response_resources = final_resources.unwrap_or_default();
 
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
+    utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     let now = Utc::now();
     let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
@@ -991,17 +981,7 @@ async fn ramp_release(
 
     info!("Successfully ramped experiment {}", experiment_id);
 
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
+    utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     Ok(Json(RampReleaseResponse {
         success: true,
@@ -1139,17 +1119,7 @@ async fn conclude_release(
         experiment_id, transformed_variant_id
     );
 
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
+    utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     Ok(Json(ConcludeReleaseResponse {
         success: true,
@@ -1492,10 +1462,11 @@ async fn serve_release_handler(
         ABError::InternalServerError(format!("Failed to serialize release config: {e}"))
     })?;
 
-    let requested_key_id = req
-        .headers()
-        .get(signing::utils::SIGNING_KEY_ID_HEADER)
-        .and_then(|value| value.to_str().ok());
+    let requested_key_id = signing::utils::requested_key_id(
+        req.headers()
+            .get(signing::utils::SIGNING_KEY_ID_HEADER)
+            .and_then(|value| value.to_str().ok()),
+    );
 
     // config.version is a UUID minted with the resolved release variant. The
     // signing helper combines it with the selected key so repeat serves can

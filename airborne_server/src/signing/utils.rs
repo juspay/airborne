@@ -26,6 +26,7 @@ use uuid::Uuid;
 use crate::{
     run_blocking,
     types::{ABError, AppState},
+    utils::advisory_lock::{try_acquire_lock, LockNamespace},
     utils::db::{
         models::{NewSigningKey, SigningKeyEntry},
         schema::hyperotaserver::{
@@ -84,6 +85,13 @@ impl From<SigningKeyEntry> for ActiveSigningKey {
             private_key_encrypted: entry.private_key_encrypted,
         }
     }
+}
+
+/// Normalize an `X-Signing-Key-Id` header value into an explicit key request.
+pub fn requested_key_id(header_value: Option<&str>) -> Option<&str> {
+    header_value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
 }
 
 /// Validate the immutable, client-visible signing key ID.
@@ -177,39 +185,43 @@ pub fn signature_header_value(key_id: &str, signature_b64: &str) -> String {
 // Cached lookups used by the public serve path
 // ---------------------------------------------------------------------------
 
-fn fetch_default_key_db(
+async fn fetch_default_key_db(
     pool: DbPool,
     organisation: String,
     application: String,
 ) -> Result<Option<ActiveSigningKey>, ABError> {
-    let mut conn = pool.get()?;
-    let entry = signing_keys_table
-        .filter(sk_org_id.eq(&organisation))
-        .filter(sk_app_id.eq(&application))
-        .filter(sk_is_default.eq(true))
-        .filter(sk_disabled.eq(false))
-        .select(SigningKeyEntry::as_select())
-        .first::<SigningKeyEntry>(&mut conn)
-        .optional()?;
-    Ok(entry.map(Into::into))
+    run_blocking!({
+        let mut conn = pool.get()?;
+        let entry = signing_keys_table
+            .filter(sk_org_id.eq(&organisation))
+            .filter(sk_app_id.eq(&application))
+            .filter(sk_is_default.eq(true))
+            .filter(sk_disabled.eq(false))
+            .select(SigningKeyEntry::as_select())
+            .first::<SigningKeyEntry>(&mut conn)
+            .optional()?;
+        Ok(entry.map(Into::into))
+    })
 }
 
-fn fetch_key_by_id_db(
+async fn fetch_key_by_id_db(
     pool: DbPool,
     organisation: String,
     application: String,
     key_id: String,
 ) -> Result<Option<ActiveSigningKey>, ABError> {
-    let mut conn = pool.get()?;
-    let entry = signing_keys_table
-        .filter(sk_name.eq(&key_id))
-        .filter(sk_org_id.eq(&organisation))
-        .filter(sk_app_id.eq(&application))
-        .filter(sk_disabled.eq(false))
-        .select(SigningKeyEntry::as_select())
-        .first::<SigningKeyEntry>(&mut conn)
-        .optional()?;
-    Ok(entry.map(Into::into))
+    run_blocking!({
+        let mut conn = pool.get()?;
+        let entry = signing_keys_table
+            .filter(sk_name.eq(&key_id))
+            .filter(sk_org_id.eq(&organisation))
+            .filter(sk_app_id.eq(&application))
+            .filter(sk_disabled.eq(false))
+            .select(SigningKeyEntry::as_select())
+            .first::<SigningKeyEntry>(&mut conn)
+            .optional()?;
+        Ok(entry.map(Into::into))
+    })
 }
 
 /// Resolve the key to sign a release config with.
@@ -223,7 +235,8 @@ pub async fn resolve_signing_key(
 
     let Some(raw_key_id) = requested_key_id else {
         let Some(cache) = &state.redis_cache else {
-            return fetch_default_key_db(pool, organisation.to_owned(), application.to_owned());
+            return fetch_default_key_db(pool, organisation.to_owned(), application.to_owned())
+                .await;
         };
         let cache_key = cache.key(
             organisation,
@@ -235,7 +248,7 @@ pub async fn resolve_signing_key(
             .get_or_try_set::<Option<ActiveSigningKey>, _, _>(
                 &cache_key,
                 KEY_CACHE_TTL_SECS,
-                || async { fetch_default_key_db(pool, org, app) },
+                || async { fetch_default_key_db(pool, org, app).await },
             )
             .await;
     };
@@ -245,12 +258,15 @@ pub async fn resolve_signing_key(
     })?;
 
     let key = match &state.redis_cache {
-        None => fetch_key_by_id_db(
-            pool,
-            organisation.to_owned(),
-            application.to_owned(),
-            key_id.clone(),
-        )?,
+        None => {
+            fetch_key_by_id_db(
+                pool,
+                organisation.to_owned(),
+                application.to_owned(),
+                key_id.clone(),
+            )
+            .await?
+        }
         Some(cache) => {
             // key_unlabeled: the key ID is high-cardinality and must not become a
             // Prometheus label value.
@@ -259,18 +275,31 @@ pub async fn resolve_signing_key(
                 application,
                 &["signing_key", "key_id", &key_id],
             );
-            let (org, app, db_key_id) = (
-                organisation.to_owned(),
-                application.to_owned(),
-                key_id.clone(),
-            );
-            cache
-                .get_or_try_set::<Option<ActiveSigningKey>, _, _>(
-                    &cache_key,
-                    KEY_CACHE_TTL_SECS,
-                    || async { fetch_key_by_id_db(pool, org, app, db_key_id) },
-                )
-                .await?
+
+            match cache.get::<ActiveSigningKey>(&cache_key).await? {
+                Some(hit) => Some(hit),
+                None => {
+                    let key = fetch_key_by_id_db(
+                        pool,
+                        organisation.to_owned(),
+                        application.to_owned(),
+                        key_id.clone(),
+                    )
+                    .await?;
+
+                    // Only ever cache a key the database actually returned. `key_id`
+                    // arrives on an unauthenticated request, so caching the misses too
+                    // would let anyone mint an unbounded number of Redis keys just by
+                    // asking for keys that do not exist.
+                    if let Some(key) = &key {
+                        if let Err(e) = cache.set_ex(&cache_key, key, KEY_CACHE_TTL_SECS).await {
+                            warn!("Failed to cache signing key {key_id}: {e}");
+                        }
+                    }
+
+                    key
+                }
+            }
         }
     };
 
@@ -415,6 +444,22 @@ pub async fn sign_release_config(
     Ok(Some(signature_header_value(&key.key_id, &signature)))
 }
 
+/// Drop every cached release-config signature for an application.
+pub async fn invalidate_signature_cache(state: &AppState, organisation: &str, application: &str) {
+    let Some(cache) = &state.redis_cache else {
+        return;
+    };
+
+    let index = signature_index_key(cache, organisation, application);
+    if let Err(e) = cache.index_drop(&index).await {
+        let ttl_secs = state.env.rc_signature_cache_ttl;
+        error!(
+            "Failed to drop cached signatures for {organisation}/{application}: {e}. \
+             Stale signatures may be served for up to {ttl_secs}s."
+        );
+    }
+}
+
 /// Drop the cached entries for an application's keys. Called after every
 /// mutation so a disable or a default change takes effect immediately.
 pub async fn invalidate_key_cache(
@@ -449,14 +494,9 @@ pub async fn invalidate_key_cache(
         warn!("Failed to invalidate signing key cache for {key_id}: {e}");
     }
 
-    let index = signature_index_key(cache, organisation, application);
-    if let Err(e) = cache.index_drop(&index).await {
-        let ttl_secs = state.env.rc_signature_cache_ttl;
-        error!(
-            "Failed to drop cached signatures for {organisation}/{application}: {e}. \
-             Signatures from the previous key may be served for up to {ttl_secs}s."
-        );
-    }
+    // Which key signs has changed, so every signature cached under the old one
+    // has to go with it.
+    invalidate_signature_cache(state, organisation, application).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -695,10 +735,27 @@ pub async fn provision_default_key(
 }
 
 /// Provision a default keypair for every application that does not have one.
+///
+/// Every instance runs this on boot. The unique constraints make a concurrent
+/// run harmless, but not free: each instance would scan the same applications and
+/// generate and encrypt a keypair for every one of them, only to throw all but
+/// the winner away. One instance does the work, the rest skip — the same pattern
+/// the superposition and Keycloak -> Casbin migrations use.
 pub async fn backfill_default_keys(
     pool: DbPool,
     master_encryption_key: Option<&str>,
 ) -> Result<(), ABError> {
+    let _lock_guard =
+        match try_acquire_lock(&pool, LockNamespace::SigningKeyBackfill, "signingkeys").await? {
+            Some(guard) => guard,
+            None => {
+                info!(
+                    "Signing key backfill: another instance holds the lock, skipping on this one"
+                );
+                return Ok(());
+            }
+        };
+
     let backfill_pool = pool.clone();
     let missing: Vec<(String, String)> = run_blocking!({
         let mut conn = backfill_pool.get()?;
@@ -885,6 +942,25 @@ mod tests {
             signature_cache_selector(Some("release-signing-2026")).expect("key selector"),
             "key:release-signing-2026"
         );
+    }
+
+    #[test]
+    fn an_empty_signing_key_header_falls_back_to_the_default_key() {
+        // A client that sets X-Signing-Key-Id unconditionally from an unset
+        // config field sends an empty value. That must mean "use the default",
+        // not "use the key named ''" — which would 400 the whole release config.
+        assert_eq!(requested_key_id(None), None);
+        assert_eq!(requested_key_id(Some("")), None);
+        assert_eq!(requested_key_id(Some("   ")), None);
+    }
+
+    #[test]
+    fn a_populated_signing_key_header_is_an_explicit_request() {
+        assert_eq!(
+            requested_key_id(Some("release-signing-2026")),
+            Some("release-signing-2026")
+        );
+        assert_eq!(requested_key_id(Some("  spaced  ")), Some("spaced"));
     }
 
     #[test]

@@ -228,9 +228,7 @@ export function SigningKeysCard({ canRead, canCreate, canUpdate }: SigningKeysCa
                         {!signingKey.is_default && !signingKey.disabled && <Badge variant="outline">Active</Badge>}
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(signingKey.created_at)}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{formatDate(signingKey.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <KeyActions
                         signingKey={signingKey}

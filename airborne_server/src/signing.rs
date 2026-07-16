@@ -29,6 +29,7 @@ use airborne_authz_macros::authz;
 
 use crate::{
     middleware::auth::{require_org_and_app, AuthResponse},
+    release::utils as release_utils,
     signing::types::{CreateSigningKeyRequest, SigningKeyResponse, UpdateSigningKeyRequest},
     types as airborne_types,
     types::{ABError, AppState, ListResponse, WithHeaders},
@@ -104,6 +105,13 @@ async fn create_signing_key(
     // "no default key" result has to go.
     utils::invalidate_key_cache(&state, &organisation, &application, &key.name).await;
 
+    // That same first key flips the application from serving unsigned configs to
+    // signed ones, and the edge is still holding the unsigned responses. A key
+    // that did not become the default changes nothing about what is served.
+    if key.is_default {
+        release_utils::invalidate_release_cache(&state, &organisation, &application).await;
+    }
+
     Ok(WithHeaders::new(Json(SigningKeyResponse::from(key))).status(StatusCode::CREATED))
 }
 
@@ -161,17 +169,25 @@ async fn update_signing_key(
     )?;
 
     let key_id = utils::validate_key_id(&path.into_inner())?;
+    let disabled = req.into_inner().disabled;
 
     let key = utils::set_key_disabled(
         state.db_pool.clone(),
         organisation.clone(),
         application.clone(),
         key_id,
-        req.into_inner().disabled,
+        disabled,
     )
     .await?;
 
     utils::invalidate_key_cache(&state, &organisation, &application, &key.name).await;
+
+    // Disabling a key has to stop its signatures from being served, and the edge
+    // is still holding responses it signed. Enabling one invalidates nothing:
+    // no cached response becomes wrong by a key becoming usable again.
+    if disabled {
+        release_utils::invalidate_release_cache(&state, &organisation, &application).await;
+    }
 
     Ok(Json(SigningKeyResponse::from(key)))
 }
@@ -205,6 +221,10 @@ async fn set_default_signing_key(
     .await?;
 
     utils::invalidate_key_cache(&state, &organisation, &application, &key.name).await;
+
+    // Every release config cached at the edge was signed by the key this one just
+    // replaced, so it has to be re-fetched to pick up the new `keyid`.
+    release_utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     Ok(Json(SigningKeyResponse::from(key)))
 }
