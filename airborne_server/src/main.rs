@@ -75,6 +75,7 @@ use crate::{
         migrations::{
             get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
         },
+        moka::MokaCache,
         redis::RedisCache,
         superposition_provider::ProviderRegistry,
     },
@@ -152,7 +153,7 @@ async fn main() -> std::io::Result<()> {
     let shared_config = aws_config::from_env().load().await;
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
 
-    let app_config = AppConfig::build(&aws_kms_client)
+    let (app_config, master_encryption_key) = AppConfig::build(&aws_kms_client)
         .await
         .expect("Failed to build AppConfig");
 
@@ -432,6 +433,7 @@ async fn main() -> std::io::Result<()> {
         info!("REDIS_URL not set, skipping Redis cache initialization");
         None
     };
+    let moka_cache = MokaCache::new("airborne");
 
     let provider_url = cac_url + "/";
 
@@ -461,6 +463,8 @@ async fn main() -> std::io::Result<()> {
         authz_provider,
         db_pool: pool,
         redis_cache,
+        moka_cache,
+        master_encryption_key,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
@@ -496,7 +500,12 @@ async fn main() -> std::io::Result<()> {
     // key. Give them a default one so every application serves signed configs.
     // Idempotent, so it is safe to leave enabled across restarts.
     if migrations_to_run_on_boot.iter().any(|m| m == "signingkeys") {
-        if let Err(e) = signing::utils::backfill_default_keys(app_state.db_pool.clone()).await {
+        if let Err(e) = signing::utils::backfill_default_keys(
+            app_state.db_pool.clone(),
+            app_state.master_encryption_key.as_deref(),
+        )
+        .await
+        {
             // Signing is additive: an app without a key serves unsigned configs
             // rather than failing, so a backfill problem must not stop boot.
             error!("Signing key backfill failed: {e}. Continuing startup.");

@@ -227,6 +227,7 @@ async fn add_application(
     // boot backfill or the Integrity tab provisions a key.
     if let Err(e) = crate::signing::utils::provision_default_key(
         state.db_pool.clone(),
+        state.master_encryption_key.as_deref(),
         organisation.clone(),
         application.clone(),
     )

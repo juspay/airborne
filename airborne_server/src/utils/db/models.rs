@@ -240,8 +240,8 @@ pub struct NewAuthzRoleBindingEntry {
 
 /// An application's ECDSA P-256 signing keypair.
 ///
-/// Deliberately does not derive `Serialize`: `private_key` must never be able to
-/// reach an HTTP response by accident. API handlers map this into
+/// Deliberately does not derive `Serialize`: private key material must never be
+/// able to reach an HTTP response by accident. API handlers map this into
 /// `signing::types::SigningKeyResponse`, which has no private-key field.
 ///
 /// The internal row UUID, `org_id`, `app_id`, and `updated_at` are omitted: every
@@ -254,7 +254,7 @@ pub struct SigningKeyEntry {
     pub name: String,
     pub algorithm: String,
     pub public_key: String,
-    pub private_key: String,
+    pub private_key_encrypted: String,
     pub is_default: bool,
     pub disabled: bool,
     pub created_at: DateTime<Utc>,
@@ -269,6 +269,6 @@ pub struct NewSigningKey {
     pub name: String,
     pub algorithm: String,
     pub public_key: String,
-    pub private_key: String,
+    pub private_key_encrypted: String,
     pub is_default: bool,
 }

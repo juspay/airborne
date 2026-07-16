@@ -93,6 +93,7 @@ async fn create_signing_key(
 
     let key = utils::create_key(
         state.db_pool.clone(),
+        state.master_encryption_key.as_deref(),
         organisation.clone(),
         application.clone(),
         key_id,

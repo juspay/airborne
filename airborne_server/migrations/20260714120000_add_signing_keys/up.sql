@@ -5,7 +5,7 @@ CREATE TABLE hyperotaserver.signing_keys (
     name TEXT NOT NULL,
     algorithm TEXT NOT NULL DEFAULT 'ecdsa-p256',
     public_key TEXT NOT NULL,
-    private_key TEXT NOT NULL,
+    private_key_encrypted TEXT NOT NULL,
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     disabled BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
