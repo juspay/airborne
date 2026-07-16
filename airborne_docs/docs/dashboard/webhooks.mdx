@@ -1,0 +1,101 @@
+---
+title: Webhooks
+description: Create application- and organisation-scoped webhooks, choose the events they subscribe to, sign deliveries, and inspect every delivery attempt.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+**Webhooks** send your systems a signed HTTP callback whenever something happens in Airborne — a release is concluded, a package is created, a new application is added, a member's role changes. They are managed on the **Webhooks** page, delivered with automatic retries, and every attempt is recorded so you can see exactly what was sent and what your endpoint returned.
+
+For the payload format, the signature algorithm, and verification code, see the [Webhooks guide](/docs/guides/webhooks).
+
+## Two scopes
+
+The **Webhooks** item appears in two places in the sidebar, and which one you use decides the webhook's **scope**. Scope is fixed at creation and cannot be changed afterwards.
+
+| | **Application webhook** | **Organisation webhook** |
+| --- | --- | --- |
+| Sidebar | Inside an **application** | Inside the **organisation** |
+| Receives events from | That one application | **Every** application in the organisation |
+| Organisation-level events | Not available | Available |
+
+An organisation webhook is how you watch the whole org from one endpoint.
+
+<Screenshot name="webhooks-org-list" caption="The organisation Webhooks page. Webhooks created here receive events from every application in the organisation." />
+
+An application webhook is scoped to a single app and never sees another app's events.
+
+<Screenshot name="webhooks-app-list" caption="The Webhooks page inside an application. These webhooks only receive that application's events." />
+
+Each row shows the endpoint **URL**, the HTTP **Method**, the subscribed **Events** (the first few, then a `+n` badge), whether deliveries are **Signed**, and an **Enabled** switch. The actions on the right are — in order — **Deliveries**, **Send test**, **Edit**, and **Delete**.
+
+## Creating a webhook
+
+Choose **Create Webhook** and fill in the dialog.
+
+<Screenshot name="webhook-create-dialog" caption="Creating an organisation webhook subscribed to three events." />
+
+- **Name** — unique within the scope. It cannot be changed later.
+- **Description** — free text, for your own reference.
+- **URL** — the HTTPS endpoint that receives deliveries.
+- **Method** — `POST` (the default), `PUT`, `PATCH`, or `GET`. See [below](#the-http-method) before choosing `GET`.
+- **Events** — tick one or more. The list depends on the scope: an organisation webhook is also offered the organisation-level events (`application.create`, `organisation_user.*`, `organisation_role.*`) that no application webhook can receive.
+- **Signing secret** *(optional)* — paste your own or choose **Generate**. If set, deliveries are HMAC-signed with an `X-Airborne-Signature` header; if left blank they are sent **unsigned**.
+- **Max retries** — how many times a failing delivery is retried.
+- **Enabled** — turn delivery on or off without deleting the webhook.
+- **Custom headers** *(optional)* — a JSON object of extra headers sent with every delivery.
+
+:::caution[Copy the signing secret now]
+The secret is stored encrypted and is **never shown again**. Copy it before closing the dialog. You can set a new one — or remove signing entirely — later by editing the webhook.
+:::
+
+On an organisation webhook, the events list notes that application events fire for **every** application in the organisation.
+
+## The HTTP method
+
+Airborne sends the JSON payload as the **request body for every method**, including `GET`. The dashboard warns you when you pick it:
+
+<Screenshot name="webhook-get-caution" caption="Choosing GET raises an inline caution — the payload is still sent as a request body." />
+
+:::danger[GET is strongly discouraged]
+A `GET` request with a body is non-standard. Many servers, proxies, and CDNs **drop or reject** it. If the body is dropped in transit your endpoint receives **no event data**, and because the signature is computed over the exact body bytes, **signature verification will fail too**.
+
+Use `POST` unless your receiver specifically requires `GET` — and if you must, confirm it works with **Send test** first.
+:::
+
+## Testing a webhook
+
+The **Send test** action delivers a sample payload immediately and shows you the result — the status, the HTTP response code, the latency, and the response body your endpoint returned. Use it to confirm connectivity and that your signature verification works before relying on real events.
+
+## Deliveries
+
+The **Deliveries** action opens the history for a webhook: every delivery, its status (`succeeded`, `failed`, `exhausted`, or still `scheduled`), how many attempts were made, and the last HTTP response code.
+
+<Screenshot name="webhook-deliveries" caption="Delivery history. On an organisation webhook, the Application column shows which app triggered each event — blank for organisation-level events." />
+
+On an **organisation** webhook there is an extra **Application** column showing which application triggered each event; organisation-level events show `organisation` instead, because they belong to no application.
+
+Choose **View** on a delivery to see the exact payload that was sent and each attempt's response.
+
+<Screenshot name="webhook-delivery-detail" caption="A delivery's payload. `data.response` carries the API response of the action that triggered the event — here, the application that was created." />
+
+The payload is the full envelope. Two fields are worth knowing:
+
+- **`application`** is `null` for organisation-level events.
+- **`data.response`** is the JSON body the Airborne API returned for the action that triggered the event — so an `application.create` delivery tells you *which* application was created, not merely that one was.
+
+Any delivery can be **resent** as a fresh attempt with the **Resend** action.
+
+:::note[Delivery history is not kept forever]
+Deliveries are retained for a configurable window (7 days by default) and then purged — see [`WEBHOOK_DELIVERY_RETENTION_DAYS`](/docs/server/configuration#webhooks-kronos).
+:::
+
+## Editing, disabling, and deleting
+
+- **Edit** changes the URL, method, events, retries, headers, and signing secret. The **name** and the **scope** are fixed.
+- The **Enabled** switch stops deliveries without losing the webhook or its history.
+- **Delete** removes the webhook and its delivery history. This cannot be undone.
+
+:::info[Webhooks need Kronos]
+Delivery is powered by [Kronos](https://github.com/juspay/kronos), which runs **embedded in the Airborne server by default**. If your operator has set `KRONOS_ENABLED=false`, the Webhooks page will reject creates and updates — see [server configuration](/docs/server/configuration#webhooks-kronos).
+:::

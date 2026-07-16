@@ -1148,6 +1148,22 @@ async fn conclude_release(
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    // Fire the "release concluded" webhook, delayed (default +60s) so downstream
+    // propagation (CDN invalidation, config settling) completes before subscribers hear.
+    let conclude_delay = state.env.webhook_conclude_delay_secs;
+    crate::webhook::emit_event(
+        &state,
+        organisation.clone(),
+        Some(application.clone()),
+        "release.conclude".to_string(),
+        serde_json::json!({
+            "release_id": experiment_id.clone(),
+            "chosen_variant": req.chosen_variant.clone(),
+            "concluded_by": auth_response.sub.clone(),
+        }),
+        conclude_delay,
+    );
+
     Ok(Json(ConcludeReleaseResponse {
         success: true,
         message: format!(

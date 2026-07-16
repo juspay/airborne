@@ -29,6 +29,7 @@ mod token;
 mod types;
 mod user;
 mod utils;
+mod webhook;
 
 use actix_web::{
     web::{self, PathConfig, QueryConfig},
@@ -151,7 +152,7 @@ async fn main() -> std::io::Result<()> {
     let shared_config = aws_config::from_env().load().await;
     let aws_kms_client = aws_sdk_kms::Client::new(&shared_config);
 
-    let app_config = AppConfig::build(&aws_kms_client)
+    let (app_config, master_encryption_key) = AppConfig::build(&aws_kms_client)
         .await
         .expect("Failed to build AppConfig");
 
@@ -339,6 +340,15 @@ async fn main() -> std::io::Result<()> {
         default_configs: get_default_configs_from_file()
             .await
             .expect("Failed to load superposition default configs from file"),
+
+        kronos_enabled: app_config.kronos_enabled,
+        kronos_workspace: app_config.kronos_workspace.clone(),
+        webhook_internal_secret: app_config.webhook_internal_secret.clone(),
+        webhook_outbound_timeout_secs: app_config.webhook_outbound_timeout_secs,
+        webhook_max_retries: app_config.webhook_max_retries,
+        webhook_conclude_delay_secs: app_config.webhook_conclude_delay_secs,
+        webhook_allow_insecure: app_config.webhook_allow_insecure,
+        webhook_delivery_retention_days: app_config.webhook_delivery_retention_days,
     };
 
     // Create an S3 client with path-style enforced (for localstack)
@@ -414,6 +424,61 @@ async fn main() -> std::io::Result<()> {
     .await
     .expect("Failed to initialize AuthZ provider");
 
+    let (kronos_client, kronos_worker_handle) = if app_config.kronos_enabled {
+        let kronos_db_url = match &app_config.kronos_database_url {
+            Some(u) => u.clone(),
+            None => db::get_database_url(&app_config, true).await,
+        };
+        match utils::kronos::build_client(&app_config, &kronos_db_url).await {
+            Ok((client, handle)) => {
+                if let Err(e) = webhook::setup_dispatcher(
+                    client.as_ref(),
+                    &app_config.kronos_workspace,
+                    &app_config.webhook_callback_base_url,
+                    &app_config.webhook_internal_secret,
+                    app_config.webhook_outbound_timeout_secs,
+                )
+                .await
+                {
+                    panic!("Failed to set up webhook dispatcher: {e:?}");
+                }
+                if let Err(e) = webhook::setup_maintenance(
+                    client.as_ref(),
+                    &app_config.kronos_workspace,
+                    &app_config.webhook_callback_base_url,
+                    app_config.webhook_outbound_timeout_secs,
+                )
+                .await
+                {
+                    panic!("Failed to set up webhook maintenance: {e:?}");
+                }
+                // Kick off the recurring retention job (self-reschedules daily).
+                if let Err(e) = webhook::schedule_maintenance(
+                    client.as_ref(),
+                    &app_config.kronos_workspace,
+                    300,
+                )
+                .await
+                {
+                    log::warn!("failed to schedule initial webhook maintenance: {e:?}");
+                }
+                info!(
+                    "Webhooks enabled ({} mode)",
+                    if app_config.kronos_url.is_some() {
+                        "service"
+                    } else {
+                        "library"
+                    }
+                );
+                (Some(client), handle)
+            }
+            Err(e) => panic!("Failed to initialize Kronos for webhooks: {e:?}"),
+        }
+    } else {
+        info!("Kronos disabled (KRONOS_ENABLED=false); webhooks unavailable");
+        (None, None)
+    };
+
     // Initialize Redis client
     let redis_cache = if let Some(redis_url) = app_config.redis_url {
         info!("Initializing Redis cache");
@@ -464,6 +529,8 @@ async fn main() -> std::io::Result<()> {
         superposition_client,
         sheets_hub: hub,
         provider_registry,
+        kronos: kronos_client,
+        master_encryption_key,
     });
     app_state
         .authz_provider
@@ -507,8 +574,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::Logger::default())
             .service(web::scope("/release").service(release::add_public_routes()))
             .service(web::scope("/build").service(build::add_routes()))
+            .service(web::scope("/internal").service(webhook::add_internal_routes()))
             .service(
                 web::scope(&server_path_prefix)
+                    .wrap(webhook::WebhookEmit)
                     .service(
                         web::resource("/health").route(
                             web::get().to(|| async {
@@ -538,7 +607,12 @@ async fn main() -> std::io::Result<()> {
                             .wrap(Auth)
                             .service(package::add_routes()),
                     )
-                    .service(release::add_routes("releases")),
+                    .service(release::add_routes("releases"))
+                    .service(
+                        web::scope("/webhooks")
+                            .wrap(Auth)
+                            .service(webhook::add_routes()),
+                    ),
             )
     })
     .workers(num_workers)
@@ -546,5 +620,13 @@ async fn main() -> std::io::Result<()> {
     .backlog(backlog)
     .bind(("0.0.0.0", port))?
     .run()
-    .await
+    .await?;
+
+    // Gracefully stop the embedded Kronos worker (no-op in remote mode).
+    if let Some(handle) = kronos_worker_handle {
+        info!("Shutting down embedded Kronos worker...");
+        handle.shutdown();
+        let _ = tokio::time::timeout(Duration::from_secs(35), handle.join()).await;
+    }
+    Ok(())
 }

@@ -1,0 +1,161 @@
+---
+title: Webhooks
+description: Receive signed HTTP callbacks when things happen in Airborne — scopes, events, payload, signature verification, retries, and delivery history.
+---
+
+import Screenshot from '@site/src/components/Screenshot';
+
+# Webhooks
+
+Airborne can send your systems a **signed HTTP callback** whenever something happens — a release is concluded, a package is created, an application is created, a cohort changes, and so on. Webhooks are configured from the dashboard, delivered with **automatic retries**, and every attempt is recorded so you can see exactly what was sent and what your endpoint returned.
+
+This guide covers the concepts and how to consume a delivery. For a click-by-click tour of the pages, see the [dashboard reference](/docs/dashboard/webhooks).
+
+:::info[No extra infrastructure to run]
+Delivery is powered by [Kronos](https://github.com/juspay/kronos), which runs **embedded inside the Airborne server by default** — you don't have to deploy anything. Operators can point Airborne at a separate Kronos deployment with `KRONOS_URL` if they prefer (see [server configuration](/docs/server/configuration#webhooks-kronos)).
+:::
+
+## Scopes: application or organisation
+
+A webhook is scoped to either **one application** or the **whole organisation**. The scope is fixed when you create it — it's decided by *where* you create it from, and it cannot be changed later.
+
+| | **Application webhook** | **Organisation webhook** |
+| --- | --- | --- |
+| Created from | **Webhooks** in the *application* sidebar | **Webhooks** in the *organisation* sidebar |
+| Receives events from | That one application | **Every** application in the organisation |
+| Can subscribe to organisation-level events | No | Yes |
+| `application` in the payload | Always that application | The app that triggered the event, or `null` |
+
+An organisation webhook is the way to watch the whole org with one endpoint. It sees everything an application webhook sees — but across all applications — **plus** the organisation-level events that belong to no application at all, such as an application being created or a member's role changing.
+
+<Screenshot name="webhooks-org-list" caption="The organisation Webhooks page — these webhooks fire for every application in the organisation." />
+
+## Create a webhook
+
+1. Go to **Webhooks** in the sidebar — of an **application** for an application webhook, or of the **organisation** for an organisation webhook.
+2. Click **Create Webhook** and fill in:
+   - **Name** — unique within the scope.
+   - **URL** — the HTTPS endpoint that will receive deliveries.
+   - **Method** — `POST` (default), `PUT`, `PATCH`, or `GET`. See the caution below before choosing `GET`.
+   - **Events** — one or more events to subscribe to (see below). You can select as many as you like.
+   - **Signing secret** *(optional)* — paste your own or click **Generate**. If set, deliveries are HMAC-signed; if left blank, they are sent **unsigned**. Copy it now — it isn't shown again. You can change or remove it later by editing the webhook.
+   - **Custom headers** *(optional)* — a JSON object of extra headers sent with every delivery.
+   - **Max retries** — how many times to retry a failing delivery.
+
+<Screenshot name="webhook-create-dialog" caption="Creating an organisation webhook. The events offered depend on the scope." />
+
+## Events
+
+Each event is a `resource.action` string. The dashboard always shows the list available for the scope you're in, and multiple webhooks can subscribe to the same event (each gets its own delivery).
+
+- **Application events** — for example `release.conclude`, `release.ramp`, `package.create`, `cohort.update`, `dimension.create`. Available to both scopes. On an **organisation** webhook they fire for **every** application in the org, with `application` naming the one that triggered it.
+- **Organisation events** — for example `application.create`, `organisation_user.create`, `organisation_user.update`, `organisation_role.create`. These happen outside any application, so **only an organisation webhook can receive them**, and their `application` is `null`.
+
+:::tip[The "release concluded" webhook is delayed]
+`release.conclude` fires about **60 seconds after** the release is concluded (configurable via `WEBHOOK_CONCLUDE_DELAY_SECONDS`), so downstream propagation — CDN invalidation, config settling — completes before your subscribers are notified.
+:::
+
+## Payload
+
+Every delivery is a JSON body with a stable envelope:
+
+```json
+{
+  "id": "0192f3a1-...-delivery-id",
+  "event": "package.create",
+  "api_version": "v1",
+  "created_at": "2026-07-09T10:00:00Z",
+  "organisation": "acme",
+  "application": "checkout",
+  "data": {
+    "actor": "user@acme.io",
+    "resource": "package",
+    "action": "create",
+    "params": { "id": "42" },
+    "response": {
+      "index": 7,
+      "version": "1.4.0"
+    }
+  }
+}
+```
+
+- **`application`** is `null` for organisation-level events, which belong to no application.
+- **`data.response`** is the JSON body the Airborne API returned for the action that triggered the event — so a `package.create` delivery tells you *which* package was created, not just that one was. It is `null` when the endpoint returned no JSON, or when the response was larger than **64 KiB** (it is sent as `null` rather than truncated, since half a JSON document is worse than none).
+- **`data.params`** holds the URL path parameters of the triggering request (for example the release id on `release.ramp`).
+
+:::note[`release.conclude` is shaped differently]
+It is emitted directly by its handler rather than by the generic path, so its `data` is `{ release_id, chosen_variant, concluded_by }` and it carries no `response`.
+:::
+
+## HTTP method
+
+Deliveries are sent with the webhook's **method** — `POST` (the default), `PUT`, `PATCH`, or `GET`. **The JSON payload is sent as the request body for all four**, including `GET`.
+
+<Screenshot name="webhook-get-caution" caption="The dashboard cautions you when you select GET." />
+
+:::danger[GET is strongly discouraged]
+A `GET` request with a body is non-standard. Many servers, proxies, load balancers, and CDNs **drop or reject** it. If the body is dropped in transit, your endpoint receives **no event data**, and — because the signature is computed over the exact body bytes — **signature verification will also fail**.
+
+Use `POST` unless your receiver specifically requires `GET`. If you must use `GET`, verify end-to-end with **Send test** before relying on it.
+:::
+
+Alongside the body, Airborne sends these headers:
+
+| Header | Meaning |
+| --- | --- |
+| `X-Airborne-Event` | The event, e.g. `release.conclude`. |
+| `X-Airborne-Delivery` | The delivery id (matches `data`/`id`). |
+| `X-Airborne-Webhook-Id` | The webhook configuration id. |
+| `X-Airborne-Attempt` | The attempt number for this delivery. |
+| `X-Airborne-Signature` | `t=<unix-timestamp>,v1=<hex-hmac-sha256>` — see below. |
+
+## Verify the signature
+
+:::note[Only for signed webhooks]
+If no signing secret is configured, deliveries are sent **without** an `X-Airborne-Signature` header — you can skip this section.
+:::
+
+The `X-Airborne-Signature` header is `t=<timestamp>,v1=<signature>`, where the signature is `HMAC-SHA256(secret, "<timestamp>.<raw-request-body>")` in hex. Compute the same value with your signing secret and compare it in constant time. Reject the request if it doesn't match, or if the timestamp is too old (to prevent replay).
+
+```javascript
+const crypto = require("crypto");
+
+function verify(rawBody, signatureHeader, secret) {
+  // signatureHeader: "t=1720519200,v1=abc123..."
+  const parts = Object.fromEntries(signatureHeader.split(",").map((p) => p.split("=")));
+  const t = parts["t"];
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${t}.${rawBody}`)
+    .digest("hex");
+  const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(parts["v1"] || ""));
+  const fresh = Math.abs(Date.now() / 1000 - Number(t)) < 300; // 5-minute tolerance
+  return ok && fresh;
+}
+```
+
+:::warning[Sign against the raw body]
+Verify against the **exact bytes** you received, before any JSON parsing/re-serialization — parsing and re-encoding can change the bytes and break the signature.
+:::
+
+## Retries, testing, and history
+
+- **Retries** — a non-`2xx` response (or a timeout) is retried with exponential backoff up to the webhook's **max retries**. A delivery ends as `succeeded`, `failed`, or `exhausted`.
+- **Test** — the **Send test** action delivers a sample payload immediately and shows you the response, so you can confirm connectivity and signature verification.
+- **Deliveries** — open a webhook's **Deliveries** view to see every delivery, its status, and — per attempt — the request, the response status and body, and the latency.
+- **Resend** — any delivery can be **resent** as a fresh attempt.
+- **Change or remove signing** — edit the webhook to set a new secret, or clear it to send unsigned; update your verifier accordingly.
+- **Retention** — delivery history is kept for a configurable window (default 7 days); older records are purged automatically.
+
+<Screenshot name="webhook-deliveries" caption="An organisation webhook's delivery history. The Application column shows which app triggered each event." />
+
+Opening a delivery shows the exact payload that was sent, and the response from each attempt.
+
+<Screenshot name="webhook-delivery-detail" caption="`data.response` carries the API response of the triggering action — here, the application that was created." />
+
+## Security notes
+
+- **Use HTTPS.** Airborne blocks webhook URLs that resolve to loopback, private, link-local (including cloud metadata), or CGNAT addresses to prevent SSRF. (Operators can relax this for local development with `WEBHOOK_ALLOW_INSECURE`.)
+- **Keep the secret secret.** It is stored encrypted at rest and shown to you only once. Rotate it if it may have leaked.
+- **Verify every request** using the signature before trusting the payload.
