@@ -18,7 +18,7 @@ use crate::{
     middleware::auth::{require_org_and_app, AuthResponse},
     organisation::application::properties::types::ConfigProperty,
     release::utils::parse_kv_string,
-    types as airborne_types,
+    signing, types as airborne_types,
     types::{ABError, AppState},
     utils::document::{
         document_to_json_value, dotted_docs_to_nested, hashmap_to_json_value,
@@ -287,16 +287,25 @@ async fn put_properties_schema_api(
     }
 
     let metadata_for_rollback = task_metadata.clone();
-    match transaction::run_fail_end(tasks, move |success_indices| async move {
-        rollback_config_update(
-            success_indices,
-            metadata_for_rollback,
-            &state.superposition_client,
-        )
-        .await;
+    // Hand the rollback its own client rather than the whole `AppState`, so
+    // `state` is still available to invalidate caches once the writes land.
+    let client_for_rollback = state.superposition_client.clone();
+    let outcome = transaction::run_fail_end(tasks, move |success_indices| async move {
+        rollback_config_update(success_indices, metadata_for_rollback, &client_for_rollback).await;
     })
-    .await
-    {
+    .await;
+
+    // `config.properties` is part of the release config the serve path signs, but
+    // editing a property does not mint a new `config.version` — and that version is
+    // what the signature cache is keyed on. Drop the cached signatures so the next
+    // serve re-signs the body it actually returns instead of handing back a
+    // signature computed over the old one.
+    //
+    // Done regardless of outcome: a rollback can itself fail, so a failed request
+    // is not a guarantee that nothing changed.
+    signing::utils::invalidate_signature_cache(&state, &organisation, &application).await;
+
+    match outcome {
         Ok(values) => info!("All good: {:?}", values),
         Err(e) => match e {
             transaction::TxnError::Operation { source, .. } => return Err(source),

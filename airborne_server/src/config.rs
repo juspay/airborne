@@ -14,9 +14,12 @@
 
 use crate::utils::kms::{decrypt_env, decrypt_master_key};
 use aws_sdk_kms::Client;
+use base64::{engine::general_purpose, Engine as _};
 use std::collections::HashSet;
 use std::env;
 use std::str::FromStr;
+
+const DEFAULT_RC_SIGNATURE_CACHE_TTL_SECS: usize = 60 * 60;
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -93,13 +96,14 @@ pub struct AppConfig {
 
     // Redis
     pub redis_url: Option<String>,
+    pub rc_signature_cache_ttl: usize,
 
     // Victoria Metrics
     pub victoria_metrics_url: String,
 }
 
 impl AppConfig {
-    pub async fn build(kms_client: &Client) -> Result<Self, String> {
+    pub async fn build(kms_client: &Client) -> Result<(Self, Option<String>), String> {
         fn parse_env<T: FromStr>(name: &str, default: T) -> T {
             env::var(name)
                 .ok()
@@ -166,7 +170,11 @@ impl AppConfig {
                 }
             });
 
-        Ok(AppConfig {
+        let master_encryption_key = master_key
+            .as_ref()
+            .map(|key| general_purpose::STANDARD.encode(key));
+
+        let app_config = AppConfig {
             // Server settings
             port: parse_env("PORT", 8081),
             keep_alive: parse_env("KEEP_ALIVE", 30),
@@ -257,10 +265,16 @@ impl AppConfig {
 
             // Redis
             redis_url: get_optional("REDIS_URL"),
+            rc_signature_cache_ttl: parse_env(
+                "RC_SIGNATURE_CACHE_TTL",
+                DEFAULT_RC_SIGNATURE_CACHE_TTL_SECS,
+            ),
 
             // Victoria Metrics
             victoria_metrics_url: get_env("VICTORIA_METRICS_INSERT_URL", Some(""))?,
-        })
+        };
+
+        Ok((app_config, master_encryption_key))
     }
 }
 

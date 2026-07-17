@@ -32,7 +32,7 @@ use thiserror::Error;
 use crate::{
     provider::{authn::AuthNProvider, authz::AuthZProvider},
     utils::{
-        db, migrations::SuperpositionDefaultConfig, redis::RedisCache,
+        db, migrations::SuperpositionDefaultConfig, moka::MokaCache, redis::RedisCache,
         superposition_provider::ProviderRegistry,
     },
 };
@@ -44,6 +44,8 @@ pub struct AppState {
     pub authz_provider: Arc<dyn AuthZProvider>,
     pub db_pool: db::DbPool,
     pub redis_cache: Option<RedisCache>,
+    pub moka_cache: MokaCache,
+    pub master_encryption_key: Option<String>,
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
     pub superposition_client: Client,
@@ -76,6 +78,7 @@ pub struct Environment {
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
     pub default_configs: Vec<SuperpositionDefaultConfig>,
+    pub rc_signature_cache_ttl: usize,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

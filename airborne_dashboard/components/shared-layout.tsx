@@ -26,6 +26,7 @@ import {
   Users2,
   Settings,
   Users,
+  Cog,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -53,6 +54,7 @@ const LAYOUT_AUTHZ = definePagePermissions({
   create_package: permission("package", "create", "app"),
   create_release: permission("release", "create", "app"),
   read_tokens: permission("token", "read", "app"),
+  read_signing_keys: permission("signing_key", "read", "app"),
 });
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
@@ -77,6 +79,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
   const appIdPath = useParams().appId as string;
   const canReadTokens = permissions.can("read_tokens");
+  const canReadSigningKeys = permissions.can("read_signing_keys");
   const canCreateFile = permissions.can("create_file");
   const canCreatePackage = permissions.can("create_package");
   const canCreateRelease = permissions.can("create_release");
@@ -197,6 +200,16 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           icon: Users,
           label: "Cohorts",
         },
+        // Integrity is the only Settings section today, so mirror its read gate here.
+        ...(canReadSigningKeys
+          ? [
+              {
+                href: `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/settings`,
+                icon: Cog,
+                label: "Settings",
+              },
+            ]
+          : []),
       ]
     : [
         { href: "/dashboard/" + encodeURIComponent(org || ""), icon: Activity, label: "Overview" },
