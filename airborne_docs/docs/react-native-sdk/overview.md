@@ -33,6 +33,10 @@ The native boot wiring differs slightly depending on your project type:
 
 Both tracks use the same `airborne-react-native` package and the same release config and dimensions concepts described below.
 
+:::note[Advanced: bare integration]
+Teams that need low-level control over the OTA lifecycle — for example, reacting to the `onPackageDownloaded` callback to prompt a reload when an update lands after the boot timeout — can integrate the **native** Airborne SDKs directly, without this plugin. That is an advanced flow; for most apps the tracks above are simpler. See [Bare Integration (Advanced)](/docs/bare-integration/overview).
+:::
+
 ## Core concepts
 
 **Release Config** — the JSON Airborne fetches from your release URL. It describes which package and resources to boot, and is versioned so the SDK can detect and apply updates.
