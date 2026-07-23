@@ -72,6 +72,17 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "category",
+          label: "Bare Integration (Advanced)",
+          link: { type: "doc", id: "bare-integration/overview" },
+          items: [
+            "bare-integration/overview",
+            "bare-integration/react-native",
+            "bare-integration/expo",
+            "bare-integration/reload-after-download",
+          ],
+        },
+        {
+          type: "category",
           label: "Airborne React Native CLI",
           link: { type: "doc", id: "react-native-cli/getting-started" },
           items: [
