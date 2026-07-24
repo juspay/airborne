@@ -98,7 +98,29 @@ val ok = Signature.getInstance("SHA256withECDSA").run {
 
 ### iOS (Swift)
 
-On iOS 14+, CryptoKit reads both the PEM and the DER signature directly:
+**The Airborne iOS SDK verifies the signature for you.** Return your trusted public keys from `publicKeys()` on `AirborneDelegate` and the SDK checks every release config before it is parsed or applied — a config that fails verification is discarded, and the app keeps running the bundle it already has.
+
+```swift
+extension AppDelegate: AirborneDelegate {
+    func publicKeys() -> [String: String] {
+        [
+            "release-signing-2026": """
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+            -----END PUBLIC KEY-----
+            """,
+        ]
+    }
+}
+```
+
+The dictionary is keyed by the `keyid` from the response header, so the SDK selects the right key on its own. Verification is off until you return at least one key. See the [iOS API reference](/docs/react-native-sdk/reference/ios-api) for the full protocol, and [callbacks & events](/docs/react-native-sdk/reference/callbacks-and-events) for the events it emits.
+
+:::tip[Roll it out in this order]
+Enable signing server-side first and confirm `X-Airborne-Signature` is present in production, **then** ship the public key. A response with no signature is accepted (the server omits the header when an application has no signing key), so shipping the key early is safe either way — but this ordering means you see the header working before you depend on it.
+:::
+
+If you are verifying by hand instead — outside the SDK, or in another Swift app — note that CryptoKit's `pemRepresentation` and `derRepresentation` key initializers are **iOS 14+**:
 
 ```swift
 let publicKey = try P256.Signing.PublicKey(pemRepresentation: pem)
@@ -106,14 +128,24 @@ let signature = try P256.Signing.ECDSASignature(derRepresentation: derBytes)
 let ok = publicKey.isValidSignature(signature, for: bodyData)
 ```
 
-On iOS 13, `pemRepresentation` is unavailable. Use the Security framework instead — `.ecdsaSignatureMessageX962SHA256` consumes the same DER signature:
+To support iOS 13 you must reach CryptoKit through `x963Representation`, which takes the **raw 65-byte EC point** rather than a PEM or an SPKI DER. A P-256 SPKI is a fixed 91 bytes — a 26-byte header followed by that point — so strip the armor, base64-decode, and take the last 65 bytes:
 
 ```swift
-let ok = SecKeyVerifySignature(
-    secPublicKey, .ecdsaSignatureMessageX962SHA256,
-    bodyData as CFData, derBytes as CFData, nil
-)
+let base64 = pem
+    .replacingOccurrences(of: "-----BEGIN PUBLIC KEY-----", with: "")
+    .replacingOccurrences(of: "-----END PUBLIC KEY-----", with: "")
+    .filter { !$0.isWhitespace }
+
+// Decode strictly: `.ignoreUnknownCharacters` would fold the armor's own letters
+// (BEGIN, PUBLIC, KEY are all valid base64 characters) into the key material.
+guard let der = Data(base64Encoded: base64), der.count == 91 else { throw MyError.badKey }
+
+let publicKey = try P256.Signing.PublicKey(x963Representation: Data(der.suffix(65)))
+let signature = try P256.Signing.ECDSASignature(derRepresentation: derBytes)
+let ok = publicKey.isValidSignature(signature, for: bodyData)
 ```
+
+The Security framework is not a shortcut here: `SecKeyCreateWithData` with `kSecAttrKeyTypeECSECPrimeRandom` wants the same raw point, so it needs the identical unwrapping step before `SecKeyVerifySignature(key, .ecdsaSignatureMessageX962SHA256, …)` can be called.
 
 ## Choosing which key signs
 
@@ -136,7 +168,7 @@ If you send `X-Signing-Key-Id` and someone later disables that key, those reques
 Because the response names the key that signed it, rotation is a rolling operation rather than a flag day:
 
 1. **Create** a new key in **Settings → Integrity**.
-2. **Ship** its public key to your apps, so they trust both the old and the new key. Select by `keyid`.
+2. **Ship** its public key to your apps, so they trust both the old and the new key. Select by `keyid`. On iOS, that means returning both from `publicKeys()` — the SDK matches the response's `keyid` against the dictionary for you.
 3. **Promote** the new key to default. New responses are signed with it immediately.
 4. **Disable** the old key once you are confident no client still needs it.
 

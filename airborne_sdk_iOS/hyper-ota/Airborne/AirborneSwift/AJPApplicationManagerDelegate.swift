@@ -46,7 +46,25 @@ import AirborneSwiftCore
      *       retrieval process, including any required headers.
      */
     @objc optional func getReleaseConfigHeaders() -> [String: String]
-    
+
+    /**
+     * Returns the public keys used to verify the release configuration's signature.
+     *
+     * The server signs each release configuration response and names the signing key in the
+     * `X-Airborne-Signature` header. The returned dictionary maps each trusted key ID to its
+     * ECDSA P-256 public key in SPKI PEM form.
+     *
+     * @return A non-null dictionary of key IDs to PEM-encoded public keys. Returns an empty
+     *         dictionary to disable signature verification.
+     *
+     * @note Verification runs on the raw response bytes before the configuration is parsed.
+     *       A response carrying a signature that cannot be verified is discarded; a response
+     *       carrying no signature at all is accepted.
+     * @note This method will not be called if the delegate provides a custom release config
+     *       fetch implementation, which takes full responsibility for verification.
+     */
+    @objc optional func getReleaseConfigPublicKeys() -> [String: String]
+
     /**
      * Returns the bundle to use for loading local assets and configuration files.
      *

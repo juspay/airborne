@@ -70,7 +70,29 @@ import AirborneSwiftModel
      *         If not implemented, defaults to an empty dictionary.
      */
     @objc optional func dimensions() -> [String: String]
-    
+
+    /**
+     * Returns the public keys used to verify the release configuration's signature.
+     *
+     * Airborne signs every release config response and names the signing key in the
+     * response header. Return the trusted public keys here, keyed by that key ID, and
+     * the SDK verifies the config before it is parsed or applied — a config that fails
+     * verification is discarded and the currently installed bundle keeps running.
+     *
+     * Keys are ECDSA P-256 public keys in SPKI PEM form ("BEGIN PUBLIC KEY"), downloadable
+     * from Settings -> Integrity in the dashboard.
+     *
+     * @return A dictionary mapping each key ID to its PEM-encoded public key.
+     *         If not implemented or empty, signature verification is disabled.
+     *
+     * @note Returning several keys is what makes rotation safe: ship the new key alongside
+     *       the old one, promote it server-side, and remove the old one once clients update.
+     * @note A response that arrives without a signature is still accepted, so it is safe to
+     *       ship keys before enabling signing on the server. A response that arrives *with*
+     *       a signature that cannot be verified is always rejected.
+     */
+    @objc optional func publicKeys() -> [String: String]
+
     /**
      * Called when the OTA boot process has completed successfully.
      *
@@ -171,6 +193,9 @@ import AirborneSwiftModel
     }()
     private lazy var dimensions: [String: String] = {
         delegate?.dimensions?() ?? [:]
+    }()
+    private lazy var publicKeys: [String: String] = {
+        delegate?.publicKeys?() ?? [:]
     }()
     private lazy var bundlePath: Bundle = {
         delegate?.bundle?() ?? Bundle.main
@@ -378,6 +403,13 @@ extension AirborneServices: AJPApplicationManagerDelegate {
      */
     public func getReleaseConfigHeaders() -> [String : String] {
         self.dimensions
+    }
+
+    /**
+     * Provides the public keys the release configuration's signature is verified against.
+     */
+    public func getReleaseConfigPublicKeys() -> [String : String] {
+        self.publicKeys
     }
 
     /**

@@ -42,6 +42,7 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
     @objc optional func bundle() -> Bundle
     @objc optional func indexBundleName() -> String
     @objc optional func dimensions() -> [String: String]
+    @objc optional func publicKeys() -> [String: String]
     @objc optional func startApp(indexBundleURL: URL?) -> Void
     @objc optional func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String) -> Void
     @objc optional func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String) -> Void
@@ -57,10 +58,33 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 | `bundle` | `func bundle() -> Bundle` | Returns the bundle used for local assets and fallback files (default release config and index bundle). Defaults to `Bundle.main`. |
 | `indexBundleName` | `func indexBundleName() -> String` | Returns the resource name of the index bundle file used as the fallback entry point. Defaults to `"main.jsbundle"`. |
 | `dimensions` | `func dimensions() -> [String: String]` | Returns custom dimensions sent as HTTP headers with the release config request, for targeting / A-B testing / segmentation. Defaults to an empty dictionary. |
+| `publicKeys` | `func publicKeys() -> [String: String]` | Returns the public keys the release config's signature is verified against, keyed by key ID. Keys are ECDSA P-256 in SPKI PEM form. Defaults to an empty dictionary, which **disables** verification. See [Verify the release config signature](/docs/guides/verify-the-release-config-signature). |
 | `startApp` | `func startApp(indexBundleURL: URL?)` | Called when the OTA boot completes successfully. `indexBundleURL` is the file URL of the index bundle to boot from. Start React Native here. Invoked on a background queue — dispatch UI work to the main queue. Boot completion occurs even if some downloads failed or timed out. |
 | `onEvent` | `func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String)` | Receives lifecycle and error events. See the [callbacks & events reference](/docs/react-native-sdk/reference/callbacks-and-events) for the full catalogue. |
 | `onLazyPackageDownloadComplete` | `func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String)` | Called when an individual lazy package download completes (success or failure). |
 | `onAllLazyPackageDownloadsComplete` | `func onAllLazyPackageDownloadsComplete()` | Called when all lazy package downloads have completed. Use `onLazyPackageDownloadComplete` for individual results. |
+
+#### publicKeys
+
+Implement this to have the SDK verify every release config before it is parsed or applied. Airborne signs each response and names the signing key in the response header; return the keys you trust, keyed by that key ID:
+
+```swift
+func publicKeys() -> [String: String] {
+    [
+        "release-signing-2026": """
+        -----BEGIN PUBLIC KEY-----
+        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+        -----END PUBLIC KEY-----
+        """,
+    ]
+}
+```
+
+Returning more than one key is what makes rotation safe — ship the new key alongside the old one, then promote it server-side. Download the PEM from **Settings → [Integrity](/docs/dashboard/integrity)**.
+
+:::info[A missing signature is accepted; an invalid one is not]
+The server omits the signature header entirely when an application has no signing key, so it is safe to ship public keys **before** enabling signing. But once a response *does* carry a signature, it must verify — otherwise the config is discarded and the currently installed bundle keeps running.
+:::
 
 #### startApp parameters
 
