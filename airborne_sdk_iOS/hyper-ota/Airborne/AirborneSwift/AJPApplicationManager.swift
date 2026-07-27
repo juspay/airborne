@@ -219,8 +219,9 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
 
         // Parsed once here rather than per fetch, so a malformed PEM is reported at boot.
-        let publicKeyPEMs = (delegate?.getReleaseConfigPublicKeys?() as? [String: String]) ?? [:]
-        self.trustStore = AJPReleaseConfigTrustStore(pems: publicKeyPEMs)
+        let signingKeyId = (delegate?.getReleaseConfigSigningKeyId?() as? String) ?? ""
+        let publicKeyPEM = (delegate?.getReleaseConfigPublicKey?() as? String) ?? ""
+        self.trustStore = AJPReleaseConfigTrustStore(keyID: signingKeyId, pem: publicKeyPEM)
 
         if let bundle = delegate?.getBaseBundle?() {
             self.baseBundle = bundle
@@ -239,12 +240,13 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         super.init()
 
-        // Surface unusable keys loudly: they were configured but cannot verify anything, so
-        // every signed config will be rejected until the PEM is fixed in a new app build.
-        if !trustStore.invalidKeyIDs.isEmpty {
+        // Surface an unusable configuration loudly: verification was asked for (a key id and/or
+        // a PEM was supplied) but it cannot run — a missing half or a malformed PEM — so every
+        // signed config will be rejected until it is fixed in a new app build.
+        if trustStore.isConfigured && !trustStore.isUsable {
             let value = NSMutableDictionary()
-            value["key_ids"] = trustStore.invalidKeyIDs.sorted().joined(separator: ",")
-            value["valid_key_count"] = NSNumber(value: trustStore.keys.count)
+            value["key_id"] = trustStore.keyID ?? ""
+            value["has_public_key"] = NSNumber(value: trustStore.publicKey != nil)
             self.tracker.trackError("release_config_signing_key_invalid", value: value)
         }
 
@@ -1219,57 +1221,30 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     }
 
     /**
-     * Checks the release config's signature against the configured public keys.
+     * Checks the release config's signature against the single configured public key.
      *
-     * - Returns: `nil` when the body may be used — verified, no keys configured, or the response
+     * - Returns: `nil` when the body may be used — verified, no key configured, or the response
      *   carried no signature. A non-nil error means the body must be discarded.
      */
     private func verifyReleaseConfigSignature(data: Data, response: URLResponse?, logData: NSMutableDictionary) -> NSError? {
-        // No keys configured means the integrator has not opted in.
+        // No key configured means the integrator has not opted in.
         guard trustStore.isConfigured else { return nil }
 
-        // value(forHTTPHeaderField:) matches case-insensitively, as HTTP requires;
-        // allHeaderFields does not.
-        let signatureHeader = (response as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: AJPReleaseConfigVerifier.signatureHeaderName)
-
-        guard let signatureHeader = signatureHeader, !signatureHeader.isEmpty else {
-            // An unsigned response is not an error: the server omits the header when the
-            // application has no signing key. Tolerating it is what lets apps ship public keys
-            // before signing is switched on server-side.
-            logData["signature_present"] = false
-            let value = NSMutableDictionary()
-            value["reason"] = AJPSignatureVerificationError.missingHeader.reasonCode
-            value["trusted_key_ids"] = trustStore.keys.keys.sorted().joined(separator: ",")
-            self.tracker.trackLog("release_config_signature_missing", value: value, level: "warning")
-            return nil
-        }
-
-        logData["signature_present"] = true
-
-        do {
-            let verifiedKeyID = try AJPReleaseConfigVerifier.verify(
-                body: data,
-                headerValue: signatureHeader,
-                trustedKeys: trustStore.keys
-            )
-            logData["signature_verified"] = true
-            logData["signature_key_id"] = verifiedKeyID
-            return nil
-        } catch {
-            let reason = (error as? AJPSignatureVerificationError)?.reasonCode ?? "unknown"
+        // Discard the body and log why. Used for both an unusable configuration and a failed
+        // verification.
+        func reject(reason: String, header: String?) -> NSError {
             logData["signature_verified"] = false
             logData["signature_error"] = reason
 
             let value = NSMutableDictionary()
             value["reason"] = reason
-            value["trusted_key_ids"] = trustStore.keys.keys.sorted().joined(separator: ",")
+            value["trusted_key_id"] = trustStore.keyID ?? ""
             value["status"] = NSNumber(value: self.utils.getResponseCode(from: response))
             // Size only — never log the body itself.
             value["body_size"] = NSNumber(value: data.count)
-            if let header = try? AJPReleaseConfigVerifier.parseSignatureHeader(signatureHeader) {
-                value["response_key_id"] = header.keyID
-                value["alg"] = header.alg
+            if let header = header, let parsed = try? AJPReleaseConfigVerifier.parseSignatureHeader(header) {
+                value["response_key_id"] = parsed.keyID
+                value["alg"] = parsed.alg
             }
             self.tracker.trackError("release_config_signature_verification_failed", value: value)
 
@@ -1278,6 +1253,48 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 code: 3,
                 userInfo: [NSLocalizedDescriptionKey: "Release config signature verification failed (\(reason))"]
             )
+        }
+
+        // value(forHTTPHeaderField:) matches case-insensitively, as HTTP requires;
+        // allHeaderFields does not.
+        let signatureHeader = (response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: AJPReleaseConfigVerifier.signatureHeaderName)
+
+        guard let signatureHeader = signatureHeader, !signatureHeader.isEmpty else {
+            // An unsigned response is not an error: the server omits the header when the
+            // application has no signing key. Tolerating it is what lets apps ship the public key
+            // before signing is switched on server-side.
+            logData["signature_present"] = false
+            let value = NSMutableDictionary()
+            value["reason"] = AJPSignatureVerificationError.missingHeader.reasonCode
+            value["trusted_key_id"] = trustStore.keyID ?? ""
+            self.tracker.trackLog("release_config_signature_missing", value: value, level: "warning")
+            return nil
+        }
+
+        logData["signature_present"] = true
+
+        // Configured (opted in) but not usable — a missing key id or an unparseable PEM. We
+        // cannot verify a signed response, so reject it rather than accept unverified bytes.
+        guard trustStore.isUsable,
+              let key = trustStore.publicKey,
+              let expectedKeyID = trustStore.keyID else {
+            return reject(reason: "invalid_signing_config", header: signatureHeader)
+        }
+
+        do {
+            let verifiedKeyID = try AJPReleaseConfigVerifier.verify(
+                body: data,
+                headerValue: signatureHeader,
+                expectedKeyID: expectedKeyID,
+                trustedKey: key
+            )
+            logData["signature_verified"] = true
+            logData["signature_key_id"] = verifiedKeyID
+            return nil
+        } catch {
+            let reason = (error as? AJPSignatureVerificationError)?.reasonCode ?? "unknown"
+            return reject(reason: reason, header: signatureHeader)
         }
     }
 

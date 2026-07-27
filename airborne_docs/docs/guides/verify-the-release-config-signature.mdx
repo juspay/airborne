@@ -98,23 +98,27 @@ val ok = Signature.getInstance("SHA256withECDSA").run {
 
 ### iOS (Swift)
 
-**The Airborne iOS SDK verifies the signature for you.** Return your trusted public keys from `publicKeys()` on `AirborneDelegate` and the SDK checks every release config before it is parsed or applied — a config that fails verification is discarded, and the app keeps running the bundle it already has.
+**The Airborne iOS SDK verifies the signature for you.** Pin the one public key you trust — and its key ID — via `publicKey()` and `signingKeyId()` on `AirborneDelegate`, and the SDK checks every release config before it is parsed or applied. A config that fails verification is discarded, and the app keeps running the bundle it already has.
 
 ```swift
 extension AppDelegate: AirborneDelegate {
-    func publicKeys() -> [String: String] {
-        [
-            "release-signing-2026": """
-            -----BEGIN PUBLIC KEY-----
-            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
-            -----END PUBLIC KEY-----
-            """,
-        ]
+    func signingKeyId() -> String { "release-signing-2026" }
+
+    func publicKey() -> String {
+        """
+        -----BEGIN PUBLIC KEY-----
+        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...
+        -----END PUBLIC KEY-----
+        """
     }
 }
 ```
 
-The dictionary is keyed by the `keyid` from the response header, so the SDK selects the right key on its own. Verification is off until you return at least one key. See the [iOS API reference](/docs/react-native-sdk/reference/ios-api) for the full protocol, and [callbacks & events](/docs/react-native-sdk/reference/callbacks-and-events) for the events it emits.
+The app trusts exactly one key: a config is accepted only when the response's `keyid` equals `signingKeyId()` and the signature verifies against `publicKey()`. Verification is off until you return a key. See the [iOS API reference](/docs/react-native-sdk/reference/ios-api) for the full protocol, and [callbacks & events](/docs/react-native-sdk/reference/callbacks-and-events) for the events it emits.
+
+:::caution[Changing the key needs an app release]
+Because the app pins a single key, it cannot follow a server-side key rotation on its own — a config signed by any other key ID is rejected. Rotating the key means shipping a new app build with the new key (see [Rotating a key](#rotating-a-key)).
+:::
 
 :::tip[Roll it out in this order]
 Enable signing server-side first and confirm `X-Airborne-Signature` is present in production, **then** ship the public key. A response with no signature is accepted (the server omits the header when an application has no signing key), so shipping the key early is safe either way — but this ordering means you see the header working before you depend on it.
@@ -168,7 +172,7 @@ If you send `X-Signing-Key-Id` and someone later disables that key, those reques
 Because the response names the key that signed it, rotation is a rolling operation rather than a flag day:
 
 1. **Create** a new key in **Settings → Integrity**.
-2. **Ship** its public key to your apps, so they trust both the old and the new key. Select by `keyid`. On iOS, that means returning both from `publicKeys()` — the SDK matches the response's `keyid` against the dictionary for you.
+2. **Ship** its public key to your apps. A verifier that can trust more than one key (e.g. a custom verifier, or the shell/Node examples above) trusts both the old and the new key and selects by `keyid`. The **iOS SDK pins a single key**, so shipping the new key means an app release that sets `publicKey()`/`signingKeyId()` to the new key — wait for that build to be adopted before the next step.
 3. **Promote** the new key to default. New responses are signed with it immediately.
 4. **Disable** the old key once you are confident no client still needs it.
 

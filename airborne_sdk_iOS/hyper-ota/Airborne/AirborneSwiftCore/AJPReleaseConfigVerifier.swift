@@ -20,11 +20,8 @@ public enum AJPSignatureVerificationError: Error, Equatable {
     /// The header named an algorithm this SDK cannot verify.
     case unsupportedAlgorithm(String)
 
-    /// The header named a key that is not in the configured trust store.
+    /// The response was signed by a key id other than the one the app pins.
     case untrustedKeyID(String)
-
-    /// Keys were configured, but none of them could be parsed.
-    case noTrustedKeys
 
     /// The `sig` field was not base64, or not a DER ECDSA signature.
     case malformedSignature
@@ -42,7 +39,6 @@ public enum AJPSignatureVerificationError: Error, Equatable {
         case .malformedHeader:      return "malformed_header"
         case .unsupportedAlgorithm: return "unsupported_alg"
         case .untrustedKeyID:       return "untrusted_key_id"
-        case .noTrustedKeys:        return "no_trusted_keys"
         case .malformedSignature:   return "malformed_signature"
         case .signatureMismatch:    return "signature_mismatch"
         }
@@ -82,40 +78,39 @@ public struct AJPSignatureHeader: Equatable {
 
 // MARK: - Trust store
 
-/// The public keys a release config may be verified against, parsed once up front.
+/// The single key id and public key a release config is verified against.
 ///
-/// Parsing eagerly means a malformed PEM surfaces at boot rather than silently at fetch time.
+/// The app pins exactly one key; changing it means shipping a new build. The PEM is parsed
+/// eagerly so a malformed one surfaces at boot rather than silently at fetch time.
 public struct AJPReleaseConfigTrustStore {
 
-    /// Whether any keys were supplied at all.
-    ///
-    /// Tracked separately from `keys` on purpose: if callers inferred "verification is off"
-    /// from an empty `keys`, then a single typo in a PEM would parse to zero keys and
-    /// silently disable verification. A misconfiguration must never look like an opt-out.
+    /// Whether the integrator asked for verification at all — i.e. supplied a key id and/or a
+    /// PEM. Kept separate from `publicKey` so a typo'd or half-finished configuration cannot
+    /// silently look like an opt-out: it stays configured-but-unusable and is rejected, loudly.
     public let isConfigured: Bool
 
-    /// The successfully parsed keys, by key ID.
-    public let keys: [String: P256.Signing.PublicKey]
+    /// The key id the app trusts. The response's `keyid` must equal this.
+    public let keyID: String?
 
-    /// The key IDs whose PEM failed to parse.
-    public let invalidKeyIDs: [String]
+    /// The parsed public key, or `nil` if no PEM was supplied or it failed to parse.
+    public let publicKey: P256.Signing.PublicKey?
 
-    /// - Parameter pems: Public keys in SPKI PEM form, keyed by the key ID the server reports.
-    public init(pems: [String: String]) {
-        var parsed: [String: P256.Signing.PublicKey] = [:]
-        var invalid: [String] = []
+    /// Whether verification can actually run: both a key id and a valid public key are present.
+    public var isUsable: Bool { keyID != nil && publicKey != nil }
 
-        for (keyID, pem) in pems {
-            if let key = try? AJPReleaseConfigVerifier.publicKey(fromPEM: pem) {
-                parsed[keyID] = key
-            } else {
-                invalid.append(keyID)
-            }
-        }
+    /// - Parameters:
+    ///   - keyID: The trusted key id (the `keyid` the server reports for this key).
+    ///   - pem: The trusted public key in SPKI PEM form.
+    public init(keyID: String?, pem: String?) {
+        let trimmedKeyID = keyID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPEM = pem?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        self.isConfigured = !pems.isEmpty
-        self.keys = parsed
-        self.invalidKeyIDs = invalid
+        let normalizedKeyID = (trimmedKeyID?.isEmpty == false) ? trimmedKeyID : nil
+        let normalizedPEM = (trimmedPEM?.isEmpty == false) ? trimmedPEM : nil
+
+        self.isConfigured = normalizedKeyID != nil || normalizedPEM != nil
+        self.keyID = normalizedKeyID
+        self.publicKey = normalizedPEM.flatMap { try? AJPReleaseConfigVerifier.publicKey(fromPEM: $0) }
     }
 }
 
@@ -260,14 +255,16 @@ public enum AJPReleaseConfigVerifier {
     /// - Parameters:
     ///   - body: The exact response bytes as received, before any parsing.
     ///   - headerValue: The raw `X-Airborne-Signature` value.
-    ///   - trustedKeys: Public keys by key ID.
+    ///   - expectedKeyID: The single key id the app pins. The response's `keyid` must equal it.
+    ///   - trustedKey: The single public key the app pins.
     /// - Returns: The key ID that verified, for logging.
     /// - Throws: `AJPSignatureVerificationError`.
     @discardableResult
     public static func verify(
         body: Data,
         headerValue: String,
-        trustedKeys: [String: P256.Signing.PublicKey]
+        expectedKeyID: String,
+        trustedKey: P256.Signing.PublicKey
     ) throws -> String {
         let header = try parseSignatureHeader(headerValue)
 
@@ -276,13 +273,11 @@ public enum AJPReleaseConfigVerifier {
             throw AJPSignatureVerificationError.unsupportedAlgorithm(header.alg)
         }
 
-        guard !trustedKeys.isEmpty else {
-            throw AJPSignatureVerificationError.noTrustedKeys
-        }
-
-        guard let key = trustedKeys[header.keyID] else {
+        // The response must be signed by exactly the key the app pins.
+        guard header.keyID == expectedKeyID else {
             throw AJPSignatureVerificationError.untrustedKeyID(header.keyID)
         }
+        let key = trustedKey
 
         guard let signatureData = Data(base64Encoded: header.signatureBase64) else {
             throw AJPSignatureVerificationError.malformedSignature

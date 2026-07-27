@@ -196,27 +196,13 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
 
     func testVerifiesGenuineSignature() throws {
         let privateKey = P256.Signing.PrivateKey()
-        let trusted = [keyID: privateKey.publicKey]
         let header = makeHeader(sig: try sign(body, with: privateKey))
 
         let verifiedKeyID = try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: trusted
+            body: body, headerValue: header, expectedKeyID: keyID, trustedKey: privateKey.publicKey
         )
 
         XCTAssertEqual(verifiedKeyID, keyID)
-    }
-
-    func testSelectsKeyByKeyIDWhenSeveralAreTrusted() throws {
-        // The rotation case: several keys trusted, the header names which one signed.
-        let old = P256.Signing.PrivateKey()
-        let new = P256.Signing.PrivateKey()
-        let trusted = ["old-key": old.publicKey, "new-key": new.publicKey]
-        let header = makeHeader(keyID: "new-key", sig: try sign(body, with: new))
-
-        XCTAssertEqual(
-            try AJPReleaseConfigVerifier.verify(body: body, headerValue: header, trustedKeys: trusted),
-            "new-key"
-        )
     }
 
     func testRejectsTamperedBody() throws {
@@ -227,57 +213,34 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
         tampered[tampered.startIndex] ^= 0x01
 
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: tampered, headerValue: header, trustedKeys: [keyID: privateKey.publicKey]
+            body: tampered, headerValue: header, expectedKeyID: keyID, trustedKey: privateKey.publicKey
         )) { error in
             XCTAssertEqual(error as? AJPSignatureVerificationError, .signatureMismatch)
         }
     }
 
     func testRejectsSignatureFromAnotherKey() throws {
+        // Header names the pinned key id, but the body was signed by a different private key.
         let attacker = P256.Signing.PrivateKey()
         let header = makeHeader(sig: try sign(body, with: attacker))
 
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: [keyID: P256.Signing.PrivateKey().publicKey]
+            body: body, headerValue: header, expectedKeyID: keyID, trustedKey: P256.Signing.PrivateKey().publicKey
         )) { error in
             XCTAssertEqual(error as? AJPSignatureVerificationError, .signatureMismatch)
         }
     }
 
-    /// A signature is only meaningful for the key ID it was issued under: re-labelling a genuine
-    /// signature as another trusted key must not verify.
-    func testRejectsGenuineSignatureRelabelledAsAnotherKeyID() throws {
-        let old = P256.Signing.PrivateKey()
-        let new = P256.Signing.PrivateKey()
-        let trusted = ["old-key": old.publicKey, "new-key": new.publicKey]
-        let header = makeHeader(keyID: "new-key", sig: try sign(body, with: old))
-
-        XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: trusted
-        )) { error in
-            XCTAssertEqual(error as? AJPSignatureVerificationError, .signatureMismatch)
-        }
-    }
-
-    func testRejectsUnknownKeyID() throws {
+    func testRejectsWhenResponseKeyIDDoesNotMatchThePin() throws {
+        // The app pins `keyID`; a response signed under any other key id is rejected outright —
+        // this is what makes a single pinned key require an app release to change.
         let privateKey = P256.Signing.PrivateKey()
         let header = makeHeader(keyID: "rotated-away", sig: try sign(body, with: privateKey))
 
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: [keyID: privateKey.publicKey]
+            body: body, headerValue: header, expectedKeyID: keyID, trustedKey: privateKey.publicKey
         )) { error in
             XCTAssertEqual(error as? AJPSignatureVerificationError, .untrustedKeyID("rotated-away"))
-        }
-    }
-
-    func testRejectsWhenNoKeysParsed() throws {
-        let privateKey = P256.Signing.PrivateKey()
-        let header = makeHeader(sig: try sign(body, with: privateKey))
-
-        XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: [:]
-        )) { error in
-            XCTAssertEqual(error as? AJPSignatureVerificationError, .noTrustedKeys)
         }
     }
 
@@ -286,7 +249,7 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
         let header = makeHeader(alg: "rs256", sig: try sign(body, with: privateKey))
 
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: [keyID: privateKey.publicKey]
+            body: body, headerValue: header, expectedKeyID: keyID, trustedKey: privateKey.publicKey
         )) { error in
             XCTAssertEqual(error as? AJPSignatureVerificationError, .unsupportedAlgorithm("rs256"))
         }
@@ -297,13 +260,12 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
         let header = makeHeader(alg: "ES256", sig: try sign(body, with: privateKey))
 
         XCTAssertNoThrow(try AJPReleaseConfigVerifier.verify(
-            body: body, headerValue: header, trustedKeys: [keyID: privateKey.publicKey]
+            body: body, headerValue: header, expectedKeyID: keyID, trustedKey: privateKey.publicKey
         ))
     }
 
     func testRejectsMalformedSignature() throws {
         let privateKey = P256.Signing.PrivateKey()
-        let trusted = [keyID: privateKey.publicKey]
 
         let cases = [
             "!!!not base64!!!",                                  // undecodable
@@ -314,7 +276,7 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
 
         for sig in cases {
             XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-                body: body, headerValue: makeHeader(sig: sig), trustedKeys: trusted
+                body: body, headerValue: makeHeader(sig: sig), expectedKeyID: keyID, trustedKey: privateKey.publicKey
             ), "sig: \(sig)") { error in
                 XCTAssertEqual(error as? AJPSignatureVerificationError, .malformedSignature, "sig: \(sig)")
             }
@@ -329,7 +291,7 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
         let reformatted = Data(#"{"config": {"version": "1.0.0"}}"#.utf8)
 
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: reformatted, headerValue: header, trustedKeys: [keyID: privateKey.publicKey]
+            body: reformatted, headerValue: header, expectedKeyID: keyID, trustedKey: privateKey.publicKey
         )) { error in
             XCTAssertEqual(error as? AJPSignatureVerificationError, .signatureMismatch)
         }
@@ -337,41 +299,48 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
 
     // MARK: - Trust store
 
-    func testTrustStoreParsesConfiguredKeys() throws {
-        let store = AJPReleaseConfigTrustStore(pems: [keyID: serverPEM])
+    func testTrustStoreParsesTheConfiguredKey() throws {
+        let store = AJPReleaseConfigTrustStore(keyID: keyID, pem: serverPEM)
 
         XCTAssertTrue(store.isConfigured)
-        XCTAssertEqual(store.keys.count, 1)
-        XCTAssertTrue(store.invalidKeyIDs.isEmpty)
+        XCTAssertTrue(store.isUsable)
+        XCTAssertEqual(store.keyID, keyID)
+        XCTAssertNotNil(store.publicKey)
     }
 
-    func testTrustStoreIsUnconfiguredWhenNoKeysSupplied() {
-        let store = AJPReleaseConfigTrustStore(pems: [:])
-
-        XCTAssertFalse(store.isConfigured)
-        XCTAssertTrue(store.keys.isEmpty)
-        XCTAssertTrue(store.invalidKeyIDs.isEmpty)
+    func testTrustStoreIsUnconfiguredWhenNothingSupplied() {
+        for store in [
+            AJPReleaseConfigTrustStore(keyID: nil, pem: nil),
+            AJPReleaseConfigTrustStore(keyID: "", pem: "   "),
+        ] {
+            XCTAssertFalse(store.isConfigured)
+            XCTAssertFalse(store.isUsable)
+            XCTAssertNil(store.publicKey)
+        }
     }
 
-    /// The silent-disable hole: a typo'd PEM parses to zero keys. If that were indistinguishable
-    /// from "no keys supplied", verification would quietly switch itself off.
-    func testTrustStoreDistinguishesInvalidKeysFromNoKeys() {
-        let store = AJPReleaseConfigTrustStore(pems: ["typo-key": "-----BEGIN PUBLIC KEY-----\noops\n-----END PUBLIC KEY-----"])
+    /// The silent-disable hole: a typo'd PEM must not look like "no key supplied". It stays
+    /// configured (opted in) but unusable, so signed configs are rejected rather than accepted.
+    func testTrustStoreConfiguredButUnusableOnBadPEM() {
+        let store = AJPReleaseConfigTrustStore(
+            keyID: keyID, pem: "-----BEGIN PUBLIC KEY-----\noops\n-----END PUBLIC KEY-----"
+        )
 
         XCTAssertTrue(store.isConfigured, "a bad PEM must not look like an opt-out")
-        XCTAssertTrue(store.keys.isEmpty)
-        XCTAssertEqual(store.invalidKeyIDs, ["typo-key"])
+        XCTAssertFalse(store.isUsable)
+        XCTAssertNil(store.publicKey)
     }
 
-    func testTrustStoreKeepsGoodKeysAlongsideBadOnes() throws {
-        let store = AJPReleaseConfigTrustStore(pems: [
-            "good-key": serverPEM,
-            "bad-key": "garbage",
-        ])
+    func testTrustStoreConfiguredButUnusableOnPartialConfig() {
+        // Key id but no PEM, and PEM but no key id: both are opted-in-but-unusable.
+        let keyIDOnly = AJPReleaseConfigTrustStore(keyID: keyID, pem: nil)
+        XCTAssertTrue(keyIDOnly.isConfigured)
+        XCTAssertFalse(keyIDOnly.isUsable)
 
-        XCTAssertTrue(store.isConfigured)
-        XCTAssertEqual(Array(store.keys.keys), ["good-key"])
-        XCTAssertEqual(store.invalidKeyIDs, ["bad-key"])
+        let pemOnly = AJPReleaseConfigTrustStore(keyID: nil, pem: serverPEM)
+        XCTAssertTrue(pemOnly.isConfigured)
+        XCTAssertFalse(pemOnly.isUsable, "a PEM without a pinned key id cannot verify")
+        XCTAssertNotNil(pemOnly.publicKey)
     }
 
     // MARK: - Reason codes
@@ -379,7 +348,6 @@ final class AJPReleaseConfigVerifierTests: XCTestCase {
     func testReasonCodesAreStableAndDropAttackerInput() {
         XCTAssertEqual(AJPSignatureVerificationError.missingHeader.reasonCode, "missing_header")
         XCTAssertEqual(AJPSignatureVerificationError.malformedHeader.reasonCode, "malformed_header")
-        XCTAssertEqual(AJPSignatureVerificationError.noTrustedKeys.reasonCode, "no_trusted_keys")
         XCTAssertEqual(AJPSignatureVerificationError.malformedSignature.reasonCode, "malformed_signature")
         XCTAssertEqual(AJPSignatureVerificationError.signatureMismatch.reasonCode, "signature_mismatch")
 

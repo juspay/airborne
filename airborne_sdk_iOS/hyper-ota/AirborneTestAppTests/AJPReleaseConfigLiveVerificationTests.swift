@@ -35,39 +35,33 @@ final class AJPReleaseConfigLiveVerificationTests: XCTestCase {
     """
 
     private func body(_ b64: String) -> Data { Data(base64Encoded: b64)! }
+    private func key(_ pem: String) -> P256.Signing.PublicKey { try! AJPReleaseConfigVerifier.publicKey(fromPEM: pem) }
 
     // MARK: - Case 1: default key
 
     func test01_defaultKey_realSignatureVerifies() throws {
         let keyID = try AJPReleaseConfigVerifier.verify(
-            body: body(bodyDefaultB64),
-            headerValue: defaultHeader,
-            trustedKeys: AJPReleaseConfigTrustStore(pems: ["default": pemDefault]).keys
+            body: body(bodyDefaultB64), headerValue: defaultHeader,
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )
         XCTAssertEqual(keyID, "default")
     }
 
-    // MARK: - Case 2: multiple keys, correct selection by keyid
+    // MARK: - Case 2: the pinned key id selects what is accepted
 
-    func test02a_multipleKeys_selectsDefaultByKeyID() throws {
-        let decoy = P256.Signing.PrivateKey().publicKey.pemRepresentation // unrelated valid P-256 key
-        let store = AJPReleaseConfigTrustStore(pems: [
-            "default": pemDefault, "release-2027": pem2027, "decoy": decoy,
-        ])
-        XCTAssertEqual(store.keys.count, 3)
-
+    func test02a_pinDefault_verifiesDefaultSignedResponse() throws {
         let keyID = try AJPReleaseConfigVerifier.verify(
-            body: body(bodyDefaultB64), headerValue: defaultHeader, trustedKeys: store.keys
+            body: body(bodyDefaultB64), headerValue: defaultHeader,
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )
-        XCTAssertEqual(keyID, "default", "must pick the key the header names, out of three")
+        XCTAssertEqual(keyID, "default")
     }
 
-    func test02b_multipleKeys_selectsRelease2027ByKeyID() throws {
-        // Same trust store, but this response was signed by release-2027 — selection must follow
-        // the header, not the default.
-        let store = AJPReleaseConfigTrustStore(pems: ["default": pemDefault, "release-2027": pem2027])
+    func test02b_pinRelease2027_verifiesRelease2027SignedResponse() throws {
+        // Pin the other key + its response — proves verification follows exactly the pinned key.
         let keyID = try AJPReleaseConfigVerifier.verify(
-            body: body(body2027B64), headerValue: key2027Header, trustedKeys: store.keys
+            body: body(body2027B64), headerValue: key2027Header,
+            expectedKeyID: "release-2027", trustedKey: key(pem2027)
         )
         XCTAssertEqual(keyID, "release-2027")
     }
@@ -75,30 +69,29 @@ final class AJPReleaseConfigLiveVerificationTests: XCTestCase {
     // MARK: - Case 3: wrong keys
 
     func test03a_wrongKey_correctKeyIDButWrongPEM_mismatch() {
-        // The map has the right key id ("default") pointing at the WRONG public key.
-        let store = AJPReleaseConfigTrustStore(pems: ["default": pem2027])
+        // Pin the right key id ("default") but the WRONG public key material.
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body(bodyDefaultB64), headerValue: defaultHeader, trustedKeys: store.keys
+            body: body(bodyDefaultB64), headerValue: defaultHeader,
+            expectedKeyID: "default", trustedKey: key(pem2027)
         )) { XCTAssertEqual($0 as? AJPSignatureVerificationError, .signatureMismatch) }
     }
 
-    func test03b_wrongKey_keyIDNotConfigured_untrusted() {
-        // Server signed with "default", but the app only trusts "release-2027".
-        let store = AJPReleaseConfigTrustStore(pems: ["release-2027": pem2027])
+    func test03b_wrongKey_pinnedKeyIDDoesNotMatchResponse_untrusted() {
+        // Server signed with "default", but the app pins "release-2027".
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body(bodyDefaultB64), headerValue: defaultHeader, trustedKeys: store.keys
+            body: body(bodyDefaultB64), headerValue: defaultHeader,
+            expectedKeyID: "release-2027", trustedKey: key(pem2027)
         )) { XCTAssertEqual($0 as? AJPSignatureVerificationError, .untrustedKeyID("default")) }
     }
 
-    // MARK: - Case 4: no keys (manager skips verification)
+    // MARK: - Case 4: no key (manager skips verification)
 
-    func test04_noKeys_trustStoreNotConfigured() {
-        // This is the exact signal AJPApplicationManager.verifyReleaseConfigSignature guards on
-        // (`guard trustStore.isConfigured else { return nil }`) to skip verification and stay
-        // backward compatible.
-        let store = AJPReleaseConfigTrustStore(pems: [:])
+    func test04_noKey_trustStoreNotConfigured() {
+        // The exact signal AJPApplicationManager.verifyReleaseConfigSignature guards on
+        // (`guard trustStore.isConfigured else { return nil }`) to skip verification.
+        let store = AJPReleaseConfigTrustStore(keyID: nil, pem: nil)
         XCTAssertFalse(store.isConfigured)
-        XCTAssertTrue(store.keys.isEmpty)
+        XCTAssertFalse(store.isUsable)
     }
 
     // MARK: - Case 5: bytes modified in transit
@@ -110,36 +103,34 @@ final class AJPReleaseConfigLiveVerificationTests: XCTestCase {
         tampered[600] ^= 0x01
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
             body: tampered, headerValue: defaultHeader,
-            trustedKeys: AJPReleaseConfigTrustStore(pems: ["default": pemDefault]).keys
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )) { XCTAssertEqual($0 as? AJPSignatureVerificationError, .signatureMismatch) }
     }
 
     // MARK: - Case 6: additional cases
 
-    func test06a_rotation_appHasOnlyOldKey_rejectsConfigSignedByNewDefault() {
-        // Rotation footgun: the server promotes release-2027 to default and signs with it, but a
-        // client still shipping only the old "default" key rejects it (untrusted key id).
-        let store = AJPReleaseConfigTrustStore(pems: ["default": pemDefault])
+    func test06a_pinnedKeyRotatedServerSide_rejected() {
+        // The app pins "default"; the server rotated and signed with "release-2027". Because the
+        // app pins one key, it rejects — changing the trusted key requires a new app build.
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
-            body: body(body2027B64), headerValue: key2027Header, trustedKeys: store.keys
+            body: body(body2027B64), headerValue: key2027Header,
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )) { XCTAssertEqual($0 as? AJPSignatureVerificationError, .untrustedKeyID("release-2027")) }
     }
 
     func test06b_algorithmTampered_unsupported() {
-        // Downgrade the algorithm label on a real header; the real signature is left intact.
         let tamperedHeader = defaultHeader.replacingOccurrences(of: "alg=\"es256\"", with: "alg=\"rs256\"")
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
             body: body(bodyDefaultB64), headerValue: tamperedHeader,
-            trustedKeys: AJPReleaseConfigTrustStore(pems: ["default": pemDefault]).keys
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )) { XCTAssertEqual($0 as? AJPSignatureVerificationError, .unsupportedAlgorithm("rs256")) }
     }
 
     func test06c_signatureCorrupted_malformed() {
-        // Corrupt the base64 signature so it is no longer valid DER.
         let tamperedHeader = defaultHeader.replacingOccurrences(of: "sig=\"ME", with: "sig=\"XX")
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
             body: body(bodyDefaultB64), headerValue: tamperedHeader,
-            trustedKeys: AJPReleaseConfigTrustStore(pems: ["default": pemDefault]).keys
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )) {
             let e = $0 as? AJPSignatureVerificationError
             XCTAssertTrue(e == .malformedSignature || e == .signatureMismatch, "got \(String(describing: e))")
@@ -151,16 +142,17 @@ final class AJPReleaseConfigLiveVerificationTests: XCTestCase {
         // an absent header and accept the config — verified end-to-end by the app run, not here.)
         XCTAssertThrowsError(try AJPReleaseConfigVerifier.verify(
             body: body(bodyDefaultB64), headerValue: "",
-            trustedKeys: AJPReleaseConfigTrustStore(pems: ["default": pemDefault]).keys
+            expectedKeyID: "default", trustedKey: key(pemDefault)
         )) { XCTAssertEqual($0 as? AJPSignatureVerificationError, .malformedHeader) }
     }
 
-    // MARK: - Trust store parses the real server PEMs
+    // MARK: - Trust store parses the real server PEM
 
-    func test07_trustStoreParsesRealServerPEMs() {
-        let store = AJPReleaseConfigTrustStore(pems: ["default": pemDefault, "release-2027": pem2027])
+    func test07_trustStoreParsesRealServerPEM() {
+        let store = AJPReleaseConfigTrustStore(keyID: "default", pem: pemDefault)
         XCTAssertTrue(store.isConfigured)
-        XCTAssertEqual(store.keys.count, 2)
-        XCTAssertTrue(store.invalidKeyIDs.isEmpty)
+        XCTAssertTrue(store.isUsable)
+        XCTAssertEqual(store.keyID, "default")
+        XCTAssertNotNil(store.publicKey)
     }
 }
