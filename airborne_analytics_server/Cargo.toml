@@ -31,3 +31,7 @@ tower-http = { version = "0.5", features = ["cors", "trace", "timeout"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+# `util` brings in ServiceExt::oneshot, used to drive the CORS layer in tests.
+tower = { version = "0.4", features = ["util"] }
