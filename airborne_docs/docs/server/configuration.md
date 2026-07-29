@@ -29,6 +29,31 @@ For local development you rarely set these by hand. `make setup` seeds `airborne
 | `RUST_LOG` | No | `debug,info,error,actix_web=info,error` | Standard Rust log filter directive. |
 | `LOG_FORMAT` | No | _(empty)_ | Tracing output format. Empty selects the default human-readable format; set to a JSON-style value for structured logs. |
 
+## Outbound fetches
+
+The server downloads URLs supplied by callers — when a file is registered with `POST /api/file` (to compute its size and checksum) and when a build is assembled. Those fetches are restricted so the server cannot be used to reach services that are only reachable from inside your network.
+
+| Variable | Required | Default / Example | Purpose |
+| --- | --- | --- | --- |
+| `SSRF_ALLOWED_HOSTS` | No | _(unset)_ | Comma-separated hosts exempt from address filtering, for example `minio.internal,assets.internal:9000`. Accepts a bare host, `host:port`, or a full URL. Use it for internal storage the deployment legitimately fetches from. |
+| `MAX_DOWNLOAD_BYTES` | No | `536870912` (512 MiB) | Ceiling on a single downloaded file. Bodies are buffered in memory, so this bounds allocation as well as transfer. |
+
+What is enforced on every such fetch:
+
+- Only `http` and `https` URLs are fetched. `file:`, `data:`, and other schemes are rejected.
+- Loopback, private (RFC 1918), link-local (including the `169.254.169.254` cloud metadata address), carrier-grade NAT, and other non-globally-routable addresses are refused — whether written directly into the URL or returned by DNS.
+- At most **5** redirects, with the scheme and address re-checked on each hop.
+- A 10-second connect timeout and a 300-second total timeout.
+- The size cap above, checked against `Content-Length` and again against the bytes that actually arrive.
+
+:::info[Your own endpoint is always reachable]
+The host in [`PUBLIC_ENDPOINT`](#server) is exempt automatically. The server fetches its own release config and its own uploaded assets through that URL, and in most deployments it resolves to a loopback or private address. You do not need to list it in `SSRF_ALLOWED_HOSTS`.
+:::
+
+:::caution[Self-hosted internal storage]
+If files are hosted on an internal service at a private address — an in-cluster MinIO, an internal mirror — registering a file from it now fails with a message naming the host. Add that host to `SSRF_ALLOWED_HOSTS`. Exemptions are exact, per-host, and do not extend to subdomains.
+:::
+
 ## Database
 
 The server connects to PostgreSQL for application data **and** Casbin policies. There are two credential sets: a runtime user and a migration user (the migration user runs schema changes and is granted broader privileges).

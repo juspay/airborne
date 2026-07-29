@@ -21,6 +21,7 @@ pub mod keycloak;
 pub mod kms;
 pub mod metrics;
 pub mod migrations;
+pub mod outbound;
 pub mod redis;
 pub mod s3;
 pub mod semver;

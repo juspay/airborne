@@ -315,6 +315,14 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // Installed before any request can be served, so no caller-supplied URL is
+    // ever fetched without the address, redirect, and size guards in place.
+    utils::outbound::init_policy(utils::outbound::OutboundPolicy::new(
+        &app_config.public_endpoint,
+        app_config.ssrf_allowed_hosts.as_deref(),
+        app_config.max_download_bytes,
+    ));
+
     let env = types::Environment {
         public_url: app_config.public_endpoint.clone(),
         authn_issuer_url,
