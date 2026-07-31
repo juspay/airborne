@@ -62,6 +62,45 @@ The management endpoints do **not** take `{org}`/`{app}` path segments — e.g. 
 - File upload (`POST /api/file/upload`) streams a **raw body** and takes an `x-checksum` header; this is called out on the operation's page.
 - A `x-request-id` header is echoed on every response (and accepted on requests) for correlation.
 
+## Client-side resolution: `extended=true`
+
+By default the release-serving endpoints ([`/release/{organisation}/{application}`](/docs/api-reference/endpoints/serve-release) and [`/release/v2/...`](/docs/api-reference/endpoints/serve-release-v-2)) resolve targeting **on the server**: you send your dimensions in `x-dimension` and a `toss`, and you get back one already-resolved release config.
+
+Adding `extended=true` keeps that resolved response exactly as-is and attaches an extra `unresolved_properties` object containing the **unresolved** Superposition bundle for the application's workspace — the same targeting data the server just resolved against, narrowed to the `config.properties` key space:
+
+| Field | What it is |
+| --- | --- |
+| `config` | The workspace config: `contexts`, `overrides`, `default_configs` and `dimensions`. |
+| `config_version` | Version identifier of the workspace config. |
+| `config_last_modified` | When the workspace config last changed (RFC 3339). |
+| `experiments` | Active experiments — needed to resolve a ramped release. |
+| `experiment_groups` | Experiment groups, used to bucket a caller by its targeting key. |
+| `experiments_last_modified` | When the experiment config last changed (RFC 3339). |
+
+**Detect it by the response `version`.** A response carrying `unresolved_properties` reports `version: "3"`; without it the response is `version: "2"` and is byte-for-byte the shape it has always been. The version tracks what is actually in the payload, not what was asked for — so if `extended=true` was requested but the bundle could not be fetched (see below), you get `"2"` and can take your existing v2 path unchanged.
+
+**Scope.** Only `config.properties` is returned. Every other config key — `config.version`, `config.boot_timeout`, `config.release_config_timeout`, `package.*`, `resources` — is filtered out of `default_configs` and out of every override map and experiment variant, and any context whose overrides do not touch `config.properties` is dropped along with them. So this bundle resolves **properties** and nothing else; the package to boot from still comes from the server-resolved part of the response.
+
+The bundle is **not** filtered by the caller's dimensions: the point of it is that the holder can resolve any dimension combination locally, which a pre-filtered response could not support.
+
+Cohorts need no separate call, and `dimensions` is deliberately left unfiltered so they keep working. A cohort is a *derived* dimension — its entry in `config.dimensions` carries `dimension_type: {"LOCAL_COHORT": "<dimension it depends on>"}` plus a `schema` holding the ordered `enum` of cohort names and the JsonLogic `definitions` for each. Cohort membership is therefore derivable from this payload alone: evaluate the definitions in `enum` order and take the first match, falling back to `otherwise`.
+
+:::warning[The bundle contains your targeting rules]
+`extended=true` returns targeting data that server-side resolution never exposes. In particular, a cohort built as a **group** embeds its member list (for example the user IDs in it) directly in the dimension's `definitions`, so every caller that requests the bundle receives the whole list. Narrowing to `config.properties` does **not** change this — `dimensions` is passed through in full. Treat the endpoint accordingly, and prefer server-side resolution where the targeting rules themselves are sensitive.
+:::
+
+:::note[Degrades rather than fails]
+The resolved release config is what an SDK boots from, so it is never held hostage to the bundle fetch. If `extended=true` is requested but the bundle cannot be fetched, the server logs the failure and returns the response **without** the `unresolved_properties` field rather than failing the request — so callers must treat it as optional and fall back to the resolved config.
+:::
+
+### Caching and freshness
+
+The bundle is cached in Redis per (organisation, application), so a request with `extended=true` normally costs no extra Superposition round-trip. The cache is **refreshed in place** whenever anything that can change the bundle changes: a release is **created, updated, ramped, concluded or discarded**, the **`config.properties` schema** is updated, or a **dimension or cohort** is created, updated or deleted (cohort definitions travel in `dimensions`).
+
+Refresh is write-through — the server re-reads from Superposition and overwrites the cached entry as part of the mutation — so the first device to ask after a release is cut does not pay the round-trip. If either the re-read or the write-back fails, the entry is dropped instead, so a failed refresh can never leave the pre-mutation bundle in place. A 7-day TTL backstops anything that bypasses those paths — for example editing the workspace in Superposition directly. If Redis is unavailable the server falls back to Superposition rather than dropping the bundle.
+
+Note that the serve-release response itself is CDN-cacheable for a day (`s-maxage=86400`), so a cache drop on the server does not by itself reach callers already being served from a CDN edge.
+
 ## Where to start
 
 - [Authentication](/docs/api-reference/authentication) — obtain a bearer token (OIDC login or a personal access token) and set the `Authorization` header.
