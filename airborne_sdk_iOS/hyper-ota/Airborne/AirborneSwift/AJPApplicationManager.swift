@@ -1056,11 +1056,23 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.startReleaseConfigTimeoutTimer()
         
-        guard let manifestUrl = URL(string: self.releaseConfigURL) else {
+        guard let baseUrl = URL(string: self.releaseConfigURL),
+              var urlComponents = URLComponents(url: baseUrl, resolvingAgainstBaseURL: false) else {
             completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
             return
         }
-        
+
+        var queryItems = urlComponents.queryItems ?? []
+        if !queryItems.contains(where: { $0.name == "extended" }) {
+            queryItems.append(URLQueryItem(name: "extended", value: "true"))
+        }
+        urlComponents.queryItems = queryItems
+
+        guard let manifestUrl = urlComponents.url else {
+            completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
+            return
+        }
+
         var request = URLRequest(url: manifestUrl)
         request.httpMethod = "GET"
         
