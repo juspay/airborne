@@ -164,6 +164,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         get { collectionsLock.withLock { _package } }
         set { collectionsLock.withLock { _package = newValue } }
     }
+
+    /// The opaque `unresolved_properties` payload from the last extended release config, cached
+    /// across launches. Held apart from `config` because it is versioned independently — see
+    /// `updateUnresolvedProperties(_:)`.
+    private var _unresolvedProperties: NSDictionary?
+    public var unresolvedProperties: NSDictionary? {
+        get { collectionsLock.withLock { _unresolvedProperties } }
+        set { collectionsLock.withLock { _unresolvedProperties = newValue } }
+    }
     
     private var _releaseConfigError: String?
     public var releaseConfigError: String? {
@@ -309,16 +318,27 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         self.handleTempResourcesInstallation()
         
         self.config = self.readApplicationConfig()
-        
-        if self.package == nil || self.config == nil || self.resources == nil {
-            if let data = try? self.fileUtil.getFileDataFromBundle("release_config.json") {
-                if let manifest = try? AJPApplicationManifest(data: data as NSData) {
-                    if self.config == nil { self.config = manifest.config }
-                    if self.package == nil { self.package = manifest.package }
-                    if self.resources == nil { self.resources = manifest.resources }
+
+        // Read at most once, and only if some component actually needs it.
+        var bundledManifest: AJPApplicationManifest?
+        var didReadBundledManifest = false
+        func readBundledManifest() -> AJPApplicationManifest? {
+            if !didReadBundledManifest {
+                didReadBundledManifest = true
+                if let data = try? self.fileUtil.getFileDataFromBundle("release_config.json") {
+                    bundledManifest = try? AJPApplicationManifest(data: data as NSData)
                 }
             }
-            
+            return bundledManifest
+        }
+
+        if self.package == nil || self.config == nil || self.resources == nil {
+            if let manifest = readBundledManifest() {
+                if self.config == nil { self.config = manifest.config }
+                if self.package == nil { self.package = manifest.package }
+                if self.resources == nil { self.resources = manifest.resources }
+            }
+
             if self.config == nil {
                 self.config = AJPApplicationConfig()
                 let logVal = NSMutableDictionary()
@@ -347,7 +367,13 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             logVal["release_config"] = "Read bundled release_config.json"
             self.tracker.trackInfo("bundled_release_config", value: logVal)
         }
-        
+
+        // Resolved on its own, after the three above: it is optional, so a cache miss here must
+        // not drag the bundled release config in as a replacement for config/package/resources
+        // the way a miss on those does. Falling back to the bundled release config gives a host
+        // app that ships one a usable payload on the very first boot, before any fetch.
+        self.unresolvedProperties = self.readUnresolvedProperties() ?? readBundledManifest()?.unresolvedProperties
+
         self.initializeLazyResourcesDownloadStatus()
         
         collectionsLock.withLock {
@@ -517,13 +543,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     
     @objc public func getCurrentApplicationManifest() -> Any? {
         collectionsLock.withLock {
-            return AJPApplicationManifest(package: self.package, config: self.config, resources: self.resources)
+            return AJPApplicationManifest(package: _package, config: _config, resources: _resources, unresolvedProperties: _unresolvedProperties)
         }
     }
-    
+
     @objc public func getCurrentResult() -> AJPDownloadResult {
-        let manifest = AJPApplicationManifest(package: self.package, config: self.config, resources: self.resources)
-        
+        let manifest = collectionsLock.withLock {
+            AJPApplicationManifest(package: _package, config: _config, resources: _resources, unresolvedProperties: _unresolvedProperties)
+        }
+
         let releaseConfigStatus = self.releaseConfigDownloadStatus
         let packageStatus = self.importantPackageDownloadStatus
         
@@ -685,6 +713,19 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     private func readApplicationConfig() -> AJPApplicationConfig? {
         return try? fileUtil.getDecodedInstanceForClass(AJPApplicationConfig.self, withContentOfFileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationConfig
     }
+
+    /// Every class the opaque payload may contain. Secure decoding validates a collection's
+    /// elements as well as the collection itself, so the whole JSON class graph has to be listed.
+    /// `NSNull` is included because the payload is backend-controlled and a single null anywhere
+    /// inside it would otherwise fail the decode.
+    private static let unresolvedPropertiesClasses: [AnyClass] = [NSDictionary.self, NSArray.self, NSString.self, NSNumber.self, NSNull.self]
+
+    /// Reads back the cached `unresolved_properties`. Returns nil when nothing has been cached
+    /// yet, which is the normal state until the first extended response arrives.
+    private func readUnresolvedProperties() -> NSDictionary? {
+        let decoded = try? fileUtil.getDecodedInstanceForClasses(Self.unresolvedPropertiesClasses, withContentOfFileName: AJPApplicationConstants.APP_UNRESOLVED_PROPERTIES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        return decoded as? NSDictionary
+    }
     
     private func updatePackage(_ package: AJPApplicationPackage, didDownloadImportant: Bool, startTime: TimeInterval) {
         let logVal = NSMutableDictionary()
@@ -770,7 +811,40 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             }
         }
     }
-    
+
+    /**
+     * Caches the `unresolved_properties` of a freshly fetched release config.
+     *
+     * Deliberately triggered on its own rather than alongside `updateConfig(_:)`: the extended
+     * payload carries its own `config_version`, so it can change on a fetch where `config.version`
+     * did not. The comparison is therefore on content, not on any version field.
+     *
+     * A response without the key writes nothing and leaves the cached copy alone, so a backend
+     * that stops sending it does not wipe what was already stored. The consequence is that no
+     * path ever clears the cache — the same as `config` and `package`, which are only overwritten.
+     */
+    private func updateUnresolvedProperties(_ unresolvedProperties: NSDictionary?) {
+        guard let unresolvedProperties = unresolvedProperties else { return }
+
+        guard !unresolvedProperties.isEqual(self.unresolvedProperties) else { return }
+
+        do {
+            try fileUtil.writeInstance(unresolvedProperties, fileName: AJPApplicationConstants.APP_UNRESOLVED_PROPERTIES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+
+            // Only promoted in memory once it is on disk, so the two copies cannot diverge.
+            self.unresolvedProperties = unresolvedProperties
+
+            let logData = NSMutableDictionary()
+            logData["new_config_version"] = unresolvedProperties["config_version"] as? String ?? ""
+            tracker.trackInfo("unresolved_properties_updated", value: logData)
+        } catch {
+            let logVal = NSMutableDictionary()
+            logVal["error"] = error.localizedDescription
+            logVal["file_name"] = AJPApplicationConstants.APP_UNRESOLVED_PROPERTIES_DATA_FILE_NAME
+            tracker.trackError("release_config_write_failed", value: logVal)
+        }
+    }
+
     // MARK: - Handlers & Sub-Loops
     
     private func getReleaseConfigTimeout() -> NSNumber? {
@@ -855,6 +929,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 self.downloadedApplicationManifest = manifest
                 self.releaseConfigDownloadStatus = .completed
                 self.cleanUpUnwantedFiles()
+                self.updateUnresolvedProperties(manifest?.unresolvedProperties)
                 if let config = manifest?.config {
                     self.updateConfig(config)
                 }
@@ -870,6 +945,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 if let manifest = manifest {
                     self.downloadedApplicationManifest = manifest
                     self.cleanUpUnwantedFiles()
+                    self.updateUnresolvedProperties(manifest.unresolvedProperties)
                     self.updateConfig(manifest.config)
                     self.tryDownloadingUpdate()
                 } else {
@@ -1029,8 +1105,34 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
     }
     
+    /// Name of the query parameter that asks the backend for the extended release config.
+    private static let extendedQueryParamName = "extended"
+
+    /**
+     * The release config is always fetched in its extended form.
+     *
+     * Any `extended` already present on the configured URL is *overwritten* rather than appended
+     * to, so the flag cannot be turned off from wherever the URL is configured. Built through
+     * `URLComponents` so a URL that already carries a query string (`...release-config.json?toss=42`)
+     * keeps it, instead of growing a malformed second `?`.
+     *
+     * Falls back to the URL as configured when it cannot be decomposed into components, leaving
+     * the failure to the request itself rather than introducing one here.
+     */
+    internal static func extendedReleaseConfigURL(from url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+
+        var queryItems = (components.queryItems ?? []).filter { $0.name != extendedQueryParamName }
+        queryItems.append(URLQueryItem(name: extendedQueryParamName, value: "true"))
+        components.queryItems = queryItems
+
+        return components.url ?? url
+    }
+
     private func fetchReleaseConfigWithCompletionHandler(_ completionHandler: @escaping AJPReleaseConfigCompletionHandler) {
-        
+
         var timeoutObserver: Any? = nil
         timeoutObserver = NotificationCenter.default.addObserver(forName: AJPApplicationConstants.RELEASE_CONFIG_TIMEOUT_NOTIFICATION, object: nil, queue: OperationQueue()) { [weak self] note in
             guard let self = self else { return }
@@ -1056,22 +1158,12 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.startReleaseConfigTimeoutTimer()
         
-        guard let baseUrl = URL(string: self.releaseConfigURL),
-              var urlComponents = URLComponents(url: baseUrl, resolvingAgainstBaseURL: false) else {
+        guard let configuredUrl = URL(string: self.releaseConfigURL) else {
             completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
             return
         }
 
-        var queryItems = urlComponents.queryItems ?? []
-        if !queryItems.contains(where: { $0.name == "extended" }) {
-            queryItems.append(URLQueryItem(name: "extended", value: "true"))
-        }
-        urlComponents.queryItems = queryItems
-
-        guard let manifestUrl = urlComponents.url else {
-            completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
-            return
-        }
+        let manifestUrl = Self.extendedReleaseConfigURL(from: configuredUrl)
 
         var request = URLRequest(url: manifestUrl)
         request.httpMethod = "GET"
