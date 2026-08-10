@@ -656,10 +656,21 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             isAvailable = _downloadedSplits.contains(path)
         }
         
-        if !isAvailable { return nil }
-        
         let resolvedFileName = utils.jsFileName(for: path)
-        return getPathForPackageFile(resolvedFileName)
+        let packagePath = getPathForPackageFile(resolvedFileName)
+        
+        if isAvailable && FileManager.default.fileExists(atPath: packagePath) {
+            return packagePath
+        }
+        
+        let bundledFileName = (resolvedFileName as NSString).lastPathComponent
+            
+        if let bundledPath = fileUtil.filePathInBundleForFileName(bundledFileName),
+           FileManager.default.fileExists(atPath: bundledPath) {
+            return bundledPath
+        }
+        
+        return nil
     }
     
     @objc public func getDownloadedSplits() -> Set<String> {

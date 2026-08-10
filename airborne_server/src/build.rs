@@ -268,17 +268,12 @@ struct File {
     file_url: String,
 }
 
-fn sanitize_path(path: &str, replace_with_hyphen: bool) -> String {
+fn sanitize_path(path: &str) -> String {
     let mut result = path.to_string();
 
     // Remove leading slash if present
     if result.starts_with('/') {
         result.remove(0);
-    }
-
-    // Replace all remaining slashes with hyphens only for iOS zip files
-    if replace_with_hyphen {
-        result = result.replace('/', "-");
     }
 
     result
@@ -347,10 +342,7 @@ async fn create_and_upload_build(
             // Add file to zip with its file path as the name
             zip_builder
                 .start_file::<_, ()>(
-                    format!(
-                        "AirborneAssets/{}",
-                        sanitize_path(&file_entry.file_path, true)
-                    ),
+                    format!("AirborneAssets/{}", sanitize_path(&file_entry.file_path)),
                     FileOptions::default(),
                 )
                 .map_err(|e| {
