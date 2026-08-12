@@ -14,7 +14,7 @@ use crate::{
     utils::{
         db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
         document::{hashmap_to_json_value, schema_doc_to_hashmap, value_to_document},
-        release_view::ReleaseViewType,
+        release_view::{self, ReleaseViewType},
     },
 };
 use diesel::prelude::*;
@@ -33,6 +33,7 @@ pub fn add_routes() -> Scope {
         .service(create_dimension_api)
         .service(list_dimensions_api)
         .service(update_dimension_api)
+        .service(list_dimension_active_releases_api)
         .service(delete_dimension_api)
         .service(create_release_view_api)
         .service(list_release_views_api)
@@ -332,6 +333,164 @@ async fn update_dimension_api(
     }))
 }
 
+/// The live release of every dimension slice that targets `dimension`.
+///
+/// A release view is one slice that has been released to, and the newest release in it is the one
+/// serving that slice today — so those are exactly the releases that have to go before the
+/// dimension can be deleted. Discarded releases never served anything and are skipped.
+async fn active_releases_using_dimension(
+    dimension: &str,
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<Vec<DimensionActiveRelease>> {
+    let affected_views = {
+        let pool = state.db_pool.clone();
+        let org = organisation.to_string();
+        let app = application.to_string();
+        let dimension = dimension.to_string();
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            let views = release_views::table
+                .filter(app_id.eq(&app))
+                .filter(org_id.eq(&org))
+                .load::<ReleaseViewEntry>(&mut conn)
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to list release views: {}", e))
+                })?;
+
+            Ok(views
+                .into_iter()
+                .filter_map(|view| {
+                    let context = release_view::view_dimensions_to_context(&view.dimensions);
+                    context.contains_key(&dimension).then_some((view, context))
+                })
+                .collect::<Vec<_>>())
+        })?
+    };
+
+    if affected_views.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // One unfiltered listing, matched against each view's context here rather than asking
+    // Superposition to filter per view — that keeps this correct regardless of how context
+    // filtering behaves, and costs one call instead of one per view.
+    let experiments = crate::release::utils::list_experiments_by_context(
+        crate::release::types::ListExperimentsQuery {
+            superposition_org_id: state.env.superposition_org_id.clone(),
+            workspace_name: workspace_name.to_string(),
+            context: std::collections::HashMap::new(),
+            strict_mode: false,
+            page: None,
+            count: None,
+            all: true,
+            status: None,
+        },
+        state.clone(),
+    )
+    .await?;
+
+    let release_name = format!("{}-{}-release-exp", application, organisation);
+    // Already sorted newest-first by the listing, so the first match per view is its active release.
+    let releases: Vec<_> = experiments
+        .data()
+        .iter()
+        .filter(|exp| {
+            exp.name.contains(&release_name)
+                && exp.status != superposition_sdk::types::ExperimentStatusType::Discarded
+        })
+        .map(|exp| {
+            let context: std::collections::HashMap<String, String> = exp
+                .context
+                .iter()
+                .map(|(key, value)| {
+                    let value = crate::utils::document::document_to_json_value(value);
+                    (
+                        key.clone(),
+                        value.as_str().map(str::to_string).unwrap_or_default(),
+                    )
+                })
+                .collect();
+            (exp, context)
+        })
+        .collect();
+
+    Ok(affected_views
+        .into_iter()
+        .filter_map(|(view, view_context)| {
+            let view_context: std::collections::HashMap<String, String> = view_context
+                .into_iter()
+                .map(|(key, value)| (key, value.as_str().unwrap_or_default().to_string()))
+                .collect();
+
+            releases
+                .iter()
+                .find(|(_, context)| *context == view_context)
+                .map(|(exp, _)| {
+                    let experimental_variant = exp.variants.iter().find(|variant| {
+                        variant.variant_type == superposition_sdk::types::VariantType::Experimental
+                    });
+
+                    DimensionActiveRelease {
+                        release_id: exp.id.to_string(),
+                        view_id: view.id,
+                        view_name: view.name.clone(),
+                        dimensions: view.dimensions.clone(),
+                        status: exp.status.to_string(),
+                        package_version: crate::release::utils::extract_integer_from_experiment::<
+                            i64,
+                        >(
+                            &experimental_variant, "package.version"
+                        ) as i32,
+                    }
+                })
+        })
+        .collect())
+}
+
+#[authz(
+    resource = "dimension",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
+#[get("/{dimension_name}/active-releases")]
+async fn list_dimension_active_releases_api(
+    path: Path<String>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<DimensionActiveReleasesResponse>> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
+    let dimension = path.into_inner();
+
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        &state.redis_cache,
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+
+    let data = active_releases_using_dimension(
+        &dimension,
+        &organisation,
+        &application,
+        &workspace_name,
+        &state,
+    )
+    .await?;
+
+    Ok(Json(DimensionActiveReleasesResponse { dimension, data }))
+}
+
 #[authz(
     resource = "dimension",
     action = "delete",
@@ -349,6 +508,7 @@ async fn delete_dimension_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    let dimension = path.into_inner();
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -360,12 +520,35 @@ async fn delete_dimension_api(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
+    // Same check the delete dialog runs, enforced here too so a release created in between (or a
+    // caller that skipped the dialog) cannot strand a slice on a dimension that no longer exists.
+    let blocking = active_releases_using_dimension(
+        &dimension,
+        &organisation,
+        &application,
+        &workspace_name,
+        &state,
+    )
+    .await?;
+
+    if !blocking.is_empty() {
+        return Err(ABError::BadRequest(format!(
+            "{} release(s) still target this dimension ({}). Delete them from their release views first.",
+            blocking.len(),
+            blocking
+                .iter()
+                .map(|release| release.view_name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )));
+    }
+
     state
         .superposition_client
         .delete_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
-        .dimension(path.into_inner())
+        .dimension(dimension)
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;

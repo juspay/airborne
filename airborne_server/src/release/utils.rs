@@ -556,6 +556,58 @@ pub async fn resolve_config_document(
     Ok(resolved.config)
 }
 
+/// Rejects targeting that names a dimension the workspace no longer has. Superposition answers
+/// those with an opaque `No matching dimension (x) found`, and the usual way to hit it is cloning an
+/// old release whose dimension has since been deleted.
+pub async fn validate_dimensions_exist(
+    superposition_org_id: String,
+    dims: &HashMap<String, Value>,
+    state: web::Data<AppState>,
+    workspace: String,
+) -> airborne_types::Result<()> {
+    if dims.is_empty() {
+        return Ok(());
+    }
+
+    let existing = state
+        .superposition_client
+        .list_dimensions()
+        .org_id(superposition_org_id)
+        .workspace_id(workspace)
+        .send()
+        .await
+        .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;
+
+    let known: HashSet<String> = existing.data.into_iter().map(|d| d.dimension).collect();
+    let mut missing: Vec<&str> = dims
+        .keys()
+        .filter(|key| !known.contains(*key))
+        .map(String::as_str)
+        .collect();
+
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    missing.sort_unstable();
+    Err(ABError::BadRequest(format!(
+        "Targeting uses {} that no longer {}: {}. Remove {} from the targeting, or recreate {}.",
+        if missing.len() == 1 {
+            "a dimension"
+        } else {
+            "dimensions"
+        },
+        if missing.len() == 1 {
+            "exists"
+        } else {
+            "exist"
+        },
+        missing.join(", "),
+        if missing.len() == 1 { "it" } else { "them" },
+        if missing.len() == 1 { "it" } else { "them" },
+    )))
+}
+
 /// Overrides carried by a release variant: every resolved key except the build-tracking ones, which
 /// are not part of release experiments.
 pub fn config_document_to_overrides(

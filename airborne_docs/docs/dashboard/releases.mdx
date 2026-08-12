@@ -150,6 +150,7 @@ While a release is still in the `Created` state (not yet ramped), choose **Disca
 ### Clone and Edit
 
 - **Clone Release** opens the wizard pre-populated with this release's full configuration — timeouts, targeting, remote config, file priorities, resources, and package — so you can tweak and ship a variant. The cloned wizard's final button is **Create Release**.
+  - If the original targeted a [dimension](/docs/dashboard/dimensions) that has since been deleted, the Targeting step flags that rule and blocks you until you pick another dimension or remove the rule — a release cannot target a dimension that no longer exists.
 - **Edit** (available while `Created`) lets you adjust a release that hasn't rolled out yet. Note that **targeting cannot be changed when editing** — clone or create a new release to change who is targeted.
 
 :::caution

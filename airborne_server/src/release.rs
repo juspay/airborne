@@ -43,7 +43,7 @@ use superposition_provider::{AllFeatureProvider, SuperpositionAPIProvider};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
-mod types;
+pub mod types;
 pub mod utils;
 
 /// Every release experiment is named `<app>-<org>-release-exp`; a delete release adds this suffix.
@@ -493,6 +493,14 @@ async fn create_release(
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
+
+    utils::validate_dimensions_exist(
+        superposition_org_id_from_env.clone(),
+        &dimensions,
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?;
 
     if dimensions.is_empty() {
         ensure_no_pending_deletion(

@@ -121,6 +121,24 @@ pub struct DeleteReleaseViewResponse {
     pub success: bool,
 }
 
+/// The live release of one dimension slice that uses a given dimension — what has to be deleted
+/// before that dimension can go.
+#[derive(Serialize)]
+pub struct DimensionActiveRelease {
+    pub release_id: String,
+    pub view_id: Uuid,
+    pub view_name: String,
+    pub dimensions: Value,
+    pub status: String,
+    pub package_version: i32,
+}
+
+#[derive(Serialize)]
+pub struct DimensionActiveReleasesResponse {
+    pub dimension: String,
+    pub data: Vec<DimensionActiveRelease>,
+}
+
 #[derive(Serialize)]
 pub struct ListDimensionsResponse {
     pub total_pages: Option<i32>,

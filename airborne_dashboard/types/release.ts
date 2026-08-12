@@ -77,6 +77,8 @@ export interface ReleaseFormState {
 
   // Targeting (Step 2)
   targetingRules: TargetingRule[];
+  /** Rule dimensions that no longer exist in this app — a cloned release can carry deleted ones. */
+  unknownDimensions: string[];
 
   // Remote Config (Step 3)
   schemaFields: SchemaField[];
@@ -109,6 +111,7 @@ export interface ReleaseFormActions {
   addTargetingRule: () => void;
   removeTargetingRule: (index: number) => void;
   updateTargetingRule: (index: number, patch: Partial<TargetingRule>) => void;
+  setUnknownDimensions: (dimensions: string[]) => void;
 
   // Remote Config
   setSchemaFields: (fields: SchemaField[]) => void;
