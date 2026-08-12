@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::utils::{db::models::ReleaseViewEntry, release_view::ReleaseViewType};
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum DimensionSchema {
@@ -72,6 +74,8 @@ pub struct CreateReleaseViewRequest {
 pub struct ListReleaseViewsQuery {
     pub page: Option<i32>,
     pub count: Option<i32>,
+    /// Restrict the listing to `custom` or `auto_generated` views.
+    pub view_type: Option<ReleaseViewType>,
 }
 
 #[derive(Serialize)]
@@ -80,6 +84,19 @@ pub struct ReleaseView {
     pub name: String,
     pub dimensions: Value,
     pub created_at: DateTime<Utc>,
+    pub view_type: ReleaseViewType,
+}
+
+impl From<ReleaseViewEntry> for ReleaseView {
+    fn from(entry: ReleaseViewEntry) -> Self {
+        Self {
+            id: entry.id,
+            name: entry.name,
+            dimensions: entry.dimensions,
+            created_at: entry.created_at,
+            view_type: ReleaseViewType::from(entry.view_type.as_str()),
+        }
+    }
 }
 
 #[derive(Serialize)]

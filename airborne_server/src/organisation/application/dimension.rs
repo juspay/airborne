@@ -14,10 +14,13 @@ use crate::{
     utils::{
         db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
         document::{hashmap_to_json_value, schema_doc_to_hashmap, value_to_document},
+        release_view::ReleaseViewType,
     },
 };
 use diesel::prelude::*;
-use release_views::dsl::{app_id, created_at, dimensions as dimensions_col, id, name, org_id};
+use release_views::dsl::{
+    app_id, created_at, dimensions as dimensions_col, id, name, org_id, view_type as view_type_col,
+};
 use serde_json::Value;
 use types::*;
 use uuid::Uuid;
@@ -457,18 +460,20 @@ async fn create_release_view_api(
                 org_id.eq(organisation),
                 name.eq(req_name),
                 dimensions_col.eq(req_dimensions),
+                view_type_col.eq(ReleaseViewType::Custom.as_str()),
             ))
             .get_result::<ReleaseViewEntry>(&mut conn)
-            .map_err(|e| ABError::InternalServerError(format!("DB insert failed: {}", e)))?;
+            .map_err(|e| match e {
+                diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UniqueViolation,
+                    _,
+                ) => ABError::BadRequest("A view with this name already exists".to_string()),
+                other => ABError::InternalServerError(format!("DB insert failed: {}", other)),
+            })?;
         Ok(result)
     })?;
 
-    Ok(Json(ReleaseView {
-        id: created_view.id,
-        name: created_view.name,
-        dimensions: created_view.dimensions,
-        created_at: created_view.created_at,
-    }))
+    Ok(Json(created_view.into()))
 }
 
 #[authz(
@@ -492,20 +497,29 @@ async fn list_release_views_api(
     let page = query.page.unwrap_or(1).max(1);
     let count = query.count.unwrap_or(20);
     let offset = (page - 1) * count;
+    let type_filter = query.view_type;
     let pool = state.db_pool.clone();
 
     let (total_items, rows) = run_blocking!({
         let mut conn = pool.get()?;
 
-        let total_items: i64 = release_views::table
+        let mut count_query = release_views::table
             .filter(app_id.eq(&application))
             .filter(org_id.eq(&organisation))
-            .count()
-            .get_result(&mut conn)?;
+            .into_boxed();
+        let mut rows_query = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .into_boxed();
 
-        let rows = release_views::table
-            .filter(app_id.eq(&application))
-            .filter(org_id.eq(&organisation))
+        if let Some(view_type) = type_filter {
+            count_query = count_query.filter(view_type_col.eq(view_type.as_str()));
+            rows_query = rows_query.filter(view_type_col.eq(view_type.as_str()));
+        }
+
+        let total_items: i64 = count_query.count().get_result(&mut conn)?;
+
+        let rows = rows_query
             .order(created_at.desc())
             .offset(offset.into())
             .limit(count.into())
@@ -517,15 +531,7 @@ async fn list_release_views_api(
     let total_pages = ((total_items as f64) / (count as f64)).ceil() as i64;
 
     Ok(Json(ListReleaseViewsResponse {
-        data: rows
-            .into_iter()
-            .map(|row| ReleaseView {
-                id: row.id,
-                name: row.name,
-                dimensions: row.dimensions,
-                created_at: row.created_at,
-            })
-            .collect(),
+        data: rows.into_iter().map(ReleaseView::from).collect(),
         total_items: Some(total_items),
         total_pages: Some(total_pages),
     }))
@@ -562,21 +568,12 @@ async fn get_release_view_api(
             .filter(org_id.eq(&organisation))
             .filter(id.eq(&view_id))
             .first::<ReleaseViewEntry>(&mut conn)
-            .map_err(|e| {
-                if e.to_string().contains("NotFound") {
-                    ABError::NotFound("View not found".to_string())
-                } else {
-                    ABError::InternalServerError(format!("Failed to fetch view: {}", e))
-                }
-            })
+            .optional()
+            .map_err(|e| ABError::InternalServerError(format!("Failed to fetch view: {}", e)))?
+            .ok_or_else(|| ABError::NotFound("View not found".to_string()))
     })?;
 
-    Ok(Json(ReleaseView {
-        id: view.id,
-        name: view.name,
-        dimensions: view.dimensions,
-        created_at: view.created_at,
-    }))
+    Ok(Json(view.into()))
 }
 
 #[authz(
@@ -661,6 +658,24 @@ async fn update_release_view_api(
 
     let updated_view = run_blocking!({
         let mut conn = pool.get()?;
+
+        let existing = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .filter(id.eq(&view_id))
+            .first::<ReleaseViewEntry>(&mut conn)
+            .optional()
+            .map_err(|e| ABError::InternalServerError(format!("Failed to fetch view: {}", e)))?
+            .ok_or_else(|| ABError::NotFound("View not found".to_string()))?;
+
+        // Auto-generated views mirror a release's dimensions, so editing them would make the name
+        // and filter lie about where they came from. Users delete them or create a custom view.
+        if ReleaseViewType::from(existing.view_type.as_str()) == ReleaseViewType::AutoGenerated {
+            return Err(ABError::BadRequest(
+                "Auto-generated views cannot be edited. Create a custom view instead.".to_string(),
+            ));
+        }
+
         let result = diesel::update(
             release_views::table.filter(
                 app_id
@@ -671,22 +686,18 @@ async fn update_release_view_api(
         )
         .set((dimensions_col.eq(&req_dimensions), name.eq(&req_name)))
         .get_result::<ReleaseViewEntry>(&mut conn)
-        .map_err(|e| {
-            if e.to_string().contains("NotFound") {
-                ABError::NotFound("View not found".to_string())
-            } else {
-                ABError::InternalServerError(format!("Failed to update view: {}", e))
-            }
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => ABError::NotFound("View not found".to_string()),
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                _,
+            ) => ABError::BadRequest("A view with this name already exists".to_string()),
+            other => ABError::InternalServerError(format!("Failed to update view: {}", other)),
         })?;
         Ok(result)
     })?;
 
-    Ok(Json(ReleaseView {
-        id: updated_view.id,
-        name: updated_view.name,
-        dimensions: updated_view.dimensions,
-        created_at: updated_view.created_at,
-    }))
+    Ok(Json(updated_view.into()))
 }
 
 #[authz(

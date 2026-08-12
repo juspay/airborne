@@ -535,6 +535,21 @@ async fn create_release(
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    // Best-effort: make this release's dimension slice browsable as a view. The release already
+    // exists at this point, so a failure here must not fail the request.
+    match crate::utils::release_view::ensure_auto_generated_view(
+        state.db_pool.clone(),
+        organisation.clone(),
+        application.clone(),
+        &dimensions,
+    )
+    .await
+    {
+        Ok(Some(view)) => info!("Created auto-generated release view '{}'", view.name),
+        Ok(None) => {}
+        Err(e) => info!("Failed to create auto-generated release view: {:?}", e),
+    }
+
     let now = Utc::now();
     let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
     let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {

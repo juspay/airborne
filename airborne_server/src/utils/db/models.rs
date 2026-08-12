@@ -153,6 +153,8 @@ pub struct ReleaseViewEntry {
     pub name: String,
     pub dimensions: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    /// `custom` (user-created) or `auto_generated`; see [`crate::utils::release_view`].
+    pub view_type: String,
 }
 
 #[derive(Queryable, Insertable, Debug, Selectable)]

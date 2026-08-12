@@ -143,6 +143,7 @@ pub mod hyperotaserver {
             name -> Text,
             dimensions -> Jsonb,
             created_at -> Timestamptz,
+            view_type -> Text,
         }
     }
 
