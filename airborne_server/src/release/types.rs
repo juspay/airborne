@@ -65,6 +65,8 @@ pub struct CreateReleaseResponse {
     pub resources: Vec<ServeFile>,
     pub experiment: Option<ReleaseExperiment>,
     pub dimensions: HashMap<String, serde_json::Value>,
+    /// True for a release that reverts its dimension slice to the default config.
+    pub is_delete_release: bool,
 }
 
 #[derive(Serialize)]
@@ -76,6 +78,16 @@ pub struct GetReleaseResponse {
     pub resources: Vec<Resource>,
     pub experiment: Option<ReleaseExperiment>,
     pub dimensions: HashMap<String, serde_json::Value>,
+    /// True for a release that reverts its dimension slice to the default config.
+    pub is_delete_release: bool,
+}
+
+#[derive(Serialize)]
+pub struct CreateDeleteReleaseResponse {
+    pub release_id: String,
+    pub view_id: uuid::Uuid,
+    pub dimensions: HashMap<String, serde_json::Value>,
+    pub status: String,
 }
 
 #[derive(Serialize)]

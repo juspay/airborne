@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter, Plus, Package } from "lucide-react";
+import { ArrowRight, Eye, Filter, Plus, Package } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
@@ -38,6 +38,8 @@ export type ApiRelease = {
     status: string;
     traffic_percentage: number;
   };
+  /** True for a release that reverts its dimension slice to the default configuration. */
+  is_delete_release?: boolean;
 };
 
 enum StatusFilter {
@@ -191,6 +193,29 @@ export default function ReleasesPage() {
         )}
       </div>
 
+      <Card className="mb-6 border-primary/30 bg-primary/5">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Eye className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">See what each audience is running</p>
+              <p className="text-sm text-muted-foreground">
+                Every set of dimensions you release to gets its own view. Release Views shows the active release for
+                each slice of your users — and is where you delete one.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" asChild className="shrink-0 gap-1.5">
+            <Link
+              href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/views?view_type=auto_generated`}
+            >
+              Release Views
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="flex items-center gap-4">
@@ -281,13 +306,14 @@ export default function ReleasesPage() {
                         <div className="block w-full h-full">{r.package?.version ?? "—"} </div>
                       </TableCell>
                       <TableCell>
-                        <div className="block w-full h-full">
+                        <div className="flex w-full h-full items-center gap-1.5">
                           {r.experiment?.status !== "INPROGRESS" && (
                             <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
                           )}
                           {r.experiment?.status === "INPROGRESS" && (
                             <Badge variant="outline">Ramping to {r.experiment?.traffic_percentage || "—"}%</Badge>
                           )}
+                          {r.is_delete_release && <Badge variant="secondary">Deletion</Badge>}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">

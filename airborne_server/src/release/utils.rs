@@ -524,6 +524,55 @@ pub async fn check_non_concluded_releases(
     Ok(non_concluded_exists)
 }
 
+/// Resolves the config Superposition currently serves for `dims` (an empty map resolves the
+/// default, dimension-less config). `build_overrides` inlines the same call but degrades to `None`
+/// on failure; callers of this one need the document or an error.
+pub async fn resolve_config_document(
+    superposition_org_id: String,
+    dims: &HashMap<String, Value>,
+    state: web::Data<AppState>,
+    workspace: String,
+) -> airborne_types::Result<Document> {
+    let builder = dims.iter().fold(
+        state
+            .superposition_client
+            .get_resolved_config()
+            .workspace_id(workspace)
+            .org_id(superposition_org_id)
+            .context("variantIds", vec![].into()),
+        |builder, (key, value)| {
+            builder.context(
+                key.clone(),
+                Document::String(value.as_str().unwrap_or("").to_string()),
+            )
+        },
+    );
+
+    let resolved = builder.send().await.map_err(|e| {
+        info!("Failed to get resolved config for {:?}: {:?}", dims, e);
+        ABError::InternalServerError("Failed to resolve config from Superposition".to_string())
+    })?;
+
+    Ok(resolved.config)
+}
+
+/// Overrides carried by a release variant: every resolved key except the build-tracking ones, which
+/// are not part of release experiments.
+pub fn config_document_to_overrides(
+    config: &Document,
+) -> airborne_types::Result<HashMap<String, Document>> {
+    match config {
+        Document::Object(obj) => Ok(obj
+            .iter()
+            .filter(|(key, _)| !key.starts_with("build."))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect()),
+        _ => Err(ABError::InternalServerError(
+            "Resolved config is not an object".to_string(),
+        )),
+    }
+}
+
 pub async fn build_overrides(
     req: &Json<CreateReleaseRequest>,
     superposition_org_id: String,

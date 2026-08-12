@@ -28,7 +28,8 @@ use crate::utils::db::{models::ReleaseViewEntry, schema::hyperotaserver::release
 use crate::{run_blocking, types::ABError};
 
 use release_views::dsl::{
-    app_id, dimensions as dimensions_col, id, name, org_id, view_type as view_type_col,
+    app_id, dimensions as dimensions_col, id, name, org_id,
+    pending_delete_release_id as pending_delete_col, view_type as view_type_col,
 };
 
 /// Name given to the auto-generated view of a release that targets no dimensions.
@@ -176,6 +177,94 @@ pub async fn ensure_auto_generated_view(
     })
 }
 
+/// Inverse of [`view_dimensions_json`] — turns a stored filter back into a context map usable as a
+/// Superposition experiment context. Values are strings because that is how a view stores them; the
+/// only dimension schema Airborne supports today is `string`, so nothing is lost.
+pub fn view_dimensions_to_context(dimensions: &Value) -> HashMap<String, Value> {
+    fingerprint(dimensions)
+        .into_iter()
+        .map(|(key, value)| (key, Value::String(value)))
+        .collect()
+}
+
+/// Records that `release_id` is the delete release that will retire this view once it concludes.
+pub async fn mark_delete_release_pending(
+    pool: DbPool,
+    view_id: Uuid,
+    release_id: String,
+) -> airborne_types::Result<()> {
+    run_blocking!({
+        let mut conn = pool.get()?;
+        diesel::update(release_views::table.filter(id.eq(&view_id)))
+            .set(pending_delete_col.eq(Some(&release_id)))
+            .execute(&mut conn)
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to mark pending deletion: {}", e))
+            })?;
+        Ok(())
+    })
+}
+
+/// Resolves the view waiting on `release_id`: removes it when the deletion actually took effect
+/// (the release concluded on its experimental variant), otherwise just clears the marker so the
+/// slice can be deleted again later. No-op when no view is waiting on that release.
+pub async fn settle_pending_delete(
+    pool: DbPool,
+    organisation: String,
+    application: String,
+    release_id: String,
+    remove_view: bool,
+) -> airborne_types::Result<()> {
+    run_blocking!({
+        let mut conn = pool.get()?;
+        let waiting = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .filter(pending_delete_col.eq(&release_id));
+
+        if remove_view {
+            diesel::delete(waiting).execute(&mut conn).map_err(|e| {
+                ABError::InternalServerError(format!("Failed to remove release view: {}", e))
+            })?;
+        } else {
+            diesel::update(waiting)
+                .set(pending_delete_col.eq(None::<String>))
+                .execute(&mut conn)
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to clear pending deletion: {}", e))
+                })?;
+        }
+        Ok(())
+    })
+}
+
+/// `(view id, view name, release id)` for every view with a delete release in flight.
+pub async fn pending_delete_releases(
+    pool: DbPool,
+    organisation: String,
+    application: String,
+) -> airborne_types::Result<Vec<(Uuid, String, String)>> {
+    run_blocking!({
+        let mut conn = pool.get()?;
+        let rows = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .filter(pending_delete_col.is_not_null())
+            .select((id, name, pending_delete_col))
+            .load::<(Uuid, String, Option<String>)>(&mut conn)
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to list pending deletions: {}", e))
+            })?;
+
+        Ok(rows
+            .into_iter()
+            .filter_map(|(view_id, view_name, release_id)| {
+                release_id.map(|release_id| (view_id, view_name, release_id))
+            })
+            .collect())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,6 +317,17 @@ mod tests {
         ]);
 
         assert_eq!(fingerprint(&generated), fingerprint(&user_created));
+    }
+
+    #[test]
+    fn context_round_trips_through_the_stored_filter() {
+        let original = dims(&[
+            ("os", Value::String("android".into())),
+            ("city", Value::String("blr".into())),
+        ]);
+        let stored = view_dimensions_json(&canonicalise(&original));
+
+        assert_eq!(view_dimensions_to_context(&stored), original);
     }
 
     #[test]

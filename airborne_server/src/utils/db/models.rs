@@ -155,6 +155,8 @@ pub struct ReleaseViewEntry {
     pub created_at: DateTime<Utc>,
     /// `custom` (user-created) or `auto_generated`; see [`crate::utils::release_view`].
     pub view_type: String,
+    /// Release that will retire this view once it concludes on its experimental variant.
+    pub pending_delete_release_id: Option<String>,
 }
 
 #[derive(Queryable, Insertable, Debug, Selectable)]

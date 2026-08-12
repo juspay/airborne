@@ -106,6 +106,8 @@ export interface ReleasePayload {
   experiment: ReleaseExperiment;
   // If your dimensions can be richer, widen this union as needed
   dimensions: Record<string, string | number | boolean | null>;
+  /** True for a release that reverts its dimension slice to the default configuration. */
+  is_delete_release?: boolean;
 }
 
 function toServeReleaseConfig(payload: ReleasePayload): ServeReleaseConfig {
@@ -333,9 +335,14 @@ export default function ReleaseDetailPage() {
                   <Badge variant="secondary" className={getStatusColor(release.experiment.status || "")}>
                     {release.experiment.status || "Unknown"}
                   </Badge>
+                  {release.is_delete_release && <Badge variant="outline">Deletion</Badge>}
                 </div>
               </div>
-              <p className="text-muted-foreground">{`Package version ${release.package?.version || "N/A"}`}</p>
+              <p className="text-muted-foreground">
+                {release.is_delete_release
+                  ? "Reverts these dimensions to the default configuration. Concluding it removes the matching view."
+                  : `Package version ${release.package?.version || "N/A"}`}
+              </p>
             </div>
             <div className="flex gap-2">
               {release.experiment.status === "CREATED" && canUpdateRelease && (

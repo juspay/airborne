@@ -85,6 +85,9 @@ pub struct ReleaseView {
     pub dimensions: Value,
     pub created_at: DateTime<Utc>,
     pub view_type: ReleaseViewType,
+    /// Set while a delete release for this slice is in flight; the view is removed once that
+    /// release concludes on its experimental variant.
+    pub pending_delete_release_id: Option<String>,
 }
 
 impl From<ReleaseViewEntry> for ReleaseView {
@@ -95,6 +98,7 @@ impl From<ReleaseViewEntry> for ReleaseView {
             dimensions: entry.dimensions,
             created_at: entry.created_at,
             view_type: ReleaseViewType::from(entry.view_type.as_str()),
+            pending_delete_release_id: entry.pending_delete_release_id,
         }
     }
 }

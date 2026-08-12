@@ -7,7 +7,7 @@ import Screenshot from '@site/src/components/Screenshot';
 
 A **release** ships a [package](/docs/dashboard/packages) version to your users over the air. Releases are the heart of Airborne: you configure one in a six-step wizard, optionally target it at a slice of users, then roll it out gradually as an experiment — ramping traffic up, watching the metrics, and concluding when you are confident.
 
-<Screenshot name="releases-list" caption="The Releases page lists every release with its package, status, and creation time." />
+<Screenshot name="releases-list" caption="The Releases page lists every release with its package, status, and creation time, above a link through to Release Views." />
 
 ## The Releases list
 
@@ -21,9 +21,11 @@ Each row shows a release's `ID`, its `Package` version, its `Status`, and when i
 | **Concluded** | Rolled out to 100% and finalised. |
 | **Discarded** | Abandoned before or during rollout. |
 
-A release that is ramping shows its current traffic in the status — for example `Ramping to 25%`.
+A release that is ramping shows its current traffic in the status — for example `Ramping to 25%`. Releases created to retire a targeted slice also carry a **Deletion** badge — see [Deletion releases](#deletion-releases).
 
 To start a new one, choose **New Release**.
+
+This list is ordered by time, which answers "what did we ship?" but not "what is each audience running right now?". For that, the banner at the top links to **Release Views** — filtered to the auto-generated views, one per dimension slice you have released to. See [Views](/docs/dashboard/views).
 
 :::tip
 For a full end-to-end walkthrough — files, package, then a targeted release — follow the [Create & target a release guide](/docs/guides/create-and-target-a-release).
@@ -152,4 +154,20 @@ While a release is still in the `Created` state (not yet ramped), choose **Disca
 
 :::caution
 **Conclude**, **Revert**, and **Discard** are final and cannot be undone. Ramp gradually and watch the **Errors** and **Affected Users** metrics before concluding.
+:::
+
+## Deletion releases
+
+A targeted release keeps serving its slice of users forever — there is no "unship" button. To retire one, you delete it from its [View](/docs/dashboard/views), and Airborne creates a **deletion release**: an ordinary release targeted at the same dimensions, whose experimental arm previews **the default configuration** — whatever your global (untargeted) release ships. Rolling a deletion out is therefore as gradual and as reversible as rolling anything else out.
+
+These are marked with a **Deletion** badge in the Releases list and on the detail page, and they behave like any other release:
+
+- **Ramp** and **Conclude** it to complete the deletion. Concluding **removes the slice's configuration outright**, so those dimensions resolve like any untargeted user from then on — and keep tracking the default as you ship future global releases. The auto-generated View for that slice disappears.
+- **Revert** (conclude on control) cancels the deletion — the slice keeps its own configuration and its View stays.
+- **Discard** it before ramping to call the whole thing off.
+
+Your dimensions themselves are untouched, so a later targeted release can take that slice over again.
+
+:::caution[A deletion release blocks global releases]
+While a deletion is ramping, the users in its experimental arm are being shown the default as it looked when the deletion was created. To stop that preview drifting, you cannot create a global (untargeted) release while a deletion is pending — conclude or discard the deletion first. The same applies in reverse: you cannot start a deletion while a global release is in flight.
 :::
