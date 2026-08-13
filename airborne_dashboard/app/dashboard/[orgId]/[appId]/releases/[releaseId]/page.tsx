@@ -108,6 +108,8 @@ export interface ReleasePayload {
   dimensions: Record<string, string | number | boolean | null>;
   /** True for a release that reverts its dimension slice to the default configuration. */
   is_delete_release?: boolean;
+  /** True when the release was concluded on its control variant, keeping what was already live. */
+  is_reverted?: boolean;
 }
 
 function toServeReleaseConfig(payload: ReleasePayload): ServeReleaseConfig {
@@ -335,6 +337,7 @@ export default function ReleaseDetailPage() {
                   <Badge variant="secondary" className={getStatusColor(release.experiment.status || "")}>
                     {release.experiment.status || "Unknown"}
                   </Badge>
+                  {release.is_reverted && <Badge variant="outline">Reverted</Badge>}
                   {release.is_delete_release && <Badge variant="outline">Deletion</Badge>}
                 </div>
               </div>
@@ -343,6 +346,21 @@ export default function ReleaseDetailPage() {
                   ? "Reverts these dimensions to the default configuration. Concluding it removes the matching view."
                   : `Package version ${release.package?.version || "N/A"}`}
               </p>
+              {/* A reverted targeted release leaves that slice on its own configuration — the one
+                  consequence that is not obvious from the status alone. */}
+              {release.is_reverted && Object.keys(release.dimensions || {}).length > 0 && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Concluded on its control variant, so these dimensions kept their own configuration and no longer
+                  follow your global releases. To put them back, use <strong>Delete release</strong> on their{" "}
+                  <Link
+                    href={`/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/views?view_type=auto_generated`}
+                    className="underline underline-offset-2"
+                  >
+                    release view
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               {release.experiment.status === "CREATED" && canUpdateRelease && (
@@ -387,7 +405,9 @@ export default function ReleaseDetailPage() {
                 </Dialog>
               )}
 
-              {canUpdateRelease && (
+              {/* A deletion release only makes sense for the one slice it retires — cloning it
+                  would ship a copy of the default config as an ordinary release. */}
+              {canUpdateRelease && !release.is_delete_release && (
                 <Button variant="outline" onClick={handleCloneRelease} disabled={isCloning} size="sm">
                   <Copy className="h-4 w-4 mr-2" />
                   {isCloning ? "Cloning..." : "Clone Release"}
@@ -464,13 +484,49 @@ export default function ReleaseDetailPage() {
                     </DialogTrigger>
 
                     {/* Dialog content */}
-                    <DialogContent>
+                    <DialogContent className="sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>Confirm Revert</DialogTitle>
                         <DialogDescription>
-                          Are you sure you want to revert this release? This action cannot be undone.
+                          Reverting concludes this release on its control variant, keeping what these users have today.
+                          This action cannot be undone.
                         </DialogDescription>
                       </DialogHeader>
+
+                      {/* Concluding on control writes the current values as this slice's own
+                          configuration, so it stops following the default. See the deletion flow. */}
+                      {Object.keys(release.dimensions || {}).length > 0 && (
+                        <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="font-medium">These users will stop following your global releases.</p>
+                            <p>
+                              Reverting keeps this release&apos;s targeting: the dimensions below get their own
+                              configuration, frozen as it is today. Future global releases will not reach them.
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 py-1">
+                              {Object.entries(release.dimensions || {}).map(([key, value]) => (
+                                <Badge key={key} variant="secondary" className="px-2 py-0.5 text-xs">
+                                  <span className="font-medium">{key}:</span>
+                                  <span className="ml-1">{String(value)}</span>
+                                </Badge>
+                              ))}
+                            </div>
+                            <p>
+                              To put them back on your global releases later, use <strong>Delete release</strong> on
+                              this slice&apos;s view in{" "}
+                              <Link
+                                href={`/dashboard/${encodeURIComponent(orgId)}/${encodeURIComponent(appId)}/views?view_type=auto_generated`}
+                                className="underline underline-offset-2"
+                              >
+                                Release Views
+                              </Link>
+                              .
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setIsRevertDialogOpen(false)}>
                           Cancel

@@ -40,6 +40,8 @@ export type ApiRelease = {
   };
   /** True for a release that reverts its dimension slice to the default configuration. */
   is_delete_release?: boolean;
+  /** True when the release was concluded on its control variant, keeping what was already live. */
+  is_reverted?: boolean;
 };
 
 enum StatusFilter {
@@ -313,6 +315,7 @@ export default function ReleasesPage() {
                           {r.experiment?.status === "INPROGRESS" && (
                             <Badge variant="outline">Ramping to {r.experiment?.traffic_percentage || "—"}%</Badge>
                           )}
+                          {r.is_reverted && <Badge variant="secondary">Reverted</Badge>}
                           {r.is_delete_release && <Badge variant="secondary">Deletion</Badge>}
                         </div>
                       </TableCell>

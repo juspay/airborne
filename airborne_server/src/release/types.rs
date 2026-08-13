@@ -67,6 +67,9 @@ pub struct CreateReleaseResponse {
     pub dimensions: HashMap<String, serde_json::Value>,
     /// True for a release that reverts its dimension slice to the default config.
     pub is_delete_release: bool,
+    /// True when the release was concluded on its control variant, keeping what was already live
+    /// instead of rolling the new configuration out.
+    pub is_reverted: bool,
 }
 
 #[derive(Serialize)]
@@ -80,6 +83,9 @@ pub struct GetReleaseResponse {
     pub dimensions: HashMap<String, serde_json::Value>,
     /// True for a release that reverts its dimension slice to the default config.
     pub is_delete_release: bool,
+    /// True when the release was concluded on its control variant, keeping what was already live
+    /// instead of rolling the new configuration out.
+    pub is_reverted: bool,
 }
 
 #[derive(Serialize)]
@@ -198,6 +204,10 @@ pub struct BuildOverrides {
 }
 
 pub struct ListExperimentsQuery {
+    /// Substring the experiment name must contain. Pushed down to Superposition so paging and
+    /// `total_items` describe the filtered set — filtering after the fact drops rows from each page
+    /// and leaves the total counting experiments the caller never sees.
+    pub experiment_name: Option<String>,
     pub superposition_org_id: String,
     pub workspace_name: String,
     pub context: HashMap<String, Value>,

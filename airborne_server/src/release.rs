@@ -46,14 +46,31 @@ use superposition_sdk::types::VariantType::Experimental;
 pub mod types;
 pub mod utils;
 
-/// Every release experiment is named `<app>-<org>-release-exp`; a delete release adds this suffix.
-/// `list_releases` matches on the shared `-release-exp` infix, so the suffix must stay at the end —
-/// prefixing it (`...-delete-release-exp`) would hide delete releases from the Releases page and
-/// leave them impossible to ramp or conclude.
+/// Every release experiment is named `<app>-<org>-release-exp`; a delete release adds this suffix
+/// so it is recognisable in Superposition's own tooling.
 const DELETE_RELEASE_NAME_SUFFIX: &str = "-delete";
 
-fn is_delete_release_name(name: &str) -> bool {
-    name.ends_with(DELETE_RELEASE_NAME_SUFFIX)
+/// A deletion is a DELETE_OVERRIDES experiment: concluding it drops the slice's overrides instead
+/// of writing new ones. That type is what produces the behaviour, so it is also what identifies it.
+fn is_delete_experiment(experiment_type: &superposition_sdk::types::ExperimentType) -> bool {
+    *experiment_type == superposition_sdk::types::ExperimentType::DeleteOverrides
+}
+
+/// Whether a release was reverted: concluded on its control variant, so the pre-release
+/// configuration was kept rather than the new one being rolled out. Superposition records which
+/// variant won, so this needs no bookkeeping of ours and holds for releases concluded long ago.
+fn is_reverted_conclusion(
+    status: &ExperimentStatusType,
+    variants: &[superposition_sdk::types::Variant],
+    chosen_variant: Option<&str>,
+) -> bool {
+    *status == ExperimentStatusType::Concluded
+        && chosen_variant.is_some_and(|chosen| {
+            variants.iter().any(|variant| {
+                variant.id == chosen
+                    && variant.variant_type == superposition_sdk::types::VariantType::Control
+            })
+        })
 }
 
 fn is_experimental_variant(
@@ -409,7 +426,12 @@ async fn get_release(
 
     let resp = GetReleaseResponse {
         id: release_key.clone(),
-        is_delete_release: is_delete_release_name(&exp_details.name),
+        is_delete_release: is_delete_experiment(&exp_details.experiment_type),
+        is_reverted: is_reverted_conclusion(
+            &exp_details.status,
+            &exp_details.variants,
+            exp_details.chosen_variant.as_deref(),
+        ),
         created_at: DateTime::parse_from_rfc3339(&utils::dt(&exp_details.created_at))
             .map(|dt| dt.with_timezone(&Utc))
             .map_err(|_| ABError::InternalServerError("Failed to parse created_at".to_string()))?,
@@ -685,7 +707,8 @@ async fn create_release(
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
         created_at: now,
-        is_delete_release: false,
+        is_delete_release: is_delete_experiment(&created_experiment_response.experiment_type),
+        is_reverted: false,
         config: Config {
             boot_timeout: req.config.boot_timeout as u32,
             release_config_timeout: req.config.release_config_timeout as u32,
@@ -824,6 +847,9 @@ async fn list_releases(
         count: None,
         all: false,
         status,
+        // Superposition applies this before paging, so a page cannot come back short and
+        // `total_items` counts releases rather than every experiment in the workspace.
+        experiment_name: Some(format!("{}-{}-release-exp", application, organisation)),
     };
 
     match *pagination_query {
@@ -838,15 +864,7 @@ async fn list_releases(
 
     let experiments_list = utils::list_experiments_by_context(query, state.clone()).await?;
 
-    let experiments = experiments_list.data();
-
-    let release_experiments: Vec<_> = experiments
-        .iter()
-        .filter(|exp| {
-            exp.name
-                .contains(&format!("{}-{}-release-exp", application, organisation))
-        })
-        .collect();
+    let release_experiments = experiments_list.data();
 
     let mut releases = Vec::new();
 
@@ -1041,7 +1059,12 @@ async fn list_releases(
         let release_response = CreateReleaseResponse {
             id: experiment.id.to_string(),
             created_at,
-            is_delete_release: is_delete_release_name(&experiment.name),
+            is_delete_release: is_delete_experiment(&experiment.experiment_type),
+            is_reverted: is_reverted_conclusion(
+                &experiment.status,
+                &experiment.variants,
+                experiment.chosen_variant.as_deref(),
+            ),
             config: Config {
                 boot_timeout: rc_boot_timeout as u32,
                 release_config_timeout: rc_release_config_timeout as u32,
@@ -1178,6 +1201,20 @@ async fn delete_release_for_view(
         ));
     }
 
+    if !utils::slice_has_override(
+        superposition_org_id_from_env.clone(),
+        &dimensions,
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "These dimensions have no configuration of their own, so there is nothing to delete"
+                .to_string(),
+        ));
+    }
+
     let control_overrides = utils::config_document_to_overrides(
         &utils::resolve_config_document(
             superposition_org_id_from_env.clone(),
@@ -1197,13 +1234,6 @@ async fn delete_release_for_view(
         )
         .await?,
     )?;
-
-    if control_overrides == experimental_overrides {
-        return Err(ABError::BadRequest(
-            "These dimensions already resolve to the default config, so there is nothing to delete"
-                .to_string(),
-        ));
-    }
 
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
@@ -2003,7 +2033,9 @@ async fn update_release(
     Ok(Json(CreateReleaseResponse {
         id: release_id.clone(),
         created_at,
-        is_delete_release: is_delete_release_name(&updated_experiment_response.name),
+        is_delete_release: is_delete_experiment(&updated_experiment_response.experiment_type),
+        // An update is only possible while CREATED, so nothing has been concluded yet.
+        is_reverted: false,
         config: Config {
             boot_timeout: req.config.boot_timeout as u32,
             release_config_timeout: req.config.release_config_timeout as u32,

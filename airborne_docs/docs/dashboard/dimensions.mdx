@@ -48,6 +48,8 @@ Choose the **delete** icon in a dimension's **Actions** column. Because releases
 - **Something still targets it** — the dialog lists the live release for each slice using the dimension: one per [release view](/docs/dashboard/views), which is the release currently serving those users. Deleting is blocked until they are gone. Follow the links to each release, or **Go to Release Views**, and [delete the release](/docs/dashboard/views#deleting-a-release-from-a-view) for each slice. Once a deletion concludes, its view disappears and the dimension is one step closer to being free.
 - **Nothing targets it** — the dialog says so, and **Delete dimension** removes it. Existing releases are untouched; the dimension simply stops being available for targeting.
 
+`variantIds` has no delete action: it belongs to Superposition, which resolves every release's variants through it, so removing it would break targeting for the whole application. The API rejects it too.
+
 :::note
 The same check runs on the server, so a dimension cannot be deleted out from under a live release even by calling the API directly.
 :::

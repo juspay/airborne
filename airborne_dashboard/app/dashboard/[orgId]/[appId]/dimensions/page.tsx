@@ -35,6 +35,10 @@ const PAGE_AUTHZ = definePagePermissions({
   delete_dimension: permission("dimension", "delete", "app"),
 });
 
+/** Superposition's own dimension — the experimentation module targets variants through it, so it
+ * is not ours to delete. */
+const RESERVED_DIMENSIONS = new Set(["variantIds"]);
+
 export type Dimension = {
   dimension: string;
   position: number;
@@ -391,7 +395,7 @@ export default function DimensionsPage() {
                           </Button>
                         </Link>
                       )}
-                      {canDeleteDimensions && (
+                      {canDeleteDimensions && !RESERVED_DIMENSIONS.has(d.dimension) && (
                         <DeleteDimension
                           dimension={d.dimension}
                           onDimensionDeleted={(name) => {

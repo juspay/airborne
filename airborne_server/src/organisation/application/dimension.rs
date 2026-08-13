@@ -28,6 +28,10 @@ use uuid::Uuid;
 mod cohort;
 mod types;
 
+/// Dimensions Superposition owns rather than the app: the experimentation module resolves every
+/// variant through `variantIds`, so deleting it would break variant targeting workspace-wide.
+const RESERVED_DIMENSIONS: [&str; 1] = ["variantIds"];
+
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_dimension_api)
@@ -375,8 +379,8 @@ async fn active_releases_using_dimension(
         return Ok(vec![]);
     }
 
-    // One unfiltered listing, matched against each view's context here rather than asking
-    // Superposition to filter per view — that keeps this correct regardless of how context
+    // One listing of this app's releases, matched against each view's context here rather than
+    // asking Superposition to filter per view — that keeps this correct regardless of how context
     // filtering behaves, and costs one call instead of one per view.
     let experiments = crate::release::utils::list_experiments_by_context(
         crate::release::types::ListExperimentsQuery {
@@ -388,20 +392,17 @@ async fn active_releases_using_dimension(
             count: None,
             all: true,
             status: None,
+            experiment_name: Some(format!("{}-{}-release-exp", application, organisation)),
         },
         state.clone(),
     )
     .await?;
 
-    let release_name = format!("{}-{}-release-exp", application, organisation);
     // Already sorted newest-first by the listing, so the first match per view is its active release.
     let releases: Vec<_> = experiments
         .data()
         .iter()
-        .filter(|exp| {
-            exp.name.contains(&release_name)
-                && exp.status != superposition_sdk::types::ExperimentStatusType::Discarded
-        })
+        .filter(|exp| exp.status != superposition_sdk::types::ExperimentStatusType::Discarded)
         .map(|exp| {
             let context: std::collections::HashMap<String, String> = exp
                 .context
@@ -509,6 +510,13 @@ async fn delete_dimension_api(
         auth_response.application.clone(),
     )?;
     let dimension = path.into_inner();
+
+    if RESERVED_DIMENSIONS.contains(&dimension.as_str()) {
+        return Err(ABError::BadRequest(format!(
+            "'{}' is an internal dimension and cannot be deleted",
+            dimension
+        )));
+    }
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(

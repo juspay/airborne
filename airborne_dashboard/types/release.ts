@@ -170,4 +170,6 @@ export interface ApiReleaseData {
   };
   dimensions?: Record<string, string | string[]>;
   resources: Array<{ file_id: string }>;
+  /** Deletion releases retire one slice's targeting and cannot be cloned. */
+  is_delete_release?: boolean;
 }

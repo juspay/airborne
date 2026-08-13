@@ -11,10 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
@@ -24,14 +21,12 @@ use diesel::{
     sql_query,
     sql_types::{Array, Integer, Text},
 };
-use http::{uri::PathAndQuery, Uri};
 use log::{debug, info};
 use serde_json::Value;
 use superposition_sdk::{
     operation::list_experiment::ListExperimentOutput,
     types::{ExperimentSortOn, SortBy, Variant, VariantType},
 };
-use url::form_urlencoded;
 
 use crate::{
     file::utils::parse_file_key,
@@ -41,6 +36,7 @@ use crate::{
     types::{ABError, AppState},
     utils::db::{models::FileEntry, DbPool},
     utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
+    utils::document::value_to_plain_string,
     utils::redis::RedisCache,
 };
 
@@ -509,6 +505,8 @@ pub async fn check_non_concluded_releases(
             count: None,
             all: true,
             status: None,
+            // Any in-flight experiment on these dimensions conflicts, not just ours.
+            experiment_name: None,
         },
         state.clone(),
     )
@@ -554,6 +552,38 @@ pub async fn resolve_config_document(
     })?;
 
     Ok(resolved.config)
+}
+
+/// Whether Superposition holds an override for exactly this dimension set.
+pub async fn slice_has_override(
+    superposition_org_id: String,
+    dims: &HashMap<String, Value>,
+    state: web::Data<AppState>,
+    workspace: String,
+) -> airborne_types::Result<bool> {
+    let mut request = state
+        .superposition_client
+        .list_contexts()
+        .org_id(superposition_org_id)
+        .workspace_id(workspace)
+        .all(true)
+        .dimension_match_strategy(superposition_sdk::types::DimensionMatchStrategy::Exact);
+
+    for (key, value) in dims {
+        // `dimension_params` keys are full query parameter names, brackets included. A bare
+        // `city=...` is accepted and then ignored, which reads back as "every context matches".
+        request =
+            request.dimension_params(format!("dimension[{key}]"), value_to_plain_string(value));
+    }
+
+    let contexts = request.send().await.map_err(|e| {
+        info!("Failed to list contexts for {:?}: {:?}", dims, e);
+        ABError::InternalServerError(
+            "Failed to look up the targeting context in Superposition".to_string(),
+        )
+    })?;
+
+    Ok(!contexts.data.is_empty())
 }
 
 /// Rejects targeting that names a dimension the workspace no longer has. Superposition answers
@@ -1065,66 +1095,16 @@ pub async fn list_experiments_by_context(
         experiments_builder = experiments_builder.status(s);
     }
 
-    let experiments_builder = experiments_builder.customize().mutate_request(move |req| {
-        let uri: http::Uri = match req.uri().parse() {
-            Ok(uri) => uri,
-            Err(e) => {
-                info!("Failed to parse URI from request: {:?}", e);
-                return;
-            }
-        };
+    if let Some(name) = experiment_query.experiment_name {
+        experiments_builder = experiments_builder.experiment_name(name);
+    }
 
-        let mut parts = uri.into_parts();
-        let (path, existing_q) = match parts.path_and_query.take() {
-            Some(pq) => {
-                let s = pq.as_str();
-                match s.split_once('?') {
-                    Some((p, q)) => (p.to_string(), Some(q.to_string())),
-                    None => (s.to_string(), None),
-                }
-            }
-            None => ("/".to_string(), None),
-        };
-
-        let mut ser = form_urlencoded::Serializer::new(String::new());
-        if let Some(eq) = existing_q {
-            for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
-                ser.append_pair(&k, &v);
-            }
-        }
-        for (k, v) in &experiment_query.context {
-            if let Some(val_str) = v.as_str() {
-                ser.append_pair(&format!("dimension[{k}]"), val_str);
-            }
-        }
-
-        let new_q = ser.finish();
-        let pq = if new_q.is_empty() {
-            path
-        } else {
-            format!("{path}?{new_q}")
-        };
-
-        let path_and_query = match PathAndQuery::from_str(&pq) {
-            Ok(pq) => pq,
-            Err(e) => {
-                info!("Failed to create valid path/query from '{}': {:?}", pq, e);
-                return; // Skip URI modification on error
-            }
-        };
-
-        parts.path_and_query = Some(path_and_query);
-
-        let new_uri = match Uri::from_parts(parts) {
-            Ok(uri) => uri,
-            Err(e) => {
-                info!("Failed to create valid URI from parts: {:?}", e);
-                return;
-            }
-        };
-
-        *req.uri_mut() = new_uri.into();
-    });
+    // This operation is POST /experiments/list and the context filter travels in the JSON body, not
+    // the query string — query parameters are accepted and ignored, which reads back as "no filter
+    // applied" rather than an error.
+    for (key, value) in &experiment_query.context {
+        experiments_builder = experiments_builder.context(key.clone(), value_to_document(value));
+    }
 
     let experiments_list = experiments_builder.send().await.map_err(|e| {
         info!("Failed to list experiments: {:?}", e);
