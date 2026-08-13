@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.7.1 - 2026-08-13
+#### Bug Fixes
+- check for bundled paths - (369fcb3) - Yash Raput
+
+- - -
+
 ## airborne_sdk_ios-v0.7.0 - 2026-07-15
 #### Features
 - onPackageDownloaded callback - (89dea2c) - yuvrajjsingh0
