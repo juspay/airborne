@@ -599,11 +599,14 @@ pub async fn validate_dimensions_exist(
         return Ok(());
     }
 
+    // Without `all` this comes back as one page, and every dimension past it would look deleted —
+    // turning a valid release into "Targeting uses a dimension that no longer exists".
     let existing = state
         .superposition_client
         .list_dimensions()
         .org_id(superposition_org_id)
         .workspace_id(workspace)
+        .all(true)
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;

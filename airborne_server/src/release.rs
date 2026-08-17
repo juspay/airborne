@@ -633,7 +633,8 @@ async fn create_release(
 
     if is_first_release {
         // For first ever release -> Directly conclude the experiment to make it live
-        let transformed_variant_id = format!("{}-experimental_1", experiment_id_for_ramping);
+        let transformed_variant_id =
+            format!("{}-experimental_{}", experiment_id_for_ramping, pkg_version);
         info!(
             "Concluding first release experiment with variant id: {}",
             transformed_variant_id
@@ -1284,8 +1285,37 @@ async fn delete_release_for_view(
 
     let release_id = created_experiment_response.id.to_string();
 
-    release_view::mark_delete_release_pending(state.db_pool.clone(), view.id, release_id.clone())
-        .await?;
+    // The marker is what makes a deletion trackable — conclude/discard settle the view by looking
+    // the release up through it. Claiming it is therefore what decides which concurrent request
+    // owns this view; the loser rolls its own experiment back rather than leaving one in flight
+    // that nothing will ever settle.
+    if !release_view::mark_delete_release_pending(
+        state.db_pool.clone(),
+        view.id,
+        release_id.clone(),
+    )
+    .await?
+    {
+        if let Err(e) = state
+            .superposition_client
+            .discard_experiment()
+            .org_id(superposition_org_id_from_env.clone())
+            .workspace_id(workspace_name.clone())
+            .id(release_id.clone())
+            .change_reason("Another deletion claimed this view first".to_string())
+            .send()
+            .await
+        {
+            info!(
+                "Failed to discard superseded delete release {}: {:?}",
+                release_id, e
+            );
+        }
+
+        return Err(ABError::BadRequest(
+            "A deletion is already in progress for this view".to_string(),
+        ));
+    }
 
     Ok(Json(CreateDeleteReleaseResponse {
         release_id,

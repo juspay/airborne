@@ -419,6 +419,10 @@ async fn active_releases_using_dimension(
         })
         .collect();
 
+    // Several views can describe the same slice — a hand-made one alongside the auto-generated one
+    // — but they share a single live release, and it should be listed once.
+    let mut seen = std::collections::HashSet::new();
+
     Ok(affected_views
         .into_iter()
         .filter_map(|(view, view_context)| {
@@ -430,6 +434,7 @@ async fn active_releases_using_dimension(
             releases
                 .iter()
                 .find(|(_, context)| *context == view_context)
+                .filter(|(exp, _)| seen.insert(exp.id.to_string()))
                 .map(|(exp, _)| {
                     let experimental_variant = exp.variants.iter().find(|variant| {
                         variant.variant_type == superposition_sdk::types::VariantType::Experimental

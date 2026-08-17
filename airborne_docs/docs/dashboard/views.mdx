@@ -36,7 +36,7 @@ Choose **Create View** to save it.
 Every time a release is created, Airborne saves a view for that release's dimensions, so each slice you have ever shipped to is browsable without rebuilding the filter by hand.
 
 - **Name** — the release's dimensions sorted by key and joined as `key=value`, for example `city=blr, os=android`. A release that targets no dimensions produces a view named `default`.
-- **No duplicates** — if a view (of either type) already covers that exact set of dimension values, no new view is created. The dimension order does not matter for this comparison.
+- **No duplicates** — if an auto-generated view already covers that exact set of dimension values, no new one is created. The dimension order does not matter for this comparison. A **custom** view over the same dimensions does not stand in for it: the two are independent, and only the auto-generated one can have its release deleted, so you may see both listed.
 
 :::note
 Auto-generated views appear only for releases created after this feature shipped — existing releases are not backfilled.
