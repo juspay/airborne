@@ -219,6 +219,25 @@ pub async fn mark_delete_release_pending(
     })
 }
 
+/// Points a reservation at the release it turned out to be, once Superposition has assigned an id.
+/// Scoped to the reservation so it can only ever rewrite the claim it was given.
+pub async fn adopt_delete_release_id(
+    pool: DbPool,
+    reservation: String,
+    release_id: String,
+) -> airborne_types::Result<()> {
+    run_blocking!({
+        let mut conn = pool.get()?;
+        diesel::update(release_views::table.filter(pending_delete_col.eq(&reservation)))
+            .set(pending_delete_col.eq(Some(&release_id)))
+            .execute(&mut conn)
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to record delete release: {}", e))
+            })?;
+        Ok(())
+    })
+}
+
 /// Resolves the view waiting on `release_id`: removes it when the deletion actually took effect
 /// (the release concluded on its experimental variant), otherwise just clears the marker so the
 /// slice can be deleted again later. No-op when no view is waiting on that release.

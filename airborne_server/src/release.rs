@@ -82,6 +82,70 @@ fn is_experimental_variant(
         .any(|variant| variant.id == variant_id && variant.variant_type == Experimental)
 }
 
+/// Looks up the release a view is waiting on, clearing the marker when that release does not exist.
+async fn live_pending_delete(
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+    superposition_org_id: &str,
+    release_id: &str,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<Option<superposition_sdk::operation::get_experiment::GetExperimentOutput>>
+{
+    if release_id.parse::<i64>().is_err() {
+        info!("Clearing stale delete reservation {}", release_id);
+        release_view::settle_pending_delete(
+            state.db_pool.clone(),
+            organisation.to_string(),
+            application.to_string(),
+            release_id.to_string(),
+            false,
+        )
+        .await?;
+        return Ok(None);
+    }
+
+    match state
+        .superposition_client
+        .get_experiment()
+        .org_id(superposition_org_id.to_string())
+        .workspace_id(workspace_name.to_string())
+        .id(release_id.to_string())
+        .send()
+        .await
+    {
+        Ok(experiment) => Ok(Some(experiment)),
+        Err(e) => {
+            let missing = e
+                .as_service_error()
+                .is_some_and(|err| err.is_resource_not_found())
+                || e.raw_response()
+                    .is_some_and(|response| response.status().as_u16() == 404);
+
+            if !missing {
+                info!(
+                    "Failed to fetch pending delete release {}: {:?}",
+                    release_id, e
+                );
+                return Err(ABError::InternalServerError(
+                    "Failed to look up the pending deletion in Superposition".to_string(),
+                ));
+            }
+
+            info!("Clearing stale delete reservation {}", release_id);
+            release_view::settle_pending_delete(
+                state.db_pool.clone(),
+                organisation.to_string(),
+                application.to_string(),
+                release_id.to_string(),
+                false,
+            )
+            .await?;
+            Ok(None)
+        }
+    }
+}
+
 /// A delete release carries a snapshot of the default config, so a global release must not be
 /// created while one is in flight: whichever concluded second would leave the slice pinned to a
 /// stale default. Markers left behind by out-of-band Superposition activity are reconciled here
@@ -108,23 +172,19 @@ async fn ensure_no_pending_deletion(
     .await?;
 
     for (_, view_name, release_id) in pending {
-        let experiment = match state
-            .superposition_client
-            .get_experiment()
-            .org_id(superposition_org_id.to_string())
-            .workspace_id(workspace_name.to_string())
-            .id(release_id.clone())
-            .send()
-            .await
+        let experiment = match live_pending_delete(
+            organisation,
+            application,
+            workspace_name,
+            superposition_org_id,
+            &release_id,
+            state,
+        )
+        .await?
         {
-            Ok(experiment) => experiment,
-            Err(e) => {
-                info!(
-                    "Failed to fetch pending delete release {}: {:?}",
-                    release_id, e
-                );
-                return Err(in_progress(&view_name));
-            }
+            Some(experiment) => experiment,
+            // The marker pointed at nothing and has been cleared; it blocks nobody.
+            None => continue,
         };
 
         if matches!(
@@ -1159,10 +1219,24 @@ async fn delete_release_for_view(
     }
 
     if let Some(pending) = &view.pending_delete_release_id {
-        return Err(ABError::BadRequest(format!(
-            "A deletion is already in progress for this view (release {})",
-            pending
-        )));
+        // Only a marker whose release actually exists stands in the way; a reservation stranded by
+        // a crashed request is cleared here rather than locking the view out of deletion for good.
+        if live_pending_delete(
+            &organisation,
+            &application,
+            &workspace_name,
+            &superposition_org_id_from_env,
+            pending,
+            &state,
+        )
+        .await?
+        .is_some()
+        {
+            return Err(ABError::BadRequest(format!(
+                "A deletion is already in progress for this view (release {})",
+                pending
+            )));
+        }
     }
 
     let dimensions = release_view::view_dimensions_to_context(&view.dimensions);
@@ -1250,6 +1324,20 @@ async fn delete_release_for_view(
         .build()
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
+    let reservation = uuid::Uuid::new_v4().to_string();
+
+    if !release_view::mark_delete_release_pending(
+        state.db_pool.clone(),
+        view.id,
+        reservation.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "A deletion is already in progress for this view".to_string(),
+        ));
+    }
+
     let created_experiment_response = state
         .superposition_client
         .create_experiment()
@@ -1268,6 +1356,7 @@ async fn delete_release_for_view(
             "Deleting targeted release overrides for application {}",
             application
         ))
+        .idempotency_key(reservation.clone())
         .variants(control_variant)
         .variants(experimental_variant)
         .set_context(Some(
@@ -1277,45 +1366,45 @@ async fn delete_release_for_view(
                 .collect::<HashMap<_, _>>(),
         ))
         .send()
-        .await
-        .map_err(|e| {
+        .await;
+
+    let created_experiment_response = match created_experiment_response {
+        Ok(created) => created,
+        Err(e) => {
             info!("Failed to create delete release experiment: {:?}", e);
-            ABError::InternalServerError("Failed to create experiment in Superposition".to_string())
-        })?;
+            // Release the claim, matching on the reservation so a deletion that started meanwhile
+            // is left alone.
+            if let Err(e) = release_view::settle_pending_delete(
+                state.db_pool.clone(),
+                organisation.clone(),
+                application.clone(),
+                reservation.clone(),
+                false,
+            )
+            .await
+            {
+                info!(
+                    "Failed to release delete reservation {}: {:?}",
+                    reservation, e
+                );
+            }
+
+            return Err(ABError::InternalServerError(
+                "Failed to create experiment in Superposition".to_string(),
+            ));
+        }
+    };
 
     let release_id = created_experiment_response.id.to_string();
 
-    // The marker is what makes a deletion trackable — conclude/discard settle the view by looking
-    // the release up through it. Claiming it is therefore what decides which concurrent request
-    // owns this view; the loser rolls its own experiment back rather than leaving one in flight
-    // that nothing will ever settle.
-    if !release_view::mark_delete_release_pending(
+    // Swap the reservation for the id everything downstream keys off: conclude and discard settle
+    // the view by looking the release up through this marker.
+    release_view::adopt_delete_release_id(
         state.db_pool.clone(),
-        view.id,
+        reservation.clone(),
         release_id.clone(),
     )
-    .await?
-    {
-        if let Err(e) = state
-            .superposition_client
-            .discard_experiment()
-            .org_id(superposition_org_id_from_env.clone())
-            .workspace_id(workspace_name.clone())
-            .id(release_id.clone())
-            .change_reason("Another deletion claimed this view first".to_string())
-            .send()
-            .await
-        {
-            info!(
-                "Failed to discard superseded delete release {}: {:?}",
-                release_id, e
-            );
-        }
-
-        return Err(ABError::BadRequest(
-            "A deletion is already in progress for this view".to_string(),
-        ));
-    }
+    .await?;
 
     Ok(Json(CreateDeleteReleaseResponse {
         release_id,
