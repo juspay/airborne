@@ -8,6 +8,13 @@ namespace io.airborne.server
 @pattern("^[a-z0-9]+(-[a-z0-9]+)*$")
 string SigningKeyId
 
+/// A signing key ID as accepted in the x-signing-key-id request header. Same rules as
+/// SigningKeyId, except that the empty string is also allowed and is treated exactly like
+/// omitting the header: the application's default key is used.
+@length(max: 50)
+@pattern("^$|^[a-z0-9]+(-[a-z0-9]+)*$")
+string OptionalSigningKeyId
+
 /// A signing key used to sign the release config an application serves to its SDKs.
 ///
 /// The private key never leaves the server: it is not part of this shape and is not
@@ -29,9 +36,11 @@ structure SigningKey {
     @required
     public_key: String
 
-    /// Whether this is the application's default key. Exactly one key per application is
+    /// Whether this is the application's default key. At most one key per application is
     /// the default: it signs every release config served without an explicit
-    /// x-signing-key-id header.
+    /// x-signing-key-id header. An application whose automatic provisioning has not run or
+    /// did not succeed may temporarily have no keys, and therefore no default key; its
+    /// release configs are served unsigned until a key is created.
     @required
     is_default: Boolean
 
@@ -161,11 +170,14 @@ structure SetDefaultSigningKeyRequest {
     application: String
 }
 
-/// List the signing keys of an application, with the default key first. Every application
-/// is provisioned with a default key when it is created, so this is never empty. The
-/// private key is never returned — only the public key, which is enough to verify a
-/// signed release config. Pass the organisation and application in the x-organisation and
-/// x-application headers. Requires a bearer token.
+/// List the signing keys of an application, with the default key first. Applications are
+/// provisioned with a default key when they are created, and older applications by the
+/// one-time backfill, so the list is normally non-empty — but it is empty for an
+/// application whose provisioning has not run or did not succeed, which then has no
+/// default key and serves release configs unsigned until a key is created. The private key
+/// is never returned — only the public key, which is enough to verify a signed release
+/// config. Pass the organisation and application in the x-organisation and x-application
+/// headers. Requires a bearer token.
 @tags(["Signing keys"])
 @http(method: "GET", uri: "/api/signing-keys")
 @requiresauth
@@ -240,8 +252,9 @@ operation UpdateSigningKey {
 }
 
 /// Make a signing key the application's default: from then on it signs every release
-/// config served without an explicit x-signing-key-id header. Exactly one key per
-/// application is the default, so the previous default is demoted in the same operation.
+/// config served without an explicit x-signing-key-id header. At most one key per
+/// application is the default, so the previous default, if any, is demoted in the same
+/// operation.
 /// A disabled key cannot be made the default — enable it first. This is how a key is
 /// rotated: create a new key, distribute its public key to your clients, then promote it.
 /// Pass the organisation and application in the x-organisation and x-application headers.

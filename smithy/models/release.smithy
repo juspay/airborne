@@ -284,7 +284,7 @@ structure GetServeReleaseInput {
     /// invalid, unknown, disabled, or belongs to another application is rejected with
     /// a 400.
     @httpHeader("x-signing-key-id")
-    signingKeyId: SigningKeyId
+    signingKeyId: OptionalSigningKeyId
 }
 
 /// Release configuration
@@ -361,6 +361,9 @@ operation GetRelease {
 @tags(["Release serving"])
 @http(method: "GET", uri: "/release/{organisation}/{application}")
 @readonly
+// Public endpoint: opt out of the service-level bearer auth so the generated
+// OpenAPI does not advertise a token this route neither needs nor checks.
+@auth([])
 @requiresauth
 operation ServeRelease {
     input: GetServeReleaseInput
@@ -378,6 +381,8 @@ operation ServeRelease {
 @tags(["Release serving"])
 @http(method: "GET", uri: "/release/v2/{organisation}/{application}")
 @readonly
+// Public endpoint: see ServeRelease.
+@auth([])
 @requiresauth
 operation ServeReleaseV2 {
     input: GetServeReleaseInput

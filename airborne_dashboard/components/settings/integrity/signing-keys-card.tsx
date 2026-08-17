@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { Copy, KeyRound, Plus, ShieldCheck } from "lucide-react";
+import { Copy, KeyRound, Plus, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
 
 import { CreateKeyDialog } from "@/components/settings/integrity/create-key-dialog";
 import { KeyActions } from "@/components/settings/integrity/key-actions";
@@ -45,12 +45,17 @@ export function SigningKeysCard({ canRead, canCreate, canUpdate }: SigningKeysCa
   const [viewedKey, setViewedKey] = useState<SigningKey | null>(null);
   const [pendingKeyId, setPendingKeyId] = useState<string | null>(null);
 
-  const { data, isLoading, mutate } = useSWR(canRead && token && org && app ? ["/signing-keys", org, app] : null, () =>
-    apiFetch<SigningKeysResponse>("/signing-keys", {}, { token, org, app })
+  const { data, error, isLoading, mutate } = useSWR(
+    canRead && token && org && app ? ["/signing-keys", org, app] : null,
+    () => apiFetch<SigningKeysResponse>("/signing-keys", {}, { token, org, app })
   );
 
   const keys = data?.data ?? [];
   const loading = !canRead || isLoading;
+  // `data` is undefined both while loading and after a failure, so the empty
+  // state must be gated on an actual successful response — otherwise a failed
+  // request reads as "this application has no keys".
+  const failed = !loading && !!error;
 
   const copyToClipboard = async (value: string, label: string) => {
     try {
@@ -155,7 +160,7 @@ export function SigningKeysCard({ canRead, canCreate, canUpdate }: SigningKeysCa
       <Card>
         <CardHeader>
           <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
-            Signing keys ({loading ? "..." : keys.length})
+            Signing keys ({loading || failed ? "..." : keys.length})
           </CardTitle>
           <CardDescription>
             Exactly one key is the default. It is the key used when no key is requested.
@@ -176,6 +181,16 @@ export function SigningKeysCard({ canRead, canCreate, canUpdate }: SigningKeysCa
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 <span className="text-muted-foreground">Loading signing keys...</span>
               </div>
+            </div>
+          ) : failed ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <XCircle className="h-12 w-12 text-destructive mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Could not load signing keys</h3>
+              <p className="text-muted-foreground mb-4">{messageOf(error, "Please try again.")}</p>
+              <Button variant="outline" className="gap-2" onClick={() => mutate()}>
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
             </div>
           ) : keys.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">

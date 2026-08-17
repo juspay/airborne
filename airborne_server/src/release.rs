@@ -1462,11 +1462,23 @@ async fn serve_release_handler(
         ABError::InternalServerError(format!("Failed to serialize release config: {e}"))
     })?;
 
-    let requested_key_id = signing::utils::requested_key_id(
-        req.headers()
-            .get(signing::utils::SIGNING_KEY_ID_HEADER)
-            .and_then(|value| value.to_str().ok()),
-    );
+    // A header that is present but not text is a malformed request, not an absent
+    // one: silently treating it as absent would sign with the default key while the
+    // caller believes it asked for another.
+    let signing_key_id_header = req
+        .headers()
+        .get(signing::utils::SIGNING_KEY_ID_HEADER)
+        .map(|value| {
+            value.to_str().map_err(|_| {
+                ABError::BadRequest(format!(
+                    "{} must be valid UTF-8",
+                    signing::utils::SIGNING_KEY_ID_HEADER
+                ))
+            })
+        })
+        .transpose()?;
+
+    let requested_key_id = signing::utils::requested_key_id(signing_key_id_header);
 
     // config.version is a UUID minted with the resolved release variant. The
     // signing helper combines it with the selected key so repeat serves can

@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use aws_lc_rs::{
+    rand::SystemRandom as LcSystemRandom,
+    signature::{
+        EcdsaKeyPair as LcEcdsaKeyPair,
+        ECDSA_P256_SHA256_ASN1_SIGNING as LC_ECDSA_P256_SHA256_ASN1_SIGNING,
+    },
+};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use diesel::prelude::*;
 use log::{error, info, warn};
 use p256::{
-    ecdsa::{signature::Signer, Signature, SigningKey},
+    ecdsa::SigningKey,
     elliptic_curve::rand_core::OsRng,
-    pkcs8::{DecodePrivateKey, EncodePrivateKey, EncodePublicKey, LineEnding},
+    pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding, SecretDocument},
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -170,10 +177,17 @@ async fn decrypt_private_key(ciphertext: &str, key: Option<&str>) -> Result<Stri
 /// Sign `payload` with ES256 (ECDSA P-256 over SHA-256) and return the
 /// base64 of the DER-encoded signature.
 pub fn sign_payload(private_key_pem: &str, payload: &[u8]) -> Result<String, ABError> {
-    let key = SigningKey::from_pkcs8_pem(private_key_pem)
+    let (_, der) = SecretDocument::from_pem(private_key_pem)
         .map_err(|e| ABError::InternalServerError(format!("Malformed signing key: {e}")))?;
-    let signature: Signature = key.sign(payload);
-    Ok(BASE64.encode(signature.to_der().as_bytes()))
+
+    let key = LcEcdsaKeyPair::from_pkcs8(&LC_ECDSA_P256_SHA256_ASN1_SIGNING, der.as_bytes())
+        .map_err(|e| ABError::InternalServerError(format!("Malformed signing key: {e}")))?;
+
+    let signature = key
+        .sign(&LcSystemRandom::new(), payload)
+        .map_err(|_| ABError::InternalServerError("Failed to sign payload".to_string()))?;
+
+    Ok(BASE64.encode(signature.as_ref()))
 }
 
 /// Render the `X-Airborne-Signature` header value.
@@ -382,6 +396,11 @@ pub async fn sign_release_config(
     let cacheable = !config_version.is_empty();
     let selector = signature_cache_selector(requested_key_id)?;
 
+    let Some(key) = resolve_signing_key(state, organisation, application, requested_key_id).await?
+    else {
+        return Ok(None);
+    };
+
     let cache_key = state
         .redis_cache
         .as_ref()
@@ -393,16 +412,13 @@ pub async fn sign_release_config(
             )
         });
 
-    if let Some((cache, key)) = &cache_key {
-        if let Some(hit) = cache.get::<CachedSignature>(key).await? {
-            return Ok(Some(signature_header_value(&hit.key_id, &hit.signature)));
+    if let Some((cache, cache_key)) = &cache_key {
+        if let Some(hit) = cache.get::<CachedSignature>(cache_key).await? {
+            if hit.key_id == key.key_id {
+                return Ok(Some(signature_header_value(&hit.key_id, &hit.signature)));
+            }
         }
     }
-
-    let Some(key) = resolve_signing_key(state, organisation, application, requested_key_id).await?
-    else {
-        return Ok(None);
-    };
 
     let decrypted_key_cache_key =
         decrypted_signing_key_cache_key(&state.moka_cache, organisation, application, &key.key_id);
@@ -871,13 +887,24 @@ mod tests {
     }
 
     #[test]
-    fn signing_is_deterministic() {
-        // RFC 6979 nonces: the same body and key must always give the same
-        // signature, so a cached CDN response stays consistent with its header.
+    fn repeated_signings_differ_but_all_verify() {
+        // Random nonces, not RFC 6979: two signings of the same body give two
+        // different signatures. That is fine — a signature travels in the same
+        // response as the body it covers, so nothing compares them across
+        // responses. What must hold is that every one of them verifies.
         let keypair = generate_keypair().expect("keygen");
+        let verifying_key =
+            VerifyingKey::from_public_key_pem(&keypair.public_key).expect("parse public key");
+
         let first = sign_payload(&keypair.private_key, BODY).expect("sign");
         let second = sign_payload(&keypair.private_key, BODY).expect("sign");
-        assert_eq!(first, second);
+        assert_ne!(first, second);
+
+        for signature_b64 in [&first, &second] {
+            let der = BASE64.decode(signature_b64).expect("decode base64");
+            let signature = DerSignature::try_from(der.as_slice()).expect("parse DER signature");
+            verifying_key.verify(BODY, &signature).expect("verify");
+        }
     }
 
     #[tokio::test]

@@ -2117,7 +2117,7 @@
         },
         "/api/signing-keys": {
             "get": {
-                "description": "List the signing keys of an application, with the default key first. Every application\nis provisioned with a default key when it is created, so this is never empty. The\nprivate key is never returned — only the public key, which is enough to verify a\nsigned release config. Pass the organisation and application in the x-organisation and\nx-application headers. Requires a bearer token.",
+                "description": "List the signing keys of an application, with the default key first. Applications are\nprovisioned with a default key when they are created, and older applications by the\none-time backfill, so the list is normally non-empty — but it is empty for an\napplication whose provisioning has not run or did not succeed, which then has no\ndefault key and serves release configs unsigned until a key is created. The private key\nis never returned — only the public key, which is enough to verify a signed release\nconfig. Pass the organisation and application in the x-organisation and x-application\nheaders. Requires a bearer token.",
                 "operationId": "ListSigningKeys",
                 "parameters": [
                     {
@@ -2457,7 +2457,7 @@
         },
         "/api/signing-keys/{keyId}/default": {
             "post": {
-                "description": "Make a signing key the application's default: from then on it signs every release\nconfig served without an explicit x-signing-key-id header. Exactly one key per\napplication is the default, so the previous default is demoted in the same operation.\nA disabled key cannot be made the default — enable it first. This is how a key is\nrotated: create a new key, distribute its public key to your clients, then promote it.\nPass the organisation and application in the x-organisation and x-application headers.\nRequires a bearer token.",
+                "description": "Make a signing key the application's default: from then on it signs every release\nconfig served without an explicit x-signing-key-id header. At most one key per\napplication is the default, so the previous default, if any, is demoted in the same\noperation.\nA disabled key cannot be made the default — enable it first. This is how a key is\nrotated: create a new key, distribute its public key to your clients, then promote it.\nPass the organisation and application in the x-organisation and x-application headers.\nRequires a bearer token.",
                 "operationId": "SetDefaultSigningKey",
                 "parameters": [
                     {
@@ -2892,8 +2892,7 @@
                         "schema": {
                             "type": "string",
                             "maxLength": 50,
-                            "minLength": 1,
-                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "pattern": "^$|^[a-z0-9]+(-[a-z0-9]+)*$",
                             "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, or sent with an empty value,\nthe application's default signing key is used. A non-empty key ID that is\ninvalid, unknown, disabled, or belongs to another application is rejected with\na 400."
                         }
                     }
@@ -2979,6 +2978,7 @@
                         }
                     }
                 },
+                "security": [],
                 "tags": [
                     "Release serving"
                 ]
@@ -3016,8 +3016,7 @@
                         "schema": {
                             "type": "string",
                             "maxLength": 50,
-                            "minLength": 1,
-                            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                            "pattern": "^$|^[a-z0-9]+(-[a-z0-9]+)*$",
                             "description": "ID of the signing key to sign the response with. This is the readable ID chosen\nwhen the key was created. Optional — when omitted, or sent with an empty value,\nthe application's default signing key is used. A non-empty key ID that is\ninvalid, unknown, disabled, or belongs to another application is rejected with\na 400."
                         }
                     }
@@ -3103,6 +3102,7 @@
                         }
                     }
                 },
+                "security": [],
                 "tags": [
                     "Release serving"
                 ]
@@ -3646,7 +3646,7 @@
                     },
                     "is_default": {
                         "type": "boolean",
-                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                        "description": "Whether this is the application's default key. At most one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header. An application whose automatic provisioning has not run or\ndid not succeed may temporarily have no keys, and therefore no default key; its\nrelease configs are served unsigned until a key is created."
                     },
                     "disabled": {
                         "type": "boolean",
@@ -4345,6 +4345,10 @@
                     "checksum": {
                         "type": "string",
                         "description": "Checksum used to verify the downloaded file."
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
                     }
                 }
             },
@@ -4443,7 +4447,7 @@
                     },
                     "is_default": {
                         "type": "boolean",
-                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                        "description": "Whether this is the application's default key. At most one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header. An application whose automatic provisioning has not run or\ndid not succeed may temporarily have no keys, and therefore no default key; its\nrelease configs are served unsigned until a key is created."
                     },
                     "disabled": {
                         "type": "boolean",
@@ -4485,7 +4489,7 @@
                     },
                     "is_default": {
                         "type": "boolean",
-                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                        "description": "Whether this is the application's default key. At most one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header. An application whose automatic provisioning has not run or\ndid not succeed may temporarily have no keys, and therefore no default key; its\nrelease configs are served unsigned until a key is created."
                     },
                     "disabled": {
                         "type": "boolean",
@@ -4672,7 +4676,7 @@
                     },
                     "is_default": {
                         "type": "boolean",
-                        "description": "Whether this is the application's default key. Exactly one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header."
+                        "description": "Whether this is the application's default key. At most one key per application is\nthe default: it signs every release config served without an explicit\nx-signing-key-id header. An application whose automatic provisioning has not run or\ndid not succeed may temporarily have no keys, and therefore no default key; its\nrelease configs are served unsigned until a key is created."
                     },
                     "disabled": {
                         "type": "boolean",

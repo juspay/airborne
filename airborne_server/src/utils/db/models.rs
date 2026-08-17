@@ -247,7 +247,9 @@ pub struct NewAuthzRoleBindingEntry {
 /// The internal row UUID, `org_id`, `app_id`, and `updated_at` are omitted: every
 /// query is already scoped to one application, and clients identify keys by
 /// `name`, so selecting them back would be dead weight.
-#[derive(Queryable, Selectable, Debug, Clone)]
+/// Deliberately does not derive `Debug` either: `{:?}` on a struct carrying
+/// `private_key_encrypted` would put key material into logs.
+#[derive(Queryable, Selectable, Clone)]
 #[diesel(table_name = signing_keys)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct SigningKeyEntry {
@@ -260,7 +262,7 @@ pub struct SigningKeyEntry {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Insertable, Debug)]
+#[derive(Insertable)]
 #[diesel(table_name = signing_keys)]
 pub struct NewSigningKey {
     pub id: uuid::Uuid,
