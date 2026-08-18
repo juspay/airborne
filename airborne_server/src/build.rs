@@ -1011,7 +1011,28 @@ async fn build(
         }
     }
 
+    // --- Step 6: Purge the edge cache so clients see the new version ---
+    invalidate_build_cf(&state, &org, &app).await;
+
     Ok(new_build_version)
+}
+
+/// Invalidate the CloudFront cache for an application's `/build` routes.
+async fn invalidate_build_cf(state: &web::Data<AppState>, org: &str, app: &str) {
+    let path = format!("/build/{}/{}*", org, app);
+
+    if let Err(e) = release::utils::invalidate_cf(
+        &state.cf_client,
+        path,
+        &state.env.cloudfront_distribution_id,
+    )
+    .await
+    {
+        info!(
+            "Failed to invalidate CloudFront cache for build {}/{}: {:?}",
+            org, app, e
+        );
+    }
 }
 
 async fn extract_args(
