@@ -1248,8 +1248,7 @@ async fn serve_release(
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
-    let superposition_client = state.rc_superposition_client.clone();
-    serve_release_handler(path, req, query, state, superposition_client).await
+    serve_release_handler(path, req, query, state).await
 }
 
 #[get("v2/{organisation}/{application}")]
@@ -1259,8 +1258,7 @@ async fn serve_release_v2(
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
-    let superposition_client = state.rc_superposition_client.clone();
-    serve_release_handler(path, req, query, state, superposition_client).await
+    serve_release_handler(path, req, query, state).await
 }
 
 async fn get_release_config_from_provider(
@@ -1290,7 +1288,6 @@ async fn serve_release_handler(
     req: actix_web::HttpRequest,
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-    superposition_client: superposition_sdk::Client,
 ) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
     let (organisation, application) = path.into_inner();
 

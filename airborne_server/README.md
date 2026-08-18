@@ -321,12 +321,11 @@ The server relies on a set of environment variables for its configuration. These
 - `AUTH_ADMIN_SCOPES`: Optional space-separated scopes (commonly used for Okta/Auth0).
 - `AUTH_ADMIN_ISSUER`: Issuer URL used to derive Keycloak admin realm/base URL (`.../realms/<realm>`). Required for Keycloak signup/import flows.
 - `SUPERPOSITION_URL`: URL of the Superposition service.
-- `SUPERPOSITION_RC_URL`: URL of the Superposition service used by RC (`/release`) endpoints. Defaults to `SUPERPOSITION_URL` when unset.
-- `ENABLE_AUTHENTICATED_SUPERPOSITION`: Enables cookie-based auth for Superposition SDK requests.
-- `SUPERPOSITION_USER_TOKEN`: User token for Superposition auth cookie (`user=...`).
-- `SUPERPOSITION_ORG_TOKEN`: Org token for Superposition auth cookie (`org_<SUPERPOSITION_ORG_ID>=...`).
-- `SUPERPOSITION_RC_USER_TOKEN`: RC-specific user token for auth cookie; defaults to `SUPERPOSITION_USER_TOKEN` when unset.
-- `SUPERPOSITION_RC_ORG_TOKEN`: RC-specific org token for auth cookie; defaults to `SUPERPOSITION_ORG_TOKEN` when unset.
+- `SUPERPOSITION_RC_URL`: URL of the Superposition service that release-config (`/release`) serving resolves against. Defaults to `SUPERPOSITION_URL` when unset.
+- `ENABLE_AUTHENTICATED_SUPERPOSITION`: Enables authenticated Superposition calls (cookie auth for the SDK client, bearer auth for the release-config provider).
+- `SUPERPOSITION_USER_TOKEN`: User token for Superposition auth cookie (`user=...`), used by the SDK client against `SUPERPOSITION_URL`.
+- `SUPERPOSITION_ORG_TOKEN`: Org token for Superposition auth cookie (`org_<SUPERPOSITION_ORG_ID>=...`), used by the SDK client against `SUPERPOSITION_URL`.
+- `SUPERPOSITION_TOKEN`: Bearer token used by the release-config provider registry against `SUPERPOSITION_RC_URL`.
 - `SUPERPOSITION_ORG_ID`: The organization ID within Superposition used by the server.
 - `AWS_BUCKET`: Name of the S3 bucket for storing package assets.
 - `PUBLIC_ENDPOINT`: The public-facing URL for accessing assets stored in S3.

@@ -246,8 +246,6 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to complete Keycloak -> Casbin import");
     }
 
-    let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
-
     let dashboard_superposition_url = app_config.superposition_url.clone();
     let rc_superposition_url = app_config.superposition_rc_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
@@ -426,13 +424,6 @@ async fn main() -> std::io::Result<()> {
         "SUPERPOSITION_USER_TOKEN",
         "SUPERPOSITION_ORG_TOKEN",
     );
-    let rc_superposition_client = create_superposition_client(
-        rc_superposition_url,
-        app_config.superposition_rc_user_token.clone(),
-        app_config.superposition_rc_org_token.clone(),
-        "SUPERPOSITION_RC_USER_TOKEN or SUPERPOSITION_USER_TOKEN",
-        "SUPERPOSITION_RC_ORG_TOKEN or SUPERPOSITION_ORG_TOKEN",
-    );
 
     let authz_provider = build_authz_provider(
         authz_provider_kind,
@@ -460,16 +451,28 @@ async fn main() -> std::io::Result<()> {
         None
     };
 
-    let provider_url = cac_url + "/";
-    let provider_access_token = format!(
-        "user={}; org_{}={}",
-        app_config.superposition_rc_user_token.clone(), superposition_org_id_env, app_config.superposition_rc_org_token.clone(),
-    );
+    let provider_url = if rc_superposition_url.ends_with('/') {
+        rc_superposition_url.to_string()
+    } else {
+        format!("{rc_superposition_url}/")
+    };
+    // The provider registry authenticates with a bearer token (`AuthMethod::Token`);
+    // it has no hook for the auth cookie the Superposition SDK client uses.
+    let superposition_token = if app_config.enable_authenticated_superposition {
+        app_config.superposition_token.clone().expect(
+            "SUPERPOSITION_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true to use provider registry features",
+        )
+    } else {
+        app_config
+            .superposition_token
+            .clone()
+            .unwrap_or_else(|| "abcd".to_string())
+    };
 
     let provider_registry = Arc::new(ProviderRegistry::new(
         superposition_org_id_env.clone(),
-        superposition_token.clone(),
-        provider_url.clone(),
+        superposition_token,
+        provider_url,
     ));
 
     if app_config.superposition_clear_unused_providers {
@@ -495,7 +498,6 @@ async fn main() -> std::io::Result<()> {
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
-        rc_superposition_client,
         sheets_hub: hub,
         provider_registry,
     });

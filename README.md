@@ -309,9 +309,10 @@ For current Keycloak-backed authorization, `AUTH_ADMIN_ISSUER` must be a Keycloa
 
 | Variable | Required | Encrypted | Default | Description |
 |----------|----------|-----------|---------|-------------|
-| `SUPERPOSITION_URL` | Yes | No | - | Superposition service URL |
+| `SUPERPOSITION_URL` | Yes | No | - | Superposition service URL (control-plane calls) |
+| `SUPERPOSITION_RC_URL` | No | No | `SUPERPOSITION_URL` | Superposition service URL used to serve release config |
 | `SUPERPOSITION_ORG_ID` | Yes | No | - | Organization ID in Superposition |
-| `SUPERPOSITION_TOKEN` | No | **Yes** | - | Superposition API token |
+| `SUPERPOSITION_TOKEN` | No | **Yes** | - | Bearer token used to serve release config from `SUPERPOSITION_RC_URL` (for authenticated mode) |
 | `SUPERPOSITION_USER_TOKEN` | No | **Yes** | - | Superposition user token (for authenticated mode) |
 | `SUPERPOSITION_ORG_TOKEN` | No | **Yes** | - | Superposition organization token (for authenticated mode) |
 | `ENABLE_AUTHENTICATED_SUPERPOSITION` | No | No | `false` | Enable authenticated Superposition calls |

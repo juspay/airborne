@@ -67,8 +67,6 @@ pub struct AppConfig {
     pub superposition_token: Option<String>,
     pub superposition_user_token: Option<String>,
     pub superposition_org_token: Option<String>,
-    pub superposition_rc_user_token: Option<String>,
-    pub superposition_rc_org_token: Option<String>,
     pub enable_authenticated_superposition: bool,
     pub superposition_clear_unused_providers: bool,
     pub superposition_unused_provider_ttl: u64,
@@ -174,10 +172,6 @@ impl AppConfig {
         let superposition_token = get_optional_secret("SUPERPOSITION_TOKEN")?;
         let superposition_user_token = get_optional_secret("SUPERPOSITION_USER_TOKEN")?;
         let superposition_org_token = get_optional_secret("SUPERPOSITION_ORG_TOKEN")?;
-        let superposition_rc_user_token = get_optional_secret("SUPERPOSITION_RC_USER_TOKEN")?
-            .or_else(|| superposition_user_token.clone());
-        let superposition_rc_org_token = get_optional_secret("SUPERPOSITION_RC_ORG_TOKEN")?
-            .or_else(|| superposition_org_token.clone());
 
         Ok(AppConfig {
             // Server settings
@@ -229,8 +223,6 @@ impl AppConfig {
             superposition_token,
             superposition_user_token,
             superposition_org_token,
-            superposition_rc_user_token,
-            superposition_rc_org_token,
             enable_authenticated_superposition: parse_env(
                 "ENABLE_AUTHENTICATED_SUPERPOSITION",
                 false,

@@ -125,25 +125,11 @@ upsert_env_raw() {
 
 sync_superposition_rc_env_defaults() {
     local superposition_url superposition_rc_url
-    local superposition_user_token superposition_rc_user_token
-    local superposition_org_token superposition_rc_org_token
 
     superposition_url=$(read_env_raw "SUPERPOSITION_URL")
     superposition_rc_url=$(read_env_raw "SUPERPOSITION_RC_URL")
     if is_value_empty "$superposition_rc_url"; then
         upsert_env_raw "SUPERPOSITION_RC_URL" "$superposition_url"
-    fi
-
-    superposition_user_token=$(read_env_raw "SUPERPOSITION_USER_TOKEN")
-    superposition_rc_user_token=$(read_env_raw "SUPERPOSITION_RC_USER_TOKEN")
-    if is_value_empty "$superposition_rc_user_token"; then
-        upsert_env_raw "SUPERPOSITION_RC_USER_TOKEN" "$superposition_user_token"
-    fi
-
-    superposition_org_token=$(read_env_raw "SUPERPOSITION_ORG_TOKEN")
-    superposition_rc_org_token=$(read_env_raw "SUPERPOSITION_RC_ORG_TOKEN")
-    if is_value_empty "$superposition_rc_org_token"; then
-        upsert_env_raw "SUPERPOSITION_RC_ORG_TOKEN" "$superposition_org_token"
     fi
 }
 
@@ -187,8 +173,6 @@ SECRETS=(
     "SUPERPOSITION_TOKEN"
     "SUPERPOSITION_USER_TOKEN"
     "SUPERPOSITION_ORG_TOKEN"
-    "SUPERPOSITION_RC_USER_TOKEN"
-    "SUPERPOSITION_RC_ORG_TOKEN"
     "GOOGLE_SERVICE_ACCOUNT_KEY"
 )
 
