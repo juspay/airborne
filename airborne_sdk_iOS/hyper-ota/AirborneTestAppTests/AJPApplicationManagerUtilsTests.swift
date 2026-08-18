@@ -273,6 +273,57 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
         XCTAssertEqual(result.first?.filePath, "b.js")
     }
 
+    // MARK: - getResourcesFrom (requiringPresenceInMain)
+
+    func testGetResourcesFrom_requiringPresence_unchangedSplitMissingFromMain_downloads() {
+        let split = makeResource(url: "https://cdn.example.com/a.js", filePath: "a.js", checksum: "aaa")
+        let result = utils.getResourcesFrom([split], filtering: [split],
+                                            isFirstRunAfterInstallation: false,
+                                            requiringPresenceInMain: true)
+        XCTAssertEqual(result.count, 1,
+                       "A split identical in both manifests must still be re-downloaded when its file is gone from main")
+    }
+
+    func testGetResourcesFrom_requiringPresence_unchangedSplitPresentInMain_skips() throws {
+        try writeFile("a.js", subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR,
+                      inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let split = makeResource(url: "https://cdn.example.com/a.js", filePath: "a.js", checksum: "aaa")
+        let result = utils.getResourcesFrom([split], filtering: [split],
+                                            isFirstRunAfterInstallation: false,
+                                            requiringPresenceInMain: true)
+        XCTAssertTrue(result.isEmpty, "An unchanged split already on disk must not be re-downloaded")
+    }
+
+    func testGetResourcesFrom_requiringPresence_nestedSplitPresentInMain_skips() throws {
+        let path = "assets/assets/images/chat-bg-light.png"
+        try writeFile(path, subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR,
+                      inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let split = makeResource(url: "https://cdn.example.com/bg.png", filePath: path, checksum: "ccc")
+        let result = utils.getResourcesFrom([split], filtering: [split],
+                                            isFirstRunAfterInstallation: false,
+                                            requiringPresenceInMain: true)
+        XCTAssertTrue(result.isEmpty, "Presence must be detected for splits nested in subdirectories")
+    }
+
+    func testGetResourcesFrom_requiringPresence_jsaSplitStoredUnderRawName_skips() throws {
+        try writeFile("bundle.jsa", subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR,
+                      inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let split = makeResource(url: "https://cdn.example.com/bundle.jsa", filePath: "bundle.jsa", checksum: "ddd")
+        let result = utils.getResourcesFrom([split], filtering: [split],
+                                            isFirstRunAfterInstallation: false,
+                                            requiringPresenceInMain: true)
+        XCTAssertTrue(result.isEmpty,
+                      "A .jsa split present under its raw name must count as installed, not re-download every boot")
+    }
+
+    func testGetResourcesFrom_withoutRequiringPresence_missingFromMain_stillSkips() {
+        let split = makeResource(url: "https://cdn.example.com/a.js", filePath: "a.js", checksum: "aaa")
+        let result = utils.getResourcesFrom([split], filtering: [split],
+                                            isFirstRunAfterInstallation: false)
+        XCTAssertTrue(result.isEmpty,
+                      "Lazy splits keep the manifest-only comparison: absence from main is their normal state")
+    }
+
     // MARK: - prepareTempDirectory / cleanupTempDirectory
 
     func testPrepareTempDirectory_createsTempDirectory() {
@@ -409,5 +460,93 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: keep),
                       "deleteFile must only remove the targeted file")
+    }
+
+    // MARK: - moveAllPackagesFromTempToMain
+
+    /// Absolute path of `relativePath` inside the package's `main` directory.
+    private func mainPath(_ relativePath: String) -> String {
+        fileUtil.fullPathInStorageForFilePath(
+            "\(AJPApplicationConstants.JUSPAY_MAIN_DIR)/\(relativePath)",
+            inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+    }
+
+    private func contents(ofMain relativePath: String) throws -> String {
+        try String(contentsOfFile: mainPath(relativePath), encoding: .utf8)
+    }
+
+    private func stageInTemp(_ relativePath: String, content: String) throws {
+        try writeFile(relativePath, subFolder: AJPApplicationConstants.JUSPAY_TEMP_DIR,
+                      inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, content: content)
+    }
+
+    private func installInMain(_ relativePath: String, content: String) throws {
+        try writeFile(relativePath, subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR,
+                      inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, content: content)
+    }
+
+    /// The regression this fix exists for: a delta update that re-downloads only part of a
+    /// directory must not take the rest of that directory down with it.
+    func testMoveAllPackages_partialUpdate_preservesUntouchedFilesInSameDirectory() throws {
+        try installInMain("assets/assets/images/chat-bg-light.png", content: "old-bg")
+        try installInMain("assets/assets/images/logo.png", content: "old-logo")
+
+        utils.prepareTempDirectory()
+        try stageInTemp("assets/assets/images/logo.png", content: "new-logo")
+
+        utils.moveAllPackagesFromTempToMain()
+
+        XCTAssertEqual(try contents(ofMain: "assets/assets/images/logo.png"), "new-logo",
+                       "The re-downloaded file must be installed")
+        XCTAssertEqual(try contents(ofMain: "assets/assets/images/chat-bg-light.png"), "old-bg",
+                       "A file the delta did not re-download must survive the install")
+    }
+
+    func testMoveAllPackages_movesNestedFilesPreservingStructure() throws {
+        utils.prepareTempDirectory()
+        try stageInTemp("main.jsbundle", content: "bundle")
+        try stageInTemp("assets/assets/images/chat-bg-light.png", content: "bg")
+
+        utils.moveAllPackagesFromTempToMain()
+
+        XCTAssertEqual(try contents(ofMain: "main.jsbundle"), "bundle")
+        XCTAssertEqual(try contents(ofMain: "assets/assets/images/chat-bg-light.png"), "bg")
+    }
+
+    func testMoveAllPackages_clearsMovedFilesFromTemp() throws {
+        utils.prepareTempDirectory()
+        try stageInTemp("assets/a.png", content: "a")
+
+        utils.moveAllPackagesFromTempToMain()
+
+        let leftovers = utils.getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+                                                     subFolder: AJPApplicationConstants.JUSPAY_TEMP_DIR,
+                                                     includeSubfolders: true)
+        XCTAssertTrue(leftovers.isEmpty, "Files must be moved out of temp, not copied")
+    }
+
+    func testMoveAllPackages_overwritesExistingDestinationFile() throws {
+        try installInMain("main.jsbundle", content: "old")
+        utils.prepareTempDirectory()
+        try stageInTemp("main.jsbundle", content: "new")
+
+        utils.moveAllPackagesFromTempToMain()
+
+        XCTAssertEqual(try contents(ofMain: "main.jsbundle"), "new")
+    }
+
+    func testMoveAllPackages_whenTempDirectoryAbsent_doesNotCrash() {
+        utils.cleanupTempDirectory()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempDirPath))
+        XCTAssertNoThrow(utils.moveAllPackagesFromTempToMain())
+    }
+
+    func testMoveAllPackages_emptyTempDirectory_leavesMainUntouched() throws {
+        try installInMain("main.jsbundle", content: "installed")
+        utils.prepareTempDirectory()
+
+        utils.moveAllPackagesFromTempToMain()
+
+        XCTAssertEqual(try contents(ofMain: "main.jsbundle"), "installed")
     }
 }
