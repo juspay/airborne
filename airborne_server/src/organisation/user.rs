@@ -69,6 +69,16 @@ async fn organisation_add_user(
     let (organisation, auth) = get_org_context(&req).await?;
     let role_name = body.access.trim();
 
+    // Reject service account emails — they must be managed via the service accounts API
+    let user_lower = body.user.trim().to_ascii_lowercase();
+    let service_account_suffix =
+        format!("@{}", crate::service_account::SERVICE_ACCOUNT_EMAIL_DOMAIN);
+    if user_lower.ends_with(&service_account_suffix) {
+        return Err(ABError::BadRequest(
+            "Service account emails cannot be added as regular users. Use the service accounts API instead.".to_string(),
+        ));
+    }
+
     state
         .authz_provider
         .add_organisation_user(
