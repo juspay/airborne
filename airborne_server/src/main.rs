@@ -246,9 +246,8 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to complete Keycloak -> Casbin import");
     }
 
-    let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
-
-    let cac_url = app_config.superposition_url.clone();
+    let dashboard_superposition_url = app_config.superposition_url.clone();
+    let rc_superposition_url = app_config.superposition_rc_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
 
     let authn_provider_kind = types::AuthnProviderKind::from_str(&app_config.authn_provider)
@@ -373,37 +372,58 @@ async fn main() -> std::io::Result<()> {
         hub = Some(Sheets::new(client, gcp_auth));
     }
 
-    let superposition_client = if app_config.enable_authenticated_superposition {
-        let superposition_user_token = app_config.superposition_user_token.clone().expect(
-            "SUPERPOSITION_USER_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
-        );
-        let superposition_org_token = app_config.superposition_org_token.clone().expect(
-            "SUPERPOSITION_ORG_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
-        );
+    let create_superposition_client =
+        |endpoint_url: String,
+         user_token: Option<String>,
+         org_token: Option<String>,
+         user_token_env_hint: &str,
+         org_token_env_hint: &str| {
+            if app_config.enable_authenticated_superposition {
+                let superposition_user_token = user_token.unwrap_or_else(|| {
+                    panic!(
+                        "{} must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
+                        user_token_env_hint
+                    )
+                });
+                let superposition_org_token = org_token.unwrap_or_else(|| {
+                    panic!(
+                        "{} must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
+                        org_token_env_hint
+                    )
+                });
 
-        // Inject Auth cookie for Superposition SDK calls
-        let cookie_interceptor = CookieIntercept::new(format!(
-            "user={}; org_{}={}",
-            superposition_user_token, superposition_org_id_env, superposition_org_token,
-        ));
+                // Inject Auth cookie for Superposition SDK calls
+                let cookie_interceptor = CookieIntercept::new(format!(
+                    "user={}; org_{}={}",
+                    superposition_user_token, superposition_org_id_env, superposition_org_token,
+                ));
 
-        superposition_sdk::Client::from_conf(
-            SrsConfig::builder()
-                .bearer_token("abcd".into())
-                .endpoint_url(cac_url.clone())
-                .behavior_version_latest()
-                .interceptor(cookie_interceptor)
-                .build(),
-        )
-    } else {
-        superposition_sdk::Client::from_conf(
-            SrsConfig::builder()
-                .bearer_token("abcd".into())
-                .endpoint_url(cac_url.clone())
-                .behavior_version_latest()
-                .build(),
-        )
-    };
+                superposition_sdk::Client::from_conf(
+                    SrsConfig::builder()
+                        .endpoint_url(endpoint_url)
+                        .behavior_version_latest()
+                        .bearer_token("abcd".into())
+                        .interceptor(cookie_interceptor)
+                        .build(),
+                )
+            } else {
+                superposition_sdk::Client::from_conf(
+                    SrsConfig::builder()
+                        .endpoint_url(endpoint_url)
+                        .behavior_version_latest()
+                        .bearer_token("abcd".into())
+                        .build(),
+                )
+            }
+        };
+
+    let superposition_client = create_superposition_client(
+        dashboard_superposition_url,
+        app_config.superposition_user_token.clone(),
+        app_config.superposition_org_token.clone(),
+        "SUPERPOSITION_USER_TOKEN",
+        "SUPERPOSITION_ORG_TOKEN",
+    );
 
     let authz_provider = build_authz_provider(
         authz_provider_kind,
@@ -431,12 +451,28 @@ async fn main() -> std::io::Result<()> {
         None
     };
 
-    let provider_url = cac_url + "/";
+    let provider_url = if rc_superposition_url.ends_with('/') {
+        rc_superposition_url.to_string()
+    } else {
+        format!("{rc_superposition_url}/")
+    };
+    // The provider registry authenticates with a bearer token (`AuthMethod::Token`);
+    // it has no hook for the auth cookie the Superposition SDK client uses.
+    let superposition_token = if app_config.enable_authenticated_superposition {
+        app_config.superposition_token.clone().expect(
+            "SUPERPOSITION_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true to use provider registry features",
+        )
+    } else {
+        app_config
+            .superposition_token
+            .clone()
+            .unwrap_or_else(|| "abcd".to_string())
+    };
 
     let provider_registry = Arc::new(ProviderRegistry::new(
         superposition_org_id_env.clone(),
-        superposition_token.clone(),
-        provider_url.clone(),
+        superposition_token,
+        provider_url,
     ));
 
     if app_config.superposition_clear_unused_providers {

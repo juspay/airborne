@@ -113,20 +113,23 @@ Authorization uses Casbin, with policies persisted in Postgres. These variables 
 
 Airborne uses Superposition as its configuration/feature-flag engine for dimensions and release targeting. The base URL and org id are required; the token variables are only needed when Superposition is run in authenticated mode.
 
+Airborne talks to Superposition through two independent paths, which may point at two different deployments. Control-plane writes (dimensions, releases, experiments) go through the Superposition SDK client at `SUPERPOSITION_URL` and authenticate with a cookie built from `SUPERPOSITION_USER_TOKEN` and `SUPERPOSITION_ORG_TOKEN`. Release-config serving (`/release`) resolves live against `SUPERPOSITION_RC_URL` through the provider registry, which authenticates with the `SUPERPOSITION_TOKEN` bearer token.
+
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
-| `SUPERPOSITION_URL` | **Yes** | `http://localhost:8080` | Base URL of the Superposition service. |
+| `SUPERPOSITION_URL` | **Yes** | `http://localhost:8080` | Base URL of the Superposition service used for control-plane calls (dimensions, releases, experiments). |
+| `SUPERPOSITION_RC_URL` | No | _(falls back to `SUPERPOSITION_URL`)_ | Base URL of the Superposition service that release-config serving (`/release`) resolves against. Set this to point RC serving at a separate Superposition deployment. |
 | `SUPERPOSITION_ORG_ID` | **Yes** | `get-org-id-from-superposition` | Superposition organisation id. Populated by `init-superposition.sh` in dev. |
-| `ENABLE_AUTHENTICATED_SUPERPOSITION` | No | `false` | When `true`, the Superposition SDK client sends auth tokens/cookies; this makes the three token variables below mandatory. |
-| `SUPERPOSITION_TOKEN` | Conditional (secret) | _(unset)_ | Bearer token for Superposition. Used as the SDK bearer token (empty string if unset). |
-| `SUPERPOSITION_USER_TOKEN` | Conditional (secret) | _(unset)_ | User cookie token. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
-| `SUPERPOSITION_ORG_TOKEN` | Conditional (secret) | _(unset)_ | Org cookie token. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
+| `ENABLE_AUTHENTICATED_SUPERPOSITION` | No | `false` | When `true`, Superposition calls are authenticated; this makes the three token variables below mandatory. |
+| `SUPERPOSITION_TOKEN` | Conditional (secret) | _(unset)_ | Bearer token used by the release-config provider registry against `SUPERPOSITION_RC_URL`. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
+| `SUPERPOSITION_USER_TOKEN` | Conditional (secret) | _(unset)_ | User cookie token for the SDK client against `SUPERPOSITION_URL`. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
+| `SUPERPOSITION_ORG_TOKEN` | Conditional (secret) | _(unset)_ | Org cookie token for the SDK client against `SUPERPOSITION_URL`. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
 | `SUPERPOSITION_CLEAR_UNUSED_PROVIDERS` | No | `false` | When `true`, a background task evicts idle per-workspace Superposition providers (see below). When `false`, providers live for the process lifetime. |
 | `SUPERPOSITION_UNUSED_PROVIDER_TTL` | No | `43200` | Idle time, in seconds, after which an unused workspace provider is evicted. Only applied when eviction is enabled. Default is 12 hours. |
 | `SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL` | No | `1500` | How often, in seconds, the eviction sweep runs. Only applied when eviction is enabled. Default is 25 minutes. |
 | `SUPERPOSITION_MIGRATION_STRATEGY` | No | `PATCH` | Strategy used when reconciling Superposition default configs during the `superposition` boot migration. |
 
-Airborne serves release config by resolving each workspace's (organisation + application) configuration live against the Superposition API. To avoid re-creating the SDK client on every request, the server caches one provider per workspace in an in-memory registry. Enabling `SUPERPOSITION_CLEAR_UNUSED_PROVIDERS` starts a background sweep that drops providers that have not been accessed within `SUPERPOSITION_UNUSED_PROVIDER_TTL`, checked every `SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL`. This bounds memory on servers hosting many rarely-served workspaces.
+Airborne serves release config by resolving each workspace's (organisation + application) configuration live against the Superposition API at `SUPERPOSITION_RC_URL`. To avoid re-creating the SDK client on every request, the server caches one provider per workspace in an in-memory registry. Enabling `SUPERPOSITION_CLEAR_UNUSED_PROVIDERS` starts a background sweep that drops providers that have not been accessed within `SUPERPOSITION_UNUSED_PROVIDER_TTL`, checked every `SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL`. This bounds memory on servers hosting many rarely-served workspaces.
 
 :::warning[Use the plural env-var name]
 The server reads `SUPERPOSITION_CLEAR_UNUSED_PROVIDERS` (**plural**). The bundled `.env.example` currently writes it as `SUPERPOSITION_CLEAR_UNUSED_PROVIDER` (singular), which the server **ignores** — so a value set on the singular key has no effect. Always set the plural name.

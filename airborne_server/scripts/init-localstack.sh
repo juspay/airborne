@@ -133,6 +133,42 @@ upsert_env_var() {
     mv "$tmp_file" "$file"
 }
 
+read_env_value() {
+    local key="$1"
+    local value=""
+
+    if [ -f ".env" ]; then
+        value=$(grep "^${key}=" ".env" 2>/dev/null | cut -d'=' -f2- | head -1)
+        value=$(strip_shell_quotes "$value")
+    fi
+
+    echo "$value"
+}
+
+is_value_empty() {
+    local value="$1"
+    case "$value" in
+        ""|"''"|'""')
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+sync_superposition_rc_env_defaults() {
+    local superposition_url superposition_rc_url
+
+    superposition_url=$(read_env_value "SUPERPOSITION_URL")
+    superposition_rc_url=$(read_env_value "SUPERPOSITION_RC_URL")
+    if is_value_empty "$superposition_rc_url"; then
+        upsert_env_var ".env" "SUPERPOSITION_RC_URL" "$superposition_url"
+    fi
+}
+
+sync_superposition_rc_env_defaults
+
 echo "${YELLOW}☁️ AWS Endpoint:${NC} ${GREEN}${AWS_ENDPOINT_URL}${NC}"
 echo "${YELLOW}🪣 S3 Bucket:${NC} ${GREEN}${AWS_BUCKET}${NC}"
 echo "${YELLOW}🌍 Region:${NC} ${GREEN}${AWS_REGION}${NC}"
@@ -162,7 +198,15 @@ aws --endpoint-url=${AWS_ENDPOINT_URL} s3 mb s3://$AWS_BUCKET >/dev/null 2>&1 ||
 echo "${GREEN}✅ S3 bucket ready: $AWS_BUCKET${NC}"
 
 # Variables that need encryption/processing
-SENSITIVE_VARS=("DB_PASSWORD" "DB_MIGRATION_PASSWORD" "OIDC_CLIENT_SECRET" "AUTH_ADMIN_CLIENT_SECRET")
+SENSITIVE_VARS=(
+    "DB_PASSWORD"
+    "DB_MIGRATION_PASSWORD"
+    "OIDC_CLIENT_SECRET"
+    "AUTH_ADMIN_CLIENT_SECRET"
+    "SUPERPOSITION_TOKEN"
+    "SUPERPOSITION_USER_TOKEN"
+    "SUPERPOSITION_ORG_TOKEN"
+)
 
 # Get values from .env.example or .env.generated
 get_value() {
