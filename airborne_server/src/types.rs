@@ -51,6 +51,11 @@ pub struct AppState {
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
     pub provider_registry: Arc<ProviderRegistry>,
+    /// Shared Kronos client (embedded or remote). `None` when `KRONOS_ENABLED=false`
+    /// (webhooks is currently the only Kronos consumer). Webhook settings live in `env`.
+    pub kronos: Option<Arc<dyn crate::utils::kronos::KronosClient>>,
+    /// Master AES key (base64) for at-rest secret encryption; `None` in non-encrypted mode.
+    pub master_encryption_key: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -76,6 +81,16 @@ pub struct Environment {
     pub google_spreadsheet_id: String,
     pub cloudfront_distribution_id: String,
     pub default_configs: Vec<SuperpositionDefaultConfig>,
+
+    // Webhooks / Kronos settings (Kronos client itself is on AppState).
+    pub kronos_enabled: bool,
+    pub kronos_workspace: String,
+    pub webhook_internal_secret: String,
+    pub webhook_outbound_timeout_secs: u64,
+    pub webhook_max_retries: i32,
+    pub webhook_conclude_delay_secs: i64,
+    pub webhook_allow_insecure: bool,
+    pub webhook_delivery_retention_days: i32,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

@@ -1,31 +1,6 @@
 // @generated automatically by Diesel CLI.
 
 pub mod hyperotaserver {
-    pub mod sql_types {
-        #[derive(diesel::query_builder::QueryId, Clone, diesel::sql_types::SqlType)]
-        #[diesel(postgres_type(name = "invite_role", schema = "hyperotaserver"))]
-        pub struct InviteRole;
-
-        #[derive(diesel::query_builder::QueryId, Clone, diesel::sql_types::SqlType)]
-        #[diesel(postgres_type(name = "invite_status", schema = "hyperotaserver"))]
-        pub struct InviteStatus;
-    }
-
-    diesel::table! {
-        hyperotaserver.builds (id) {
-            id -> Uuid,
-            build_version -> Text,
-            organisation -> Text,
-            application -> Text,
-            release_id -> Text,
-            created_at -> Timestamptz,
-            major_version -> Int4,
-            minor_version -> Int4,
-            patch_version -> Int4,
-            status -> Text,
-        }
-    }
-
     diesel::table! {
         hyperotaserver.authz_memberships (subject, scope, organisation, application) {
             subject -> Text,
@@ -45,6 +20,21 @@ pub mod hyperotaserver {
             resource -> Text,
             action -> Text,
             created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.builds (id) {
+            id -> Uuid,
+            build_version -> Text,
+            organisation -> Text,
+            application -> Text,
+            release_id -> Text,
+            created_at -> Timestamptz,
+            major_version -> Int4,
+            minor_version -> Int4,
+            patch_version -> Int4,
+            status -> Text,
         }
     }
 
@@ -87,23 +77,6 @@ pub mod hyperotaserver {
             size -> Int8,
             checksum -> Text,
             metadata -> Jsonb,
-            created_at -> Timestamptz,
-        }
-    }
-
-    diesel::table! {
-        use diesel::sql_types::*;
-        use super::sql_types::InviteRole;
-        use super::sql_types::InviteStatus;
-
-        hyperotaserver.organisation_invites (id) {
-            id -> Uuid,
-            org_id -> Text,
-            applications -> Jsonb,
-            email -> Text,
-            role -> InviteRole,
-            token -> Text,
-            status -> InviteStatus,
             created_at -> Timestamptz,
         }
     }
@@ -160,6 +133,19 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.service_accounts (client_id) {
+            client_id -> Uuid,
+            name -> Text,
+            email -> Text,
+            description -> Text,
+            organisation -> Text,
+            created_by -> Text,
+            created_at -> Timestamptz,
+            encrypted_refresh_token -> Text,
+        }
+    }
+
+    diesel::table! {
         hyperotaserver.user_credentials (client_id) {
             client_id -> Uuid,
             username -> Text,
@@ -167,6 +153,50 @@ pub mod hyperotaserver {
             organisation -> Text,
             application -> Text,
             created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.webhook_deliveries (id) {
+            id -> Uuid,
+            webhook_id -> Uuid,
+            org_id -> Text,
+            app_id -> Nullable<Text>,
+            event -> Text,
+            payload -> Jsonb,
+            status -> Text,
+            kronos_job_id -> Nullable<Text>,
+            scheduled_for -> Timestamptz,
+            attempt_count -> Int4,
+            max_attempts -> Int4,
+            last_status_code -> Nullable<Int4>,
+            is_test -> Bool,
+            idempotency_key -> Text,
+            created_at -> Timestamptz,
+            updated_at -> Timestamptz,
+            attempts -> Jsonb,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.webhooks (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Nullable<Text>,
+            name -> Text,
+            description -> Text,
+            url -> Text,
+            method -> Text,
+            events -> Jsonb,
+            secret_encrypted -> Nullable<Text>,
+            custom_headers -> Jsonb,
+            enabled -> Bool,
+            payload_version -> Text,
+            max_retries -> Int4,
+            created_at -> Timestamptz,
+            created_by -> Text,
+            updated_at -> Timestamptz,
+            updated_by -> Text,
         }
     }
 
@@ -179,19 +209,23 @@ pub mod hyperotaserver {
         }
     }
 
+    diesel::joinable!(webhook_deliveries -> webhooks (webhook_id));
+
     diesel::allow_tables_to_appear_in_same_query!(
         authz_memberships,
         authz_role_bindings,
-        cleanup_outbox,
         builds,
+        cleanup_outbox,
         configs,
         files,
-        organisation_invites,
         packages,
         packages_v2,
         release_views,
         releases,
+        service_accounts,
         user_credentials,
+        webhook_deliveries,
+        webhooks,
         workspace_names,
     );
 }

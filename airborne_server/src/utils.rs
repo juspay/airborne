@@ -19,6 +19,7 @@ pub mod encryption;
 pub mod interceptor;
 pub mod keycloak;
 pub mod kms;
+pub mod kronos;
 pub mod metrics;
 pub mod migrations;
 pub mod redis;
