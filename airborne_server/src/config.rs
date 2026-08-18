@@ -87,6 +87,10 @@ pub struct AppConfig {
     // Public endpoint
     pub public_endpoint: String,
 
+    // Outbound fetch guards (SSRF)
+    pub ssrf_allowed_hosts: Option<String>,
+    pub max_download_bytes: Option<u64>,
+
     // Migration settings
     pub superposition_migration_strategy: String,
     pub migrations_to_run_on_boot: String,
@@ -247,6 +251,12 @@ impl AppConfig {
 
             // Public endpoint
             public_endpoint: get_env("PUBLIC_ENDPOINT", None)?,
+
+            // Outbound fetch guards (SSRF)
+            ssrf_allowed_hosts: get_optional("SSRF_ALLOWED_HOSTS"),
+            max_download_bytes: env::var("MAX_DOWNLOAD_BYTES")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok()),
 
             // Migration settings
             superposition_migration_strategy: get_env(
