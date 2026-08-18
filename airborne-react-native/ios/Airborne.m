@@ -5,7 +5,6 @@
 
 @property (nonatomic, strong) NSString* namespace;
 @property (nonatomic, strong) AirborneServices* airborne;
-@property (nonatomic, weak) id <AirborneDelegate> delegate;
 
 @end
 
@@ -51,9 +50,13 @@
 }
 
 - (instancetype)initWithReleaseConfigURL:(NSString *)releaseConfigURL delegate:(id<AirborneDelegate>)delegate {
+    return [self initWithReleaseConfigURL:releaseConfigURL delegate:delegate shouldUpdate:YES];
+}
+
+- (instancetype)initWithReleaseConfigURL:(NSString *)releaseConfigURL delegate:(id<AirborneDelegate>)delegate shouldUpdate:(BOOL)shouldUpdate {
     self = [super init];
     if (self) {
-        self.airborne = [[AirborneServices alloc] initWithReleaseConfigURL:releaseConfigURL delegate:delegate ?: self];
+        self.airborne = [[AirborneServices alloc] initWithReleaseConfigURL:releaseConfigURL delegate:delegate ?: self shouldUpdate:shouldUpdate];
     }
     return self;
 }
@@ -70,6 +73,14 @@
     return [self.airborne getReleaseConfig];
 }
 
+- (void)checkForUpdate:(void (^)(NSString * _Nonnull))completion {
+    if (!self.airborne) {
+        completion(@"{\"updateAvailable\":false,\"error\":\"Airborne is not initialized\"}");
+        return;
+    }
+    [self.airborne checkForUpdate:completion];
+}
+
 #pragma mark - AirborneDelegate
 
 - (NSString *)namespace {
@@ -77,4 +88,3 @@
 }
 
 @end
-

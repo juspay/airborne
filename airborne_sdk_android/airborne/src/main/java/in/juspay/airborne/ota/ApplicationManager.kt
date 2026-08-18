@@ -36,6 +36,7 @@ import `in`.juspay.airborne.constants.LogSubCategory
 import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.ref.WeakReference
+import java.net.HttpURLConnection.HTTP_OK
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
@@ -421,6 +422,77 @@ class ApplicationManager(
 
     fun readReleaseConfig(): String {
         return releaseConfig?.serialize() ?: ""
+    }
+
+    fun checkForUpdate(): String {
+        val url = if (releaseConfigTemplateUrl == "") {
+            rcCallback?.getReleaseConfig(false) ?: ""
+        } else {
+            releaseConfigTemplateUrl
+        }
+
+        if (url.isEmpty()) {
+            return JSONObject()
+                .put("updateAvailable", false)
+                .put("error", "No release config URL")
+                .toString()
+        }
+
+        val localRc = releaseConfig
+        val headers = mutableMapOf("cache-control" to "no-cache")
+        localRc?.let {
+            headers["x-release-config-version"] = it.version
+            headers["x-package-version"] = it.pkg.version
+            headers["x-config-version"] = it.config.version
+        }
+
+        val sortedDimensions = (rcHeaders ?: emptyMap()).toSortedMap()
+        if (sortedDimensions.isNotEmpty()) {
+            headers["x-dimension"] =
+                sortedDimensions.entries.joinToString(";") { "${it.key}=${it.value}" }
+        }
+
+        val clientId =
+            sanitizeClientId(otaServices.clientId?.takeIf { it.isNotBlank() } ?: "default")
+        val releaseConfigNetUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
+
+        return try {
+            val resp = releaseConfigNetUtils.doGet(url, headers, null, null, null)
+            val code = resp.code()
+            val body = resp.body()
+
+            if (code != HTTP_OK || body == null) {
+                resp.close()
+                JSONObject()
+                    .put("updateAvailable", false)
+                    .put("error", "HTTP $code")
+                    .toString()
+            } else {
+                val remoteJson = JSONObject(body.string())
+                resp.close()
+
+                val localVersion = localRc?.config?.version ?: ""
+                val localPkgVersion = localRc?.pkg?.version ?: ""
+                val remoteVersion =
+                    remoteJson.optJSONObject("config")?.optString("version", "") ?: ""
+                val remotePkgVersion =
+                    remoteJson.optJSONObject("package")?.optString("version", "") ?: ""
+
+                JSONObject()
+                    .put("updateAvailable", remoteVersion != localVersion)
+                    .put("currentVersion", localVersion)
+                    .put("remoteVersion", remoteVersion)
+                    .put("currentPackageVersion", localPkgVersion)
+                    .put("remotePackageVersion", remotePkgVersion)
+                    .toString()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "checkForUpdate failed", e)
+            JSONObject()
+                .put("updateAvailable", false)
+                .put("error", e.message ?: "Unknown error")
+                .toString()
+        }
     }
 
     private fun trackUpdateResult(updateResult: UpdateResult) {
