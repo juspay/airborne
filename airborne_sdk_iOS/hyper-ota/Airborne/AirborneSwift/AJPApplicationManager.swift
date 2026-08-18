@@ -116,6 +116,11 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     private var workspace: String
     private var releaseConfigURL: String
     private var releaseConfigHeaders: [String: String]
+    /// Public keys the release config's signature is checked against.
+    ///
+    /// `let`, and never mutated after `init`, so the release config fetch can read it straight
+    /// from the URLSession callback queue without taking `stateLock`.
+    private let trustStore: AJPReleaseConfigTrustStore
     private var baseBundle: Bundle
     private var isLocalAssets: Bool
     private var forceUpdate: Bool
@@ -212,7 +217,12 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         } else {
             self.releaseConfigHeaders = [:]
         }
-        
+
+        // Parsed once here rather than per fetch, so a malformed PEM is reported at boot.
+        let signingKeyId = (delegate?.getReleaseConfigSigningKeyId?() as? String) ?? ""
+        let publicKeyPEM = (delegate?.getReleaseConfigPublicKey?() as? String) ?? ""
+        self.trustStore = AJPReleaseConfigTrustStore(keyID: signingKeyId, pem: publicKeyPEM)
+
         if let bundle = delegate?.getBaseBundle?() {
             self.baseBundle = bundle
         } else {
@@ -229,7 +239,17 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         self.tracker.addLogger(logger)
         
         super.init()
-        
+
+        // Surface an unusable configuration loudly: verification was asked for (a key id and/or
+        // a PEM was supplied) but it cannot run — a missing half or a malformed PEM — so every
+        // signed config will be rejected until it is fixed in a new app build.
+        if trustStore.isConfigured && !trustStore.isUsable {
+            let value = NSMutableDictionary()
+            value["key_id"] = trustStore.keyID ?? ""
+            value["has_public_key"] = NSNumber(value: trustStore.publicKey != nil)
+            self.tracker.trackError("release_config_signing_key_invalid", value: value)
+        }
+
         // Let's fire up initialization
         self.initializeDefaults()
         
@@ -1074,7 +1094,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         var request = URLRequest(url: manifestUrl)
         request.httpMethod = "GET"
-        
+
+        // Do not set Accept-Encoding here. URLSession only decompresses transparently while it
+        // owns the header, and the signature covers the uncompressed body — setting it by hand
+        // hands back a raw gzip stream and makes every signature check fail.
         let networkType = AJPNetworkTypeDetector.currentNetworkTypeString()
         request.setValue(networkType, forHTTPHeaderField: "x-network-type")
         #if os(iOS)
@@ -1118,11 +1141,57 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 }
                 return
             }
-            
+
+            // A release config is only served from a 2xx response. Treat anything else — a
+            // 4xx/5xx from the server, an error page injected by a proxy — as a failed fetch:
+            // it is not a config and must not be parsed, verified, or staged, even if its body
+            // happens to look like one. The SDK then falls back to the installed bundle.
+            guard (200...299).contains(statusCode) else {
+                logData["is_success"] = false
+                logData["message"] = "Unexpected HTTP status \(statusCode)"
+                self.tracker.trackInfo("release_config_fetch", value: logData)
+
+                if !didTimeoutOccur {
+                    // Not deleting the temp manifest: a config staged after an earlier timeout
+                    // is still the best config we have, and this response gave nothing better.
+                    completionHandler(
+                        nil,
+                        NSError(
+                            domain: "in.juspay.Airborne",
+                            code: 4,
+                            userInfo: [NSLocalizedDescriptionKey: "Release config request failed with HTTP status \(statusCode)"]
+                        ),
+                        false
+                    )
+                }
+                // On the timeout path, returning before saveManifestToTemp keeps a non-2xx body
+                // from becoming the next boot's config.
+                return
+            }
+
             if let data = data {
+                // Verify the signature over the bytes exactly as received, before anything
+                // parses or persists them. Non-2xx responses were already rejected above, so
+                // this guards the 2xx path: a body that fails verification is dropped, never
+                // parsed or staged.
+                if let signatureError = self.verifyReleaseConfigSignature(data: data, response: response, logData: logData) {
+                    logData["is_success"] = false
+                    self.tracker.trackInfo("release_config_fetch", value: logData)
+
+                    if !didTimeoutOccur {
+                        // Deliberately not deleting the temp manifest here: it was verified when
+                        // it was written, which makes it a better config than the one we just
+                        // rejected.
+                        completionHandler(nil, signatureError, false)
+                    }
+                    // On the timeout path, returning before saveManifestToTemp is what keeps an
+                    // unverified body from becoming the next boot's config.
+                    return
+                }
+
                 var manifestError: NSError?
                 var manifest: AJPApplicationManifest?
-                
+
                 do {
                     manifest = try AJPApplicationManifest(data: NSData(data: data))
                 } catch let err as NSError {
@@ -1161,7 +1230,85 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         task.resume()
     }
-    
+
+    /**
+     * Checks the release config's signature against the single configured public key.
+     *
+     * - Returns: `nil` when the body may be used — verified, no key configured, or the response
+     *   carried no signature. A non-nil error means the body must be discarded.
+     */
+    private func verifyReleaseConfigSignature(data: Data, response: URLResponse?, logData: NSMutableDictionary) -> NSError? {
+        // No key configured means the integrator has not opted in.
+        guard trustStore.isConfigured else { return nil }
+
+        // Discard the body and log why. Used for both an unusable configuration and a failed
+        // verification.
+        func reject(reason: String, header: String?) -> NSError {
+            logData["signature_verified"] = false
+            logData["signature_error"] = reason
+
+            let value = NSMutableDictionary()
+            value["reason"] = reason
+            value["trusted_key_id"] = trustStore.keyID ?? ""
+            value["status"] = NSNumber(value: self.utils.getResponseCode(from: response))
+            // Size only — never log the body itself.
+            value["body_size"] = NSNumber(value: data.count)
+            if let header = header, let parsed = try? AJPReleaseConfigVerifier.parseSignatureHeader(header) {
+                value["response_key_id"] = parsed.keyID
+                value["alg"] = parsed.alg
+            }
+            self.tracker.trackError("release_config_signature_verification_failed", value: value)
+
+            return NSError(
+                domain: "in.juspay.Airborne",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Release config signature verification failed (\(reason))"]
+            )
+        }
+
+        // value(forHTTPHeaderField:) matches case-insensitively, as HTTP requires;
+        // allHeaderFields does not.
+        let signatureHeader = (response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: AJPReleaseConfigVerifier.signatureHeaderName)
+
+        guard let signatureHeader = signatureHeader, !signatureHeader.isEmpty else {
+            // An unsigned response is not an error: the server omits the header when the
+            // application has no signing key. Tolerating it is what lets apps ship the public key
+            // before signing is switched on server-side.
+            logData["signature_present"] = false
+            let value = NSMutableDictionary()
+            value["reason"] = AJPSignatureVerificationError.missingHeader.reasonCode
+            value["trusted_key_id"] = trustStore.keyID ?? ""
+            self.tracker.trackLog("release_config_signature_missing", value: value, level: "warning")
+            return nil
+        }
+
+        logData["signature_present"] = true
+
+        // Configured (opted in) but not usable — a missing key id or an unparseable PEM. We
+        // cannot verify a signed response, so reject it rather than accept unverified bytes.
+        guard trustStore.isUsable,
+              let key = trustStore.publicKey,
+              let expectedKeyID = trustStore.keyID else {
+            return reject(reason: "invalid_signing_config", header: signatureHeader)
+        }
+
+        do {
+            let verifiedKeyID = try AJPReleaseConfigVerifier.verify(
+                body: data,
+                headerValue: signatureHeader,
+                expectedKeyID: expectedKeyID,
+                trustedKey: key
+            )
+            logData["signature_verified"] = true
+            logData["signature_key_id"] = verifiedKeyID
+            return nil
+        } catch {
+            let reason = (error as? AJPSignatureVerificationError)?.reasonCode ?? "unknown"
+            return reject(reason: reason, header: signatureHeader)
+        }
+    }
+
     // MARK: - Downloads & Moving
     
     private func downloadImportantPackagesWithNewManifest(_ newManifest: AJPApplicationPackage, currentManifest: AJPApplicationPackage) async -> (downloadFailed: Bool, timedOut: Bool) {

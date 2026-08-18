@@ -41,8 +41,10 @@ jsonwebtoken = "9.3.1"
 keycloak = "=26.1.0"
 lazy_static = "=1.5.0"
 log = "0.4.27"
+moka = { version = "0.12", features = ["future"] }
 openidconnect = "4.0.1"
 open-feature = "=0.2.7"
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem", "std"] }
 prometheus = "=0.14.0"
 r2d2 = "=0.8.10"
 redis = { version = "0.32.7", features = ["tokio-comp", "aio", "connection-manager"] }
