@@ -12,9 +12,13 @@ interface ViewReleaseInfoProps {
   view: View;
 }
 
+/** Enough to cover a slice's history inline; anything beyond this is noted below the table. */
+const PAGE_SIZE = 20;
+
 const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
   const router = useRouter();
   const [releases, setReleases] = useState<ApiRelease[]>([]);
+  const [totalItems, setTotalItems] = useState<number>(0);
   const { token, org, app } = useAppContext();
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -23,7 +27,7 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
   const fetchRelease = async () => {
     setLoading(true);
     try {
-      const { data }: { data: ApiRelease[] } = await apiFetch(
+      const { data, total_items }: { data: ApiRelease[]; total_items?: number } = await apiFetch(
         `/releases/list`,
         {
           headers: {
@@ -31,13 +35,14 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
           },
           query: {
             page: 1,
-            count: 5,
+            count: PAGE_SIZE,
           },
         },
         { token, org, app }
       );
 
       setReleases(data);
+      setTotalItems(total_items ?? data.length);
     } catch (err) {
       console.log(err);
     } finally {
@@ -92,7 +97,11 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
                 </TableCell>
                 <TableCell className="text-muted-foreground">{r.package?.version ?? "—"}</TableCell>
                 <TableCell>
-                  <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline">{r.experiment?.status || "—"}</Badge>
+                    {r.is_reverted && <Badge variant="secondary">Reverted</Badge>}
+                    {r.is_delete_release && <Badge variant="secondary">Deletion</Badge>}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
@@ -101,6 +110,11 @@ const ViewReleaseInfo: React.FC<ViewReleaseInfoProps> = ({ view }) => {
             ))}
           </TableBody>
         </Table>
+      )}
+      {totalItems > releases.length && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Showing the {releases.length} most recent of {totalItems} releases for this view.
+        </p>
       )}
     </div>
   );
