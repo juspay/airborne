@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.15.1 - 2026-08-18
+#### Bug Fixes
+- docs nav - (8bdbc71) - yuvrajjsingh0
+
+- - -
+
+## v0.42.1 - 2026-08-18
+#### Miscellaneous Chores
+- **(version)** v0.42.1 [skip ci] - (8862e15) - Airborne Bot
+
+- - -
+
+## v0.42.0 - 2026-08-18
+#### Miscellaneous Chores
+- **(version)** v0.42.0 [skip ci] - (a706e7f) - Airborne Bot
+
+- - -
+
+## v0.41.0 - 2026-08-18
+#### Miscellaneous Chores
+- **(version)** v0.41.0 [skip ci] - (99073d5) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.15.0 - 2026-07-07
 #### Features
 - airborne documentation end-to-end - (b895096) - yuvrajjsingh0

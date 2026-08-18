@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.43.0 - 2026-08-18
+### Package updates
+- airborne_dashboard bumped to airborne_dashboard-v0.15.1
+### Global changes
+#### Bug Fixes
+- docs nav - (8bdbc71) - yuvrajjsingh0
+#### Features
+- algolia search on docs - (13690f3) - yuvrajjsingh0
+#### Miscellaneous Chores
+- docs for bare airborne integration - (9cdc228) - yuvrajjsingh0
+
+- - -
+
 ## v0.42.1 - 1970-01-01
 ### Package updates
 - airborne_sdk_ios bumped to airborne_sdk_ios-v0.7.1
