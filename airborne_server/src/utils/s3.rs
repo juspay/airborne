@@ -32,6 +32,7 @@ pub async fn stream_file(
     filename: String,
     file_size: i64,
     checksum: String,
+    content_encoding: Option<String>,
 ) -> airborne_types::Result<PutObjectOutput> {
     info!("Uploading file: {}", filename);
     info!("Uploading File: {}", file_size);
@@ -40,6 +41,7 @@ pub async fn stream_file(
         .bucket(bucket_name)
         .key(filename.clone())
         .content_length(file_size)
+        .set_content_encoding(content_encoding)
         .set_checksum_sha256(Some(checksum))
         .set_checksum_algorithm(Some(ChecksumAlgorithm::Sha256))
         .body(byte_stream)
