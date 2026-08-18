@@ -39,6 +39,22 @@
           buildInputs = [ pkgs.postgresql_15 pkgs.openssl ];
           nativeBuildInputs = [ pkgs.pkg-config ];
           DOCS_RS = "1";
+          # `diesel` in this workspace is a local re-export shim (diesel-shim/)
+          # that redirects the crates.io `diesel` pulled in by diesel-adapter and
+          # diesel_migrations onto the juspay_diesel fork via [patch.crates-io].
+          # crane's dependency-only build (cargoArtifacts) stubs every local
+          # crate's source with an empty file, which erases the shim's
+          # `pub use juspay_diesel::*;` and makes diesel_migrations / diesel-adapter
+          # fail to resolve `diesel::backend`, `diesel::migration`, etc. Restore
+          # the shim's real source into the dummy tree so the cached dependency
+          # build compiles those crates against the actual re-export.
+          dummySrc = config.rust-project.crane-lib.mkDummySrc {
+            src = config.rust-project.src;
+            extraDummyScript = ''
+              mkdir -p "$out/diesel-shim/src"
+              cp -f ${./diesel-shim/src/lib.rs} "$out/diesel-shim/src/lib.rs"
+            '';
+          };
         };
         formatter = pkgs.nixpkgs-fmt;
         devShells.default = pkgs.mkShell {
