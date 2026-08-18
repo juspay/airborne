@@ -452,15 +452,16 @@ pub fn parse_kv_string(input: &str) -> HashMap<String, Value> {
 
 pub async fn invalidate_cf(
     client: &aws_sdk_cloudfront::Client,
-    path: String,
+    paths: Vec<String>,
     distribution_id: &str,
 ) -> airborne_types::Result<()> {
     // Make this unique on each call
     let caller_reference = format!("invalidate-{}", uuid::Uuid::new_v4());
 
+    let quantity = paths.len() as i32;
     let paths = aws_sdk_cloudfront::types::Paths::builder()
-        .items(path)
-        .quantity(1)
+        .set_items(Some(paths))
+        .quantity(quantity)
         .build()
         .map_err(|e| ABError::InternalServerError(format!("Failed to build paths: {}", e)))?;
 
@@ -491,6 +492,27 @@ pub async fn invalidate_cf(
         });
 
     Ok(())
+}
+
+/// Best-effort: drop the CDN's cached release-config responses for an application.
+///
+/// Both serve routes are listed: the v1 pattern does not cover `/release/v2/...`,
+/// so without its own entry the v2 endpoint would keep serving from the edge.
+pub async fn invalidate_release_cache(state: &AppState, organisation: &str, application: &str) {
+    let paths = vec![
+        format!("/release/{organisation}/{application}*"),
+        format!("/release/v2/{organisation}/{application}*"),
+    ];
+
+    if let Err(e) = invalidate_cf(
+        &state.cf_client,
+        paths,
+        &state.env.cloudfront_distribution_id,
+    )
+    .await
+    {
+        info!("Failed to invalidate CloudFront cache: {:?}", e);
+    }
 }
 
 pub async fn check_non_concluded_releases(
