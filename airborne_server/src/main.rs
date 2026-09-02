@@ -69,7 +69,6 @@ use crate::{
         },
     },
     utils::{
-        interceptor::CookieIntercept,
         metrics::push_metrics_task,
         migrations::{
             get_default_configs_from_file, migrate_superposition, SuperpositionMigrationStrategy,
@@ -374,25 +373,11 @@ async fn main() -> std::io::Result<()> {
     }
 
     let superposition_client = if app_config.enable_authenticated_superposition {
-        let superposition_user_token = app_config.superposition_user_token.clone().expect(
-            "SUPERPOSITION_USER_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
-        );
-        let superposition_org_token = app_config.superposition_org_token.clone().expect(
-            "SUPERPOSITION_ORG_TOKEN must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true",
-        );
-
-        // Inject Auth cookie for Superposition SDK calls
-        let cookie_interceptor = CookieIntercept::new(format!(
-            "user={}; org_{}={}",
-            superposition_user_token, superposition_org_id_env, superposition_org_token,
-        ));
-
         superposition_sdk::Client::from_conf(
             SrsConfig::builder()
-                .bearer_token("abcd".into())
+                .bearer_token(superposition_token.clone().into())
                 .endpoint_url(cac_url.clone())
                 .behavior_version_latest()
-                .interceptor(cookie_interceptor)
                 .build(),
         )
     } else {
