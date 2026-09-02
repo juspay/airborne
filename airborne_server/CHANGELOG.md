@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.23.2 - 2026-09-02
+#### Bug Fixes
+- use superposition bearer token - (a2b0be2) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.23.1 - 2026-08-13
 #### Bug Fixes
 - check for bundled paths - (369fcb3) - Yash Raput

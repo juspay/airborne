@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.43.1 - 2026-09-02
+### Package updates
+- airborne_server bumped to airborne_server-v0.23.2
+### Global changes
+#### Bug Fixes
+- use superposition bearer token - (a2b0be2) - yuvrajjsingh0
+
+- - -
+
 ## v0.43.0 - 2026-08-18
 ### Package updates
 - airborne_dashboard bumped to airborne_dashboard-v0.15.1
