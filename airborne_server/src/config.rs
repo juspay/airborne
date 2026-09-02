@@ -64,8 +64,6 @@ pub struct AppConfig {
     pub superposition_url: String,
     pub superposition_org_id: String,
     pub superposition_token: Option<String>,
-    pub superposition_user_token: Option<String>,
-    pub superposition_org_token: Option<String>,
     pub enable_authenticated_superposition: bool,
     pub superposition_clear_unused_providers: bool,
     pub superposition_unused_provider_ttl: u64,
@@ -213,8 +211,6 @@ impl AppConfig {
             superposition_url: get_env("SUPERPOSITION_URL", None)?,
             superposition_org_id: get_env("SUPERPOSITION_ORG_ID", None)?,
             superposition_token: get_optional_secret("SUPERPOSITION_TOKEN")?,
-            superposition_user_token: get_optional_secret("SUPERPOSITION_USER_TOKEN")?,
-            superposition_org_token: get_optional_secret("SUPERPOSITION_ORG_TOKEN")?,
             enable_authenticated_superposition: parse_env(
                 "ENABLE_AUTHENTICATED_SUPERPOSITION",
                 false,
