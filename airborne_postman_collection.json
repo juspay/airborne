@@ -1,0 +1,2831 @@
+{
+  "info": {
+    "name": "Airborne Dashboard APIs",
+    "description": "Complete Postman collection for all Airborne Server dashboard APIs.\n\n## Authentication\nMost endpoints require a Bearer token in the Authorization header. Use the \"Login\" or \"Issue Token\" endpoints to obtain a token.\n\n## Required Headers\n- `Authorization: Bearer <token>` — for authenticated endpoints\n- `x-organisation` — organisation name (for org-scoped endpoints)\n- `x-application` — application name (for app-scoped endpoints)\n\n---\n\n## Path to Release (Step-by-Step)\n\nBelow is the full workflow to go from zero to a live release, with curl examples.\n\n### Step 1: Register a user\n```\ncurl -X POST http://localhost:8081/api/users/create \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"myuser\",\"password\":\"MyPass@123\",\"email\":\"user@example.com\"}'\n```\nSave the `access_token` from `user_token` in the response.\n\n### Step 2: Create an organisation\n```\ncurl -X POST http://localhost:8081/api/organisations/create \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"name\":\"my-org\"}'\n```\n\n### Step 3: Create an application\n```\ncurl -X POST http://localhost:8081/api/organisations/applications/create \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"application\":\"my-app\"}'\n```\n\n### Step 4: Create dimensions (optional, for targeting)\n```\ncurl -X POST http://localhost:8081/api/organisations/applications/dimension/create \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"dimension\":\"os\",\"schema\":\"string\",\"description\":\"Operating system\",\"dimension_type\":\"standard\",\"depends_on\":null}'\n```\n\n### Step 5: Upload files\nUpload the files that will be part of your release bundle.\n```\ncurl -X POST http://localhost:8081/api/file/upload?file_path=index.js \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -F 'file=@./dist/index.js'\n```\nRepeat for each file. Note the `file_path` values returned.\n\n### Step 6: Create a package\nBundle the uploaded files into a package. The `index` field is the entry-point file path, `files` lists all file paths.\n```\ncurl -X POST http://localhost:8081/api/packages \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"index\":\"index.js\",\"tag\":\"v1.0.0\",\"files\":[\"index.js\",\"style.css\"]}'\n```\nNote the `package_key` (format: `index@version:N`) from the response headers or body.\n\n### Step 7: Create a release\nReference a package by `package_id` (resolves against the application's **primary** package group). Both `package_id` and `package` are required. Use `sub_packages: [\"<group_id>@<version>\"]` to pull in additional non-primary groups.\n```\ncurl -X POST http://localhost:8081/api/releases \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\n    \"config\": {\n      \"boot_timeout\": 5000,\n      \"release_config_timeout\": 3000,\n      \"properties\": {}\n    },\n    \"package_id\": \"index.js@version:1\",\n    \"package\": {\n      \"properties\": {},\n      \"important\": [],\n      \"lazy\": []\n    },\n    \"sub_packages\": [],\n    \"dimensions\": {\"os\": \"android\"},\n    \"resources\": []\n  }'\n```\nSave the `id` from the response — this is your `release_id`.\n\nThe configured validation function (see Validation Functions folder) is invoked on every Create Release; if it returns false the request is rejected.\n\n### Step 8: Ramp the release (gradual rollout)\nIncrease traffic to the new release.\n```\ncurl -X POST http://localhost:8081/api/releases/<RELEASE_ID>/ramp \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"traffic_percentage\": 50, \"change_reason\": \"Canary rollout to 50%\"}'\n```\n\n### Step 9: Conclude or discard\n**Conclude** (promote to 100%):\n```\ncurl -X POST http://localhost:8081/api/releases/<RELEASE_ID>/conclude \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"chosen_variant\": \"control\", \"change_reason\": \"Metrics look good, rolling out\"}'\n```\n**Discard** (rollback):\n```\ncurl -X POST http://localhost:8081/api/releases/<RELEASE_ID>/discard \\\n  -H 'Authorization: Bearer <TOKEN>' \\\n  -H 'x-organisation: my-org' \\\n  -H 'x-application: my-app' \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"change_reason\": \"Found regression, rolling back\"}'\n```\n\n### Step 10: Serve the release (public, no auth)\nClients fetch the current release via:\n```\ncurl http://localhost:8081/release/my-org/my-app\n```\nOr v2 with experiment toss:\n```\ncurl http://localhost:8081/release/v2/my-org/my-app?toss=42\n```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "prefix",
+      "value": "api",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "organisation",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "application",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "health"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard Configuration",
+      "item": [
+        {
+          "name": "Get Global Configuration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/dashboard/configuration",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "dashboard", "configuration"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users & Authentication",
+      "item": [
+        {
+          "name": "Create User (Register)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.user_token && jsonData.user_token.access_token) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.user_token.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"testuser\",\n  \"password\": \"password123\",\n  \"first_name\": \"Test\",\n  \"last_name\": \"User\",\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/users/create",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "users", "create"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.user_token && jsonData.user_token.access_token) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.user_token.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"testuser\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/users/login",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "users", "login"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get OAuth URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/users/oauth/url?offline=false&idp=google",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "users", "oauth", "url"],
+              "query": [
+                {
+                  "key": "offline",
+                  "value": "false"
+                },
+                {
+                  "key": "idp",
+                  "value": "google",
+                  "description": "Identity provider name"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "OAuth Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.user_token && jsonData.user_token.access_token) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.user_token.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"oauth_authorization_code\",\n  \"state\": \"optional_state_param\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/users/oauth/login",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "users", "oauth", "login"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "OAuth Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"oauth_authorization_code\",\n  \"state\": \"optional_state_param\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/users/oauth/signup",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "users", "oauth", "signup"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "users"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Token Management",
+      "item": [
+        {
+          "name": "Issue Token (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"client_secret\": \"<paste client_secret from the PAT file>\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/token/issue",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "token", "issue"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Exchanges a Personal Access Token (PAT) for a short-lived OIDC access token.\n\nBody is the JSON downloaded when the PAT was created via `POST /token`: `{ client_id, client_secret }`. Public endpoint — no Authorization header.\n\nThe test script auto-stores the returned `access_token` into the `{{access_token}}` collection variable so subsequent requests in this collection authenticate automatically."
+          }
+        },
+        {
+          "name": "Create Personal Access Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{username}}\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/token",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "token"]
+            },
+            "description": "Creates a Personal Access Token for the logged-in user. The `name` MUST equal the authenticated user's username (server checks `auth_response.username == req.name` and rejects with 401 Unauthorized otherwise). Set the `{{username}}` collection variable accordingly."
+          }
+        },
+        {
+          "name": "Create Token via OAuth",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"oauth_authorization_code\",\n  \"state\": \"optional_state\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/token/oauth",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "token", "oauth"]
+            }
+          }
+        },
+        {
+          "name": "List Tokens",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/token/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "token", "list"]
+            }
+          }
+        },
+        {
+          "name": "Delete Token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/token/:client_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "token", ":client_id"],
+              "variable": [
+                {
+                  "key": "client_id",
+                  "value": "",
+                  "description": "UUID of the token to delete"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authorization",
+      "item": [
+        {
+          "name": "Get Permission Catalog",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/authz/catalog?scope=org",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "authz", "catalog"],
+              "query": [
+                {
+                  "key": "scope",
+                  "value": "org",
+                  "description": "Scope filter: org, app, or auto"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Enforce My Permissions (Batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checks\": [\n    {\n      \"resource\": \"release\",\n      \"action\": \"create\"\n    },\n    {\n      \"resource\": \"config\",\n      \"action\": \"read\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/authz/me/enforce-batch",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "authz", "me", "enforce-batch"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organisations",
+      "item": [
+        {
+          "name": "Request Organisation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organisation_name\": \"my-org\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"play_store_link\": \"https://play.google.com/store/apps/details?id=com.example\",\n  \"app_store_link\": \"https://apps.apple.com/app/example/id123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/request",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "request"]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Create Organisation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.name) {",
+                  "    pm.collectionVariables.set('organisation', jsonData.name);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-org\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/create",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "create"]
+            }
+          }
+        },
+        {
+          "name": "List Organisations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations"]
+            }
+          }
+        },
+        {
+          "name": "Delete Organisation",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}",
+                "description": "Must match the org being deleted; handler authorizes on auth_response.organisation"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/:org_name",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", ":org_name"],
+              "variable": [
+                {
+                  "key": "org_name",
+                  "value": "{{organisation}}",
+                  "description": "Organisation name to delete"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Applications",
+      "item": [
+        {
+          "name": "Create Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.application) {",
+                  "    pm.collectionVariables.set('application', jsonData.application);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"application\": \"my-app\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/create",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "create"]
+            }
+          }
+        },
+        {
+          "name": "Config - Create JSON v1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"config\": {\n    \"version\": \"1\",\n    \"release_config_timeout\": 3000,\n    \"boot_timeout\": 5000\n  },\n  \"tenant_info\": {},\n  \"properties\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/config/create_json_v1",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "config", "create_json_v1"]
+            }
+          }
+        },
+        {
+          "name": "Config - Create JSON v1 (Multipart)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "json",
+                  "value": "{\"config\": {\"version\": \"1\", \"release_config_timeout\": 3000, \"boot_timeout\": 5000}, \"tenant_info\": {}, \"properties\": {}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/config/create_json_v1/multipart",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "config", "create_json_v1", "multipart"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Organisation Users",
+      "item": [
+        {
+          "name": "Add User to Organisation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"username\",\n  \"access\": \"write\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/create",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "create"]
+            }
+          }
+        },
+        {
+          "name": "Update Organisation User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"username\",\n  \"access\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/update",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "update"]
+            }
+          }
+        },
+        {
+          "name": "Remove User from Organisation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"username\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/remove",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "remove"]
+            }
+          }
+        },
+        {
+          "name": "List Organisation Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "list"]
+            }
+          }
+        },
+        {
+          "name": "Transfer Organisation Ownership",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"new_owner_username\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/transfer-ownership",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "transfer-ownership"]
+            }
+          }
+        },
+        {
+          "name": "List Organisation Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/roles/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "roles", "list"]
+            }
+          }
+        },
+        {
+          "name": "List Organisation Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/permissions/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "permissions", "list"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Organisation Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"custom-role\",\n  \"permissions\": [\"release.create\", \"release.read\", \"config.read\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisation/user/roles/upsert",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisation", "user", "roles", "upsert"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Application Users",
+      "item": [
+        {
+          "name": "Add User to Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"username\",\n  \"access\": \"write\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/create",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "create"]
+            }
+          }
+        },
+        {
+          "name": "Update Application User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"username\",\n  \"access\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/update",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "update"]
+            }
+          }
+        },
+        {
+          "name": "Remove User from Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user\": \"username\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/remove",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "remove"]
+            }
+          }
+        },
+        {
+          "name": "List Application Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "list"]
+            }
+          }
+        },
+        {
+          "name": "List Application Roles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/roles/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "roles", "list"]
+            }
+          }
+        },
+        {
+          "name": "List Application Permissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/permissions/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "permissions", "list"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Application Role",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"custom-role\",\n  \"permissions\": [\"release.create\", \"release.read\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/user/roles/upsert",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "user", "roles", "upsert"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dimensions",
+      "item": [
+        {
+          "name": "Create Dimension",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dimension\": \"os\",\n  \"schema\": \"string\",\n  \"description\": \"Operating system dimension\",\n  \"dimension_type\": \"standard\",\n  \"depends_on\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/create",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "create"]
+            }
+          }
+        },
+        {
+          "name": "List Dimensions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/list?page=1&count=20",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "list"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (optional)"
+                },
+                {
+                  "key": "count",
+                  "value": "20",
+                  "description": "Items per page (optional)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Dimension",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"position\": 1,\n  \"change_reason\": \"Reordering dimensions\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension_name",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension_name"],
+              "variable": [
+                {
+                  "key": "dimension_name",
+                  "value": "os",
+                  "description": "Name of the dimension to update"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Dimension",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension_name",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension_name"],
+              "variable": [
+                {
+                  "key": "dimension_name",
+                  "value": "os",
+                  "description": "Name of the dimension to delete"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Release Views",
+      "item": [
+        {
+          "name": "Create Release View",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Production Android\",\n  \"dimensions\": [\n    {\"key\": \"os\", \"value\": \"android\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/release-view",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "release-view"]
+            }
+          }
+        },
+        {
+          "name": "List Release Views",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/release-view/list?page=1&count=20",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "release-view", "list"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "count",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Release View",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/release-view/:view_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "release-view", ":view_id"],
+              "variable": [
+                {
+                  "key": "view_id",
+                  "value": "",
+                  "description": "UUID of the release view"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Release View",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Production Android Updated\",\n  \"dimensions\": [\n    {\"key\": \"os\", \"value\": \"android\"},\n    {\"key\": \"env\", \"value\": \"production\"}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/release-view/:view_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "release-view", ":view_id"],
+              "variable": [
+                {
+                  "key": "view_id",
+                  "value": "",
+                  "description": "UUID of the release view to update"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Release View",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/release-view/:view_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", "release-view", ":view_id"],
+              "variable": [
+                {
+                  "key": "view_id",
+                  "value": "",
+                  "description": "UUID of the release view to delete"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cohorts",
+      "item": [
+        {
+          "name": "Get Cohort",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension/cohort",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension", "cohort"],
+              "variable": [
+                {
+                  "key": "dimension",
+                  "value": "",
+                  "description": "Cohort dimension name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Checkpoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"v1_2_release\",\n  \"value\": \"1.2.0\",\n  \"comparator\": \"semver_gt\"\n}"
+            },
+            "description": "Comparator is one of: semver_gt, semver_ge, str_gt, str_ge.",
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension/cohort/checkpoint",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension", "cohort", "checkpoint"],
+              "variable": [
+                {
+                  "key": "dimension",
+                  "value": "",
+                  "description": "Cohort dimension name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Cohort Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"beta_users\",\n  \"members\": [\"user_1\", \"user_2\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension/cohort/group",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension", "cohort", "group"],
+              "variable": [
+                {
+                  "key": "dimension",
+                  "value": "",
+                  "description": "Cohort dimension name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Cohort Group Priority",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension/cohort/group/priority",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension", "cohort", "group", "priority"],
+              "variable": [
+                {
+                  "key": "dimension",
+                  "value": "",
+                  "description": "Cohort dimension name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Cohort Group Priority",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority_map\": {\n    \"beta_users\": 0,\n    \"alpha_users\": 1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/dimension/:dimension/cohort/group/priority",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "dimension", ":dimension", "cohort", "group", "priority"],
+              "variable": [
+                {
+                  "key": "dimension",
+                  "value": "",
+                  "description": "Cohort dimension name"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Properties",
+      "item": [
+        {
+          "name": "List Properties",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/properties/list",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "properties", "list"]
+            }
+          }
+        },
+        {
+          "name": "Get Properties Schema",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/properties/schema",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "properties", "schema"]
+            }
+          }
+        },
+        {
+          "name": "Update Properties Schema",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"properties\": {\n    \"app_version\": {\n      \"description\": \"Application version\",\n      \"default_value\": \"1.0.0\",\n      \"schema\": {\n        \"type\": \"string\"\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/properties/schema",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "properties", "schema"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Validation Functions",
+      "item": [
+        {
+          "name": "Get Validation Function",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/validation-functions",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "validation-functions"]
+            },
+            "description": "Returns the JS validation function source for this org/app. Defaults to `async function main(args) { return true; }` if none stored."
+          }
+        },
+        {
+          "name": "Update Validation Function",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"function_code\": \"async function main(args) {\\n  // args is a map keyed by package-group name → that package version's metadata JSON.\\n  // The primary group is always present; any sub_packages referenced by the release add more entries.\\n  // Example: { primary: { ...primary pkg metadata... }, 'common-assets': { ...sub pkg metadata... } }\\n  return true;\\n}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/validation-functions",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "validation-functions"]
+            },
+            "description": "Upserts the JS validation function. Body must declare a `main(args)` function that returns a boolean. It is invoked on every Create Release and the release is rejected when it returns false."
+          }
+        },
+        {
+          "name": "Test Validation Function",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"function_code\": \"async function main(args) {\\n  // Reject the release unless the primary package metadata declares minSdk >= 21\\n  const meta = args.primary || {};\\n  return typeof meta.minSdk === 'number' && meta.minSdk >= 21;\\n}\",\n  \"test_args\": {\n    \"primary\": { \"minSdk\": 24, \"buildType\": \"release\" },\n    \"common-assets\": { \"version\": \"1.2.0\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/organisations/applications/validation-functions/test",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "organisations", "applications", "validation-functions", "test"]
+            },
+            "description": "Dry-runs a validation function against supplied `test_args` without persisting. Returns `{valid, result, error}`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Files",
+      "item": [
+        {
+          "name": "Create File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"file_path\": \"assets/main.js\",\n  \"url\": \"https://cdn.example.com/assets/main.js\",\n  \"tag\": \"v1.0.0\",\n  \"metadata\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Create Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"files\": [\n    {\n      \"file_path\": \"assets/main.js\",\n      \"url\": \"https://cdn.example.com/assets/main.js\",\n      \"tag\": \"v1.0.0\"\n    },\n    {\n      \"file_path\": \"assets/style.css\",\n      \"url\": \"https://cdn.example.com/assets/style.css\",\n      \"tag\": \"v1.0.0\"\n    }\n  ],\n  \"skip_duplicates\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Upload File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              },
+              {
+                "key": "x-checksum",
+                "value": "<base64 SHA-256 of file bytes>",
+                "description": "Required. Base64-encoded SHA-256 of the raw body. Server rejects with 400 if missing."
+              }
+            ],
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": ""
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/upload?file_path=assets/main.js&tag=v1.0.0",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", "upload"],
+              "query": [
+                {
+                  "key": "file_path",
+                  "value": "assets/main.js",
+                  "description": "Target file path"
+                },
+                {
+                  "key": "tag",
+                  "value": "v1.0.0",
+                  "description": "Optional tag"
+                }
+              ]
+            },
+            "description": "Streams the raw file bytes (no multipart). Handler reads body via Payload and requires Content-Length (auto-set by Postman) plus x-checksum (base64 SHA-256 of body, set manually)."
+          }
+        },
+        {
+          "name": "Upload Bulk Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "",
+                  "description": "Single ZIP archive containing `mappings.json` plus the listed file entries."
+                },
+                {
+                  "key": "skip_duplicates",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Required boolean. When true, paths whose (file_path, version) already exist are skipped instead of failing the batch."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/bulk_upload",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", "bulk_upload"]
+            },
+            "description": "Multipart upload of a single ZIP. The form has exactly two fields: `file` (the .zip) and `skip_duplicates` (text bool). The ZIP must contain `mappings.json` with [{file_name, file_path, version, metadata?}] entries."
+          }
+        },
+        {
+          "name": "Get File",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file?file_key=assets/main.js@version:1",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file"],
+              "query": [
+                {
+                  "key": "file_key",
+                  "value": "assets/main.js@version:1",
+                  "description": "File key (format: path@version:N or path@tag:TAG)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Files",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/list?page=1&per_page=20&search=main&tags=v1.0.0",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", "list"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (optional)"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20",
+                  "description": "Items per page (optional)"
+                },
+                {
+                  "key": "search",
+                  "value": "main",
+                  "description": "Search filter (optional)"
+                },
+                {
+                  "key": "tags",
+                  "value": "v1.0.0",
+                  "description": "Tag filter — comma-separated list, e.g. \"v1.0.0,beta\" (optional)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update File",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tag\": \"v2.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/:file_key",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", ":file_key"],
+              "variable": [
+                {
+                  "key": "file_key",
+                  "value": "assets/main.js@version:1",
+                  "description": "File key (format: path@version:N or path@tag:TAG)"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List File Tags",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/tags",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", "tags"],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "true",
+                  "description": "Return all rows. Omit (or set false) and use `page` + `count` for pagination.",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (1-indexed). Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "count",
+                  "value": "20",
+                  "description": "Page size (note: `count`, not `per_page`). Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "ILIKE match against tag name (optional).",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List File Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/file/groups",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "file", "groups"],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "true",
+                  "description": "Return all rows. Omit (or set false) and use `page` + `count` for pagination.",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (1-indexed). Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "count",
+                  "value": "20",
+                  "description": "Page size. Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "ILIKE match against group path (optional).",
+                  "disabled": true
+                },
+                {
+                  "key": "tags",
+                  "value": "",
+                  "description": "Comma-separated tag filter, e.g. \"v1.0.0,beta\" (optional).",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Packages",
+      "item": [
+        {
+          "name": "Create Package",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"index\": \"index.js\",\n  \"tag\": \"v1.0.0\",\n  \"files\": [\n    \"assets/main.js\",\n    \"assets/style.css\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/packages",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "packages"]
+            }
+          }
+        },
+        {
+          "name": "Get Package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/packages?package_key=tag:latest",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "packages"],
+              "query": [
+                {
+                  "key": "package_key",
+                  "value": "tag:latest",
+                  "description": "Required format: `version:N` or `tag:NAME`. If neither matches, server falls back to `tag:latest`. A bare name like `my-package` is silently treated as the fallback."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Packages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/packages/list?search=my-package",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "packages", "list"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "my-package",
+                  "description": "Search filter (optional)"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Package Groups",
+      "description": "Package Groups are the v2 packaging model. Every application gets a `primary` group at creation time. The primary group requires `index` on each package and is what `package_id` resolves against in Create Release. Non-primary groups (sub-packages) must NOT supply `index` and are referenced from a release via `sub_packages: [\"<group_id>@<version>\"]`.",
+      "item": [
+        {
+          "name": "Create Package Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"common-assets\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups"]
+            },
+            "description": "Creates a new non-primary package group. `is_primary` is always false here — the primary group is auto-created with the application."
+          }
+        },
+        {
+          "name": "List Package Groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups?all=true&search=",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups"],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "true",
+                  "description": "Return all rows. Omit (or set false) and use `page` + `count` for pagination."
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (1-indexed). Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "count",
+                  "value": "20",
+                  "description": "Page size. Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "ILIKE match against group name (optional)."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Package Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups/:group_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups", ":group_id"],
+              "variable": [
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "description": "Package group UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Rename Package Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"renamed-group\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups/:group_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups", ":group_id"],
+              "variable": [
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "description": "Package group UUID"
+                }
+              ]
+            },
+            "description": "Renames the group. Fails with 400 if another group in this app already has the target name."
+          }
+        },
+        {
+          "name": "List Packages in Group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups/:group_id/packages?all=true&search=",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups", ":group_id", "packages"],
+              "query": [
+                {
+                  "key": "all",
+                  "value": "true",
+                  "description": "Return all rows. Omit (or set false) and use `page` + `count` for pagination."
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (1-indexed). Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "count",
+                  "value": "20",
+                  "description": "Page size. Used when `all` is absent/false.",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "ILIKE match against the package `index` (optional)."
+                }
+              ],
+              "variable": [
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "description": "Package group UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Package in Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tag\": \"v1.0.0\",\n  \"files\": [\n    \"assets/main.js@version:1\",\n    \"assets/style.css@version:1\"\n  ],\n  \"metadata\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups/:group_id/packages",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups", ":group_id", "packages"],
+              "variable": [
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "description": "Package group UUID"
+                }
+              ]
+            },
+            "description": "Creates a new v2 package version inside the group. Server auto-assigns `version = max(existing) + 1` scoped to the group.\n\n• Primary group: `index` is REQUIRED and must reference an existing file (e.g. add `\"index\": \"index.js@version:1\"` to the body).\n• Non-primary group: `index` MUST be omitted/null — the request fails otherwise.\n\nThe default example body omits `index` because the `Create Package Group` request creates non-primary groups. Add `index` only when targeting the auto-created `primary` group.\n\nAll entries in `files` are resolved by `<file_path>@version:N` or `<file_path>@tag:NAME`; missing files reject the request."
+          }
+        },
+        {
+          "name": "Get Package by Version",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups/:group_id/packages/version/:version",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups", ":group_id", "packages", "version", ":version"],
+              "variable": [
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "description": "Package group UUID"
+                },
+                {
+                  "key": "version",
+                  "value": "1",
+                  "description": "Integer package version within the group"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Package by Tag",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/package-groups/:group_id/packages/tag/:tag",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "package-groups", ":group_id", "packages", "tag", ":tag"],
+              "variable": [
+                {
+                  "key": "group_id",
+                  "value": "",
+                  "description": "Package group UUID"
+                },
+                {
+                  "key": "tag",
+                  "value": "v1.0.0",
+                  "description": "Tag string set when the package was created"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Releases",
+      "item": [
+        {
+          "name": "Create Release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"config\": {\n    \"boot_timeout\": 5000,\n    \"release_config_timeout\": 3000,\n    \"properties\": {}\n  },\n  \"package_id\": \"index.js@version:1\",\n  \"package\": {\n    \"properties\": {},\n    \"important\": [],\n    \"lazy\": []\n  },\n  \"sub_packages\": [],\n  \"dimensions\": {\n    \"os\": \"android\"\n  },\n  \"resources\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases"]
+            }
+          }
+        },
+        {
+          "name": "List Releases",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              },
+              {
+                "key": "x-dimension",
+                "value": "os=android",
+                "description": "Optional. Semicolon-separated key=value dimensions used to filter experiments by context (format: `key1=v1;key2=v2`).",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases/list?status=created",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases", "list"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "created",
+                  "description": "Filter by status. Values are lowercase: created, inprogress, concluded, discarded (optional)."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Release",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases/:release_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases", ":release_id"],
+              "variable": [
+                {
+                  "key": "release_id",
+                  "value": "",
+                  "description": "Release UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Release",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"config\": {\n    \"boot_timeout\": 6000,\n    \"release_config_timeout\": 4000,\n    \"properties\": {}\n  },\n  \"package_id\": \"index.js@version:1\",\n  \"package\": {\n    \"properties\": {},\n    \"important\": [],\n    \"lazy\": []\n  },\n  \"sub_packages\": [],\n  \"dimensions\": {\n    \"os\": \"android\"\n  },\n  \"resources\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases/:release_id",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases", ":release_id"],
+              "variable": [
+                {
+                  "key": "release_id",
+                  "value": "",
+                  "description": "Release UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Ramp Release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"traffic_percentage\": 50,\n  \"change_reason\": \"Ramping to 50% for canary testing\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases/:release_id/ramp",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases", ":release_id", "ramp"],
+              "variable": [
+                {
+                  "key": "release_id",
+                  "value": "",
+                  "description": "Release UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Conclude Release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chosen_variant\": \"control\",\n  \"change_reason\": \"Experiment concluded, rolling out to 100%\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases/:release_id/conclude",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases", ":release_id", "conclude"],
+              "variable": [
+                {
+                  "key": "release_id",
+                  "value": "",
+                  "description": "Release UUID"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Discard Release",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-organisation",
+                "value": "{{organisation}}"
+              },
+              {
+                "key": "x-application",
+                "value": "{{application}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"change_reason\": \"Discarding due to critical bug found\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/{{prefix}}/releases/:release_id/discard",
+              "host": ["{{base_url}}"],
+              "path": ["{{prefix}}", "releases", ":release_id", "discard"],
+              "variable": [
+                {
+                  "key": "release_id",
+                  "value": "",
+                  "description": "Release UUID"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public - Serve Release",
+      "item": [
+        {
+          "name": "Serve Release (v1)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-dimension",
+                "value": "os=android",
+                "description": "Optional. Semicolon-separated key=value dimensions used to pick the matching release variant (format: `key1=v1;key2=v2`). Without this header the resolved context is empty, so only default-targeted releases match.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/release/:organisation/:application?toss=123",
+              "host": ["{{base_url}}"],
+              "path": ["release", ":organisation", ":application"],
+              "query": [
+                {
+                  "key": "toss",
+                  "value": "123",
+                  "description": "Toss value for experiment bucketing (optional)"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "organisation",
+                  "value": "{{organisation}}",
+                  "description": "Organisation name"
+                },
+                {
+                  "key": "application",
+                  "value": "{{application}}",
+                  "description": "Application name"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Serve Release (v2)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-dimension",
+                "value": "os=android",
+                "description": "Optional. Semicolon-separated key=value dimensions used to pick the matching release variant (format: `key1=v1;key2=v2`). Without this header the resolved context is empty, so only default-targeted releases match.",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/release/v2/:organisation/:application?toss=123",
+              "host": ["{{base_url}}"],
+              "path": ["release", "v2", ":organisation", ":application"],
+              "query": [
+                {
+                  "key": "toss",
+                  "value": "123",
+                  "description": "Toss value for experiment bucketing (optional)"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "organisation",
+                  "value": "{{organisation}}",
+                  "description": "Organisation name"
+                },
+                {
+                  "key": "application",
+                  "value": "{{application}}",
+                  "description": "Application name"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public - Build",
+      "item": [
+        {
+          "name": "Serve Version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/build/:organisation/:application",
+              "host": ["{{base_url}}"],
+              "path": ["build", ":organisation", ":application"],
+              "variable": [
+                {
+                  "key": "organisation",
+                  "value": "{{organisation}}",
+                  "description": "Organisation name"
+                },
+                {
+                  "key": "application",
+                  "value": "{{application}}",
+                  "description": "Application name"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Serve AAR",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/build/:organisation/:application/aar",
+              "host": ["{{base_url}}"],
+              "path": ["build", ":organisation", ":application", "aar"],
+              "variable": [
+                {
+                  "key": "organisation",
+                  "value": "{{organisation}}",
+                  "description": "Organisation name"
+                },
+                {
+                  "key": "application",
+                  "value": "{{application}}",
+                  "description": "Application name"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Serve ZIP",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/build/:organisation/:application/zip",
+              "host": ["{{base_url}}"],
+              "path": ["build", ":organisation", ":application", "zip"],
+              "variable": [
+                {
+                  "key": "organisation",
+                  "value": "{{organisation}}",
+                  "description": "Organisation name"
+                },
+                {
+                  "key": "application",
+                  "value": "{{application}}",
+                  "description": "Application name"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
