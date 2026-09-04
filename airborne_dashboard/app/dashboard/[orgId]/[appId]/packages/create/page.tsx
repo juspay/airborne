@@ -195,10 +195,10 @@ export default function CreatePackagePage() {
                   onChange={handleIndexFileChange}
                 />
                 {selectedIndexFile && (
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-green-600" />
-                      <span className="font-mono text-sm">{selectedIndexFile.file_path}</span>
+                      <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <span className="font-mono text-sm text-foreground">{selectedIndexFile.file_path}</span>
                       <span className="text-muted-foreground text-xs">(v{selectedIndexFile.version})</span>
                     </div>
                   </div>

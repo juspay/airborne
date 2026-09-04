@@ -93,8 +93,8 @@ export function ResourcesStep() {
           />
 
           {selectedResources.size > 0 && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <div className="text-sm text-green-800">
+            <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <div className="text-sm text-green-700 dark:text-green-400">
                 Selected {selectedResources.size} resource
                 {selectedResources.size !== 1 ? "s" : ""} for this release
               </div>
