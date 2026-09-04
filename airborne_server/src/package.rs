@@ -5,10 +5,13 @@ use crate::{
     run_blocking,
     types::{ABError, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::db::{
-        models::{NewPackageV2Entry, PackageV2Entry},
-        schema::hyperotaserver::packages_v2::{
-            app_id as package_app_id, index as package_index, org_id as package_org_id,
-            table as packages_table, tag as package_tag, version as package_version,
+        models::{FileEntry, FileGroupEntry, NewPackageV2Entry, PackageV2Entry},
+        schema::hyperotaserver::{
+            file_groups, files as files_table_mod,
+            packages_v2::{
+                app_id as package_app_id, index as package_index, org_id as package_org_id,
+                table as packages_table, tag as package_tag, version as package_version,
+            },
         },
         DbPool,
     },
@@ -75,8 +78,68 @@ async fn create_package(
     let db_organisation = organisation.clone();
     let db_application = application.clone();
     let db_pkg_index = request.index.clone();
+    let group_refs = request.file_groups.clone().unwrap_or_default();
     let package = run_blocking!({
         let mut conn = pool.get()?;
+
+        // Resolve each referenced file group version to its member files and
+        // snapshot them: the package remembers exactly which groups (at which
+        // group version) contributed which files.
+        let mut group_snapshots: Vec<PackageFileGroup> = Vec::new();
+        // Rule: the exact same file (path AND version) must not enter the
+        // package twice — across groups, or a group vs an individually
+        // chosen file. The same path at a different version is allowed.
+        let mut seen: std::collections::HashMap<String, String> = files
+            .iter()
+            .map(|f| {
+                (
+                    format!("{}@version:{}", f.file_path, f.version),
+                    "individually selected files".to_string(),
+                )
+            })
+            .collect();
+
+        for group_ref in &group_refs {
+            let group: FileGroupEntry = file_groups::table
+                .filter(file_groups::org_id.eq(&db_organisation))
+                .filter(file_groups::app_id.eq(&db_application))
+                .filter(file_groups::name.eq(&group_ref.name))
+                .filter(file_groups::version.eq(group_ref.version))
+                .select(FileGroupEntry::as_select())
+                .first(&mut conn)
+                .optional()?
+                .ok_or_else(|| {
+                    ABError::BadRequest(format!(
+                        "Version {} of file group '{}' not found",
+                        group_ref.version, group_ref.name
+                    ))
+                })?;
+
+            let member_files: Vec<FileEntry> = files_table_mod::table
+                .filter(files_table_mod::id.eq_any(&group.file_ids))
+                .select(FileEntry::as_select())
+                .load(&mut conn)?;
+
+            let mut keys: Vec<String> = Vec::new();
+            for f in &member_files {
+                let key = format!("{}@version:{}", f.file_path, f.version);
+                if let Some(source) =
+                    seen.insert(key.clone(), format!("file group '{}'", group.name))
+                {
+                    return Err(ABError::BadRequest(format!(
+                        "Duplicate file '{}': included by both {} and file group '{}'",
+                        key, source, group.name
+                    )));
+                }
+                keys.push(key);
+            }
+
+            group_snapshots.push(PackageFileGroup {
+                name: group.name,
+                version: group.version,
+                files: keys,
+            });
+        }
 
         let latest_package = packages_table
             .filter(package_org_id.eq(&db_organisation))
@@ -92,16 +155,25 @@ async fn create_package(
             1
         };
 
+        let all_files: Vec<Option<String>> = files
+            .iter()
+            .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
+            .chain(
+                group_snapshots
+                    .iter()
+                    .flat_map(|g| g.files.iter().cloned().map(Some)),
+            )
+            .collect();
+
         let new_package = NewPackageV2Entry {
             index: db_pkg_index.clone(),
             org_id: db_organisation.clone(),
             app_id: db_application.clone(),
             tag: opt_pkg_tag.clone(),
             version: new_version,
-            files: files
-                .iter()
-                .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
-                .collect(),
+            files: all_files,
+            file_groups: serde_json::to_value(&group_snapshots)
+                .map_err(|e| ABError::InternalServerError(e.to_string()))?,
         };
 
         let result = diesel::insert_into(packages_table)

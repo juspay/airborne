@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
 import { notFound } from "next/navigation";
 import { FileChooser, SelectedFile } from "@/components/file-chooser";
+import type { NamedFileGroup } from "@/types/files";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 
@@ -34,6 +35,7 @@ export default function CreatePackagePage() {
 
   // Step 2: Package Files
   const [selectedPackageFiles, setSelectedPackageFiles] = useState<SelectedFile[]>([]);
+  const [selectedFileGroups, setSelectedFileGroups] = useState<NamedFileGroup[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -94,6 +96,9 @@ export default function CreatePackagePage() {
             tag: tag || undefined,
             properties,
             files: filteredFileIds,
+            file_groups: selectedFileGroups
+              .filter((g) => g.latest)
+              .map((g) => ({ name: g.name, version: g.latest!.version })),
           },
         },
         { token, org, app }
@@ -216,7 +221,17 @@ export default function CreatePackagePage() {
                   selected={selectedPackageFiles}
                   onChange={handlePackageFilesChange}
                   excludeFiles={selectedIndexFile ? [selectedIndexFile.file_path] : []}
+                  selectedGroups={selectedFileGroups}
+                  onGroupsChange={setSelectedFileGroups}
                 />
+                {selectedFileGroups.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {selectedFileGroups.length} file group{selectedFileGroups.length === 1 ? "" : "s"} selected —{" "}
+                    {selectedFileGroups.map((g) => `${g.name} (v${g.latest?.version})`).join(", ")} — contributing{" "}
+                    {selectedFileGroups.reduce((n, g) => n + (g.latest?.files.length || 0), 0)} files. The package will
+                    remember these groups.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

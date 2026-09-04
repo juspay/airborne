@@ -145,6 +145,7 @@ pub mod hyperotaserver {
             files -> Array<Nullable<Text>>,
             tag -> Nullable<Text>,
             created_at -> Timestamptz,
+            file_groups -> Jsonb,
         }
     }
 

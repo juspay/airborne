@@ -37,6 +37,13 @@ export interface FileChooserProps {
   excludeFiles?: string[]; // File paths to exclude from selection
   /** Show the File Groups quick-select panel (multi mode). Off inside the group editor itself. */
   showFileGroups?: boolean;
+  /**
+   * Group-reference mode: when provided, checking a group selects the group
+   * itself (pinned to its latest version) instead of copying its files into
+   * `selected`. Used by package creation so packages remember their groups.
+   */
+  selectedGroups?: NamedFileGroup[];
+  onGroupsChange?: (groups: NamedFileGroup[]) => void;
 }
 
 const GROUPS_PER_PAGE = 15;
@@ -51,6 +58,8 @@ export function FileChooser({
   disabled = false,
   excludeFiles = [],
   showFileGroups = true,
+  selectedGroups,
+  onGroupsChange,
 }: FileChooserProps) {
   const { token, org, app } = useAppContext();
 
@@ -102,16 +111,31 @@ export function FileChooser({
     [excludeFilesSet]
   );
 
+  const refMode = Boolean(onGroupsChange);
+  const groupRefs = useMemo(() => selectedGroups || [], [selectedGroups]);
+
+  /** Exact file versions covered by the selected group references. */
+  const coveredByGroup = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of groupRefs) {
+      for (const f of g.latest?.files || []) {
+        map.set(`${f.file_path}@${f.version}`, g.name);
+      }
+    }
+    return map;
+  }, [groupRefs]);
+
   /** A group counts as selected when every selectable file of it is in the selection. */
   const isGroupSelected = useCallback(
     (group: NamedFileGroup) => {
+      if (refMode) return groupRefs.some((g) => g.name === group.name);
       const candidates = selectableGroupFiles(group);
       if (candidates.length === 0) return false;
       return candidates.every((f) =>
         selected.some((s) => s.file_path === f.file_path && s.version === f.version)
       );
     },
-    [selected, selectableGroupFiles]
+    [selected, selectableGroupFiles, refMode, groupRefs]
   );
 
   /** Partially selected: some but not all selectable files are chosen. */
@@ -131,6 +155,32 @@ export function FileChooser({
     (group: NamedFileGroup) => {
       const candidates = selectableGroupFiles(group);
       if (candidates.length === 0) return;
+
+      if (refMode && onGroupsChange) {
+        if (groupRefs.some((g) => g.name === group.name)) {
+          onGroupsChange(groupRefs.filter((g) => g.name !== group.name));
+          return;
+        }
+
+        // Rule: the exact same file (path AND version) must not enter the
+        // package twice — across groups, or a group vs an individual file.
+        const conflicts = (group.latest?.files || []).filter(
+          (f) =>
+            coveredByGroup.has(`${f.file_path}@${f.version}`) ||
+            selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+        );
+        if (conflicts.length > 0) {
+          const sample = `${conflicts[0].file_path}@v${conflicts[0].version}`;
+          toastError(
+            `Cannot add file group "${group.name}"`,
+            `${conflicts.length} of its file${conflicts.length === 1 ? " is" : "s are"} already included (e.g. ${sample}). The same file version cannot be included twice.`
+          );
+          return;
+        }
+
+        onGroupsChange([...groupRefs, group]);
+        return;
+      }
 
       if (isGroupSelected(group)) {
         // Deselect: drop exactly this group's selectable file versions
@@ -163,7 +213,7 @@ export function FileChooser({
 
       if (newFiles.length > 0) onChange([...selected, ...newFiles]);
     },
-    [selected, onChange, isGroupSelected, selectableGroupFiles]
+    [selected, onChange, isGroupSelected, selectableGroupFiles, refMode, onGroupsChange, groupRefs, coveredByGroup]
   );
 
   const computeHasMorePages = useCallback((result: FileGroupsResponse, page: number) => {
@@ -405,6 +455,14 @@ export function FileChooser({
       if (mode === "single") {
         onChange([selectedFile]);
       } else {
+        const coveredBy = refMode ? coveredByGroup.get(`${group.file_path}@${version.version}`) : undefined;
+        if (coveredBy) {
+          toastError(
+            "Already included via a file group",
+            `${group.file_path}@v${version.version} is part of the selected group "${coveredBy}".`
+          );
+          return;
+        }
         const isSelected = isVersionSelected(group.file_path, version.version);
         if (isSelected) {
           onChange(selected.filter((s) => !(s.file_path === group.file_path && s.version === version.version)));
@@ -414,7 +472,7 @@ export function FileChooser({
         }
       }
     },
-    [mode, selected, onChange, isVersionSelected, getVersionTag]
+    [mode, selected, onChange, isVersionSelected, getVersionTag, refMode, coveredByGroup]
   );
 
   const handleTagFilterToggle = useCallback((tag: string) => {
@@ -629,6 +687,7 @@ export function FileChooser({
                     const existing = selected.find((s) => s.file_path === g.file_path);
                     if (existing) return;
                     const v = g.versions[0];
+                    if (v && refMode && coveredByGroup.has(`${g.file_path}@${v.version}`)) return;
                     if (v) {
                       newFiles.push({
                         file_path: g.file_path,

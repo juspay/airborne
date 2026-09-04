@@ -159,6 +159,10 @@ pub struct PackageV2Entry {
     pub tag: Option<String>,
     pub files: Vec<Option<String>>,
     pub created_at: DateTime<Utc>,
+    /// Snapshot of the file groups this package was built from:
+    /// [{id, name, version, files}]. Empty for packages built without groups.
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub file_groups: serde_json::Value,
 }
 
 #[derive(Insertable)]
@@ -170,6 +174,8 @@ pub struct NewPackageV2Entry {
     pub version: i32,
     pub tag: Option<String>,
     pub files: Vec<Option<String>>,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub file_groups: serde_json::Value,
 }
 
 #[derive(Queryable, Insertable, Debug, Selectable)]
