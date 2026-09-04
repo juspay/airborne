@@ -172,6 +172,33 @@ async fn create_file(
             info!("No existing file found, creating new entry");
         }
 
+        // Dedupe against the latest version regardless of tag: re-registering
+        // the same URL with unchanged content returns the existing version
+        // instead of creating an identical new one. A request that asks for a
+        // different tag still creates a version, since the caller wants that
+        // tag attached.
+        let latest_existing = files
+            .filter(org_id.eq(&db_organisation))
+            .filter(app_id.eq(&db_application))
+            .filter(file_path.eq(&db_file_path))
+            .order(version.desc())
+            .select(DbFile::as_select())
+            .first::<DbFile>(&mut conn)
+            .optional()?;
+
+        if let Some(latest) = &latest_existing {
+            if latest.url == request.url
+                && latest.checksum == file_checksum
+                && (db_tag.is_none() || db_tag == latest.tag)
+            {
+                info!(
+                    "Latest version of '{}' already has this URL and checksum, returning it",
+                    db_file_path
+                );
+                return Ok(latest.clone());
+            }
+        }
+
         let result = conn.transaction::<DbFile, diesel::result::Error, _>(|conn| {
             let latest_file = files
                 .filter(file_path.eq(&db_file_path))
