@@ -24,10 +24,10 @@ export interface CreateDimensionCommandOutput extends CreateDimensionResponse, _
 declare const CreateDimensionCommand_base: {
     new (input: CreateDimensionCommandInput): import("@smithy/smithy-client").CommandImpl<CreateDimensionCommandInput, CreateDimensionCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: CreateDimensionCommandInput): import("@smithy/smithy-client").CommandImpl<CreateDimensionCommandInput, CreateDimensionCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Create dimension request operation
+ * Create a targeting dimension (standard or cohort) that releases can be targeted against. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

@@ -18,6 +18,14 @@ import {
   CreateFileCommandOutput,
 } from "./commands/CreateFileCommand";
 import {
+  CreateFileGroupCommandInput,
+  CreateFileGroupCommandOutput,
+} from "./commands/CreateFileGroupCommand";
+import {
+  CreateFileGroupVersionCommandInput,
+  CreateFileGroupVersionCommandOutput,
+} from "./commands/CreateFileGroupVersionCommand";
+import {
   CreateOrganisationCommandInput,
   CreateOrganisationCommandOutput,
 } from "./commands/CreateOrganisationCommand";
@@ -34,6 +42,14 @@ import {
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
 import {
+  GetFileGroupCommandInput,
+  GetFileGroupCommandOutput,
+} from "./commands/GetFileGroupCommand";
+import {
+  GetFileGroupVersionCommandInput,
+  GetFileGroupVersionCommandOutput,
+} from "./commands/GetFileGroupVersionCommand";
+import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
 } from "./commands/GetReleaseCommand";
@@ -49,6 +65,10 @@ import {
   ListFileGroupsCommandInput,
   ListFileGroupsCommandOutput,
 } from "./commands/ListFileGroupsCommand";
+import {
+  ListFileVersionGroupsCommandInput,
+  ListFileVersionGroupsCommandOutput,
+} from "./commands/ListFileVersionGroupsCommand";
 import {
   ListFilesCommandInput,
   ListFilesCommandOutput,
@@ -162,14 +182,19 @@ export type ServiceInputTypes =
   | CreateApplicationCommandInput
   | CreateDimensionCommandInput
   | CreateFileCommandInput
+  | CreateFileGroupCommandInput
+  | CreateFileGroupVersionCommandInput
   | CreateOrganisationCommandInput
   | CreatePackageCommandInput
   | CreateReleaseCommandInput
   | DeleteDimensionCommandInput
+  | GetFileGroupCommandInput
+  | GetFileGroupVersionCommandInput
   | GetReleaseCommandInput
   | GetUserCommandInput
   | ListDimensionsCommandInput
   | ListFileGroupsCommandInput
+  | ListFileVersionGroupsCommandInput
   | ListFilesCommandInput
   | ListOrganisationsCommandInput
   | ListPackagesCommandInput
@@ -189,14 +214,19 @@ export type ServiceOutputTypes =
   | CreateApplicationCommandOutput
   | CreateDimensionCommandOutput
   | CreateFileCommandOutput
+  | CreateFileGroupCommandOutput
+  | CreateFileGroupVersionCommandOutput
   | CreateOrganisationCommandOutput
   | CreatePackageCommandOutput
   | CreateReleaseCommandOutput
   | DeleteDimensionCommandOutput
+  | GetFileGroupCommandOutput
+  | GetFileGroupVersionCommandOutput
   | GetReleaseCommandOutput
   | GetUserCommandOutput
   | ListDimensionsCommandOutput
   | ListFileGroupsCommandOutput
+  | ListFileVersionGroupsCommandOutput
   | ListFilesCommandOutput
   | ListOrganisationsCommandOutput
   | ListPackagesCommandOutput

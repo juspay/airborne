@@ -20,7 +20,12 @@ service Airborne {
         CreateFile
         ListFiles
         UploadFile
+        ListFileVersionGroups
+        CreateFileGroup
         ListFileGroups
+        GetFileGroup
+        CreateFileGroupVersion
+        GetFileGroupVersion
         UpdateFile
         // package
         CreatePackage

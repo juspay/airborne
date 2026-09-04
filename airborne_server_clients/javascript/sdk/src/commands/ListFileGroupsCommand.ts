@@ -35,7 +35,7 @@ export interface ListFileGroupsCommandInput extends ListFileGroupsRequest {}
 export interface ListFileGroupsCommandOutput extends ListFileGroupsResponse, __MetadataBearer {}
 
 /**
- * List file groups operation
+ * List the file groups of the application, ordered by name. Supports pagination and an optional name search. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -45,38 +45,40 @@ export interface ListFileGroupsCommandOutput extends ListFileGroupsResponse, __M
  * const input = { // ListFileGroupsRequest
  *   page: Number("int"),
  *   count: Number("int"),
+ *   all: true || false,
  *   search: "STRING_VALUE",
- *   tags: "STRING_VALUE",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
  * const command = new ListFileGroupsCommand(input);
  * const response = await client.send(command);
  * // { // ListFileGroupsResponse
- * //   groups: [ // FileGroupList // required
- * //     { // FileGroup
- * //       file_path: "STRING_VALUE", // required
- * //       total_versions: Number("int"), // required
- * //       versions: [ // FileGroupVersionList // required
- * //         { // FileGroupVersion
- * //           version: Number("int"), // required
- * //           url: "STRING_VALUE", // required
- * //           size: Number("int"), // required
- * //           created_at: "STRING_VALUE", // required
- * //         },
- * //       ],
- * //       tags: [ // FileGroupTagList // required
- * //         { // FileGroupTag
- * //           tag: "STRING_VALUE", // required
- * //           version: Number("int"), // required
- * //         },
- * //       ],
+ * //   data: [ // NamedFileGroupList // required
+ * //     { // NamedFileGroup
+ * //       name: "STRING_VALUE", // required
+ * //       total_versions: Number("long"), // required
+ * //       latest: { // FileGroupVersionInfo
+ * //         version: Number("int"), // required
+ * //         metadata: "DOCUMENT_VALUE", // required
+ * //         files: [ // FileGroupMemberList // required
+ * //           { // FileGroupMember
+ * //             id: "STRING_VALUE", // required
+ * //             file_path: "STRING_VALUE", // required
+ * //             version: Number("int"), // required
+ * //             tag: "STRING_VALUE",
+ * //             url: "STRING_VALUE", // required
+ * //             size: Number("long"), // required
+ * //             checksum: "STRING_VALUE", // required
+ * //           },
+ * //         ],
+ * //         created_at: "STRING_VALUE", // required
+ * //       },
+ * //       created_at: "STRING_VALUE", // required
+ * //       updated_at: "STRING_VALUE", // required
  * //     },
  * //   ],
- * //   total_items: Number("int"), // required
+ * //   total_items: Number("long"), // required
  * //   total_pages: Number("int"), // required
- * //   page: Number("int"), // required
- * //   count: Number("int"), // required
  * // };
  *
  * ```

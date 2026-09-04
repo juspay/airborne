@@ -35,7 +35,7 @@ export interface GetReleaseCommandInput extends GetReleaseRequest {}
 export interface GetReleaseCommandOutput extends GetReleaseResponse, __MetadataBearer {}
 
 /**
- * Release request operation
+ * Get a single release by its id, including its config, package, resources, targeting dimensions, and experiment details. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -67,6 +67,7 @@ export interface GetReleaseCommandOutput extends GetReleaseResponse, __MetadataB
  * //       file_path: "STRING_VALUE",
  * //       url: "STRING_VALUE",
  * //       checksum: "STRING_VALUE",
+ * //       size: Number("long"),
  * //     },
  * //     properties: "DOCUMENT_VALUE",
  * //     important: [ // ServeFileList
@@ -74,6 +75,7 @@ export interface GetReleaseCommandOutput extends GetReleaseResponse, __MetadataB
  * //         file_path: "STRING_VALUE",
  * //         url: "STRING_VALUE",
  * //         checksum: "STRING_VALUE",
+ * //         size: Number("long"),
  * //       },
  * //     ],
  * //     lazy: [
@@ -81,6 +83,7 @@ export interface GetReleaseCommandOutput extends GetReleaseResponse, __MetadataB
  * //         file_path: "STRING_VALUE",
  * //         url: "STRING_VALUE",
  * //         checksum: "STRING_VALUE",
+ * //         size: Number("long"),
  * //       },
  * //     ],
  * //   },
@@ -89,6 +92,7 @@ export interface GetReleaseCommandOutput extends GetReleaseResponse, __MetadataB
  * //       file_path: "STRING_VALUE",
  * //       url: "STRING_VALUE",
  * //       checksum: "STRING_VALUE",
+ * //       size: Number("long"),
  * //     },
  * //   ],
  * //   experiment: { // ReleaseExperiment

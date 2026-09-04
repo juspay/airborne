@@ -35,7 +35,7 @@ export interface ListDimensionsCommandInput extends ListDimensionsRequest {}
 export interface ListDimensionsCommandOutput extends ListDimensionsResponse, __MetadataBearer {}
 
 /**
- * List dimensions request operation
+ * List the targeting dimensions defined for an application, in priority order, with pagination. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

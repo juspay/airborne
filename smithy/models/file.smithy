@@ -386,8 +386,8 @@ list FileGroupList {
     member: FileGroup
 }
 
-/// List file groups request
-structure ListFileGroupsRequest {
+/// List file version groups request
+structure ListFileVersionGroupsRequest {
     /// Page number for pagination
     @httpQuery("page")
     page: Integer
@@ -415,8 +415,8 @@ structure ListFileGroupsRequest {
     application: String
 }
 
-/// List file groups response
-structure ListFileGroupsResponse {
+/// List file version groups response
+structure ListFileVersionGroupsResponse {
     /// List of file groups
     @required
     groups: FileGroupList
@@ -443,11 +443,333 @@ structure ListFileGroupsResponse {
 @http(method: "GET", uri: "/api/file/groups")
 @requiresauth
 @readonly
+operation ListFileVersionGroups {
+    input: ListFileVersionGroupsRequest
+    output: ListFileVersionGroupsResponse
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+// ─── File Groups ───
+// A file group is a peer of a file: a named, reusable collection of file keys.
+// Files do not belong to a group; a file may appear in any number of groups, or none.
+
+/// List of file keys, e.g. "path/to/file@version:3" or "path/to/file@tag:latest"
+list FileKeyList {
+    /// A file key
+    member: String
+}
+
+/// A file belonging to a file group, resolved from the files table
+structure FileGroupMember {
+    /// File key, e.g. "path/to/file@version:3"
+    @required
+    id: String
+
+    /// Logical path of the file
+    @required
+    file_path: String
+
+    /// Version of the file
+    @required
+    version: Integer
+
+    /// Tag of the file, if any
+    tag: String
+
+    /// URL the file content is served from
+    @required
+    url: String
+
+    /// File size in bytes
+    @required
+    size: Long
+
+    /// SHA256 checksum in hex
+    @required
+    checksum: String
+}
+
+/// Files belonging to a file group
+list FileGroupMemberList {
+    /// A member file
+    member: FileGroupMember
+}
+
+/// One immutable version of a file group: its files plus its own metadata
+structure FileGroupVersionInfo {
+    /// Version number, starting at 1
+    @required
+    version: Integer
+
+    /// Metadata attached to this version (arbitrary JSON object)
+    @required
+    metadata: Document
+
+    /// Files snapshotted by this version, resolved from the files table
+    @required
+    files: FileGroupMemberList
+
+    /// When the version was created (RFC 3339)
+    @required
+    created_at: String
+}
+
+/// List of file group versions, newest first
+list FileGroupVersionInfoList {
+    /// A file group version
+    member: FileGroupVersionInfo
+}
+
+/// A file group summary: identity plus its latest version
+structure NamedFileGroup {
+    /// Name of the group — its identity, unique within the application
+    @required
+    name: String
+
+    /// Total number of versions
+    @required
+    total_versions: Long
+
+    /// The latest version of the group
+    latest: FileGroupVersionInfo
+
+    /// When the group was created (RFC 3339)
+    @required
+    created_at: String
+
+    /// When the group was last updated (RFC 3339)
+    @required
+    updated_at: String
+}
+
+/// A file group with its full version history
+structure FileGroupDetail {
+    /// Name of the group — its identity, unique within the application
+    @required
+    name: String
+
+    /// Every version of the group, newest first
+    @required
+    versions: FileGroupVersionInfoList
+
+    /// When the group was created (RFC 3339)
+    @required
+    created_at: String
+
+    /// When the group was last updated (RFC 3339)
+    @required
+    updated_at: String
+}
+
+/// List of file groups
+list NamedFileGroupList {
+    /// A file group
+    member: NamedFileGroup
+}
+
+/// Create file group request
+structure CreateFileGroupRequest {
+    /// Name of the file group, unique within the application
+    @required
+    name: String
+
+    /// File keys snapshotted as version 1
+    files: FileKeyList
+
+    /// Metadata attached to version 1 (arbitrary JSON object)
+    metadata: Document
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// Get file group request
+structure GetFileGroupRequest {
+    /// Name of the file group
+    @required
+    @httpLabel
+    name: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// List file groups request
+structure ListFileGroupsRequest {
+    /// Page number for pagination
+    @httpQuery("page")
+    page: Integer
+
+    /// Number of groups per page
+    @httpQuery("count")
+    count: Integer
+
+    /// If true, fetch all groups without pagination
+    @httpQuery("all")
+    all: Boolean
+
+    /// Search query to filter groups by name
+    @httpQuery("search")
+    search: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// List file groups response
+structure ListFileGroupsResponse {
+    /// List of file groups
+    @required
+    data: NamedFileGroupList
+
+    /// Total number of groups
+    @required
+    total_items: Long
+
+    /// Total number of pages
+    @required
+    total_pages: Integer
+}
+
+/// Create file group version request
+structure CreateFileGroupVersionRequest {
+    /// Name of the file group
+    @required
+    @httpLabel
+    name: String
+
+    /// File keys this version snapshots
+    @required
+    files: FileKeyList
+
+    /// Metadata for this version (arbitrary JSON object; defaults to {})
+    metadata: Document
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// Get file group version request
+structure GetFileGroupVersionRequest {
+    /// Name of the file group
+    @required
+    @httpLabel
+    name: String
+
+    /// Version number
+    @required
+    @httpLabel
+    version: Integer
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// Create a new immutable version of a file group, snapshotting the given files with its own metadata. The version number is assigned automatically. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "POST", uri: "/api/file-groups/{name}/versions")
+@requiresauth
+operation CreateFileGroupVersion {
+    input: CreateFileGroupVersionRequest
+    output: FileGroupVersionInfo
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
+    ]
+}
+
+/// Get one version of a file group with its resolved files and metadata. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "GET", uri: "/api/file-groups/{name}/versions/{version}")
+@requiresauth
+@readonly
+operation GetFileGroupVersion {
+    input: GetFileGroupVersionRequest
+    output: FileGroupVersionInfo
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
+    ]
+}
+
+/// Create a file group: a named, versioned collection of files that can be selected together when building packages and releases. Names are unique within the application; the given files and metadata become version 1. Every file key must resolve to an existing file. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "POST", uri: "/api/file-groups")
+@requiresauth
+operation CreateFileGroup {
+    input: CreateFileGroupRequest
+    output: NamedFileGroup
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+/// List the file groups of the application, ordered by name. Supports pagination and an optional name search. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "GET", uri: "/api/file-groups")
+@requiresauth
+@readonly
 operation ListFileGroups {
     input: ListFileGroupsRequest
     output: ListFileGroupsResponse
     errors: [
         Unauthorized
         BadRequestError
+    ]
+}
+
+/// Get a file group and its full version history by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "GET", uri: "/api/file-groups/{name}")
+@requiresauth
+@readonly
+operation GetFileGroup {
+    input: GetFileGroupRequest
+    output: FileGroupDetail
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
     ]
 }

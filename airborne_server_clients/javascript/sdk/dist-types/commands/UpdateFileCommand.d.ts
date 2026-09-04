@@ -24,10 +24,10 @@ export interface UpdateFileCommandOutput extends CreateFileResponse, __MetadataB
 declare const UpdateFileCommand_base: {
     new (input: UpdateFileCommandInput): import("@smithy/smithy-client").CommandImpl<UpdateFileCommandInput, UpdateFileCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: UpdateFileCommandInput): import("@smithy/smithy-client").CommandImpl<UpdateFileCommandInput, UpdateFileCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Update file operation
+ * Update the tag of an existing file, identified by its file key in the path (a file path with a version or tag, e.g. "path/to/file@version:3" or "path/to/file@tag:prod"). Pass the organisation and application in the x-organisation and x-application headers. Returns the updated file. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

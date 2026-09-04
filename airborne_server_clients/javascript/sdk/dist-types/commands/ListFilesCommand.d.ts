@@ -24,10 +24,10 @@ export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBea
 declare const ListFilesCommand_base: {
     new (input: ListFilesCommandInput): import("@smithy/smithy-client").CommandImpl<ListFilesCommandInput, ListFilesCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: ListFilesCommandInput): import("@smithy/smithy-client").CommandImpl<ListFilesCommandInput, ListFilesCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * List files request operation
+ * List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

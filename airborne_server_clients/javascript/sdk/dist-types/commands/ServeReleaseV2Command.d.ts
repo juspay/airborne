@@ -24,10 +24,10 @@ export interface ServeReleaseV2CommandOutput extends ReleaseConfig, __MetadataBe
 declare const ServeReleaseV2Command_base: {
     new (input: ServeReleaseV2CommandInput): import("@smithy/smithy-client").CommandImpl<ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: ServeReleaseV2CommandInput): import("@smithy/smithy-client").CommandImpl<ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Get release v2 request operation
+ * Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

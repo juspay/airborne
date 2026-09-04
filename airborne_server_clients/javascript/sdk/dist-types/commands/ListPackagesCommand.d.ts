@@ -24,10 +24,10 @@ export interface ListPackagesCommandOutput extends ListPackagesResponse, __Metad
 declare const ListPackagesCommand_base: {
     new (input: ListPackagesCommandInput): import("@smithy/smithy-client").CommandImpl<ListPackagesCommandInput, ListPackagesCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: ListPackagesCommandInput): import("@smithy/smithy-client").CommandImpl<ListPackagesCommandInput, ListPackagesCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * List packages request operation
+ * List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

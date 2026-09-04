@@ -2,14 +2,19 @@ import { AirborneClient, } from "./AirborneClient";
 import { CreateApplicationCommand, } from "./commands/CreateApplicationCommand";
 import { CreateDimensionCommand, } from "./commands/CreateDimensionCommand";
 import { CreateFileCommand, } from "./commands/CreateFileCommand";
+import { CreateFileGroupCommand, } from "./commands/CreateFileGroupCommand";
+import { CreateFileGroupVersionCommand, } from "./commands/CreateFileGroupVersionCommand";
 import { CreateOrganisationCommand, } from "./commands/CreateOrganisationCommand";
 import { CreatePackageCommand, } from "./commands/CreatePackageCommand";
 import { CreateReleaseCommand, } from "./commands/CreateReleaseCommand";
 import { DeleteDimensionCommand, } from "./commands/DeleteDimensionCommand";
+import { GetFileGroupCommand, } from "./commands/GetFileGroupCommand";
+import { GetFileGroupVersionCommand, } from "./commands/GetFileGroupVersionCommand";
 import { GetReleaseCommand, } from "./commands/GetReleaseCommand";
 import { GetUserCommand, } from "./commands/GetUserCommand";
 import { ListDimensionsCommand, } from "./commands/ListDimensionsCommand";
 import { ListFileGroupsCommand, } from "./commands/ListFileGroupsCommand";
+import { ListFileVersionGroupsCommand, } from "./commands/ListFileVersionGroupsCommand";
 import { ListFilesCommand, } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommand, } from "./commands/ListOrganisationsCommand";
 import { ListPackagesCommand, } from "./commands/ListPackagesCommand";
@@ -26,15 +31,20 @@ const commands = {
     CreateApplicationCommand,
     CreateDimensionCommand,
     CreateFileCommand,
+    CreateFileGroupCommand,
+    CreateFileGroupVersionCommand,
     CreateOrganisationCommand,
     CreatePackageCommand,
     CreateReleaseCommand,
     DeleteDimensionCommand,
+    GetFileGroupCommand,
+    GetFileGroupVersionCommand,
     GetReleaseCommand,
     GetUserCommand,
     ListDimensionsCommand,
     ListFileGroupsCommand,
     ListFilesCommand,
+    ListFileVersionGroupsCommand,
     ListOrganisationsCommand,
     ListPackagesCommand,
     ListReleasesCommand,

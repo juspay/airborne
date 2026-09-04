@@ -24,10 +24,10 @@ export interface CreateApplicationCommandOutput extends Application, __MetadataB
 declare const CreateApplicationCommand_base: {
     new (input: CreateApplicationCommandInput): import("@smithy/smithy-client").CommandImpl<CreateApplicationCommandInput, CreateApplicationCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: CreateApplicationCommandInput): import("@smithy/smithy-client").CommandImpl<CreateApplicationCommandInput, CreateApplicationCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Create application request operation
+ * Create a new application inside an organisation. Pass the target organisation in the x-organisation header. Returns the created application and the caller's access levels. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

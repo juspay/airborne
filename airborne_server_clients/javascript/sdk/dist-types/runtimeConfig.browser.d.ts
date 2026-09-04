@@ -1,3 +1,5 @@
+/// <reference types="node" />
+/// <reference types="node" />
 import { FetchHttpHandler as RequestHandler } from "@smithy/fetch-http-handler";
 import { AirborneClientConfig } from "./AirborneClient";
 /**
@@ -12,9 +14,14 @@ export declare const getRuntimeConfig: (config: AirborneClientConfig) => {
     requestHandler: import("@smithy/protocol-http").HttpHandler<any> | RequestHandler;
     retryMode: string | import("@smithy/types").Provider<string>;
     sha256: import("@smithy/types").HashConstructor;
-    streamCollector: import("@smithy/types").StreamCollector;
-    apiVersion: string;
+    streamCollector: (stream: import("stream").Readable | ReadableStream<any> | import("stream/web").ReadableStream<any> | Blob) => Promise<Uint8Array>;
     cacheMiddleware?: boolean | undefined;
+    protocol?: import("@smithy/types").ClientProtocol<any, any> | import("@smithy/types").$ClientProtocol<any, any> | import("@smithy/types").ClientProtocolCtor<any, any> | import("@smithy/types").$ClientProtocolCtor<any, any> | undefined;
+    protocolSettings?: {
+        [setting: string]: unknown;
+        defaultNamespace?: string | undefined;
+    } | undefined;
+    apiVersion: string;
     urlParser: import("@smithy/types").UrlParser;
     base64Decoder: import("@smithy/types").Decoder;
     base64Encoder: (_input: string | Uint8Array) => string;

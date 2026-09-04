@@ -4,8 +4,8 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::utils::db::schema::hyperotaserver::{
-    authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, files, packages,
-    packages_v2, release_views, releases, user_credentials, workspace_names,
+    authz_memberships, authz_role_bindings, builds, cleanup_outbox, configs, file_groups, files,
+    packages, packages_v2, release_views, releases, user_credentials, workspace_names,
 };
 use crate::utils::semver::SemVer;
 
@@ -117,6 +117,34 @@ pub struct NewFileEntry {
     #[diesel(sql_type = diesel::sql_types::Jsonb)]
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
+}
+
+/// One immutable version of a file group. The version rows ARE the group —
+/// no separate identity table, mirroring how files (path + version rows)
+/// and packages (version rows) are modelled. file_ids references rows in
+/// files; file data is never copied here.
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]
+#[diesel(table_name = file_groups)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+pub struct FileGroupEntry {
+    pub id: uuid::Uuid,
+    pub name: String,
+    pub version: i32,
+    #[diesel(sql_type = diesel::sql_types::Jsonb)]
+    pub metadata: serde_json::Value,
+    pub file_ids: Vec<uuid::Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Insertable)]
+#[diesel(table_name = file_groups)]
+pub struct NewFileGroupEntry {
+    pub org_id: String,
+    pub app_id: String,
+    pub name: String,
+    pub version: i32,
+    pub metadata: serde_json::Value,
+    pub file_ids: Vec<uuid::Uuid>,
 }
 
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Clone)]

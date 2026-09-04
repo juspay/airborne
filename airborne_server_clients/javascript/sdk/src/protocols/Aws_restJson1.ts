@@ -12,6 +12,14 @@ import {
   CreateFileCommandOutput,
 } from "../commands/CreateFileCommand";
 import {
+  CreateFileGroupCommandInput,
+  CreateFileGroupCommandOutput,
+} from "../commands/CreateFileGroupCommand";
+import {
+  CreateFileGroupVersionCommandInput,
+  CreateFileGroupVersionCommandOutput,
+} from "../commands/CreateFileGroupVersionCommand";
+import {
   CreateOrganisationCommandInput,
   CreateOrganisationCommandOutput,
 } from "../commands/CreateOrganisationCommand";
@@ -28,6 +36,14 @@ import {
   DeleteDimensionCommandOutput,
 } from "../commands/DeleteDimensionCommand";
 import {
+  GetFileGroupCommandInput,
+  GetFileGroupCommandOutput,
+} from "../commands/GetFileGroupCommand";
+import {
+  GetFileGroupVersionCommandInput,
+  GetFileGroupVersionCommandOutput,
+} from "../commands/GetFileGroupVersionCommand";
+import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
 } from "../commands/GetReleaseCommand";
@@ -43,6 +59,10 @@ import {
   ListFileGroupsCommandInput,
   ListFileGroupsCommandOutput,
 } from "../commands/ListFileGroupsCommand";
+import {
+  ListFileVersionGroupsCommandInput,
+  ListFileVersionGroupsCommandOutput,
+} from "../commands/ListFileVersionGroupsCommand";
 import {
   ListFilesCommandInput,
   ListFilesCommandOutput,
@@ -95,10 +115,12 @@ import {
   CreateReleaseRequestConfig,
   CreateReleaseRequestPackage,
   DimensionResponse,
+  FileGroupVersionInfo,
   ForbiddenError,
   GetReleaseConfig,
   GetReleaseResponse,
   InternalServerError,
+  NamedFileGroup,
   NotFoundError,
   ServePackage,
   Unauthorized,
@@ -215,6 +237,58 @@ export const se_CreateFileCommand = async(
 }
 
 /**
+ * serializeAws_restJson1CreateFileGroupCommand
+ */
+export const se_CreateFileGroupCommand = async(
+  input: CreateFileGroupCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-groups");
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'files': _ => _json(_),
+    'metadata': _ => se_Document(_, context),
+    'name': [],
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1CreateFileGroupVersionCommand
+ */
+export const se_CreateFileGroupVersionCommand = async(
+  input: CreateFileGroupVersionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-groups/{name}/versions");
+  b.p('name', () => input.name!, '{name}', false)
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'files': _ => _json(_),
+    'metadata': _ => se_Document(_, context),
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1CreateOrganisationCommand
  */
 export const se_CreateOrganisationCommand = async(
@@ -312,6 +386,49 @@ export const se_DeleteDimensionCommand = async(
 }
 
 /**
+ * serializeAws_restJson1GetFileGroupCommand
+ */
+export const se_GetFileGroupCommand = async(
+  input: GetFileGroupCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-groups/{name}");
+  b.p('name', () => input.name!, '{name}', false)
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1GetFileGroupVersionCommand
+ */
+export const se_GetFileGroupVersionCommand = async(
+  input: GetFileGroupVersionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-groups/{name}/versions/{version}");
+  b.p('name', () => input.name!, '{name}', false)
+  b.p('version', () => input.version!.toString(), '{version}', false)
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1GetReleaseCommand
  */
 export const se_GetReleaseCommand = async(
@@ -387,12 +504,12 @@ export const se_ListFileGroupsCommand = async(
     [_xo]: input[_o]!,
     [_xa]: input[_a]!,
   });
-  b.bp("/api/file/groups");
+  b.bp("/api/file-groups");
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
     [_s]: [,input[_s]!],
-    [_t]: [,input[_t]!],
   });
   let body: any;
   b.m("GET")
@@ -418,6 +535,33 @@ export const se_ListFilesCommand = async(
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
+    [_s]: [,input[_s]!],
+    [_t]: [,input[_t]!],
+  });
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .q(query)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1ListFileVersionGroupsCommand
+ */
+export const se_ListFileVersionGroupsCommand = async(
+  input: ListFileVersionGroupsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file/groups");
+  const query: any = map({
+    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
+    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
     [_s]: [,input[_s]!],
     [_t]: [,input[_t]!],
   });
@@ -752,6 +896,55 @@ export const de_CreateFileCommand = async(
 }
 
 /**
+ * deserializeAws_restJson1CreateFileGroupCommand
+ */
+export const de_CreateFileGroupCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<CreateFileGroupCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'latest': _ => de_FileGroupVersionInfo(_, context),
+    'name': __expectString,
+    'total_versions': __expectLong,
+    'updated_at': __expectString,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1CreateFileGroupVersionCommand
+ */
+export const de_CreateFileGroupVersionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<CreateFileGroupVersionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'files': _json,
+    'metadata': _ => de_Document(_, context),
+    'version': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
  * deserializeAws_restJson1CreateOrganisationCommand
  */
 export const de_CreateOrganisationCommand = async(
@@ -838,6 +1031,54 @@ export const de_DeleteDimensionCommand = async(
     $metadata: deserializeMetadata(output),
   });
   await collectBody(output.body, context);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetFileGroupCommand
+ */
+export const de_GetFileGroupCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetFileGroupCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'name': __expectString,
+    'updated_at': __expectString,
+    'versions': _ => de_FileGroupVersionInfoList(_, context),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetFileGroupVersionCommand
+ */
+export const de_GetFileGroupVersionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetFileGroupVersionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'files': _json,
+    'metadata': _ => de_Document(_, context),
+    'version': __expectInt32,
+  });
+  Object.assign(contents, doc);
   return contents;
 }
 
@@ -929,10 +1170,8 @@ export const de_ListFileGroupsCommand = async(
   });
   const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
   const doc = take(data, {
-    'count': __expectInt32,
-    'groups': _json,
-    'page': __expectInt32,
-    'total_items': __expectInt32,
+    'data': _ => de_NamedFileGroupList(_, context),
+    'total_items': __expectLong,
     'total_pages': __expectInt32,
   });
   Object.assign(contents, doc);
@@ -960,6 +1199,31 @@ export const de_ListFilesCommand = async(
     'page': __expectInt32,
     'per_page': __expectInt32,
     'total': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1ListFileVersionGroupsCommand
+ */
+export const de_ListFileVersionGroupsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ListFileVersionGroupsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'count': __expectInt32,
+    'groups': _json,
+    'page': __expectInt32,
+    'total_items': __expectInt32,
+    'total_pages': __expectInt32,
   });
   Object.assign(contents, doc);
   return contents;
@@ -1399,6 +1663,8 @@ const de_CommandError = async(
     }, {});
   }
 
+  // se_FileKeyList omitted.
+
   // se_StringList omitted.
 
   /**
@@ -1498,11 +1764,43 @@ const de_CommandError = async(
 
   // de_FileGroupList omitted.
 
+  // de_FileGroupMember omitted.
+
+  // de_FileGroupMemberList omitted.
+
   // de_FileGroupTag omitted.
 
   // de_FileGroupTagList omitted.
 
   // de_FileGroupVersion omitted.
+
+  /**
+   * deserializeAws_restJson1FileGroupVersionInfo
+   */
+  const de_FileGroupVersionInfo = (
+    output: any,
+    context: __SerdeContext
+  ): FileGroupVersionInfo => {
+    return take(output, {
+      'created_at': __expectString,
+      'files': _json,
+      'metadata': (_: any) => de_Document(_, context),
+      'version': __expectInt32,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1FileGroupVersionInfoList
+   */
+  const de_FileGroupVersionInfoList = (
+    output: any,
+    context: __SerdeContext
+  ): (FileGroupVersionInfo)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_FileGroupVersionInfo(entry, context);
+    });
+    return retVal;
+  }
 
   // de_FileGroupVersionList omitted.
 
@@ -1561,6 +1859,35 @@ const de_CommandError = async(
   ): (GetReleaseResponse)[] => {
     const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
       return de_GetReleaseResponse(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1NamedFileGroup
+   */
+  const de_NamedFileGroup = (
+    output: any,
+    context: __SerdeContext
+  ): NamedFileGroup => {
+    return take(output, {
+      'created_at': __expectString,
+      'latest': (_: any) => de_FileGroupVersionInfo(_, context),
+      'name': __expectString,
+      'total_versions': __expectLong,
+      'updated_at': __expectString,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1NamedFileGroupList
+   */
+  const de_NamedFileGroupList = (
+    output: any,
+    context: __SerdeContext
+  ): (NamedFileGroup)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_NamedFileGroup(entry, context);
     });
     return retVal;
   }

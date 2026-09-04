@@ -19,6 +19,16 @@ import {
   CreateFileCommandOutput,
 } from "./commands/CreateFileCommand";
 import {
+  CreateFileGroupCommand,
+  CreateFileGroupCommandInput,
+  CreateFileGroupCommandOutput,
+} from "./commands/CreateFileGroupCommand";
+import {
+  CreateFileGroupVersionCommand,
+  CreateFileGroupVersionCommandInput,
+  CreateFileGroupVersionCommandOutput,
+} from "./commands/CreateFileGroupVersionCommand";
+import {
   CreateOrganisationCommand,
   CreateOrganisationCommandInput,
   CreateOrganisationCommandOutput,
@@ -39,6 +49,16 @@ import {
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
 import {
+  GetFileGroupCommand,
+  GetFileGroupCommandInput,
+  GetFileGroupCommandOutput,
+} from "./commands/GetFileGroupCommand";
+import {
+  GetFileGroupVersionCommand,
+  GetFileGroupVersionCommandInput,
+  GetFileGroupVersionCommandOutput,
+} from "./commands/GetFileGroupVersionCommand";
+import {
   GetReleaseCommand,
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
@@ -58,6 +78,11 @@ import {
   ListFileGroupsCommandInput,
   ListFileGroupsCommandOutput,
 } from "./commands/ListFileGroupsCommand";
+import {
+  ListFileVersionGroupsCommand,
+  ListFileVersionGroupsCommandInput,
+  ListFileVersionGroupsCommandOutput,
+} from "./commands/ListFileVersionGroupsCommand";
 import {
   ListFilesCommand,
   ListFilesCommandInput,
@@ -120,15 +145,20 @@ const commands = {
   CreateApplicationCommand,
   CreateDimensionCommand,
   CreateFileCommand,
+  CreateFileGroupCommand,
+  CreateFileGroupVersionCommand,
   CreateOrganisationCommand,
   CreatePackageCommand,
   CreateReleaseCommand,
   DeleteDimensionCommand,
+  GetFileGroupCommand,
+  GetFileGroupVersionCommand,
   GetReleaseCommand,
   GetUserCommand,
   ListDimensionsCommand,
   ListFileGroupsCommand,
   ListFilesCommand,
+  ListFileVersionGroupsCommand,
   ListOrganisationsCommand,
   ListPackagesCommand,
   ListReleasesCommand,
@@ -191,6 +221,40 @@ export interface Airborne {
     args: CreateFileCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: CreateFileCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link CreateFileGroupCommand}
+   */
+  createFileGroup(
+    args: CreateFileGroupCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<CreateFileGroupCommandOutput>;
+  createFileGroup(
+    args: CreateFileGroupCommandInput,
+    cb: (err: any, data?: CreateFileGroupCommandOutput) => void
+  ): void;
+  createFileGroup(
+    args: CreateFileGroupCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: CreateFileGroupCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link CreateFileGroupVersionCommand}
+   */
+  createFileGroupVersion(
+    args: CreateFileGroupVersionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<CreateFileGroupVersionCommandOutput>;
+  createFileGroupVersion(
+    args: CreateFileGroupVersionCommandInput,
+    cb: (err: any, data?: CreateFileGroupVersionCommandOutput) => void
+  ): void;
+  createFileGroupVersion(
+    args: CreateFileGroupVersionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: CreateFileGroupVersionCommandOutput) => void
   ): void;
 
   /**
@@ -259,6 +323,40 @@ export interface Airborne {
     args: DeleteDimensionCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: DeleteDimensionCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link GetFileGroupCommand}
+   */
+  getFileGroup(
+    args: GetFileGroupCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<GetFileGroupCommandOutput>;
+  getFileGroup(
+    args: GetFileGroupCommandInput,
+    cb: (err: any, data?: GetFileGroupCommandOutput) => void
+  ): void;
+  getFileGroup(
+    args: GetFileGroupCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: GetFileGroupCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link GetFileGroupVersionCommand}
+   */
+  getFileGroupVersion(
+    args: GetFileGroupVersionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<GetFileGroupVersionCommandOutput>;
+  getFileGroupVersion(
+    args: GetFileGroupVersionCommandInput,
+    cb: (err: any, data?: GetFileGroupVersionCommandOutput) => void
+  ): void;
+  getFileGroupVersion(
+    args: GetFileGroupVersionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: GetFileGroupVersionCommandOutput) => void
   ): void;
 
   /**
@@ -345,6 +443,23 @@ export interface Airborne {
     args: ListFilesCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: ListFilesCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link ListFileVersionGroupsCommand}
+   */
+  listFileVersionGroups(
+    args: ListFileVersionGroupsCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<ListFileVersionGroupsCommandOutput>;
+  listFileVersionGroups(
+    args: ListFileVersionGroupsCommandInput,
+    cb: (err: any, data?: ListFileVersionGroupsCommandOutput) => void
+  ): void;
+  listFileVersionGroups(
+    args: ListFileVersionGroupsCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: ListFileVersionGroupsCommandOutput) => void
   ): void;
 
   /**

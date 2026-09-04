@@ -1,0 +1,136 @@
+// smithy-typescript generated code
+import {
+  AirborneClientResolvedConfig,
+  ServiceInputTypes,
+  ServiceOutputTypes,
+} from "../AirborneClient";
+import {
+  ListFileVersionGroupsRequest,
+  ListFileVersionGroupsResponse,
+} from "../models/models_0";
+import {
+  de_ListFileVersionGroupsCommand,
+  se_ListFileVersionGroupsCommand,
+} from "../protocols/Aws_restJson1";
+import { getSerdePlugin } from "@smithy/middleware-serde";
+import { Command as $Command } from "@smithy/smithy-client";
+import { MetadataBearer as __MetadataBearer } from "@smithy/types";
+
+/**
+ * @public
+ */
+export type { __MetadataBearer };
+export { $Command };
+/**
+ * @public
+ *
+ * The input for {@link ListFileVersionGroupsCommand}.
+ */
+export interface ListFileVersionGroupsCommandInput extends ListFileVersionGroupsRequest {}
+/**
+ * @public
+ *
+ * The output of {@link ListFileVersionGroupsCommand}.
+ */
+export interface ListFileVersionGroupsCommandOutput extends ListFileVersionGroupsResponse, __MetadataBearer {}
+
+/**
+ * List files grouped by path, so that all versions and tags of a file appear together. Supports pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+ * @example
+ * Use a bare-bones client and the command you need to make an API call.
+ * ```javascript
+ * import { AirborneClient, ListFileVersionGroupsCommand } from "airborne-server-sdk"; // ES Modules import
+ * // const { AirborneClient, ListFileVersionGroupsCommand } = require("airborne-server-sdk"); // CommonJS import
+ * const client = new AirborneClient(config);
+ * const input = { // ListFileVersionGroupsRequest
+ *   page: Number("int"),
+ *   count: Number("int"),
+ *   search: "STRING_VALUE",
+ *   tags: "STRING_VALUE",
+ *   organisation: "STRING_VALUE", // required
+ *   application: "STRING_VALUE", // required
+ * };
+ * const command = new ListFileVersionGroupsCommand(input);
+ * const response = await client.send(command);
+ * // { // ListFileVersionGroupsResponse
+ * //   groups: [ // FileGroupList // required
+ * //     { // FileGroup
+ * //       file_path: "STRING_VALUE", // required
+ * //       total_versions: Number("int"), // required
+ * //       versions: [ // FileGroupVersionList // required
+ * //         { // FileGroupVersion
+ * //           version: Number("int"), // required
+ * //           url: "STRING_VALUE", // required
+ * //           size: Number("int"), // required
+ * //           created_at: "STRING_VALUE", // required
+ * //         },
+ * //       ],
+ * //       tags: [ // FileGroupTagList // required
+ * //         { // FileGroupTag
+ * //           tag: "STRING_VALUE", // required
+ * //           version: Number("int"), // required
+ * //         },
+ * //       ],
+ * //     },
+ * //   ],
+ * //   total_items: Number("int"), // required
+ * //   total_pages: Number("int"), // required
+ * //   page: Number("int"), // required
+ * //   count: Number("int"), // required
+ * // };
+ *
+ * ```
+ *
+ * @param ListFileVersionGroupsCommandInput - {@link ListFileVersionGroupsCommandInput}
+ * @returns {@link ListFileVersionGroupsCommandOutput}
+ * @see {@link ListFileVersionGroupsCommandInput} for command's `input` shape.
+ * @see {@link ListFileVersionGroupsCommandOutput} for command's `response` shape.
+ * @see {@link AirborneClientResolvedConfig | config} for AirborneClient's `config` shape.
+ *
+ * @throws {@link Unauthorized} (client fault)
+ *  Unauthorized error
+ *
+ * @throws {@link BadRequestError} (client fault)
+ *  Bad request error
+ *
+ * @throws {@link NotFoundError} (client fault)
+ *  Not found error
+ *
+ * @throws {@link InternalServerError} (server fault)
+ *  Internal server error
+ *
+ * @throws {@link ForbiddenError} (client fault)
+ *
+ * @throws {@link AirborneServiceException}
+ * <p>Base exception class for all service exceptions from Airborne service.</p>
+ *
+ *
+ * @public
+ */
+export class ListFileVersionGroupsCommand extends $Command.classBuilder<ListFileVersionGroupsCommandInput, ListFileVersionGroupsCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>()
+      .m(function (this: any, Command: any, cs: any, config: AirborneClientResolvedConfig, o: any) {
+          return [
+
+  getSerdePlugin(config, this.serialize, this.deserialize),
+      ];
+  })
+  .s("Airborne", "ListFileVersionGroups", {
+
+  })
+  .n("AirborneClient", "ListFileVersionGroupsCommand")
+  .f(void 0, void 0)
+  .ser(se_ListFileVersionGroupsCommand)
+  .de(de_ListFileVersionGroupsCommand)
+.build() {
+/** @internal type navigation helper, not in runtime. */
+declare protected static __types: {
+  api: {
+      input: ListFileVersionGroupsRequest;
+      output: ListFileVersionGroupsResponse;
+  };
+  sdk: {
+      input: ListFileVersionGroupsCommandInput;
+      output: ListFileVersionGroupsCommandOutput;
+  };
+};
+}

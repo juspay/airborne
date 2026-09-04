@@ -24,10 +24,10 @@ export interface CreateOrganisationCommandOutput extends Organisation, __Metadat
 declare const CreateOrganisationCommand_base: {
     new (input: CreateOrganisationCommandInput): import("@smithy/smithy-client").CommandImpl<CreateOrganisationCommandInput, CreateOrganisationCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: CreateOrganisationCommandInput): import("@smithy/smithy-client").CommandImpl<CreateOrganisationCommandInput, CreateOrganisationCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Create organisation request operation
+ * Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

@@ -24,10 +24,10 @@ export interface DeleteDimensionCommandOutput extends __MetadataBearer {
 declare const DeleteDimensionCommand_base: {
     new (input: DeleteDimensionCommandInput): import("@smithy/smithy-client").CommandImpl<DeleteDimensionCommandInput, DeleteDimensionCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: DeleteDimensionCommandInput): import("@smithy/smithy-client").CommandImpl<DeleteDimensionCommandInput, DeleteDimensionCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Delete dimension request operation
+ * Delete a dimension by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

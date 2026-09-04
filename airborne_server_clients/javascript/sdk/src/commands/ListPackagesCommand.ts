@@ -35,7 +35,7 @@ export interface ListPackagesCommandInput extends ListPackagesRequest {}
 export interface ListPackagesCommandOutput extends ListPackagesResponse, __MetadataBearer {}
 
 /**
- * List packages request operation
+ * List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

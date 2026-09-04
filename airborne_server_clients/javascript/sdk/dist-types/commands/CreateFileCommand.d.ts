@@ -24,10 +24,10 @@ export interface CreateFileCommandOutput extends CreateFileResponse, __MetadataB
 declare const CreateFileCommand_base: {
     new (input: CreateFileCommandInput): import("@smithy/smithy-client").CommandImpl<CreateFileCommandInput, CreateFileCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: CreateFileCommandInput): import("@smithy/smithy-client").CommandImpl<CreateFileCommandInput, CreateFileCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * Create file request operation
+ * Register a file by URL, recording its metadata and assigning it a version. Pass the organisation and application in the x-organisation and x-application headers. Use this when the file is already hosted somewhere the server can reach; to upload the bytes directly, use UploadFile instead. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

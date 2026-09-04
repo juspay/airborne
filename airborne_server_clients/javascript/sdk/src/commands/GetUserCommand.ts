@@ -32,7 +32,7 @@ export interface GetUserCommandInput {}
 export interface GetUserCommandOutput extends User, __MetadataBearer {}
 
 /**
- * Get user request operation
+ * Get the authenticated user's profile, including the organisations they belong to and the caller's access level in each. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

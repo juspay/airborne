@@ -35,7 +35,7 @@ export interface UpdateFileCommandInput extends UpdateFileRequest {}
 export interface UpdateFileCommandOutput extends CreateFileResponse, __MetadataBearer {}
 
 /**
- * Update file operation
+ * Update the tag of an existing file, identified by its file key in the path (a file path with a version or tag, e.g. "path/to/file@version:3" or "path/to/file@tag:prod"). Pass the organisation and application in the x-organisation and x-application headers. Returns the updated file. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

@@ -1,3 +1,5 @@
+/// <reference types="node" />
+/// <reference types="node" />
 import { AirborneClientConfig } from "./AirborneClient";
 /**
  * @internal
@@ -6,11 +8,16 @@ export declare const getRuntimeConfig: (config: AirborneClientConfig) => {
     runtime: string;
     sha256: import("@smithy/types").HashConstructor;
     requestHandler: import("@smithy/types").NodeHttpHandlerOptions | import("@smithy/types").FetchHttpHandlerOptions | Record<string, unknown> | import("@smithy/protocol-http").HttpHandler<any> | import("@smithy/fetch-http-handler").FetchHttpHandler;
-    apiVersion: string;
     cacheMiddleware?: boolean | undefined;
+    protocol?: import("@smithy/types").ClientProtocol<any, any> | import("@smithy/types").$ClientProtocol<any, any> | import("@smithy/types").ClientProtocolCtor<any, any> | import("@smithy/types").$ClientProtocolCtor<any, any> | undefined;
+    protocolSettings?: {
+        [setting: string]: unknown;
+        defaultNamespace?: string | undefined;
+    } | undefined;
+    apiVersion: string;
     urlParser: import("@smithy/types").UrlParser;
     bodyLengthChecker: import("@smithy/types").BodyLengthCalculator;
-    streamCollector: import("@smithy/types").StreamCollector;
+    streamCollector: (stream: import("stream").Readable | ReadableStream<any> | import("stream/web").ReadableStream<any> | Blob) => Promise<Uint8Array>;
     base64Decoder: import("@smithy/types").Decoder;
     base64Encoder: (_input: string | Uint8Array) => string;
     utf8Decoder: import("@smithy/types").Decoder;

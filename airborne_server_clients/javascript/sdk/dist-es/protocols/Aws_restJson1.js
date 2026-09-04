@@ -59,6 +59,44 @@ export const se_CreateFileCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_CreateFileGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-groups");
+    let body;
+    body = JSON.stringify(take(input, {
+        'files': _ => _json(_),
+        'metadata': _ => se_Document(_, context),
+        'name': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_CreateFileGroupVersionCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-groups/{name}/versions");
+    b.p('name', () => input.name, '{name}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'files': _ => _json(_),
+        'metadata': _ => se_Document(_, context),
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_CreateOrganisationCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = {
@@ -128,6 +166,35 @@ export const se_DeleteDimensionCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_GetFileGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-groups/{name}");
+    b.p('name', () => input.name, '{name}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetFileGroupVersionCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-groups/{name}/versions/{version}");
+    b.p('name', () => input.name, '{name}', false);
+    b.p('version', () => input.version.toString(), '{version}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_GetReleaseCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -176,12 +243,12 @@ export const se_ListFileGroupsCommand = async (input, context) => {
         [_xo]: input[_o],
         [_xa]: input[_a],
     });
-    b.bp("/api/file/groups");
+    b.bp("/api/file-groups");
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
         [_s]: [, input[_s]],
-        [_t]: [, input[_t]],
     });
     let body;
     b.m("GET")
@@ -200,6 +267,26 @@ export const se_ListFilesCommand = async (input, context) => {
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
+        [_s]: [, input[_s]],
+        [_t]: [, input[_t]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+export const se_ListFileVersionGroupsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file/groups");
+    const query = map({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
         [_s]: [, input[_s]],
         [_t]: [, input[_t]],
     });
@@ -438,6 +525,41 @@ export const de_CreateFileCommand = async (output, context) => {
     Object.assign(contents, doc);
     return contents;
 };
+export const de_CreateFileGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'created_at': __expectString,
+        'latest': _ => de_FileGroupVersionInfo(_, context),
+        'name': __expectString,
+        'total_versions': __expectLong,
+        'updated_at': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_CreateFileGroupVersionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'created_at': __expectString,
+        'files': _json,
+        'metadata': _ => de_Document(_, context),
+        'version': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
 export const de_CreateOrganisationCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -498,6 +620,40 @@ export const de_DeleteDimensionCommand = async (output, context) => {
         $metadata: deserializeMetadata(output),
     });
     await collectBody(output.body, context);
+    return contents;
+};
+export const de_GetFileGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'created_at': __expectString,
+        'name': __expectString,
+        'updated_at': __expectString,
+        'versions': _ => de_FileGroupVersionInfoList(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_GetFileGroupVersionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'created_at': __expectString,
+        'files': _json,
+        'metadata': _ => de_Document(_, context),
+        'version': __expectInt32,
+    });
+    Object.assign(contents, doc);
     return contents;
 };
 export const de_GetReleaseCommand = async (output, context) => {
@@ -561,10 +717,8 @@ export const de_ListFileGroupsCommand = async (output, context) => {
     });
     const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
     const doc = take(data, {
-        'count': __expectInt32,
-        'groups': _json,
-        'page': __expectInt32,
-        'total_items': __expectInt32,
+        'data': _ => de_NamedFileGroupList(_, context),
+        'total_items': __expectLong,
         'total_pages': __expectInt32,
     });
     Object.assign(contents, doc);
@@ -585,6 +739,24 @@ export const de_ListFilesCommand = async (output, context) => {
         'page': __expectInt32,
         'per_page': __expectInt32,
         'total': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_ListFileVersionGroupsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'count': __expectInt32,
+        'groups': _json,
+        'page': __expectInt32,
+        'total_items': __expectInt32,
+        'total_pages': __expectInt32,
     });
     Object.assign(contents, doc);
     return contents;
@@ -932,6 +1104,20 @@ const de_DimensionsMap = (output, context) => {
         return acc;
     }, {});
 };
+const de_FileGroupVersionInfo = (output, context) => {
+    return take(output, {
+        'created_at': __expectString,
+        'files': _json,
+        'metadata': (_) => de_Document(_, context),
+        'version': __expectInt32,
+    });
+};
+const de_FileGroupVersionInfoList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_FileGroupVersionInfo(entry, context);
+    });
+    return retVal;
+};
 const de_FileResponseList = (output, context) => {
     const retVal = (output || []).filter((e) => e != null).map((entry) => {
         return de_CreateFileResponse(entry, context);
@@ -960,6 +1146,21 @@ const de_GetReleaseResponse = (output, context) => {
 const de_GetReleaseResponseList = (output, context) => {
     const retVal = (output || []).filter((e) => e != null).map((entry) => {
         return de_GetReleaseResponse(entry, context);
+    });
+    return retVal;
+};
+const de_NamedFileGroup = (output, context) => {
+    return take(output, {
+        'created_at': __expectString,
+        'latest': (_) => de_FileGroupVersionInfo(_, context),
+        'name': __expectString,
+        'total_versions': __expectLong,
+        'updated_at': __expectString,
+    });
+};
+const de_NamedFileGroupList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_NamedFileGroup(entry, context);
     });
     return retVal;
 };

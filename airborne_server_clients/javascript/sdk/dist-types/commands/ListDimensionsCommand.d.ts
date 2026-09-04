@@ -24,10 +24,10 @@ export interface ListDimensionsCommandOutput extends ListDimensionsResponse, __M
 declare const ListDimensionsCommand_base: {
     new (input: ListDimensionsCommandInput): import("@smithy/smithy-client").CommandImpl<ListDimensionsCommandInput, ListDimensionsCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
     new (__0_0: ListDimensionsCommandInput): import("@smithy/smithy-client").CommandImpl<ListDimensionsCommandInput, ListDimensionsCommandOutput, AirborneClientResolvedConfig, ServiceInputTypes, ServiceOutputTypes>;
-    getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
+    getEndpointParameterInstructions(): import("@smithy/types").EndpointParameterInstructions;
 };
 /**
- * List dimensions request operation
+ * List the targeting dimensions defined for an application, in priority order, with pagination. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

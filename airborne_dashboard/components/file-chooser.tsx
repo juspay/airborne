@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ChevronDown, ChevronRight, File, X, Tag, Loader2 } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, File, X, Tag, Loader2, FolderPlus } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
+import { toastError } from "@/hooks/use-toast";
 
 import type {
   FileGroup,
@@ -19,6 +20,8 @@ import type {
   TagInfo,
   TagsResponse,
   SelectedFile,
+  NamedFileGroup,
+  NamedFileGroupsResponse,
 } from "@/types/files";
 
 // Re-export for backward compatibility
@@ -32,6 +35,8 @@ export interface FileChooserProps {
   className?: string;
   disabled?: boolean;
   excludeFiles?: string[]; // File paths to exclude from selection
+  /** Show the File Groups quick-select panel (multi mode). Off inside the group editor itself. */
+  showFileGroups?: boolean;
 }
 
 const GROUPS_PER_PAGE = 15;
@@ -45,6 +50,7 @@ export function FileChooser({
   className,
   disabled = false,
   excludeFiles = [],
+  showFileGroups = true,
 }: FileChooserProps) {
   const { token, org, app } = useAppContext();
 
@@ -76,6 +82,89 @@ export function FileChooser({
   // Stable references
   const excludeFilesSet = useMemo(() => new Set(excludeFiles), [excludeFiles]);
   const tagsFilterKey = useMemo(() => selectedTagFilters.join(","), [selectedTagFilters]);
+
+  // Named file groups (multi mode): one click adds all of a group's files
+  const { data: namedGroupsData } = useSWR(
+    token && org && app && mode === "multi" && showFileGroups ? ["/file-groups", org, app] : null,
+    async () =>
+      apiFetch<NamedFileGroupsResponse>(
+        "/file-groups",
+        { method: "GET", query: { page: 1, count: 100 } },
+        { token, org, app }
+      ),
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+  const namedGroups = useMemo(() => namedGroupsData?.data || [], [namedGroupsData]);
+
+  /** Files of a group's latest version that are actually selectable here (not excluded, e.g. already in the package). */
+  const selectableGroupFiles = useCallback(
+    (group: NamedFileGroup) => (group.latest?.files || []).filter((f) => !excludeFilesSet.has(f.file_path)),
+    [excludeFilesSet]
+  );
+
+  /** A group counts as selected when every selectable file of it is in the selection. */
+  const isGroupSelected = useCallback(
+    (group: NamedFileGroup) => {
+      const candidates = selectableGroupFiles(group);
+      if (candidates.length === 0) return false;
+      return candidates.every((f) =>
+        selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+      );
+    },
+    [selected, selectableGroupFiles]
+  );
+
+  /** Partially selected: some but not all selectable files are chosen. */
+  const isGroupPartiallySelected = useCallback(
+    (group: NamedFileGroup) => {
+      const candidates = selectableGroupFiles(group);
+      if (candidates.length === 0) return false;
+      const chosen = candidates.filter((f) =>
+        selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+      ).length;
+      return chosen > 0 && chosen < candidates.length;
+    },
+    [selected, selectableGroupFiles]
+  );
+
+  const toggleGroup = useCallback(
+    (group: NamedFileGroup) => {
+      const candidates = selectableGroupFiles(group);
+      if (candidates.length === 0) return;
+
+      if (isGroupSelected(group)) {
+        // Deselect: drop exactly this group's selectable file versions
+        const groupKeys = new Set(candidates.map((f) => `${f.file_path}@${f.version}`));
+        onChange(selected.filter((s) => !groupKeys.has(`${s.file_path}@${s.version}`)));
+        return;
+      }
+
+      // Rule: the exact same file (path AND version) cannot enter the
+      // selection twice — e.g. from two overlapping file groups. The same
+      // path at a different version is allowed.
+      const duplicates = candidates.filter((f) =>
+        selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+      );
+      if (duplicates.length > 0) {
+        const sample = `${duplicates[0].file_path}@v${duplicates[0].version}`;
+        toastError(
+          `Cannot add file group "${group.name}"`,
+          `${duplicates.length} of its file${duplicates.length === 1 ? " is" : "s are"} already selected (e.g. ${sample}). The same file version cannot be included twice.`
+        );
+        return;
+      }
+
+      const newFiles: SelectedFile[] = candidates.map((f) => ({
+        file_path: f.file_path,
+        version: f.version,
+        url: f.url,
+        tag: f.tag || undefined,
+      }));
+
+      if (newFiles.length > 0) onChange([...selected, ...newFiles]);
+    },
+    [selected, onChange, isGroupSelected, selectableGroupFiles]
+  );
 
   const computeHasMorePages = useCallback((result: FileGroupsResponse, page: number) => {
     if (typeof result.total_items === "number" && result.total_items >= 0) {
@@ -459,6 +548,73 @@ export function FileChooser({
         )}
       </div>
 
+      {/* File Groups — selectable alongside individual files */}
+      {mode === "multi" && showFileGroups && namedGroups.length > 0 && (
+        <div className="border rounded-md bg-background">
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-muted/40">
+            <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">File Groups</span>
+            <span className="text-xs text-muted-foreground">
+              — select a whole group, or pick individual files below
+            </span>
+          </div>
+          <div className="divide-y divide-border/50 max-h-40 overflow-y-auto">
+            {namedGroups.map((g) => {
+              const candidates = selectableGroupFiles(g);
+              const noneSelectable = candidates.length === 0;
+              const checked = isGroupSelected(g);
+              const partial = isGroupPartiallySelected(g);
+              return (
+                <div
+                  key={g.name}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 transition-colors",
+                    noneSelectable || disabled ? "opacity-50" : "cursor-pointer hover:bg-accent/50",
+                    checked && "bg-green-500/5"
+                  )}
+                  onClick={() => !disabled && toggleGroup(g)}
+                  title={
+                    noneSelectable
+                      ? (g.latest?.files || []).length === 0
+                        ? "This group is empty"
+                        : "All files of this group are already in the package"
+                      : undefined
+                  }
+                >
+                  <Checkbox
+                    checked={checked}
+                    className="h-4 w-4"
+                    onClick={(e) => e.stopPropagation()}
+                    onCheckedChange={() => toggleGroup(g)}
+                    disabled={disabled || noneSelectable}
+                  />
+                  <FolderPlus className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
+                  <span className="flex-1 min-w-0 truncate">
+                    <span className="text-sm font-medium">{g.name}</span>
+                    {g.latest && <span className="ml-1.5 text-xs text-muted-foreground">v{g.latest.version}</span>}
+                  </span>
+                  {partial && (
+                    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                      partial
+                    </Badge>
+                  )}
+                  {noneSelectable && (g.latest?.files || []).length > 0 && (
+                    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                      all in package
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {candidates.length < (g.latest?.files || []).length
+                      ? `${candidates.length} of ${(g.latest?.files || []).length} selectable`
+                      : `${(g.latest?.files || []).length} file${(g.latest?.files || []).length === 1 ? "" : "s"}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Select All / Actions Bar */}
       {groups.length > 0 && mode === "multi" && (
         <div className="flex items-center justify-between px-1">
@@ -502,8 +658,8 @@ export function FileChooser({
         </div>
       )}
 
-      {/* File Groups List */}
-      <div className="border rounded-md bg-background">
+      {/* File Groups List — scrolls internally so the page/dialog doesn't grow as pages load */}
+      <div className="border rounded-md bg-background max-h-80 overflow-y-auto">
         {initialLoading && accumulatedGroups.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -584,10 +740,15 @@ export function FileChooser({
                       <div className="text-xs text-muted-foreground/70 truncate">{group.file_path}</div>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-1">
+                    <div className="hidden sm:flex items-center gap-1 min-w-0 flex-shrink overflow-hidden">
                       {group.tags.slice(0, 2).map((t) => (
-                        <Badge key={t.tag} variant="outline" className="text-[10px] h-5 px-1.5">
-                          {t.tag}
+                        <Badge
+                          key={t.tag}
+                          variant="outline"
+                          className="text-[10px] h-5 px-1.5 max-w-40 overflow-hidden"
+                          title={t.tag}
+                        >
+                          <span className="truncate">{t.tag}</span>
                         </Badge>
                       ))}
                       {group.tags.length > 2 && (
@@ -631,8 +792,12 @@ export function FileChooser({
                                   v{version.version}
                                 </span>
                                 {versionTag && (
-                                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-                                    {versionTag}
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-[10px] h-5 px-1.5 max-w-40 overflow-hidden"
+                                    title={versionTag}
+                                  >
+                                    <span className="truncate">{versionTag}</span>
                                   </Badge>
                                 )}
                               </div>
