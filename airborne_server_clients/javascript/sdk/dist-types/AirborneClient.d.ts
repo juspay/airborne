@@ -12,6 +12,7 @@ import { GetFileGroupCommandInput, GetFileGroupCommandOutput } from "./commands/
 import { GetFileGroupVersionCommandInput, GetFileGroupVersionCommandOutput } from "./commands/GetFileGroupVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
+import { GetValidationFunctionCommandInput, GetValidationFunctionCommandOutput } from "./commands/GetValidationFunctionCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
 import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "./commands/ListFileGroupsCommand";
 import { ListFileVersionGroupsCommandInput, ListFileVersionGroupsCommandOutput } from "./commands/ListFileVersionGroupsCommand";
@@ -23,8 +24,10 @@ import { PostLoginCommandInput, PostLoginCommandOutput } from "./commands/PostLo
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "./commands/ServeReleaseV2Command";
+import { TestValidationFunctionCommandInput, TestValidationFunctionCommandOutput } from "./commands/TestValidationFunctionCommand";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "./commands/UpdateDimensionCommand";
 import { UpdateFileCommandInput, UpdateFileCommandOutput } from "./commands/UpdateFileCommand";
+import { UpdateValidationFunctionCommandInput, UpdateValidationFunctionCommandOutput } from "./commands/UpdateValidationFunctionCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "./commands/UploadFileCommand";
 import { RuntimeExtension, RuntimeExtensionsConfig } from "./runtimeExtensions";
 import { HostHeaderInputConfig, HostHeaderResolvedConfig } from "@aws-sdk/middleware-host-header";
@@ -38,11 +41,11 @@ export { __Client };
 /**
  * @public
  */
-export type ServiceInputTypes = CreateApplicationCommandInput | CreateDimensionCommandInput | CreateFileCommandInput | CreateFileGroupCommandInput | CreateFileGroupVersionCommandInput | CreateOrganisationCommandInput | CreatePackageCommandInput | CreateReleaseCommandInput | DeleteDimensionCommandInput | GetFileGroupCommandInput | GetFileGroupVersionCommandInput | GetReleaseCommandInput | GetUserCommandInput | ListDimensionsCommandInput | ListFileGroupsCommandInput | ListFileVersionGroupsCommandInput | ListFilesCommandInput | ListOrganisationsCommandInput | ListPackagesCommandInput | ListReleasesCommandInput | PostLoginCommandInput | RequestOrganisationCommandInput | ServeReleaseCommandInput | ServeReleaseV2CommandInput | UpdateDimensionCommandInput | UpdateFileCommandInput | UploadFileCommandInput;
+export type ServiceInputTypes = CreateApplicationCommandInput | CreateDimensionCommandInput | CreateFileCommandInput | CreateFileGroupCommandInput | CreateFileGroupVersionCommandInput | CreateOrganisationCommandInput | CreatePackageCommandInput | CreateReleaseCommandInput | DeleteDimensionCommandInput | GetFileGroupCommandInput | GetFileGroupVersionCommandInput | GetReleaseCommandInput | GetUserCommandInput | GetValidationFunctionCommandInput | ListDimensionsCommandInput | ListFileGroupsCommandInput | ListFileVersionGroupsCommandInput | ListFilesCommandInput | ListOrganisationsCommandInput | ListPackagesCommandInput | ListReleasesCommandInput | PostLoginCommandInput | RequestOrganisationCommandInput | ServeReleaseCommandInput | ServeReleaseV2CommandInput | TestValidationFunctionCommandInput | UpdateDimensionCommandInput | UpdateFileCommandInput | UpdateValidationFunctionCommandInput | UploadFileCommandInput;
 /**
  * @public
  */
-export type ServiceOutputTypes = CreateApplicationCommandOutput | CreateDimensionCommandOutput | CreateFileCommandOutput | CreateFileGroupCommandOutput | CreateFileGroupVersionCommandOutput | CreateOrganisationCommandOutput | CreatePackageCommandOutput | CreateReleaseCommandOutput | DeleteDimensionCommandOutput | GetFileGroupCommandOutput | GetFileGroupVersionCommandOutput | GetReleaseCommandOutput | GetUserCommandOutput | ListDimensionsCommandOutput | ListFileGroupsCommandOutput | ListFileVersionGroupsCommandOutput | ListFilesCommandOutput | ListOrganisationsCommandOutput | ListPackagesCommandOutput | ListReleasesCommandOutput | PostLoginCommandOutput | RequestOrganisationCommandOutput | ServeReleaseCommandOutput | ServeReleaseV2CommandOutput | UpdateDimensionCommandOutput | UpdateFileCommandOutput | UploadFileCommandOutput;
+export type ServiceOutputTypes = CreateApplicationCommandOutput | CreateDimensionCommandOutput | CreateFileCommandOutput | CreateFileGroupCommandOutput | CreateFileGroupVersionCommandOutput | CreateOrganisationCommandOutput | CreatePackageCommandOutput | CreateReleaseCommandOutput | DeleteDimensionCommandOutput | GetFileGroupCommandOutput | GetFileGroupVersionCommandOutput | GetReleaseCommandOutput | GetUserCommandOutput | GetValidationFunctionCommandOutput | ListDimensionsCommandOutput | ListFileGroupsCommandOutput | ListFileVersionGroupsCommandOutput | ListFilesCommandOutput | ListOrganisationsCommandOutput | ListPackagesCommandOutput | ListReleasesCommandOutput | PostLoginCommandOutput | RequestOrganisationCommandOutput | ServeReleaseCommandOutput | ServeReleaseV2CommandOutput | TestValidationFunctionCommandOutput | UpdateDimensionCommandOutput | UpdateFileCommandOutput | UpdateValidationFunctionCommandOutput | UploadFileCommandOutput;
 /**
  * @public
  */

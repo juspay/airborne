@@ -52,6 +52,10 @@ import {
   GetUserCommandOutput,
 } from "../commands/GetUserCommand";
 import {
+  GetValidationFunctionCommandInput,
+  GetValidationFunctionCommandOutput,
+} from "../commands/GetValidationFunctionCommand";
+import {
   ListDimensionsCommandInput,
   ListDimensionsCommandOutput,
 } from "../commands/ListDimensionsCommand";
@@ -96,6 +100,10 @@ import {
   ServeReleaseV2CommandOutput,
 } from "../commands/ServeReleaseV2Command";
 import {
+  TestValidationFunctionCommandInput,
+  TestValidationFunctionCommandOutput,
+} from "../commands/TestValidationFunctionCommand";
+import {
   UpdateDimensionCommandInput,
   UpdateDimensionCommandOutput,
 } from "../commands/UpdateDimensionCommand";
@@ -103,6 +111,10 @@ import {
   UpdateFileCommandInput,
   UpdateFileCommandOutput,
 } from "../commands/UpdateFileCommand";
+import {
+  UpdateValidationFunctionCommandInput,
+  UpdateValidationFunctionCommandOutput,
+} from "../commands/UpdateValidationFunctionCommand";
 import {
   UploadFileCommandInput,
   UploadFileCommandOutput,
@@ -468,6 +480,26 @@ export const se_GetUserCommand = async(
 }
 
 /**
+ * serializeAws_restJson1GetValidationFunctionCommand
+ */
+export const se_GetValidationFunctionCommand = async(
+  input: GetValidationFunctionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/organisations/applications/validation-functions");
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1ListDimensionsCommand
  */
 export const se_ListDimensionsCommand = async(
@@ -737,6 +769,31 @@ export const se_ServeReleaseV2Command = async(
 }
 
 /**
+ * serializeAws_restJson1TestValidationFunctionCommand
+ */
+export const se_TestValidationFunctionCommand = async(
+  input: TestValidationFunctionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/organisations/applications/validation-functions/test");
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'function_code': [],
+    'test_args': _ => se_Document(_, context),
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1UpdateDimensionCommand
  */
 export const se_UpdateDimensionCommand = async(
@@ -782,6 +839,30 @@ export const se_UpdateFileCommand = async(
     'tag': [],
   }));
   b.m("PATCH")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1UpdateValidationFunctionCommand
+ */
+export const se_UpdateValidationFunctionCommand = async(
+  input: UpdateValidationFunctionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/organisations/applications/validation-functions");
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'function_code': [],
+  }));
+  b.m("PUT")
   .h(headers)
   .b(body);
   return b.build();
@@ -1133,6 +1214,27 @@ export const de_GetUserCommand = async(
 }
 
 /**
+ * deserializeAws_restJson1GetValidationFunctionCommand
+ */
+export const de_GetValidationFunctionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetValidationFunctionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'function_code': __expectString,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
  * deserializeAws_restJson1ListDimensionsCommand
  */
 export const de_ListDimensionsCommand = async(
@@ -1390,6 +1492,29 @@ export const de_ServeReleaseV2Command = async(
 }
 
 /**
+ * deserializeAws_restJson1TestValidationFunctionCommand
+ */
+export const de_TestValidationFunctionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<TestValidationFunctionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'error': __expectString,
+    'result': __expectBoolean,
+    'valid': __expectBoolean,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
  * deserializeAws_restJson1UpdateDimensionCommand
  */
 export const de_UpdateDimensionCommand = async(
@@ -1440,6 +1565,27 @@ export const de_UpdateFileCommand = async(
     'tag': __expectString,
     'url': __expectString,
     'version': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1UpdateValidationFunctionCommand
+ */
+export const de_UpdateValidationFunctionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<UpdateValidationFunctionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'function_code': __expectString,
   });
   Object.assign(contents, doc);
   return contents;

@@ -5,6 +5,7 @@ version.workspace = true
 edition = "2021"
 
 [dependencies]
+rustyscript = "0.12.3"
 async-trait = "0.1.89"
 airborne_authz_macros = { path = "../airborne_authz_macros" }
 actix-multipart = "0.7.2"

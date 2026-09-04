@@ -58,6 +58,10 @@ import {
   GetUserCommandOutput,
 } from "./commands/GetUserCommand";
 import {
+  GetValidationFunctionCommandInput,
+  GetValidationFunctionCommandOutput,
+} from "./commands/GetValidationFunctionCommand";
+import {
   ListDimensionsCommandInput,
   ListDimensionsCommandOutput,
 } from "./commands/ListDimensionsCommand";
@@ -102,6 +106,10 @@ import {
   ServeReleaseV2CommandOutput,
 } from "./commands/ServeReleaseV2Command";
 import {
+  TestValidationFunctionCommandInput,
+  TestValidationFunctionCommandOutput,
+} from "./commands/TestValidationFunctionCommand";
+import {
   UpdateDimensionCommandInput,
   UpdateDimensionCommandOutput,
 } from "./commands/UpdateDimensionCommand";
@@ -109,6 +117,10 @@ import {
   UpdateFileCommandInput,
   UpdateFileCommandOutput,
 } from "./commands/UpdateFileCommand";
+import {
+  UpdateValidationFunctionCommandInput,
+  UpdateValidationFunctionCommandOutput,
+} from "./commands/UpdateValidationFunctionCommand";
 import {
   UploadFileCommandInput,
   UploadFileCommandOutput,
@@ -192,6 +204,7 @@ export type ServiceInputTypes =
   | GetFileGroupVersionCommandInput
   | GetReleaseCommandInput
   | GetUserCommandInput
+  | GetValidationFunctionCommandInput
   | ListDimensionsCommandInput
   | ListFileGroupsCommandInput
   | ListFileVersionGroupsCommandInput
@@ -203,8 +216,10 @@ export type ServiceInputTypes =
   | RequestOrganisationCommandInput
   | ServeReleaseCommandInput
   | ServeReleaseV2CommandInput
+  | TestValidationFunctionCommandInput
   | UpdateDimensionCommandInput
   | UpdateFileCommandInput
+  | UpdateValidationFunctionCommandInput
   | UploadFileCommandInput;
 
 /**
@@ -224,6 +239,7 @@ export type ServiceOutputTypes =
   | GetFileGroupVersionCommandOutput
   | GetReleaseCommandOutput
   | GetUserCommandOutput
+  | GetValidationFunctionCommandOutput
   | ListDimensionsCommandOutput
   | ListFileGroupsCommandOutput
   | ListFileVersionGroupsCommandOutput
@@ -235,8 +251,10 @@ export type ServiceOutputTypes =
   | RequestOrganisationCommandOutput
   | ServeReleaseCommandOutput
   | ServeReleaseV2CommandOutput
+  | TestValidationFunctionCommandOutput
   | UpdateDimensionCommandOutput
   | UpdateFileCommandOutput
+  | UpdateValidationFunctionCommandOutput
   | UploadFileCommandOutput;
 
 /**

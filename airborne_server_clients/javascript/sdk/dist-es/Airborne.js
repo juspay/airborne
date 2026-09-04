@@ -12,6 +12,7 @@ import { GetFileGroupCommand, } from "./commands/GetFileGroupCommand";
 import { GetFileGroupVersionCommand, } from "./commands/GetFileGroupVersionCommand";
 import { GetReleaseCommand, } from "./commands/GetReleaseCommand";
 import { GetUserCommand, } from "./commands/GetUserCommand";
+import { GetValidationFunctionCommand, } from "./commands/GetValidationFunctionCommand";
 import { ListDimensionsCommand, } from "./commands/ListDimensionsCommand";
 import { ListFileGroupsCommand, } from "./commands/ListFileGroupsCommand";
 import { ListFileVersionGroupsCommand, } from "./commands/ListFileVersionGroupsCommand";
@@ -23,8 +24,10 @@ import { PostLoginCommand, } from "./commands/PostLoginCommand";
 import { RequestOrganisationCommand, } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommand, } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2Command, } from "./commands/ServeReleaseV2Command";
+import { TestValidationFunctionCommand, } from "./commands/TestValidationFunctionCommand";
 import { UpdateDimensionCommand, } from "./commands/UpdateDimensionCommand";
 import { UpdateFileCommand, } from "./commands/UpdateFileCommand";
+import { UpdateValidationFunctionCommand, } from "./commands/UpdateValidationFunctionCommand";
 import { UploadFileCommand, } from "./commands/UploadFileCommand";
 import { createAggregatedClient } from "@smithy/smithy-client";
 const commands = {
@@ -41,6 +44,7 @@ const commands = {
     GetFileGroupVersionCommand,
     GetReleaseCommand,
     GetUserCommand,
+    GetValidationFunctionCommand,
     ListDimensionsCommand,
     ListFileGroupsCommand,
     ListFilesCommand,
@@ -52,8 +56,10 @@ const commands = {
     RequestOrganisationCommand,
     ServeReleaseCommand,
     ServeReleaseV2Command,
+    TestValidationFunctionCommand,
     UpdateDimensionCommand,
     UpdateFileCommand,
+    UpdateValidationFunctionCommand,
     UploadFileCommand,
 };
 export class Airborne extends AirborneClient {

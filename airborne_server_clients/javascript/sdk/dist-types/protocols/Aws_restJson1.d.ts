@@ -11,6 +11,7 @@ import { GetFileGroupCommandInput, GetFileGroupCommandOutput } from "../commands
 import { GetFileGroupVersionCommandInput, GetFileGroupVersionCommandOutput } from "../commands/GetFileGroupVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "../commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "../commands/GetUserCommand";
+import { GetValidationFunctionCommandInput, GetValidationFunctionCommandOutput } from "../commands/GetValidationFunctionCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "../commands/ListDimensionsCommand";
 import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "../commands/ListFileGroupsCommand";
 import { ListFileVersionGroupsCommandInput, ListFileVersionGroupsCommandOutput } from "../commands/ListFileVersionGroupsCommand";
@@ -22,8 +23,10 @@ import { PostLoginCommandInput, PostLoginCommandOutput } from "../commands/PostL
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "../commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "../commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "../commands/ServeReleaseV2Command";
+import { TestValidationFunctionCommandInput, TestValidationFunctionCommandOutput } from "../commands/TestValidationFunctionCommand";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "../commands/UpdateDimensionCommand";
 import { UpdateFileCommandInput, UpdateFileCommandOutput } from "../commands/UpdateFileCommand";
+import { UpdateValidationFunctionCommandInput, UpdateValidationFunctionCommandOutput } from "../commands/UpdateValidationFunctionCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "../commands/UploadFileCommand";
 import { HttpRequest as __HttpRequest, HttpResponse as __HttpResponse } from "@smithy/protocol-http";
 import { SerdeContext as __SerdeContext } from "@smithy/types";
@@ -80,6 +83,10 @@ export declare const se_GetReleaseCommand: (input: GetReleaseCommandInput, conte
  */
 export declare const se_GetUserCommand: (input: GetUserCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1GetValidationFunctionCommand
+ */
+export declare const se_GetValidationFunctionCommand: (input: GetValidationFunctionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1ListDimensionsCommand
  */
 export declare const se_ListDimensionsCommand: (input: ListDimensionsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -124,6 +131,10 @@ export declare const se_ServeReleaseCommand: (input: ServeReleaseCommandInput, c
  */
 export declare const se_ServeReleaseV2Command: (input: ServeReleaseV2CommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1TestValidationFunctionCommand
+ */
+export declare const se_TestValidationFunctionCommand: (input: TestValidationFunctionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1UpdateDimensionCommand
  */
 export declare const se_UpdateDimensionCommand: (input: UpdateDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -131,6 +142,10 @@ export declare const se_UpdateDimensionCommand: (input: UpdateDimensionCommandIn
  * serializeAws_restJson1UpdateFileCommand
  */
 export declare const se_UpdateFileCommand: (input: UpdateFileCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1UpdateValidationFunctionCommand
+ */
+export declare const se_UpdateValidationFunctionCommand: (input: UpdateValidationFunctionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1UploadFileCommand
  */
@@ -188,6 +203,10 @@ export declare const de_GetReleaseCommand: (output: __HttpResponse, context: __S
  */
 export declare const de_GetUserCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetUserCommandOutput>;
 /**
+ * deserializeAws_restJson1GetValidationFunctionCommand
+ */
+export declare const de_GetValidationFunctionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetValidationFunctionCommandOutput>;
+/**
  * deserializeAws_restJson1ListDimensionsCommand
  */
 export declare const de_ListDimensionsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListDimensionsCommandOutput>;
@@ -232,6 +251,10 @@ export declare const de_ServeReleaseCommand: (output: __HttpResponse, context: _
  */
 export declare const de_ServeReleaseV2Command: (output: __HttpResponse, context: __SerdeContext) => Promise<ServeReleaseV2CommandOutput>;
 /**
+ * deserializeAws_restJson1TestValidationFunctionCommand
+ */
+export declare const de_TestValidationFunctionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<TestValidationFunctionCommandOutput>;
+/**
  * deserializeAws_restJson1UpdateDimensionCommand
  */
 export declare const de_UpdateDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateDimensionCommandOutput>;
@@ -239,6 +262,10 @@ export declare const de_UpdateDimensionCommand: (output: __HttpResponse, context
  * deserializeAws_restJson1UpdateFileCommand
  */
 export declare const de_UpdateFileCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateFileCommandOutput>;
+/**
+ * deserializeAws_restJson1UpdateValidationFunctionCommand
+ */
+export declare const de_UpdateValidationFunctionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateValidationFunctionCommandOutput>;
 /**
  * deserializeAws_restJson1UploadFileCommand
  */

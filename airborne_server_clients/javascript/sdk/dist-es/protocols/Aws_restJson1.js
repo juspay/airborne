@@ -219,6 +219,19 @@ export const se_GetUserCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_GetValidationFunctionCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/validation-functions");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_ListDimensionsCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -408,6 +421,24 @@ export const se_ServeReleaseV2Command = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_TestValidationFunctionCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/validation-functions/test");
+    let body;
+    body = JSON.stringify(take(input, {
+        'function_code': [],
+        'test_args': _ => se_Document(_, context),
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_UpdateDimensionCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -441,6 +472,23 @@ export const se_UpdateFileCommand = async (input, context) => {
         'tag': [],
     }));
     b.m("PATCH")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_UpdateValidationFunctionCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/validation-functions");
+    let body;
+    body = JSON.stringify(take(input, {
+        'function_code': [],
+    }));
+    b.m("PUT")
         .h(headers)
         .b(body);
     return b.build();
@@ -692,6 +740,20 @@ export const de_GetUserCommand = async (output, context) => {
     Object.assign(contents, doc);
     return contents;
 };
+export const de_GetValidationFunctionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'function_code': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
 export const de_ListDimensionsCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -872,6 +934,22 @@ export const de_ServeReleaseV2Command = async (output, context) => {
     Object.assign(contents, doc);
     return contents;
 };
+export const de_TestValidationFunctionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'error': __expectString,
+        'result': __expectBoolean,
+        'valid': __expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
 export const de_UpdateDimensionCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -910,6 +988,20 @@ export const de_UpdateFileCommand = async (output, context) => {
         'tag': __expectString,
         'url': __expectString,
         'version': __expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_UpdateValidationFunctionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'function_code': __expectString,
     });
     Object.assign(contents, doc);
     return contents;

@@ -1889,6 +1889,9 @@
                     "target": "io.airborne.server#GetUser"
                 },
                 {
+                    "target": "io.airborne.server#GetValidationFunction"
+                },
+                {
                     "target": "io.airborne.server#ListDimensions"
                 },
                 {
@@ -1922,10 +1925,16 @@
                     "target": "io.airborne.server#ServeReleaseV2"
                 },
                 {
+                    "target": "io.airborne.server#TestValidationFunction"
+                },
+                {
                     "target": "io.airborne.server#UpdateDimension"
                 },
                 {
                     "target": "io.airborne.server#UpdateFile"
+                },
+                {
+                    "target": "io.airborne.server#UpdateValidationFunction"
                 },
                 {
                     "target": "io.airborne.server#UploadFile"
@@ -3701,6 +3710,59 @@
                 ]
             }
         },
+        "io.airborne.server#GetValidationFunction": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetValidationFunctionRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ValidationFunctionResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Get the application's release validation function. Apps that never saved one get the default, which accepts every release. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/organisations/applications/validation-functions"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Applications"
+                ]
+            }
+        },
+        "io.airborne.server#GetValidationFunctionRequest": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Get validation function request"
+            }
+        },
         "io.airborne.server#InternalServerError": {
             "type": "structure",
             "members": {
@@ -5062,6 +5124,99 @@
                 "smithy.api#documentation": "List of strings"
             }
         },
+        "io.airborne.server#TestValidationFunction": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#TestValidationFunctionRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#TestValidationFunctionResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Run validation code against test arguments without saving it, returning the boolean result or the execution error. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/organisations/applications/validation-functions/test"
+                },
+                "smithy.api#tags": [
+                    "Applications"
+                ]
+            }
+        },
+        "io.airborne.server#TestValidationFunctionRequest": {
+            "type": "structure",
+            "members": {
+                "function_code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "JavaScript source to test (need not be saved)",
+                        "smithy.api#required": {}
+                    }
+                },
+                "test_args": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Arguments passed to main, mirroring the release validation context",
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Test validation function request"
+            }
+        },
+        "io.airborne.server#TestValidationFunctionResponse": {
+            "type": "structure",
+            "members": {
+                "valid": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Whether the code loaded and executed successfully",
+                        "smithy.api#required": {}
+                    }
+                },
+                "result": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "The boolean returned by main, when execution succeeded"
+                    }
+                },
+                "error": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Error message, when the code failed to load or execute"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Test validation function response"
+            }
+        },
         "io.airborne.server#Unauthorized": {
             "type": "structure",
             "members": {
@@ -5218,6 +5373,66 @@
             },
             "traits": {
                 "smithy.api#documentation": "Update file request"
+            }
+        },
+        "io.airborne.server#UpdateValidationFunction": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#UpdateValidationFunctionRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ValidationFunctionResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Save the application's release validation function. The code must define a synchronous `function main(args)` returning a boolean; it runs before every release create/update, and returning false rejects the release. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "PUT",
+                    "uri": "/api/organisations/applications/validation-functions"
+                },
+                "smithy.api#idempotent": {},
+                "smithy.api#tags": [
+                    "Applications"
+                ]
+            }
+        },
+        "io.airborne.server#UpdateValidationFunctionRequest": {
+            "type": "structure",
+            "members": {
+                "function_code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "JavaScript source defining a synchronous `function main(args)`",
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Update validation function request"
             }
         },
         "io.airborne.server#UploadFile": {
@@ -5394,6 +5609,21 @@
             },
             "traits": {
                 "smithy.api#documentation": "Tokens returned after a successful login."
+            }
+        },
+        "io.airborne.server#ValidationFunctionResponse": {
+            "type": "structure",
+            "members": {
+                "function_code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "JavaScript source defining a synchronous `function main(args)`",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "The application's validation function"
             }
         },
         "io.airborne.server#authapi": {

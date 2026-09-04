@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFileVersionGroupsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_GetFileGroupVersionCommand = exports.de_GetFileGroupCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileGroupVersionCommand = exports.de_CreateFileGroupCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFileVersionGroupsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_GetFileGroupVersionCommand = exports.se_GetFileGroupCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileGroupVersionCommand = exports.se_CreateFileGroupCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
-exports.de_UploadFileCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = void 0;
+exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFileVersionGroupsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_GetValidationFunctionCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_GetFileGroupVersionCommand = exports.de_GetFileGroupCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileGroupVersionCommand = exports.de_CreateFileGroupCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateValidationFunctionCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_TestValidationFunctionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFileVersionGroupsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_GetValidationFunctionCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_GetFileGroupVersionCommand = exports.se_GetFileGroupCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileGroupVersionCommand = exports.se_CreateFileGroupCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdateValidationFunctionCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_TestValidationFunctionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
@@ -236,6 +236,20 @@ const se_GetUserCommand = async (input, context) => {
     return b.build();
 };
 exports.se_GetUserCommand = se_GetUserCommand;
+const se_GetValidationFunctionCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/validation-functions");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetValidationFunctionCommand = se_GetValidationFunctionCommand;
 const se_ListDimensionsCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -436,6 +450,25 @@ const se_ServeReleaseV2Command = async (input, context) => {
     return b.build();
 };
 exports.se_ServeReleaseV2Command = se_ServeReleaseV2Command;
+const se_TestValidationFunctionCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/validation-functions/test");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'function_code': [],
+        'test_args': _ => se_Document(_, context),
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_TestValidationFunctionCommand = se_TestValidationFunctionCommand;
 const se_UpdateDimensionCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -475,6 +508,24 @@ const se_UpdateFileCommand = async (input, context) => {
     return b.build();
 };
 exports.se_UpdateFileCommand = se_UpdateFileCommand;
+const se_UpdateValidationFunctionCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/validation-functions");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'function_code': [],
+    }));
+    b.m("PUT")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_UpdateValidationFunctionCommand = se_UpdateValidationFunctionCommand;
 const se_UploadFileCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -736,6 +787,21 @@ const de_GetUserCommand = async (output, context) => {
     return contents;
 };
 exports.de_GetUserCommand = de_GetUserCommand;
+const de_GetValidationFunctionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'function_code': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetValidationFunctionCommand = de_GetValidationFunctionCommand;
 const de_ListDimensionsCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -927,6 +993,23 @@ const de_ServeReleaseV2Command = async (output, context) => {
     return contents;
 };
 exports.de_ServeReleaseV2Command = de_ServeReleaseV2Command;
+const de_TestValidationFunctionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'error': smithy_client_1.expectString,
+        'result': smithy_client_1.expectBoolean,
+        'valid': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_TestValidationFunctionCommand = de_TestValidationFunctionCommand;
 const de_UpdateDimensionCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -971,6 +1054,21 @@ const de_UpdateFileCommand = async (output, context) => {
     return contents;
 };
 exports.de_UpdateFileCommand = de_UpdateFileCommand;
+const de_UpdateValidationFunctionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'function_code': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_UpdateValidationFunctionCommand = de_UpdateValidationFunctionCommand;
 const de_UploadFileCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);

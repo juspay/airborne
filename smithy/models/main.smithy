@@ -16,6 +16,9 @@ service Airborne {
         RequestOrganisation
         // application
         CreateApplication
+        GetValidationFunction
+        UpdateValidationFunction
+        TestValidationFunction
         // file
         CreateFile
         ListFiles

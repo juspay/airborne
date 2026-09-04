@@ -1756,6 +1756,303 @@
                 ]
             }
         },
+        "/api/organisations/applications/validation-functions": {
+            "get": {
+                "description": "Get the application's release validation function. Apps that never saved one get the default, which accepts every release. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "GetValidationFunction",
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetValidationFunction 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetValidationFunctionResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Applications"
+                ]
+            },
+            "put": {
+                "description": "Save the application's release validation function. The code must define a synchronous `function main(args)` returning a boolean; it runs before every release create/update, and returning false rejects the release. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "UpdateValidationFunction",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateValidationFunctionRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UpdateValidationFunction 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateValidationFunctionResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Applications"
+                ]
+            }
+        },
+        "/api/organisations/applications/validation-functions/test": {
+            "post": {
+                "description": "Run validation code against test arguments without saving it, returning the boolean result or the execution error. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "operationId": "TestValidationFunction",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestValidationFunctionRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "TestValidationFunction 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TestValidationFunctionResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Applications"
+                ]
+            }
+        },
         "/api/organisations/create": {
             "post": {
                 "description": "Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.",
@@ -3817,6 +4114,19 @@
                     "user_id"
                 ]
             },
+            "GetValidationFunctionResponseContent": {
+                "type": "object",
+                "description": "The application's validation function",
+                "properties": {
+                    "function_code": {
+                        "type": "string",
+                        "description": "JavaScript source defining a synchronous `function main(args)`"
+                    }
+                },
+                "required": [
+                    "function_code"
+                ]
+            },
             "InternalServerErrorResponseContent": {
                 "type": "object",
                 "description": "Internal server error",
@@ -4356,6 +4666,44 @@
                     "resources"
                 ]
             },
+            "TestValidationFunctionRequestContent": {
+                "type": "object",
+                "description": "Test validation function request",
+                "properties": {
+                    "function_code": {
+                        "type": "string",
+                        "description": "JavaScript source to test (need not be saved)"
+                    },
+                    "test_args": {
+                        "description": "Arguments passed to main, mirroring the release validation context"
+                    }
+                },
+                "required": [
+                    "function_code",
+                    "test_args"
+                ]
+            },
+            "TestValidationFunctionResponseContent": {
+                "type": "object",
+                "description": "Test validation function response",
+                "properties": {
+                    "valid": {
+                        "type": "boolean",
+                        "description": "Whether the code loaded and executed successfully"
+                    },
+                    "result": {
+                        "type": "boolean",
+                        "description": "The boolean returned by main, when execution succeeded"
+                    },
+                    "error": {
+                        "type": "string",
+                        "description": "Error message, when the code failed to load or execute"
+                    }
+                },
+                "required": [
+                    "valid"
+                ]
+            },
             "UnauthorizedResponseContent": {
                 "type": "object",
                 "description": "Unauthorized error",
@@ -4486,6 +4834,32 @@
                     "status",
                     "url",
                     "version"
+                ]
+            },
+            "UpdateValidationFunctionRequestContent": {
+                "type": "object",
+                "description": "Update validation function request",
+                "properties": {
+                    "function_code": {
+                        "type": "string",
+                        "description": "JavaScript source defining a synchronous `function main(args)`"
+                    }
+                },
+                "required": [
+                    "function_code"
+                ]
+            },
+            "UpdateValidationFunctionResponseContent": {
+                "type": "object",
+                "description": "The application's validation function",
+                "properties": {
+                    "function_code": {
+                        "type": "string",
+                        "description": "JavaScript source defining a synchronous `function main(args)`"
+                    }
+                },
+                "required": [
+                    "function_code"
                 ]
             },
             "UploadFileInputPayload": {

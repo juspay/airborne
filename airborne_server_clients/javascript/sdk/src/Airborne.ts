@@ -69,6 +69,11 @@ import {
   GetUserCommandOutput,
 } from "./commands/GetUserCommand";
 import {
+  GetValidationFunctionCommand,
+  GetValidationFunctionCommandInput,
+  GetValidationFunctionCommandOutput,
+} from "./commands/GetValidationFunctionCommand";
+import {
   ListDimensionsCommand,
   ListDimensionsCommandInput,
   ListDimensionsCommandOutput,
@@ -124,6 +129,11 @@ import {
   ServeReleaseV2CommandOutput,
 } from "./commands/ServeReleaseV2Command";
 import {
+  TestValidationFunctionCommand,
+  TestValidationFunctionCommandInput,
+  TestValidationFunctionCommandOutput,
+} from "./commands/TestValidationFunctionCommand";
+import {
   UpdateDimensionCommand,
   UpdateDimensionCommandInput,
   UpdateDimensionCommandOutput,
@@ -133,6 +143,11 @@ import {
   UpdateFileCommandInput,
   UpdateFileCommandOutput,
 } from "./commands/UpdateFileCommand";
+import {
+  UpdateValidationFunctionCommand,
+  UpdateValidationFunctionCommandInput,
+  UpdateValidationFunctionCommandOutput,
+} from "./commands/UpdateValidationFunctionCommand";
 import {
   UploadFileCommand,
   UploadFileCommandInput,
@@ -155,6 +170,7 @@ const commands = {
   GetFileGroupVersionCommand,
   GetReleaseCommand,
   GetUserCommand,
+  GetValidationFunctionCommand,
   ListDimensionsCommand,
   ListFileGroupsCommand,
   ListFilesCommand,
@@ -166,8 +182,10 @@ const commands = {
   RequestOrganisationCommand,
   ServeReleaseCommand,
   ServeReleaseV2Command,
+  TestValidationFunctionCommand,
   UpdateDimensionCommand,
   UpdateFileCommand,
+  UpdateValidationFunctionCommand,
   UploadFileCommand,
 }
 
@@ -395,6 +413,23 @@ export interface Airborne {
   ): void;
 
   /**
+   * @see {@link GetValidationFunctionCommand}
+   */
+  getValidationFunction(
+    args: GetValidationFunctionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<GetValidationFunctionCommandOutput>;
+  getValidationFunction(
+    args: GetValidationFunctionCommandInput,
+    cb: (err: any, data?: GetValidationFunctionCommandOutput) => void
+  ): void;
+  getValidationFunction(
+    args: GetValidationFunctionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: GetValidationFunctionCommandOutput) => void
+  ): void;
+
+  /**
    * @see {@link ListDimensionsCommand}
    */
   listDimensions(
@@ -583,6 +618,23 @@ export interface Airborne {
   ): void;
 
   /**
+   * @see {@link TestValidationFunctionCommand}
+   */
+  testValidationFunction(
+    args: TestValidationFunctionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<TestValidationFunctionCommandOutput>;
+  testValidationFunction(
+    args: TestValidationFunctionCommandInput,
+    cb: (err: any, data?: TestValidationFunctionCommandOutput) => void
+  ): void;
+  testValidationFunction(
+    args: TestValidationFunctionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: TestValidationFunctionCommandOutput) => void
+  ): void;
+
+  /**
    * @see {@link UpdateDimensionCommand}
    */
   updateDimension(
@@ -614,6 +666,23 @@ export interface Airborne {
     args: UpdateFileCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: UpdateFileCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link UpdateValidationFunctionCommand}
+   */
+  updateValidationFunction(
+    args: UpdateValidationFunctionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<UpdateValidationFunctionCommandOutput>;
+  updateValidationFunction(
+    args: UpdateValidationFunctionCommandInput,
+    cb: (err: any, data?: UpdateValidationFunctionCommandOutput) => void
+  ): void;
+  updateValidationFunction(
+    args: UpdateValidationFunctionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: UpdateValidationFunctionCommandOutput) => void
   ): void;
 
   /**

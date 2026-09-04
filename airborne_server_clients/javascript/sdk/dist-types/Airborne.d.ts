@@ -12,6 +12,7 @@ import { GetFileGroupCommandInput, GetFileGroupCommandOutput } from "./commands/
 import { GetFileGroupVersionCommandInput, GetFileGroupVersionCommandOutput } from "./commands/GetFileGroupVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
+import { GetValidationFunctionCommandInput, GetValidationFunctionCommandOutput } from "./commands/GetValidationFunctionCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
 import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "./commands/ListFileGroupsCommand";
 import { ListFileVersionGroupsCommandInput, ListFileVersionGroupsCommandOutput } from "./commands/ListFileVersionGroupsCommand";
@@ -23,8 +24,10 @@ import { PostLoginCommandInput, PostLoginCommandOutput } from "./commands/PostLo
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "./commands/RequestOrganisationCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "./commands/ServeReleaseV2Command";
+import { TestValidationFunctionCommandInput, TestValidationFunctionCommandOutput } from "./commands/TestValidationFunctionCommand";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "./commands/UpdateDimensionCommand";
 import { UpdateFileCommandInput, UpdateFileCommandOutput } from "./commands/UpdateFileCommand";
+import { UpdateValidationFunctionCommandInput, UpdateValidationFunctionCommandOutput } from "./commands/UpdateValidationFunctionCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "./commands/UploadFileCommand";
 import { HttpHandlerOptions as __HttpHandlerOptions } from "@smithy/types";
 export interface Airborne {
@@ -108,6 +111,12 @@ export interface Airborne {
     getUser(args: GetUserCommandInput, cb: (err: any, data?: GetUserCommandOutput) => void): void;
     getUser(args: GetUserCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetUserCommandOutput) => void): void;
     /**
+     * @see {@link GetValidationFunctionCommand}
+     */
+    getValidationFunction(args: GetValidationFunctionCommandInput, options?: __HttpHandlerOptions): Promise<GetValidationFunctionCommandOutput>;
+    getValidationFunction(args: GetValidationFunctionCommandInput, cb: (err: any, data?: GetValidationFunctionCommandOutput) => void): void;
+    getValidationFunction(args: GetValidationFunctionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetValidationFunctionCommandOutput) => void): void;
+    /**
      * @see {@link ListDimensionsCommand}
      */
     listDimensions(args: ListDimensionsCommandInput, options?: __HttpHandlerOptions): Promise<ListDimensionsCommandOutput>;
@@ -175,6 +184,12 @@ export interface Airborne {
     serveReleaseV2(args: ServeReleaseV2CommandInput, cb: (err: any, data?: ServeReleaseV2CommandOutput) => void): void;
     serveReleaseV2(args: ServeReleaseV2CommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ServeReleaseV2CommandOutput) => void): void;
     /**
+     * @see {@link TestValidationFunctionCommand}
+     */
+    testValidationFunction(args: TestValidationFunctionCommandInput, options?: __HttpHandlerOptions): Promise<TestValidationFunctionCommandOutput>;
+    testValidationFunction(args: TestValidationFunctionCommandInput, cb: (err: any, data?: TestValidationFunctionCommandOutput) => void): void;
+    testValidationFunction(args: TestValidationFunctionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: TestValidationFunctionCommandOutput) => void): void;
+    /**
      * @see {@link UpdateDimensionCommand}
      */
     updateDimension(args: UpdateDimensionCommandInput, options?: __HttpHandlerOptions): Promise<UpdateDimensionCommandOutput>;
@@ -186,6 +201,12 @@ export interface Airborne {
     updateFile(args: UpdateFileCommandInput, options?: __HttpHandlerOptions): Promise<UpdateFileCommandOutput>;
     updateFile(args: UpdateFileCommandInput, cb: (err: any, data?: UpdateFileCommandOutput) => void): void;
     updateFile(args: UpdateFileCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdateFileCommandOutput) => void): void;
+    /**
+     * @see {@link UpdateValidationFunctionCommand}
+     */
+    updateValidationFunction(args: UpdateValidationFunctionCommandInput, options?: __HttpHandlerOptions): Promise<UpdateValidationFunctionCommandOutput>;
+    updateValidationFunction(args: UpdateValidationFunctionCommandInput, cb: (err: any, data?: UpdateValidationFunctionCommandOutput) => void): void;
+    updateValidationFunction(args: UpdateValidationFunctionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdateValidationFunctionCommandOutput) => void): void;
     /**
      * @see {@link UploadFileCommand}
      */

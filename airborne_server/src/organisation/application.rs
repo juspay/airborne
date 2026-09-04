@@ -45,6 +45,7 @@ mod dimension;
 mod properties;
 pub mod types;
 pub mod user;
+pub mod validation_functions;
 
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
@@ -58,6 +59,7 @@ pub fn add_routes() -> Scope {
         .service(Scope::new("/dimension").service(dimension::add_routes()))
         .service(Scope::new("/user").service(user::add_routes()))
         .service(Scope::new("/properties").service(properties::add_routes()))
+        .service(Scope::new("/validation-functions").service(validation_functions::add_routes()))
 }
 
 #[derive(Serialize, Deserialize)]

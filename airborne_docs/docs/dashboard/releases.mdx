@@ -153,3 +153,23 @@ While a release is still in the `Created` state (not yet ramped), choose **Disca
 :::caution
 **Conclude**, **Revert**, and **Discard** are final and cannot be undone. Ramp gradually and watch the **Errors** and **Affected Users** metrics before concluding.
 :::
+
+## Release validation functions
+
+Every application can define one JavaScript **validation function** (sidebar → **Validation Function**) that runs on the server before a release is created or updated. If it returns `false`, the release is rejected.
+
+The code must define a **synchronous** `function main(args)` returning a boolean — async functions are rejected when saving. `args` describes the release being validated:
+
+```json
+{
+  "package": { "version": 91, "tag": "2.16.0", "index": "…" },
+  "file_groups": {
+    "<group name>": { "version": 1, "metadata": { "bundle_version": "4.149.7" }, "files": ["…"] }
+  },
+  "important": ["…"], "lazy": ["…"], "resources": ["…"]
+}
+```
+
+Because each file group version carries its own metadata, the function can enforce cross-version compatibility — for example, rejecting a release whose assets group does not match the micro-app bundle version it was built for.
+
+The editor page includes a **test runner**: edit the JSON test arguments and execute the code server-side without saving it, seeing the boolean result or the error. Applications that never save a function accept every release (the default returns `true`).

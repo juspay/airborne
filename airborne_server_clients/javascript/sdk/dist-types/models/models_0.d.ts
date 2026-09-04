@@ -985,6 +985,33 @@ export interface User {
     user_token?: UserToken | undefined;
 }
 /**
+ * Get validation function request
+ * @public
+ */
+export interface GetValidationFunctionRequest {
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * The application's validation function
+ * @public
+ */
+export interface ValidationFunctionResponse {
+    /**
+     * JavaScript source defining a synchronous `function main(args)`
+     * @public
+     */
+    function_code: string | undefined;
+}
+/**
  * Query parameters and headers for listing dimensions.
  * @public
  */
@@ -1567,6 +1594,53 @@ export interface ReleaseConfig {
     resources: __DocumentType | undefined;
 }
 /**
+ * Test validation function request
+ * @public
+ */
+export interface TestValidationFunctionRequest {
+    /**
+     * JavaScript source to test (need not be saved)
+     * @public
+     */
+    function_code: string | undefined;
+    /**
+     * Arguments passed to main, mirroring the release validation context
+     * @public
+     */
+    test_args: __DocumentType | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Test validation function response
+ * @public
+ */
+export interface TestValidationFunctionResponse {
+    /**
+     * Whether the code loaded and executed successfully
+     * @public
+     */
+    valid: boolean | undefined;
+    /**
+     * The boolean returned by main, when execution succeeded
+     * @public
+     */
+    result?: boolean | undefined;
+    /**
+     * Error message, when the code failed to load or execute
+     * @public
+     */
+    error?: string | undefined;
+}
+/**
  * @public
  */
 export interface UpdateDimensionRequest {
@@ -1611,6 +1685,27 @@ export interface UpdateFileRequest {
      * @public
      */
     tag: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Update validation function request
+ * @public
+ */
+export interface UpdateValidationFunctionRequest {
+    /**
+     * JavaScript source defining a synchronous `function main(args)`
+     * @public
+     */
+    function_code: string | undefined;
     /**
      * Name of the organisation
      * @public

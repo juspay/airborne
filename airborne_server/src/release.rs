@@ -429,6 +429,24 @@ async fn create_release(
     )
     .await?;
 
+    // Run the app's validation function before accepting the release.
+    let validation_context =
+        crate::organisation::application::validation_functions::build_release_validation_context(
+            &state,
+            &package_data,
+            final_important.as_deref().unwrap_or_default(),
+            final_lazy.as_deref().unwrap_or_default(),
+            final_resources.as_deref().unwrap_or_default(),
+        )
+        .await?;
+    crate::organisation::application::validation_functions::enforce_release_validation(
+        &state,
+        &organisation,
+        &application,
+        validation_context,
+    )
+    .await?;
+
     let control_variant = VariantBuilder::default()
         .id("control".to_string())
         .variant_type(superposition_sdk::types::VariantType::Control)
@@ -1548,6 +1566,24 @@ async fn update_release(
         dimensions.clone(),
         state.clone(),
         workspace_name.clone(),
+    )
+    .await?;
+
+    // Run the app's validation function before accepting the release.
+    let validation_context =
+        crate::organisation::application::validation_functions::build_release_validation_context(
+            &state,
+            &package_data,
+            final_important.as_deref().unwrap_or_default(),
+            final_lazy.as_deref().unwrap_or_default(),
+            final_resources.as_deref().unwrap_or_default(),
+        )
+        .await?;
+    crate::organisation::application::validation_functions::enforce_release_validation(
+        &state,
+        &organisation,
+        &application,
+        validation_context,
     )
     .await?;
 
