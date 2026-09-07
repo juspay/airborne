@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.43.2 - 1970-01-01
+### Package updates
+- airborne_react_native bumped to airborne_react_native-v0.3.10
+### Global changes
+
+- - -
+
 ## v0.43.1 - 2026-09-02
 ### Package updates
 - airborne_server bumped to airborne_server-v0.23.2

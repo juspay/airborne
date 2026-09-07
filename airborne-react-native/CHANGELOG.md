@@ -2,6 +2,96 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.3.10 - 2026-09-07
+#### Bug Fixes
+- disable dev support for release builds in react host - (858212f) - Yash Rajput
+
+- - -
+
+## v0.43.1 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.43.1 [skip ci] - (12393de) - Airborne Bot
+
+- - -
+
+## v0.43.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.43.0 [skip ci] - (a9214fc) - Airborne Bot
+
+- - -
+
+## v0.42.1 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.42.1 [skip ci] - (8862e15) - Airborne Bot
+
+- - -
+
+## v0.42.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.42.0 [skip ci] - (a706e7f) - Airborne Bot
+
+- - -
+
+## v0.41.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.41.0 [skip ci] - (99073d5) - Airborne Bot
+
+- - -
+
+## v0.40.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.40.0 [skip ci] - (dc82a08) - Airborne Bot
+
+- - -
+
+## v0.39.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.39.0 [skip ci] - (34d7ecc) - Airborne Bot
+
+- - -
+
+## v0.38.2 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.38.2 [skip ci] - (85d265a) - Airborne Bot
+
+- - -
+
+## v0.38.1 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.38.1 [skip ci] - (e1da6be) - Airborne Bot
+
+- - -
+
+## v0.38.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.38.0 [skip ci] - (72c7726) - Airborne Bot
+
+- - -
+
+## v0.37.2 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.37.2 [skip ci] - (4ca949f) - Airborne Bot
+
+- - -
+
+## v0.37.1 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.37.1 [skip ci] - (8d2dd58) - Airborne Bot
+
+- - -
+
+## v0.37.0 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.37.0 [skip ci] - (c2ab543) - Airborne Bot
+
+- - -
+
+## v0.36.5 - 2026-09-07
+#### Miscellaneous Chores
+- **(version)** v0.36.5 [skip ci] - (bcfe497) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.3.9 - 2026-05-29
 #### Bug Fixes
 - add index_bundle_path delegate method - (2842344) - Yash Rajput
