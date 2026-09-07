@@ -35,7 +35,7 @@ abstract class AirborneReactNativeHostBase(application: Application) :
             val componentFactory = ComponentFactory()
             DefaultComponentsRegistry.register(componentFactory)
             val reactHostImpl =
-                ReactHostImpl(context, reactHostDelegate, componentFactory, true, true)
+                ReactHostImpl(context, reactHostDelegate, componentFactory, true, BuildConfig.DEBUG)
             return reactHostImpl
         }
     }
