@@ -7,8 +7,11 @@ import androidx.annotation.Keep
 import `in`.juspay.airborne.HyperOTAServices
 import `in`.juspay.airborne.LazyDownloadCallback
 import `in`.juspay.airborne.TrackerCallback
+import `in`.juspay.hyperutil.constants.LogCategory
 import `in`.juspay.hyperutil.constants.LogLevel
+import `in`.juspay.hyperutil.constants.LogSubCategory
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509TrustManager
 
@@ -124,7 +127,46 @@ class Airborne(
         applicationManager.setSslConfig(sslSocketFactory, trustManager)
     }
 
+    /**
+     * Reports an exception to the host app through [AirborneInterface.onEvent].
+     */
+    @Keep
+    fun trackException(label: String, description: String, e: Throwable) {
+        trackerCallback.trackException(LogCategory.LIFECYCLE, LogSubCategory.LifeCycle.HYPER_OTA, label, description, e)
+    }
+
     companion object {
+        /**
+         * Reports a React instance failure (bundle load or runtime fatal) to the [Airborne]
+         * instance that owns [bundlePath], i.e. whose [getBundlePath] matches the bundle the failing
+         * React host booted from, so the host app's [AirborneInterface.onEvent] sees it even when
+         * React Native dev support is disabled and no RedBox is shown. Falls back to every
+         * initialised instance only when no instance matches (custom bundle path, or the path
+         * changed after boot).
+         *
+         * @param error the failure React Native reported.
+         * @param bundlePath the bundle the React host loaded, as returned by the host's
+         *   `getJSBundleFile()`, or null if unknown.
+         */
+        @JvmStatic
+        fun trackReactInstanceException(error: Throwable, bundlePath: String?) {
+            val instances = airborneObjectMap.values.toList()
+            val owners = if (bundlePath == null) emptyList() else instances.filter { airborne ->
+                try {
+                    airborne.getBundlePath() == bundlePath
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            owners.ifEmpty { instances }.forEach { airborne ->
+                try {
+                    airborne.trackException("react_instance_exception", error.message ?: error.javaClass.name, error)
+                } catch (_: Exception) {
+                    // never let telemetry failures mask the original error
+                }
+            }
+        }
+
 //        private var initializer: (() -> Airborne)? = null
 //
 //        /**
@@ -164,7 +206,7 @@ class Airborne(
 //            }
 //        }
 
-        public val airborneObjectMap: MutableMap<String, Airborne> = mutableMapOf()
+        public val airborneObjectMap: MutableMap<String, Airborne> = ConcurrentHashMap()
 
         /**
          * Default LazyDownloadCallback implementation.

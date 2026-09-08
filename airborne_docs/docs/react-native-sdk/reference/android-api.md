@@ -33,6 +33,13 @@ class Airborne(
 | `getFileContent` | `fun getFileContent(filePath: String): String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. |
 | `getReleaseConfig` | `fun getReleaseConfig(): String` | Returns the current release config as a stringified JSON. |
 | `setSslConfig` | `fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager)` | Sets a custom SSL configuration for mTLS. Call before any network requests are made to enable client-certificate authentication. |
+| `trackException` | `fun trackException(label: String, description: String, e: Throwable)` | Reports an exception to your `AirborneInterface.onEvent` with `level = "exception"`, `category = "lifecycle"`, `subCategory = "hyperota"`, the given `label` as the event label, `description` as the key, and a `value` of `{"throwable": e}`. |
+
+### Companion methods
+
+| Method | Signature | Description |
+| --- | --- | --- |
+| `trackReactInstanceException` | `@JvmStatic fun trackReactInstanceException(error: Throwable, bundlePath: String?)` | Reports a React instance failure (bundle load or runtime fatal) via `trackException`, with label `react_instance_exception` and the error message as the key, to the `Airborne` instance whose `getBundlePath()` equals `bundlePath` (the bundle the failing host loaded). Falls back to every constructed instance only if none matches. Called by the React host delegate when React Native dev support is disabled and no RedBox is shown, so production failures still reach `onEvent`. |
 
 ## AirborneInterface
 
@@ -109,14 +116,14 @@ Overrides you typically provide:
 | `getJSBundleFile(): String?` | Return `airborneInstance.getBundlePath()` so React Native boots from the Airborne-managed bundle. |
 | `getJSMainModuleName(): String` | `index` on plain React Native; `.expo/.virtual-metro-entry` on Expo. |
 | `getPackages(): List<ReactPackage>` | The autolinked package list. |
-| `getUseDeveloperSupport(): Boolean` | Usually `BuildConfig.DEBUG`. |
+| `getUseDeveloperSupport(): Boolean` | Usually `BuildConfig.DEBUG`. Also controls dev support (Metro, dev menu, fast refresh) for the `ReactHost` built by `getReactHost`. |
 | `isNewArchEnabled: Boolean` | `BuildConfig.IS_NEW_ARCHITECTURE_ENABLED`. |
 
 ### AirborneReactNativeHostBase
 
 | Member | Signature | Description |
 | --- | --- | --- |
-| `getReactHost` | `companion fun getReactHost(context: Context, reactNativeHost: ReactNativeHost): ReactHost` | Builds a `ReactHost` wired to Airborne's host delegate. On the plain React Native track, return it from the `reactHost` property. |
+| `getReactHost` | `companion fun getReactHost(context: Context, reactNativeHost: ReactNativeHost): ReactHost` | Builds a `ReactHost` wired to Airborne's host delegate. Dev support follows `reactNativeHost.getUseDeveloperSupport()`. When dev support is off, React instance failures are logged and reported through `Airborne.trackReactInstanceException`. On the plain React Native track, return it from the `reactHost` property. |
 
 ## See also
 
