@@ -1,14 +1,44 @@
-use std::{future::Future, sync::Arc};
+use std::{
+    future::Future,
+    sync::{Arc, LazyLock},
+};
 
 use log::{error, info};
 use redis::aio::ConnectionManager;
 use redis::AsyncCommands;
+use redis::Script;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     types::ABError,
     utils::metrics::{CACHE_FAILS, CACHE_HITS, CACHE_KEY_LEVELS, CACHE_MISSES, INSTANCE_ID},
 };
+
+/// Add a member to an index SET and (re)arm the SET's TTL in one step.
+///
+/// `KEYS[1]` index key, `ARGV[1]` member key, `ARGV[2]` TTL in seconds.
+static INDEX_ADD: LazyLock<Script> = LazyLock::new(|| {
+    Script::new(
+        r"redis.call('SADD', KEYS[1], ARGV[1])
+          redis.call('EXPIRE', KEYS[1], ARGV[2])",
+    )
+});
+
+/// Delete every member an index SET names, then the index, in one step.
+///
+/// Members go out in batches: one variadic `DEL` over a large index would
+/// overflow Lua's stack.
+///
+/// `KEYS[1]` index key.
+static INDEX_DROP: LazyLock<Script> = LazyLock::new(|| {
+    Script::new(
+        r"local members = redis.call('SMEMBERS', KEYS[1])
+          for i = 1, #members, 500 do
+              redis.call('DEL', unpack(members, i, math.min(i + 499, #members)))
+          end
+          redis.call('DEL', KEYS[1])",
+    )
+});
 
 #[derive(Debug)]
 pub struct RedisKey {
@@ -197,6 +227,58 @@ impl RedisCache {
         Ok(())
     }
 
+    /// Record `member` in the SET at `index`, so a family of cache entries can be
+    /// dropped together later. The SET is given the same TTL as its members, so a
+    /// forgotten index cannot outlive them.
+    ///
+    /// One script, so the SET can never be left without its TTL: a SADD whose
+    /// EXPIRE failed would leave an index that outlives every member it names.
+    pub async fn index_add(
+        &self,
+        index: &RedisKey,
+        member: &RedisKey,
+        ttl_secs: usize,
+    ) -> Result<(), ABError> {
+        let mut r = (*self.conn).clone();
+        let (index_key, member_key) = (index.key.clone(), member.key.clone());
+
+        let _: () = INDEX_ADD
+            .key(&index_key)
+            .arg(&member_key)
+            .arg(ttl_secs as i64)
+            .invoke_async(&mut r)
+            .await
+            .map_err(|e| {
+                error!("Failed to index {member_key} under {index_key}: {e}");
+                CACHE_FAILS.with_label_values(&index.labels).inc();
+                ABError::InternalServerError("service error".to_string())
+            })?;
+
+        Ok(())
+    }
+
+    /// Delete every key recorded in the SET at `index`, then the index itself.
+    ///
+    /// One script, so no `index_add` can slip between the read and the deletes:
+    /// a member added in that window would survive with its index gone, and go on
+    /// being served as a cache hit that nothing can invalidate.
+    pub async fn index_drop(&self, index: &RedisKey) -> Result<(), ABError> {
+        let mut r = (*self.conn).clone();
+        let index_key = index.key.clone();
+
+        let _: () = INDEX_DROP
+            .key(&index_key)
+            .invoke_async(&mut r)
+            .await
+            .map_err(|e| {
+                error!("Failed to drop index {index_key}: {e}");
+                CACHE_FAILS.with_label_values(&index.labels).inc();
+                ABError::InternalServerError("service error".to_string())
+            })?;
+
+        Ok(())
+    }
+
     /// Get the cached value, or compute it via `fetch_fn`, then cache it.
     ///
     /// - `key`: Redis key
@@ -222,5 +304,135 @@ impl RedisCache {
         let _ = self.set_ex(key, &val, ttl_secs).await;
 
         Ok(val)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    const TEST_REDIS_URL: &str = "redis://127.0.0.1:6379";
+    /// Short enough that anything a failing test leaves behind expires on its own.
+    const TTL: usize = 60;
+
+    /// A cache under a prefix unique to this process, so tests can run against a
+    /// developer's local Redis without touching anything else in it. Returns
+    /// `None` when no Redis is reachable — `cargo test` has to stay green on a
+    /// machine that isn't running one.
+    async fn test_cache(name: &str) -> Option<RedisCache> {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let client = redis::Client::open(TEST_REDIS_URL).ok()?;
+        match RedisCache::new(client, format!("airborne-test:{name}:{nanos}")).await {
+            Ok(cache) => Some(cache),
+            Err(_) => {
+                eprintln!("skipping {name}: no Redis at {TEST_REDIS_URL}");
+                None
+            }
+        }
+    }
+
+    async fn raw_conn() -> redis::aio::MultiplexedConnection {
+        redis::Client::open(TEST_REDIS_URL)
+            .expect("client")
+            .get_multiplexed_async_connection()
+            .await
+            .expect("connect")
+    }
+
+    #[tokio::test]
+    async fn index_add_records_the_member_and_arms_the_index_ttl() {
+        let Some(cache) = test_cache("index-add").await else {
+            return;
+        };
+        let index = cache.key("org", "app", &["sig_index"]);
+        let member = cache.key("org", "app", &["sig", "v1"]);
+
+        cache.index_add(&index, &member, TTL).await.expect("add");
+
+        let mut raw = raw_conn().await;
+        let members: Vec<String> = raw.smembers(&index.key).await.expect("smembers");
+        assert_eq!(members, vec![member.key.clone()]);
+
+        // The SADD and the EXPIRE are one script precisely so this can never be -1.
+        let ttl: i64 = raw.ttl(&index.key).await.expect("ttl");
+        assert!(ttl > 0 && ttl <= TTL as i64, "index TTL was {ttl}");
+
+        cache.index_drop(&index).await.expect("cleanup");
+    }
+
+    #[tokio::test]
+    async fn index_drop_removes_every_member_and_the_index() {
+        let Some(cache) = test_cache("index-drop").await else {
+            return;
+        };
+        let index = cache.key("org", "app", &["sig_index"]);
+        let members: Vec<RedisKey> = (0..5)
+            .map(|i| cache.key("org", "app", &["sig", &i.to_string()]))
+            .collect();
+
+        for member in &members {
+            cache.set_ex(member, &"signature", TTL).await.expect("set");
+            cache.index_add(&index, member, TTL).await.expect("add");
+        }
+
+        cache.index_drop(&index).await.expect("drop");
+
+        let mut raw = raw_conn().await;
+        for member in &members {
+            let exists: bool = raw.exists(&member.key).await.expect("exists");
+            assert!(!exists, "{} survived the drop", member.key);
+        }
+        let index_exists: bool = raw.exists(&index.key).await.expect("exists");
+        assert!(!index_exists, "the index itself survived the drop");
+    }
+
+    #[tokio::test]
+    async fn index_drop_deletes_more_members_than_one_variadic_del_can_take() {
+        let Some(cache) = test_cache("index-drop-batched").await else {
+            return;
+        };
+        // Over the script's 500-per-DEL batch size, so the loop runs more than
+        // once. A single `DEL unpack(members)` would risk the Lua stack here.
+        const COUNT: usize = 1_200;
+
+        let index = cache.key("org", "app", &["sig_index"]);
+        let members: Vec<RedisKey> = (0..COUNT)
+            .map(|i| cache.key("org", "app", &["sig", &i.to_string()]))
+            .collect();
+
+        for member in &members {
+            cache.set_ex(member, &"signature", TTL).await.expect("set");
+            cache.index_add(&index, member, TTL).await.expect("add");
+        }
+
+        let mut raw = raw_conn().await;
+        let before: usize = raw.scard(&index.key).await.expect("scard");
+        assert_eq!(before, COUNT);
+
+        cache.index_drop(&index).await.expect("drop");
+
+        for member in [&members[0], &members[COUNT / 2], &members[COUNT - 1]] {
+            let exists: bool = raw.exists(&member.key).await.expect("exists");
+            assert!(!exists, "{} survived the batched drop", member.key);
+        }
+        let index_exists: bool = raw.exists(&index.key).await.expect("exists");
+        assert!(!index_exists);
+    }
+
+    #[tokio::test]
+    async fn index_drop_on_a_missing_index_succeeds() {
+        let Some(cache) = test_cache("index-drop-missing").await else {
+            return;
+        };
+        // The empty-set path: `for i = 1, 0` must not run, and DEL of a
+        // non-existent key is fine. Invalidation is best-effort and runs on keys
+        // that may never have been cached, so this is the common case.
+        let index = cache.key("org", "app", &["never_written"]);
+        cache.index_drop(&index).await.expect("drop");
     }
 }
