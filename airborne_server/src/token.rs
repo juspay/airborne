@@ -309,9 +309,8 @@ async fn issue_token(
         })?;
 
     log::info!(
-        "[ISSUE TOKEN] Refresh token decrypted successfully, length: {}, first 10 chars: {}",
-        decrypted_refresh_token.len(),
-        &decrypted_refresh_token.chars().take(10).collect::<String>()
+        "[ISSUE TOKEN] Refresh token decrypted successfully for client_id: {}",
+        client_id
     );
 
     let token = state
