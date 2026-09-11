@@ -35,7 +35,7 @@ export interface CreatePackageCommandInput extends CreatePackageRequest {}
 export interface CreatePackageCommandOutput extends Package, __MetadataBearer {}
 
 /**
- * Create package request operation
+ * Create a package: an index file plus the set of files that make up an OTA bundle. Pass the organisation and application in the x-organisation and x-application headers. Returns the created package with its assigned version. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

@@ -27,7 +27,7 @@ declare const CreateDimensionCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Create dimension request operation
+ * Create a targeting dimension (standard or cohort) that releases can be targeted against. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

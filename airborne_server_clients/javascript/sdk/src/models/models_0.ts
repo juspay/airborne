@@ -152,7 +152,13 @@ export class Unauthorized extends __BaseException {
  * @enum
  */
 export const DimensionType = {
+  /**
+   * A cohort dimension whose values depend on another dimension.
+   */
   COHORT: "cohort",
+  /**
+   * A standard dimension with independent values.
+   */
   STANDARD: "standard",
 } as const
 /**
@@ -203,6 +209,7 @@ export interface CreateDimensionRequest {
 }
 
 /**
+ * A created dimension.
  * @public
  */
 export interface CreateDimensionResponse {
@@ -350,6 +357,10 @@ export interface CreateFileResponse {
  * @public
  */
 export interface CreateOrganisationRequest {
+  /**
+   * Name for the new organisation.
+   * @public
+   */
   name: string | undefined;
 }
 
@@ -388,7 +399,12 @@ export interface CreatePackageRequest {
    */
   index: string | undefined;
 
+  /**
+   * Optional tag to identify the package.
+   * @public
+   */
   tag?: string | undefined;
+
   /**
    * Space Separated file ids to be included in the package
    * @public
@@ -413,11 +429,26 @@ export interface CreatePackageRequest {
  * @public
  */
 export interface Package {
-  tag?: string | undefined;
-  version: number | undefined;
-  index: string | undefined;
   /**
-   * List of strings
+   * Optional tag identifying the package.
+   * @public
+   */
+  tag?: string | undefined;
+
+  /**
+   * Version number assigned to the package.
+   * @public
+   */
+  version: number | undefined;
+
+  /**
+   * File id of the package's index (entry) file.
+   * @public
+   */
+  index: string | undefined;
+
+  /**
+   * File ids included in the package.
    * @public
    */
   files: (string)[] | undefined;
@@ -472,6 +503,7 @@ export interface CreateReleaseRequestPackage {
 }
 
 /**
+ * Request body for creating a release.
  * @public
  */
 export interface CreateReleaseRequest {
@@ -523,57 +555,159 @@ export interface CreateReleaseRequest {
  * @public
  */
 export interface ConfigProperties {
+  /**
+   * Tenant-specific configuration, as a JSON document.
+   * @public
+   */
   tenant_info: __DocumentType | undefined;
 }
 
 /**
+ * Resolved release configuration returned to callers.
  * @public
  */
 export interface GetReleaseConfig {
-  version: string | undefined;
-  release_config_timeout: number | undefined;
-  boot_timeout: number | undefined;
   /**
-   * Configuration properties
+   * Version identifier of the config.
+   * @public
+   */
+  version: string | undefined;
+
+  /**
+   * Time allowed for fetching the release config, in seconds.
+   * @public
+   */
+  release_config_timeout: number | undefined;
+
+  /**
+   * Time allowed for the app to boot, in seconds.
+   * @public
+   */
+  boot_timeout: number | undefined;
+
+  /**
+   * Config properties.
    * @public
    */
   properties: ConfigProperties | undefined;
 }
 
 /**
+ * Details of the experiment backing a release, used to ramp it out gradually.
  * @public
  */
 export interface ReleaseExperiment {
+  /**
+   * Identifier of the experiment.
+   * @public
+   */
   experiment_id?: string | undefined;
+
+  /**
+   * Package version served by the experiment.
+   * @public
+   */
   package_version?: number | undefined;
+
+  /**
+   * Config version served by the experiment.
+   * @public
+   */
   config_version?: string | undefined;
+
+  /**
+   * Time the experiment was created.
+   * @public
+   */
   created_at?: string | undefined;
+
+  /**
+   * Percentage of traffic currently routed to this release.
+   * @public
+   */
   traffic_percentage?: number | undefined;
+
+  /**
+   * Current status of the experiment.
+   * @public
+   */
   status?: string | undefined;
 }
 
 /**
+ * A file as served to the SDK, with the location and checksum needed to download and verify it.
  * @public
  */
 export interface ServeFile {
+  /**
+   * Path where the file is stored on the SDK.
+   * @public
+   */
   file_path?: string | undefined;
+
+  /**
+   * URL the SDK downloads the file from.
+   * @public
+   */
   url?: string | undefined;
+
+  /**
+   * Checksum used to verify the downloaded file.
+   * @public
+   */
   checksum?: string | undefined;
+
+  /**
+   * Size of the file in bytes
+   * @public
+   */
+  size?: number | undefined;
 }
 
 /**
+ * A package as served to the SDK: the index file plus the files that make up the OTA bundle.
  * @public
  */
 export interface ServePackage {
+  /**
+   * Name of the package.
+   * @public
+   */
   name?: string | undefined;
+
+  /**
+   * Version of the package.
+   * @public
+   */
   version?: string | undefined;
+
+  /**
+   * The package's index (entry) file.
+   * @public
+   */
   index?: ServeFile | undefined;
+
+  /**
+   * Package properties, as a JSON document.
+   * @public
+   */
   properties?: __DocumentType | undefined;
+
+  /**
+   * Files that must be downloaded before boot.
+   * @public
+   */
   important?: (ServeFile)[] | undefined;
+
+  /**
+   * Files that can be downloaded lazily after boot.
+   * @public
+   */
   lazy?: (ServeFile)[] | undefined;
 }
 
 /**
+ * A created release.
  * @public
  */
 export interface CreateReleaseResponse {
@@ -638,6 +772,7 @@ export interface DeleteDimensionRequest {
 }
 
 /**
+ * Path and headers for fetching a single release.
  * @public
  */
 export interface GetReleaseRequest {
@@ -661,50 +796,115 @@ export interface GetReleaseRequest {
 }
 
 /**
+ * A release with its full details.
  * @public
  */
 export interface GetReleaseResponse {
+  /**
+   * ID of the release.
+   * @public
+   */
   id?: string | undefined;
+
+  /**
+   * Time the release was created.
+   * @public
+   */
   created_at?: string | undefined;
+
+  /**
+   * Resolved config of the release.
+   * @public
+   */
   config?: GetReleaseConfig | undefined;
+
+  /**
+   * Package served by the release.
+   * @public
+   */
   package?: ServePackage | undefined;
+
+  /**
+   * Additional resources served with the release.
+   * @public
+   */
   resources?: (ServeFile)[] | undefined;
+
+  /**
+   * Experiment backing the release, when it is being ramped.
+   * @public
+   */
   experiment?: ReleaseExperiment | undefined;
+
+  /**
+   * Targeting dimensions the release applies to.
+   * @public
+   */
   dimensions?: Record<string, __DocumentType> | undefined;
 }
 
 /**
- * User token response
+ * Tokens returned after a successful login.
  * @public
  */
 export interface UserToken {
+  /**
+   * Bearer token to send in the Authorization header on authenticated requests.
+   * @public
+   */
   access_token: string | undefined;
+
+  /**
+   * Type of the token (e.g. "Bearer").
+   * @public
+   */
   token_type: string | undefined;
+
+  /**
+   * Lifetime of the access token, in seconds.
+   * @public
+   */
   expires_in: number | undefined;
+
+  /**
+   * Token used to obtain a new access token once the current one expires.
+   * @public
+   */
   refresh_token: string | undefined;
+
+  /**
+   * Lifetime of the refresh token, in seconds.
+   * @public
+   */
   refresh_expires_in: number | undefined;
 }
 
 /**
- * User information
+ * Information about the authenticated user.
  * @public
  */
 export interface User {
-  user_id: string | undefined;
   /**
-   * List of organisations
+   * Unique identifier of the user.
+   * @public
+   */
+  user_id: string | undefined;
+
+  /**
+   * Organisations the user belongs to, with the user's access level in each.
    * @public
    */
   organisations: (Organisation)[] | undefined;
 
   /**
-   * User token response
+   * Tokens issued for the user, when available.
    * @public
    */
   user_token?: UserToken | undefined;
 }
 
 /**
+ * Query parameters and headers for listing dimensions.
  * @public
  */
 export interface ListDimensionsRequest {
@@ -720,11 +920,21 @@ export interface ListDimensionsRequest {
    */
   application: string | undefined;
 
+  /**
+   * Page number for pagination.
+   * @public
+   */
   page?: number | undefined;
+
+  /**
+   * Number of dimensions per page.
+   * @public
+   */
   count?: number | undefined;
 }
 
 /**
+ * A targeting dimension.
  * @public
  */
 export interface DimensionResponse {
@@ -758,15 +968,34 @@ export interface DimensionResponse {
    */
   change_reason: string | undefined;
 
+  /**
+   * Whether a value for this dimension is required when targeting.
+   * @public
+   */
   mandatory?: boolean | undefined;
 }
 
 /**
+ * Paginated list of dimensions.
  * @public
  */
 export interface ListDimensionsResponse {
+  /**
+   * Total number of pages.
+   * @public
+   */
   total_pages?: number | undefined;
+
+  /**
+   * Total number of dimensions.
+   * @public
+   */
   total_items?: number | undefined;
+
+  /**
+   * Dimensions on this page.
+   * @public
+   */
   data?: (DimensionResponse)[] | undefined;
 }
 
@@ -1089,6 +1318,7 @@ export interface ListPackagesResponse {
 }
 
 /**
+ * Query parameters and headers for listing releases.
  * @public
  */
 export interface ListReleasesRequest {
@@ -1136,6 +1366,7 @@ export interface ListReleasesRequest {
 }
 
 /**
+ * Paginated list of releases.
  * @public
  */
 export interface ListReleasesResponse {
@@ -1241,7 +1472,16 @@ export interface RequestOrganisationResponse {
  * @public
  */
 export interface GetServeReleaseInput {
+  /**
+   * Name of the organisation.
+   * @public
+   */
   organisation: string | undefined;
+
+  /**
+   * Name of the application.
+   * @public
+   */
   application: string | undefined;
 }
 
@@ -1250,13 +1490,22 @@ export interface GetServeReleaseInput {
  * @public
  */
 export interface ReleaseConfig {
-  config: GetReleaseConfig | undefined;
   /**
-   * Package information
+   * Resolved release config.
+   * @public
+   */
+  config: GetReleaseConfig | undefined;
+
+  /**
+   * Package to boot from.
    * @public
    */
   package: Package | undefined;
 
+  /**
+   * Additional resources for the release, as a JSON document.
+   * @public
+   */
   resources: __DocumentType | undefined;
 }
 

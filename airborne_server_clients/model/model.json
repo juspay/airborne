@@ -1999,6 +1999,7 @@
                 "tenant_info": {
                     "target": "smithy.api#Document",
                     "traits": {
+                        "smithy.api#documentation": "Tenant-specific configuration, as a JSON document.",
                         "smithy.api#required": {}
                     }
                 }
@@ -2025,11 +2026,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create application request operation",
+                "smithy.api#documentation": "Create a new application inside an organisation. Pass the target organisation in the x-organisation header. Returns the created application and the caller's access levels. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/organisations/applications/create"
-                }
+                },
+                "smithy.api#tags": [
+                    "Applications"
+                ]
             }
         },
         "io.airborne.server#CreateApplicationRequest": {
@@ -2073,11 +2077,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create dimension request operation",
+                "smithy.api#documentation": "Create a targeting dimension (standard or cohort) that releases can be targeted against. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/organisations/applications/dimension/create"
-                }
+                },
+                "smithy.api#tags": [
+                    "Dimensions"
+                ]
             }
         },
         "io.airborne.server#CreateDimensionRequest": {
@@ -2168,6 +2175,9 @@
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "A created dimension."
             }
         },
         "io.airborne.server#CreateFile": {
@@ -2188,11 +2198,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create file request operation",
+                "smithy.api#documentation": "Register a file by URL, recording its metadata and assigning it a version. Pass the organisation and application in the x-organisation and x-application headers. Use this when the file is already hosted somewhere the server can reach; to upload the bytes directly, use UploadFile instead. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/file"
-                }
+                },
+                "smithy.api#tags": [
+                    "Files"
+                ]
             }
         },
         "io.airborne.server#CreateFileRequest": {
@@ -2340,11 +2353,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create organisation request operation",
+                "smithy.api#documentation": "Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/organisations/create"
-                }
+                },
+                "smithy.api#tags": [
+                    "Organisations"
+                ]
             }
         },
         "io.airborne.server#CreateOrganisationRequest": {
@@ -2353,6 +2369,7 @@
                 "name": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Name for the new organisation.",
                         "smithy.api#required": {}
                     }
                 }
@@ -2379,11 +2396,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create package request operation",
+                "smithy.api#documentation": "Create a package: an index file plus the set of files that make up an OTA bundle. Pass the organisation and application in the x-organisation and x-application headers. Returns the created package with its assigned version. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/packages"
-                }
+                },
+                "smithy.api#tags": [
+                    "Packages"
+                ]
             }
         },
         "io.airborne.server#CreatePackageRequest": {
@@ -2397,7 +2417,10 @@
                     }
                 },
                 "tag": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional tag to identify the package."
+                    }
                 },
                 "files": {
                     "target": "io.airborne.server#StringList",
@@ -2445,11 +2468,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create release request operation",
+                "smithy.api#documentation": "Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/releases"
-                }
+                },
+                "smithy.api#tags": [
+                    "Releases"
+                ]
             }
         },
         "io.airborne.server#CreateReleaseRequest": {
@@ -2502,6 +2528,9 @@
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Request body for creating a release."
             }
         },
         "io.airborne.server#CreateReleaseRequestConfig": {
@@ -2603,6 +2632,9 @@
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "A created release."
             }
         },
         "io.airborne.server#DeleteDimension": {
@@ -2626,12 +2658,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Delete dimension request operation",
+                "smithy.api#documentation": "Delete a dimension by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "DELETE",
                     "uri": "/api/organisations/applications/dimension/{dimension}"
                 },
-                "smithy.api#idempotent": {}
+                "smithy.api#idempotent": {},
+                "smithy.api#tags": [
+                    "Dimensions"
+                ]
             }
         },
         "io.airborne.server#DeleteDimensionRequest": {
@@ -2667,6 +2702,9 @@
             "type": "list",
             "member": {
                 "target": "io.airborne.server#DimensionResponse"
+            },
+            "traits": {
+                "smithy.api#documentation": "List of dimensions."
             }
         },
         "io.airborne.server#DimensionResponse": {
@@ -2707,8 +2745,14 @@
                     }
                 },
                 "mandatory": {
-                    "target": "smithy.api#Boolean"
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Whether a value for this dimension is required when targeting."
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "A targeting dimension."
             }
         },
         "io.airborne.server#DimensionType": {
@@ -2717,15 +2761,20 @@
                 "STANDARD": {
                     "target": "smithy.api#Unit",
                     "traits": {
+                        "smithy.api#documentation": "A standard dimension with independent values.",
                         "smithy.api#enumValue": "standard"
                     }
                 },
                 "COHORT": {
                     "target": "smithy.api#Unit",
                     "traits": {
+                        "smithy.api#documentation": "A cohort dimension whose values depend on another dimension.",
                         "smithy.api#enumValue": "cohort"
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Kind of targeting dimension."
             }
         },
         "io.airborne.server#DimensionsMap": {
@@ -2741,6 +2790,9 @@
                 "traits": {
                     "smithy.api#documentation": "Dimension value"
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Map of dimension name to value."
             }
         },
         "io.airborne.server#File": {
@@ -2999,12 +3051,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Release request operation",
+                "smithy.api#documentation": "Get a single release by its id, including its config, package, resources, targeting dimensions, and experiment details. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/releases/{releaseId}"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Releases"
+                ]
             }
         },
         "io.airborne.server#GetReleaseConfig": {
@@ -3013,27 +3068,34 @@
                 "version": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Version identifier of the config.",
                         "smithy.api#required": {}
                     }
                 },
                 "release_config_timeout": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Time allowed for fetching the release config, in seconds.",
                         "smithy.api#required": {}
                     }
                 },
                 "boot_timeout": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Time allowed for the app to boot, in seconds.",
                         "smithy.api#required": {}
                     }
                 },
                 "properties": {
                     "target": "io.airborne.server#ConfigProperties",
                     "traits": {
+                        "smithy.api#documentation": "Config properties.",
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Resolved release configuration returned to callers."
             }
         },
         "io.airborne.server#GetReleaseRequest": {
@@ -3063,38 +3125,68 @@
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Path and headers for fetching a single release."
             }
         },
         "io.airborne.server#GetReleaseResponse": {
             "type": "structure",
             "members": {
                 "id": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the release."
+                    }
                 },
                 "created_at": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Time the release was created."
+                    }
                 },
                 "config": {
-                    "target": "io.airborne.server#GetReleaseConfig"
+                    "target": "io.airborne.server#GetReleaseConfig",
+                    "traits": {
+                        "smithy.api#documentation": "Resolved config of the release."
+                    }
                 },
                 "package": {
-                    "target": "io.airborne.server#ServePackage"
+                    "target": "io.airborne.server#ServePackage",
+                    "traits": {
+                        "smithy.api#documentation": "Package served by the release."
+                    }
                 },
                 "resources": {
-                    "target": "io.airborne.server#ServeFileList"
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Additional resources served with the release."
+                    }
                 },
                 "experiment": {
-                    "target": "io.airborne.server#ReleaseExperiment"
+                    "target": "io.airborne.server#ReleaseExperiment",
+                    "traits": {
+                        "smithy.api#documentation": "Experiment backing the release, when it is being ramped."
+                    }
                 },
                 "dimensions": {
-                    "target": "io.airborne.server#DimensionsMap"
+                    "target": "io.airborne.server#DimensionsMap",
+                    "traits": {
+                        "smithy.api#documentation": "Targeting dimensions the release applies to."
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "A release with its full details."
             }
         },
         "io.airborne.server#GetReleaseResponseList": {
             "type": "list",
             "member": {
                 "target": "io.airborne.server#GetReleaseResponse"
+            },
+            "traits": {
+                "smithy.api#documentation": "List of releases."
             }
         },
         "io.airborne.server#GetServeReleaseInput": {
@@ -3103,6 +3195,7 @@
                 "organisation": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Name of the organisation.",
                         "smithy.api#httpLabel": {},
                         "smithy.api#required": {}
                     }
@@ -3110,6 +3203,7 @@
                 "application": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Name of the application.",
                         "smithy.api#httpLabel": {},
                         "smithy.api#required": {}
                     }
@@ -3134,12 +3228,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Get user request operation",
+                "smithy.api#documentation": "Get the authenticated user's profile, including the organisations they belong to and the caller's access level in each. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/users"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Users"
+                ]
             }
         },
         "io.airborne.server#InternalServerError": {
@@ -3176,12 +3273,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List dimensions request operation",
+                "smithy.api#documentation": "List the targeting dimensions defined for an application, in priority order, with pagination. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/organisations/applications/dimension/list"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Dimensions"
+                ]
             }
         },
         "io.airborne.server#ListDimensionsRequest": {
@@ -3206,29 +3306,46 @@
                 "page": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Page number for pagination.",
                         "smithy.api#httpQuery": "page"
                     }
                 },
                 "count": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Number of dimensions per page.",
                         "smithy.api#httpQuery": "count"
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Query parameters and headers for listing dimensions."
             }
         },
         "io.airborne.server#ListDimensionsResponse": {
             "type": "structure",
             "members": {
                 "total_pages": {
-                    "target": "smithy.api#Integer"
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages."
+                    }
                 },
                 "total_items": {
-                    "target": "smithy.api#Integer"
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of dimensions."
+                    }
                 },
                 "data": {
-                    "target": "io.airborne.server#DimensionList"
+                    "target": "io.airborne.server#DimensionList",
+                    "traits": {
+                        "smithy.api#documentation": "Dimensions on this page."
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Paginated list of dimensions."
             }
         },
         "io.airborne.server#ListFileGroups": {
@@ -3249,12 +3366,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List file groups operation",
+                "smithy.api#documentation": "List files grouped by path, so that all versions and tags of a file appear together. Supports pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/file/groups"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Files"
+                ]
             }
         },
         "io.airborne.server#ListFileGroupsRequest": {
@@ -3477,12 +3597,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List files request operation",
+                "smithy.api#documentation": "List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/file/list"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Files"
+                ]
             }
         },
         "io.airborne.server#ListFilesRequest": {
@@ -3605,12 +3728,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List organisations request operation",
+                "smithy.api#documentation": "List all organisations the authenticated user belongs to, along with their applications and the caller's access level in each. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/organisations/"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Organisations"
+                ]
             }
         },
         "io.airborne.server#ListOrganisationsResponse": {
@@ -3646,12 +3772,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List packages request operation",
+                "smithy.api#documentation": "List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/packages/list"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Packages"
+                ]
             }
         },
         "io.airborne.server#ListPackagesRequest": {
@@ -3753,12 +3882,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "List Releases request operation",
+                "smithy.api#documentation": "List releases for an application, with pagination and optional filtering by status or targeting dimension. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/api/releases/list"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Releases"
+                ]
             }
         },
         "io.airborne.server#ListReleasesRequest": {
@@ -3815,6 +3947,9 @@
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Query parameters and headers for listing releases."
             }
         },
         "io.airborne.server#ListReleasesResponse": {
@@ -3841,6 +3976,9 @@
                         "smithy.api#required": {}
                     }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Paginated list of releases."
             }
         },
         "io.airborne.server#NotFoundError": {
@@ -3901,23 +4039,29 @@
             "type": "structure",
             "members": {
                 "tag": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional tag identifying the package."
+                    }
                 },
                 "version": {
                     "target": "smithy.api#Integer",
                     "traits": {
+                        "smithy.api#documentation": "Version number assigned to the package.",
                         "smithy.api#required": {}
                     }
                 },
                 "index": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "File id of the package's index (entry) file.",
                         "smithy.api#required": {}
                     }
                 },
                 "files": {
                     "target": "io.airborne.server#StringList",
                     "traits": {
+                        "smithy.api#documentation": "File ids included in the package.",
                         "smithy.api#required": {}
                     }
                 }
@@ -3950,11 +4094,14 @@
             ],
             "traits": {
                 "smithy.api#auth": [],
-                "smithy.api#documentation": "Login request operation",
+                "smithy.api#documentation": "Exchange user credentials (client_id and client_secret) for an access token and a refresh token. Public — no auth token required. Call this first, then send the returned access token as a bearer token on subsequent requests.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/token/issue"
-                }
+                },
+                "smithy.api#tags": [
+                    "Authentication"
+                ]
             }
         },
         "io.airborne.server#ReleaseConfig": {
@@ -3963,18 +4110,21 @@
                 "config": {
                     "target": "io.airborne.server#GetReleaseConfig",
                     "traits": {
+                        "smithy.api#documentation": "Resolved release config.",
                         "smithy.api#required": {}
                     }
                 },
                 "package": {
                     "target": "io.airborne.server#Package",
                     "traits": {
+                        "smithy.api#documentation": "Package to boot from.",
                         "smithy.api#required": {}
                     }
                 },
                 "resources": {
                     "target": "smithy.api#Document",
                     "traits": {
+                        "smithy.api#documentation": "Additional resources for the release, as a JSON document.",
                         "smithy.api#required": {}
                     }
                 }
@@ -3987,23 +4137,44 @@
             "type": "structure",
             "members": {
                 "experiment_id": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Identifier of the experiment."
+                    }
                 },
                 "package_version": {
-                    "target": "smithy.api#Integer"
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Package version served by the experiment."
+                    }
                 },
                 "config_version": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Config version served by the experiment."
+                    }
                 },
                 "created_at": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Time the experiment was created."
+                    }
                 },
                 "traffic_percentage": {
-                    "target": "smithy.api#Integer"
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Percentage of traffic currently routed to this release."
+                    }
                 },
                 "status": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Current status of the experiment."
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "Details of the experiment backing a release, used to ramp it out gradually."
             }
         },
         "io.airborne.server#RequestOrganisation": {
@@ -4024,11 +4195,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Request organisation request operation",
+                "smithy.api#documentation": "Submit a request to have an organisation provisioned (for onboarding flows that require manual approval), including contact details and store links. Returns a confirmation message. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/organisations/request"
-                }
+                },
+                "smithy.api#tags": [
+                    "Organisations"
+                ]
             }
         },
         "io.airborne.server#RequestOrganisationRequest": {
@@ -4107,43 +4281,85 @@
             "type": "structure",
             "members": {
                 "file_path": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Path where the file is stored on the SDK."
+                    }
                 },
                 "url": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "URL the SDK downloads the file from."
+                    }
                 },
                 "checksum": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Checksum used to verify the downloaded file."
+                    }
+                },
+                "size": {
+                    "target": "smithy.api#Long",
+                    "traits": {
+                        "smithy.api#documentation": "Size of the file in bytes"
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "A file as served to the SDK, with the location and checksum needed to download and verify it."
             }
         },
         "io.airborne.server#ServeFileList": {
             "type": "list",
             "member": {
                 "target": "io.airborne.server#ServeFile"
+            },
+            "traits": {
+                "smithy.api#documentation": "List of files served to the SDK."
             }
         },
         "io.airborne.server#ServePackage": {
             "type": "structure",
             "members": {
                 "name": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the package."
+                    }
                 },
                 "version": {
-                    "target": "smithy.api#String"
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Version of the package."
+                    }
                 },
                 "index": {
-                    "target": "io.airborne.server#ServeFile"
+                    "target": "io.airborne.server#ServeFile",
+                    "traits": {
+                        "smithy.api#documentation": "The package's index (entry) file."
+                    }
                 },
                 "properties": {
-                    "target": "smithy.api#Document"
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Package properties, as a JSON document."
+                    }
                 },
                 "important": {
-                    "target": "io.airborne.server#ServeFileList"
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Files that must be downloaded before boot."
+                    }
                 },
                 "lazy": {
-                    "target": "io.airborne.server#ServeFileList"
+                    "target": "io.airborne.server#ServeFileList",
+                    "traits": {
+                        "smithy.api#documentation": "Files that can be downloaded lazily after boot."
+                    }
                 }
+            },
+            "traits": {
+                "smithy.api#documentation": "A package as served to the SDK: the index file plus the files that make up the OTA bundle."
             }
         },
         "io.airborne.server#ServeRelease": {
@@ -4164,12 +4380,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Get release request operation",
+                "smithy.api#documentation": "Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/release/{organisation}/{application}"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Release serving"
+                ]
             }
         },
         "io.airborne.server#ServeReleaseV2": {
@@ -4190,12 +4409,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Get release v2 request operation",
+                "smithy.api#documentation": "Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.",
                 "smithy.api#http": {
                     "method": "GET",
                     "uri": "/release/v2/{organisation}/{application}"
                 },
-                "smithy.api#readonly": {}
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Release serving"
+                ]
             }
         },
         "io.airborne.server#StreamingBlob": {
@@ -4251,12 +4473,15 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Update dimension request operation",
+                "smithy.api#documentation": "Update a dimension, identified by name in the path — for example to change its priority position. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "PUT",
                     "uri": "/api/organisations/applications/dimension/{dimension}"
                 },
-                "smithy.api#idempotent": {}
+                "smithy.api#idempotent": {},
+                "smithy.api#tags": [
+                    "Dimensions"
+                ]
             }
         },
         "io.airborne.server#UpdateDimensionRequest": {
@@ -4320,11 +4545,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Update file operation",
+                "smithy.api#documentation": "Update the tag of an existing file, identified by its file key in the path (a file path with a version or tag, e.g. \"path/to/file@version:3\" or \"path/to/file@tag:prod\"). Pass the organisation and application in the x-organisation and x-application headers. Returns the updated file. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "PATCH",
                     "uri": "/api/file/{file_key}"
-                }
+                },
+                "smithy.api#tags": [
+                    "Files"
+                ]
             }
         },
         "io.airborne.server#UpdateFileRequest": {
@@ -4384,11 +4612,14 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Upload file request operation",
+                "smithy.api#documentation": "Upload a file's bytes directly as the request body and register it in one step. Send the raw file as the payload, with its Base64-encoded SHA-256 digest in the x-checksum header and the organisation and application in the x-organisation and x-application headers. Returns the created file. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/file/upload"
-                }
+                },
+                "smithy.api#tags": [
+                    "Files"
+                ]
             }
         },
         "io.airborne.server#UploadFileRequest": {
@@ -4452,21 +4683,26 @@
                 "user_id": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Unique identifier of the user.",
                         "smithy.api#required": {}
                     }
                 },
                 "organisations": {
                     "target": "io.airborne.server#Organisations",
                     "traits": {
+                        "smithy.api#documentation": "Organisations the user belongs to, with the user's access level in each.",
                         "smithy.api#required": {}
                     }
                 },
                 "user_token": {
-                    "target": "io.airborne.server#UserToken"
+                    "target": "io.airborne.server#UserToken",
+                    "traits": {
+                        "smithy.api#documentation": "Tokens issued for the user, when available."
+                    }
                 }
             },
             "traits": {
-                "smithy.api#documentation": "User information"
+                "smithy.api#documentation": "Information about the authenticated user."
             }
         },
         "io.airborne.server#UserCredentials": {
@@ -4497,36 +4733,41 @@
                 "access_token": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Bearer token to send in the Authorization header on authenticated requests.",
                         "smithy.api#required": {}
                     }
                 },
                 "token_type": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Type of the token (e.g. \"Bearer\").",
                         "smithy.api#required": {}
                     }
                 },
                 "expires_in": {
                     "target": "smithy.api#Long",
                     "traits": {
+                        "smithy.api#documentation": "Lifetime of the access token, in seconds.",
                         "smithy.api#required": {}
                     }
                 },
                 "refresh_token": {
                     "target": "smithy.api#String",
                     "traits": {
+                        "smithy.api#documentation": "Token used to obtain a new access token once the current one expires.",
                         "smithy.api#required": {}
                     }
                 },
                 "refresh_expires_in": {
                     "target": "smithy.api#Long",
                     "traits": {
+                        "smithy.api#documentation": "Lifetime of the refresh token, in seconds.",
                         "smithy.api#required": {}
                     }
                 }
             },
             "traits": {
-                "smithy.api#documentation": "User token response"
+                "smithy.api#documentation": "Tokens returned after a successful login."
             }
         },
         "io.airborne.server#authapi": {
@@ -4554,6 +4795,39 @@
             "traits": {
                 "smithy.api#trait": {
                     "selector": "*"
+                }
+            }
+        },
+        "smithy.openapi#SpecificationExtensionKey": {
+            "type": "string",
+            "traits": {
+                "smithy.api#pattern": "^x-.+$",
+                "smithy.api#private": {}
+            }
+        },
+        "smithy.openapi#specificationExtension": {
+            "type": "structure",
+            "members": {
+                "as": {
+                    "target": "smithy.openapi#SpecificationExtensionKey",
+                    "traits": {
+                        "smithy.api#documentation": "Explicitly name the specification extension.\nIf set must begin with `x-`, otherwise defaults to the target trait shape's ID normalized with hyphens and prepended with `x-`."
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Indicates a trait shape should be converted into an [OpenAPI specification extension](https://spec.openapis.org/oas/v3.1.0#specification-extensions).",
+                "smithy.api#trait": {
+                    "selector": "[trait|trait]",
+                    "breakingChanges": [
+                        {
+                            "change": "presence"
+                        },
+                        {
+                            "path": "/as",
+                            "change": "any"
+                        }
+                    ]
                 }
             }
         },

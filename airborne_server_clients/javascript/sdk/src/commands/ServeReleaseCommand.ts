@@ -35,7 +35,7 @@ export interface ServeReleaseCommandInput extends GetServeReleaseInput {}
 export interface ServeReleaseCommandOutput extends ReleaseConfig, __MetadataBearer {}
 
 /**
- * Get release request operation
+ * Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

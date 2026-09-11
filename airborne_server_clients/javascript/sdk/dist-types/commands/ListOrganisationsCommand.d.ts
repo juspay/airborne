@@ -27,7 +27,7 @@ declare const ListOrganisationsCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * List organisations request operation
+ * List all organisations the authenticated user belongs to, along with their applications and the caller's access level in each. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

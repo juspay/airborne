@@ -35,7 +35,7 @@ export interface CreateReleaseCommandInput extends CreateReleaseRequest {}
 export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __MetadataBearer {}
 
 /**
- * Create release request operation
+ * Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -87,6 +87,7 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  * //       file_path: "STRING_VALUE",
  * //       url: "STRING_VALUE",
  * //       checksum: "STRING_VALUE",
+ * //       size: Number("long"),
  * //     },
  * //     properties: "DOCUMENT_VALUE",
  * //     important: [ // ServeFileList
@@ -94,6 +95,7 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  * //         file_path: "STRING_VALUE",
  * //         url: "STRING_VALUE",
  * //         checksum: "STRING_VALUE",
+ * //         size: Number("long"),
  * //       },
  * //     ],
  * //     lazy: [
@@ -101,6 +103,7 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  * //         file_path: "STRING_VALUE",
  * //         url: "STRING_VALUE",
  * //         checksum: "STRING_VALUE",
+ * //         size: Number("long"),
  * //       },
  * //     ],
  * //   },

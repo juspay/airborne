@@ -125,7 +125,7 @@ program
  .option("--organisation <organisation>", "organisation parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create application request operation:
+ Create a new application inside an organisation. Pass the target organisation in the x-organisation header. Returns the created application and the caller's access levels. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreateApplication \\
@@ -198,7 +198,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create dimension request operation:
+ Create a targeting dimension (standard or cohort) that releases can be targeted against. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreateDimension \\
@@ -290,7 +290,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create file request operation:
+ Register a file by URL, recording its metadata and assigning it a version. Pass the organisation and application in the x-organisation and x-application headers. Use this when the file is already hosted somewhere the server can reach; to upload the bytes directly, use UploadFile instead. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreateFile \\
@@ -369,7 +369,7 @@ program
  .option("--name <name>", "name parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create organisation request operation:
+ Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreateOrganisation \\
@@ -383,7 +383,7 @@ Usage 3 - Mixed Usage:
   $ airborne-core-cli CreateOrganisation @params.json --name <value> --token <value>
 
 Parameters:
-    --name <string> (required)
+    --name <string> (required) : Name for the new organisation.
     --token <string> (required) : Bearer token for authentication
 
 `)
@@ -426,12 +426,12 @@ program
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--index <index>", "index parameter")
  .option("--tag <tag>", "tag parameter")
- .option("--files <files...>", "files parameter")
+ .option("--files <files...>", "files parameter", [])
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create package request operation:
+ Create a package: an index file plus the set of files that make up an OTA bundle. Pass the organisation and application in the x-organisation and x-application headers. Returns the created package with its assigned version. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreatePackage \\
@@ -450,7 +450,7 @@ Usage 3 - Mixed Usage:
 
 Parameters:
     --index <string> (required) : Index file id
-    --tag <string> (optional)
+    --tag <string> (optional) : Optional tag to identify the package.
     --files [<string>] (required) : Space Separated file ids to be included in the package
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
@@ -506,12 +506,12 @@ program
  .option("--package_id <package_id>", "package_id parameter")
  .option("--package <package>", "package parameter")
  .option("--dimensions <dimensions>", "dimensions parameter")
- .option("--resources <resources...>", "resources parameter")
+ .option("--resources <resources...>", "resources parameter", [])
  .option("--organisation <organisation>", "organisation parameter")
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create release request operation:
+ Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreateRelease \\
@@ -597,7 +597,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Delete dimension request operation:
+ Delete a dimension by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli DeleteDimension \\
@@ -665,7 +665,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Release request operation:
+ Get a single release by its id, including its config, package, resources, targeting dimensions, and experiment details. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli GetRelease \\
@@ -731,7 +731,7 @@ program
 
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Get user request operation:
+ Get the authenticated user's profile, including the organisations they belong to and the caller's access level in each. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli GetUser \\
@@ -800,7 +800,7 @@ program
 })
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List dimensions request operation:
+ List the targeting dimensions defined for an application, in priority order, with pagination. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListDimensions \\
@@ -818,8 +818,8 @@ Usage 3 - Mixed Usage:
 Parameters:
     --organisation <string> (required) : Name of the organisation
     --application <string> (required) : Name of the application
-    --page <integer> (optional)
-    --count <integer> (optional)
+    --page <integer> (optional) : Page number for pagination.
+    --count <integer> (optional) : Number of dimensions per page.
     --token <string> (required) : Bearer token for authentication
 
 `)
@@ -885,7 +885,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List file groups operation:
+ List files grouped by path, so that all versions and tags of a file appear together. Supports pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListFileGroups \\
@@ -974,7 +974,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List files request operation:
+ List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListFiles \\
@@ -1046,7 +1046,7 @@ program
 
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List organisations request operation:
+ List all organisations the authenticated user belongs to, along with their applications and the caller's access level in each. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListOrganisations \\
@@ -1121,7 +1121,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List packages request operation:
+ List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListPackages \\
@@ -1215,7 +1215,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- List Releases request operation:
+ List releases for an application, with pagination and optional filtering by status or targeting dimension. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ListReleases \\
@@ -1289,7 +1289,7 @@ program
  .option("--client_id <client_id>", "client_id parameter")
  .option("--client_secret <client_secret>", "client_secret parameter")
   .description(`
- Login request operation:
+ Exchange user credentials (client_id and client_secret) for an access token and a refresh token. Public — no auth token required. Call this first, then send the returned access token as a bearer token on subsequent requests.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli PostLogin \\
@@ -1352,7 +1352,7 @@ program
  .option("--play_store_link <play_store_link>", "play_store_link parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Request organisation request operation:
+ Submit a request to have an organisation provisioned (for onboarding flows that require manual approval), including contact details and store links. Returns a confirmation message. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli RequestOrganisation \\
@@ -1431,7 +1431,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Get release request operation:
+ Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ServeRelease \\
@@ -1446,8 +1446,8 @@ Usage 3 - Mixed Usage:
   $ airborne-core-cli ServeRelease @params.json --organisation <value> --application <value> --token <value>
 
 Parameters:
-    --organisation <string> (required)
-    --application <string> (required)
+    --organisation <string> (required) : Name of the organisation.
+    --application <string> (required) : Name of the application.
     --token <string> (required) : Bearer token for authentication
 
 `)
@@ -1494,7 +1494,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Get release v2 request operation:
+ Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli ServeReleaseV2 \\
@@ -1509,8 +1509,8 @@ Usage 3 - Mixed Usage:
   $ airborne-core-cli ServeReleaseV2 @params.json --organisation <value> --application <value> --token <value>
 
 Parameters:
-    --organisation <string> (required)
-    --application <string> (required)
+    --organisation <string> (required) : Name of the organisation.
+    --application <string> (required) : Name of the application.
     --token <string> (required) : Bearer token for authentication
 
 `)
@@ -1566,7 +1566,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Update dimension request operation:
+ Update a dimension, identified by name in the path — for example to change its priority position. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli UpdateDimension \\
@@ -1643,7 +1643,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Update file operation:
+ Update the tag of an existing file, identified by its file key in the path (a file path with a version or tag, e.g. "path/to/file@version:3" or "path/to/file@tag:prod"). Pass the organisation and application in the x-organisation and x-application headers. Returns the updated file. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli UpdateFile \\
@@ -1727,7 +1727,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Upload file request operation:
+ Upload a file's bytes directly as the request body and register it in one step. Send the raw file as the payload, with its Base64-encoded SHA-256 digest in the x-checksum header and the organisation and application in the x-organisation and x-application headers. Returns the created file. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli UploadFile \\
