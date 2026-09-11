@@ -27,7 +27,7 @@ declare const RequestOrganisationCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Request organisation request operation
+ * Submit a request to have an organisation provisioned (for onboarding flows that require manual approval), including contact details and store links. Returns a confirmation message. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

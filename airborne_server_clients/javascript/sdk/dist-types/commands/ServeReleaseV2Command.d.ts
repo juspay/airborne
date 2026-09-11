@@ -27,7 +27,7 @@ declare const ServeReleaseV2Command_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Get release v2 request operation
+ * Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

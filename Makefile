@@ -28,7 +28,7 @@ export YELLOW := $(shell printf '\033[1;33m')
 export RED := $(shell printf '\033[0;31m')
 export NC := $(shell printf '\033[0m') # No Color
 
-export SMITHY_MAVEN_REPOS = https://repo1.maven.org/maven2%7Chttps://sandbox.assets.juspay.in/smithy/m2
+export SMITHY_MAVEN_REPOS := https://repo1.maven.org/maven2|https://sandbox.assets.juspay.in/smithy/m2
 
 # Docker detection
 HAS_DOCKER := $(shell command -v docker > /dev/null; echo $$?)

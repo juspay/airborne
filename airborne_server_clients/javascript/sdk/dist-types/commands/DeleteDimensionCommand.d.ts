@@ -27,7 +27,7 @@ declare const DeleteDimensionCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Delete dimension request operation
+ * Delete a dimension by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

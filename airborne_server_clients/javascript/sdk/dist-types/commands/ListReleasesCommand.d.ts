@@ -27,7 +27,7 @@ declare const ListReleasesCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * List Releases request operation
+ * List releases for an application, with pagination and optional filtering by status or targeting dimension. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -65,6 +65,7 @@ declare const ListReleasesCommand_base: {
  * //           file_path: "STRING_VALUE",
  * //           url: "STRING_VALUE",
  * //           checksum: "STRING_VALUE",
+ * //           size: Number("long"),
  * //         },
  * //         properties: "DOCUMENT_VALUE",
  * //         important: [ // ServeFileList
@@ -72,6 +73,7 @@ declare const ListReleasesCommand_base: {
  * //             file_path: "STRING_VALUE",
  * //             url: "STRING_VALUE",
  * //             checksum: "STRING_VALUE",
+ * //             size: Number("long"),
  * //           },
  * //         ],
  * //         lazy: [
@@ -79,6 +81,7 @@ declare const ListReleasesCommand_base: {
  * //             file_path: "STRING_VALUE",
  * //             url: "STRING_VALUE",
  * //             checksum: "STRING_VALUE",
+ * //             size: Number("long"),
  * //           },
  * //         ],
  * //       },
@@ -87,6 +90,7 @@ declare const ListReleasesCommand_base: {
  * //           file_path: "STRING_VALUE",
  * //           url: "STRING_VALUE",
  * //           checksum: "STRING_VALUE",
+ * //           size: Number("long"),
  * //         },
  * //       ],
  * //       experiment: { // ReleaseExperiment

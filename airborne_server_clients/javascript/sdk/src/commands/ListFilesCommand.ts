@@ -35,7 +35,7 @@ export interface ListFilesCommandInput extends ListFilesRequest {}
 export interface ListFilesCommandOutput extends ListFilesResponse, __MetadataBearer {}
 
 /**
- * List files request operation
+ * List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

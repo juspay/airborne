@@ -27,7 +27,7 @@ declare const GetReleaseCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Release request operation
+ * Get a single release by its id, including its config, package, resources, targeting dimensions, and experiment details. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -59,6 +59,7 @@ declare const GetReleaseCommand_base: {
  * //       file_path: "STRING_VALUE",
  * //       url: "STRING_VALUE",
  * //       checksum: "STRING_VALUE",
+ * //       size: Number("long"),
  * //     },
  * //     properties: "DOCUMENT_VALUE",
  * //     important: [ // ServeFileList
@@ -66,6 +67,7 @@ declare const GetReleaseCommand_base: {
  * //         file_path: "STRING_VALUE",
  * //         url: "STRING_VALUE",
  * //         checksum: "STRING_VALUE",
+ * //         size: Number("long"),
  * //       },
  * //     ],
  * //     lazy: [
@@ -73,6 +75,7 @@ declare const GetReleaseCommand_base: {
  * //         file_path: "STRING_VALUE",
  * //         url: "STRING_VALUE",
  * //         checksum: "STRING_VALUE",
+ * //         size: Number("long"),
  * //       },
  * //     ],
  * //   },
@@ -81,6 +84,7 @@ declare const GetReleaseCommand_base: {
  * //       file_path: "STRING_VALUE",
  * //       url: "STRING_VALUE",
  * //       checksum: "STRING_VALUE",
+ * //       size: Number("long"),
  * //     },
  * //   ],
  * //   experiment: { // ReleaseExperiment

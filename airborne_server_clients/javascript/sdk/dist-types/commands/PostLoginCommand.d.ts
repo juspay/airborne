@@ -27,7 +27,7 @@ declare const PostLoginCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Login request operation
+ * Exchange user credentials (client_id and client_secret) for an access token and a refresh token. Public — no auth token required. Call this first, then send the returned access token as a bearer token on subsequent requests.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

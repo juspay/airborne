@@ -35,7 +35,7 @@ export interface UpdateDimensionCommandInput extends UpdateDimensionRequest {}
 export interface UpdateDimensionCommandOutput extends DimensionResponse, __MetadataBearer {}
 
 /**
- * Update dimension request operation
+ * Update a dimension, identified by name in the path — for example to change its priority position. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

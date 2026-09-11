@@ -27,7 +27,7 @@ declare const CreateOrganisationCommand_base: {
     getEndpointParameterInstructions(): import("@smithy/middleware-endpoint").EndpointParameterInstructions;
 };
 /**
- * Create organisation request operation
+ * Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript

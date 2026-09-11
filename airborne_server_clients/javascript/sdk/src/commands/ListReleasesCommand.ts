@@ -35,7 +35,7 @@ export interface ListReleasesCommandInput extends ListReleasesRequest {}
 export interface ListReleasesCommandOutput extends ListReleasesResponse, __MetadataBearer {}
 
 /**
- * List Releases request operation
+ * List releases for an application, with pagination and optional filtering by status or targeting dimension. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -73,6 +73,7 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //           file_path: "STRING_VALUE",
  * //           url: "STRING_VALUE",
  * //           checksum: "STRING_VALUE",
+ * //           size: Number("long"),
  * //         },
  * //         properties: "DOCUMENT_VALUE",
  * //         important: [ // ServeFileList
@@ -80,6 +81,7 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //             file_path: "STRING_VALUE",
  * //             url: "STRING_VALUE",
  * //             checksum: "STRING_VALUE",
+ * //             size: Number("long"),
  * //           },
  * //         ],
  * //         lazy: [
@@ -87,6 +89,7 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //             file_path: "STRING_VALUE",
  * //             url: "STRING_VALUE",
  * //             checksum: "STRING_VALUE",
+ * //             size: Number("long"),
  * //           },
  * //         ],
  * //       },
@@ -95,6 +98,7 @@ export interface ListReleasesCommandOutput extends ListReleasesResponse, __Metad
  * //           file_path: "STRING_VALUE",
  * //           url: "STRING_VALUE",
  * //           checksum: "STRING_VALUE",
+ * //           size: Number("long"),
  * //         },
  * //       ],
  * //       experiment: { // ReleaseExperiment

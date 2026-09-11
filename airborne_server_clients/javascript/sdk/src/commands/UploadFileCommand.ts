@@ -42,7 +42,7 @@ export interface UploadFileCommandInput extends Omit<UploadFileRequest, "file"> 
 export interface UploadFileCommandOutput extends CreateFileResponse, __MetadataBearer {}
 
 /**
- * Upload file request operation
+ * Upload a file's bytes directly as the request body and register it in one step. Send the raw file as the payload, with its Base64-encoded SHA-256 digest in the x-checksum header and the organisation and application in the x-organisation and x-application headers. Returns the created file. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
