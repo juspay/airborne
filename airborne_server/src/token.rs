@@ -203,6 +203,22 @@ async fn create_token_oauth(
     }))
 }
 
+/// Builds the delete for a personal access token, scoped to a single tenant.
+fn scoped_token_delete(
+    client_uid: uuid::Uuid,
+    organisation: String,
+    application: String,
+) -> impl diesel::query_dsl::methods::ExecuteDsl<diesel::PgConnection>
+       + diesel::query_builder::QueryFragment<diesel::pg::Pg>
+       + diesel::query_builder::QueryId {
+    diesel::delete(
+        user_credentials_table
+            .filter(uid.eq(client_uid))
+            .filter(cred_org.eq(organisation))
+            .filter(cred_app.eq(application)),
+    )
+}
+
 #[authz(
     resource = "token",
     action = "delete",
@@ -216,21 +232,30 @@ async fn delete_token(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<DeleteTokenResponse>> {
     let auth_response = auth_response.into_inner();
-    let (_organisation, _application) = require_org_and_app(
+    let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    let client_uid = *client_id;
     let pool = state.db_pool.clone();
-    run_blocking!({
+    let deleted_rows = run_blocking!({
         let mut conn = pool.get()?;
-        diesel::delete(user_credentials_table.filter(uid.eq(*client_id)))
-            .execute(&mut conn)
-            .map_err(|e| {
-                log::error!("[DELETE TOKEN] Failed to delete token from database: {}", e);
-                ABError::InternalServerError(format!("Failed to delete user credentials: {}", e))
-            })?;
-        Ok(())
+        let deleted_rows = diesel::query_dsl::methods::ExecuteDsl::execute(
+            scoped_token_delete(client_uid, organisation, application),
+            &mut conn,
+        )
+        .map_err(|e| {
+            log::error!("[DELETE TOKEN] Failed to delete token from database: {}", e);
+            ABError::InternalServerError(format!("Failed to delete user credentials: {}", e))
+        })?;
+        Ok(deleted_rows)
     })?;
+
+    if deleted_rows == 0 {
+        // Identical response whether the token does not exist or belongs to
+        // another tenant, so this cannot be used to probe for live client ids.
+        return Err(ABError::NotFound("Token not found".to_string()));
+    }
 
     Ok(Json(DeleteTokenResponse { success: true }))
 }
