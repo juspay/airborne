@@ -16,17 +16,20 @@ use crate::{
     file::utils::parse_file_key,
     middleware::auth::{require_org_and_app, Auth, AuthResponse},
     release::types::*,
-    types as airborne_types,
+    signing, types as airborne_types,
     types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
 use actix_web::{
-    error, get, post, put,
+    error, get,
+    http::header::{HeaderName, CACHE_CONTROL, CONTENT_TYPE, VARY},
+    post, put,
     web::{self, Json, Path, Query},
     Scope,
 };
 use airborne_authz_macros::authz;
 use aws_smithy_types::Document;
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use http::{HeaderValue, StatusCode};
 use log::info;
@@ -523,17 +526,7 @@ async fn create_release(
 
     let response_resources = final_resources.unwrap_or_default();
 
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
+    utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     let now = Utc::now();
     let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
@@ -988,17 +981,7 @@ async fn ramp_release(
 
     info!("Successfully ramped experiment {}", experiment_id);
 
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
+    utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     Ok(Json(RampReleaseResponse {
         success: true,
@@ -1136,17 +1119,7 @@ async fn conclude_release(
         experiment_id, transformed_variant_id
     );
 
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
+    utils::invalidate_release_cache(&state, &organisation, &application).await;
 
     Ok(Json(ConcludeReleaseResponse {
         success: true,
@@ -1247,7 +1220,7 @@ async fn serve_release(
     req: actix_web::HttpRequest,
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
+) -> airborne_types::Result<WithHeaders<Bytes>> {
     serve_release_handler(path, req, query, state).await
 }
 
@@ -1257,7 +1230,7 @@ async fn serve_release_v2(
     req: actix_web::HttpRequest,
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
+) -> airborne_types::Result<WithHeaders<Bytes>> {
     serve_release_handler(path, req, query, state).await
 }
 
@@ -1288,7 +1261,7 @@ async fn serve_release_handler(
     req: actix_web::HttpRequest,
     query: Query<ServeReleaseQueryParams>,
     state: web::Data<AppState>,
-) -> airborne_types::Result<WithHeaders<Json<ServeReleaseResponse>>> {
+) -> airborne_types::Result<WithHeaders<Bytes>> {
     let (organisation, application) = path.into_inner();
 
     let span = tracing::Span::current();
@@ -1373,7 +1346,7 @@ async fn serve_release_handler(
         let files_result = utils::get_files_by_file_keys_async(
             state.db_pool.clone(),
             &state.redis_cache,
-            organisation,
+            organisation.clone(),
             application.clone(),
             all_files,
         )
@@ -1482,16 +1455,57 @@ async fn serve_release_handler(
         resources: resource_files,
     };
 
-    Ok(WithHeaders::new(Json(release_response))
+    // Serialize once and sign exactly these bytes. Handing `Json(..)` to actix
+    // would serialize a second time, leaving room for the bytes we signed and the
+    // bytes we send to drift apart.
+    let body = serde_json::to_vec(&release_response).map_err(|e| {
+        ABError::InternalServerError(format!("Failed to serialize release config: {e}"))
+    })?;
+
+    let requested_key_id = signing::utils::requested_key_id(
+        req.headers()
+            .get(signing::utils::SIGNING_KEY_ID_HEADER)
+            .and_then(|value| value.to_str().ok()),
+    );
+
+    // config.version is a UUID minted with the resolved release variant. The
+    // signing helper combines it with the selected key so repeat serves can
+    // reuse the signature safely.
+    let signature = signing::utils::sign_release_config(
+        &state,
+        &organisation,
+        &application,
+        requested_key_id,
+        &release_response.config.version,
+        &body,
+    )
+    .await?;
+
+    let mut response = WithHeaders::new(Bytes::from(body))
+        .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
         .header(
-            actix_web::http::header::CONTENT_TYPE,
-            HeaderValue::from_static("application/json"),
-        )
-        .header(
-            actix_web::http::header::CACHE_CONTROL,
+            CACHE_CONTROL,
             HeaderValue::from_static("public, s-maxage=86400, max-age=0"),
         )
-        .status(StatusCode::OK))
+        .header(
+            VARY,
+            HeaderValue::from_static("x-dimension, x-signing-key-id"),
+        )
+        .status(StatusCode::OK);
+
+    if let Some(signature) = signature {
+        match HeaderValue::from_str(&signature) {
+            Ok(value) => {
+                response = response.header(
+                    HeaderName::from_static(signing::utils::SIGNATURE_HEADER),
+                    value,
+                );
+            }
+            Err(e) => log::error!("Failed to build signature header: {e}. Serving unsigned."),
+        }
+    }
+
+    Ok(response)
 }
 
 #[authz(

@@ -32,6 +32,7 @@
 		DC3A448E2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A448B2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift */; };
 		DC3A448F2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A448A2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift */; };
 		DC3A44902F91FC8F00E8F78D /* AJPNetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A44892F91FC8F00E8F78D /* AJPNetworkClient.swift */; };
+		DCA1B2C42FB0000100E8F78D /* AJPReleaseConfigVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA1B2C32FB0000100E8F78D /* AJPReleaseConfigVerifier.swift */; };
 		DC3A44912F91FC8F00E8F78D /* AJPHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A44882F91FC8F00E8F78D /* AJPHelpers.swift */; };
 		DC3A44AF2F92009000E8F78D /* AJPLoggerDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3A44AE2F92009000E8F78D /* AJPLoggerDelegate.swift */; };
 		DC63767E2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC63767D2F9F2F7E00BE5CD4 /* AJPApplicationManagerUtils.swift */; };
@@ -89,6 +90,7 @@
 		DC3A44872F91FC8F00E8F78D /* AJPFileUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPFileUtil.swift; sourceTree = "<group>"; };
 		DC3A44882F91FC8F00E8F78D /* AJPHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPHelpers.swift; sourceTree = "<group>"; };
 		DC3A44892F91FC8F00E8F78D /* AJPNetworkClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPNetworkClient.swift; sourceTree = "<group>"; };
+		DCA1B2C32FB0000100E8F78D /* AJPReleaseConfigVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPReleaseConfigVerifier.swift; sourceTree = "<group>"; };
 		DC3A448A2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPNetworkTypeDetector.swift; sourceTree = "<group>"; };
 		DC3A448B2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPRemoteFileUtil.swift; sourceTree = "<group>"; };
 		DC3A44AE2F92009000E8F78D /* AJPLoggerDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPLoggerDelegate.swift; sourceTree = "<group>"; };
@@ -248,6 +250,7 @@
 				DC3A44892F91FC8F00E8F78D /* AJPNetworkClient.swift */,
 				DC3A448A2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift */,
 				DC3A448B2F91FC8F00E8F78D /* AJPRemoteFileUtil.swift */,
+				DCA1B2C32FB0000100E8F78D /* AJPReleaseConfigVerifier.swift */,
 			);
 			path = AirborneSwiftCore;
 			sourceTree = "<group>";
@@ -478,6 +481,7 @@
 				DC3A448F2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift in Sources */,
 				DC3A44902F91FC8F00E8F78D /* AJPNetworkClient.swift in Sources */,
 				DC3A44912F91FC8F00E8F78D /* AJPHelpers.swift in Sources */,
+				DCA1B2C42FB0000100E8F78D /* AJPReleaseConfigVerifier.swift in Sources */,
 				DC6376832F9F327200BE5CD4 /* AJPApplicationConstants.swift in Sources */,
 				DCD868E02F9B523900E341CD /* AJPApplicationConfig.swift in Sources */,
 				DCD868E12F9B523900E341CD /* AJPApplicationPackage.swift in Sources */,
