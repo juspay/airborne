@@ -31,6 +31,11 @@ class AirborneModule(reactContext: ReactApplicationContext) :
     implementation.getBundlePath(namespace, promise)
   }
 
+  @ReactMethod
+  fun checkForUpdate(namespace: String, promise: Promise) {
+    implementation.checkForUpdate(namespace, promise)
+  }
+
   companion object {
     const val NAME = "Airborne"
   }
