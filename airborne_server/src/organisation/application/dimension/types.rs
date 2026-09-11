@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::utils::{db::models::ReleaseViewEntry, release_view::ReleaseViewType};
+
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum DimensionSchema {
@@ -72,6 +74,8 @@ pub struct CreateReleaseViewRequest {
 pub struct ListReleaseViewsQuery {
     pub page: Option<i32>,
     pub count: Option<i32>,
+    /// Restrict the listing to `custom` or `auto_generated` views.
+    pub view_type: Option<ReleaseViewType>,
 }
 
 #[derive(Serialize)]
@@ -80,6 +84,23 @@ pub struct ReleaseView {
     pub name: String,
     pub dimensions: Value,
     pub created_at: DateTime<Utc>,
+    pub view_type: ReleaseViewType,
+    /// Set while a delete release for this slice is in flight; the view is removed once that
+    /// release concludes on its experimental variant.
+    pub pending_delete_release_id: Option<String>,
+}
+
+impl From<ReleaseViewEntry> for ReleaseView {
+    fn from(entry: ReleaseViewEntry) -> Self {
+        Self {
+            id: entry.id,
+            name: entry.name,
+            dimensions: entry.dimensions,
+            created_at: entry.created_at,
+            view_type: ReleaseViewType::from(entry.view_type.as_str()),
+            pending_delete_release_id: entry.pending_delete_release_id,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -98,6 +119,24 @@ pub struct UpdateReleaseViewRequest {
 #[derive(Serialize)]
 pub struct DeleteReleaseViewResponse {
     pub success: bool,
+}
+
+/// The live release of one dimension slice that uses a given dimension — what has to be deleted
+/// before that dimension can go.
+#[derive(Serialize)]
+pub struct DimensionActiveRelease {
+    pub release_id: String,
+    pub view_id: Uuid,
+    pub view_name: String,
+    pub dimensions: Value,
+    pub status: String,
+    pub package_version: i32,
+}
+
+#[derive(Serialize)]
+pub struct DimensionActiveReleasesResponse {
+    pub dimension: String,
+    pub data: Vec<DimensionActiveRelease>,
 }
 
 #[derive(Serialize)]

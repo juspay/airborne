@@ -7,7 +7,7 @@ import Screenshot from '@site/src/components/Screenshot';
 
 A **release** ships a [package](/docs/dashboard/packages) version to your users over the air. Releases are the heart of Airborne: you configure one in a six-step wizard, optionally target it at a slice of users, then roll it out gradually as an experiment — ramping traffic up, watching the metrics, and concluding when you are confident.
 
-<Screenshot name="releases-list" caption="The Releases page lists every release with its package, status, and creation time." />
+<Screenshot name="releases-list" caption="The Releases page lists every release with its package, status, and creation time, above a link through to Release Views." />
 
 ## The Releases list
 
@@ -21,9 +21,18 @@ Each row shows a release's `ID`, its `Package` version, its `Status`, and when i
 | **Concluded** | Rolled out to 100% and finalised. |
 | **Discarded** | Abandoned before or during rollout. |
 
-A release that is ramping shows its current traffic in the status — for example `Ramping to 25%`.
+A release that is ramping shows its current traffic in the status — for example `Ramping to 25%`. Two badges add what the status alone cannot say:
+
+| Badge | Meaning |
+| --- | --- |
+| **Reverted** | Concluded on its control variant — the new configuration never rolled out. See [Revert](#revert). |
+| **Deletion** | Created to retire a targeted slice. See [Deletion releases](#deletion-releases). |
+
+`Concluded` on its own means the release finished; the **Reverted** badge is what tells you it finished by keeping the old configuration rather than shipping the new one.
 
 To start a new one, choose **New Release**.
+
+This list is ordered by time, which answers "what did we ship?" but not "what is each audience running right now?". For that, the banner at the top links to **Release Views** — filtered to the auto-generated views, one per dimension slice you have released to. See [Views](/docs/dashboard/views).
 
 :::tip
 For a full end-to-end walkthrough — files, package, then a targeted release — follow the [Create & target a release guide](/docs/guides/create-and-target-a-release).
@@ -141,6 +150,16 @@ When you are confident, choose **Conclude** (available while `In Progress`). Thi
 
 If something looks wrong, choose **Revert Release** (also available while `In Progress`). This concludes the experiment on the **control** arm instead — effectively rolling back to the pre-release experience. This cannot be undone.
 
+A reverted release still ends up `Concluded`, because the experiment did finish. It is marked with a **Reverted** badge in the list and on the detail page so you can tell the two outcomes apart afterwards.
+
+:::caution[Reverting a targeted release leaves that slice behind]
+Concluding on control does not simply cancel the release — it writes what those users are getting *today* as that slice's own configuration. From then on the slice is frozen: **your global releases will no longer reach it**, even though nothing looks different at the moment you revert.
+
+The dialog spells this out and lists the dimensions affected. The slice appears in [Release Views](/docs/dashboard/views) as an auto-generated view, which is your signal that it has a configuration of its own. To put those users back on your global releases, use **Delete release** on that view — see [deletion releases](#deletion-releases).
+
+Reverting an untargeted (global) release has no such effect; there is no slice to strand.
+:::
+
 ### Discard
 
 While a release is still in the `Created` state (not yet ramped), choose **Discard** to abandon it. This also cannot be undone.
@@ -148,8 +167,26 @@ While a release is still in the `Created` state (not yet ramped), choose **Disca
 ### Clone and Edit
 
 - **Clone Release** opens the wizard pre-populated with this release's full configuration — timeouts, targeting, remote config, file priorities, resources, and package — so you can tweak and ship a variant. The cloned wizard's final button is **Create Release**.
+  - If the original targeted a [dimension](/docs/dashboard/dimensions) that has since been deleted, the Targeting step flags that rule and blocks you until you pick another dimension or remove the rule — a release cannot target a dimension that no longer exists.
 - **Edit** (available while `Created`) lets you adjust a release that hasn't rolled out yet. Note that **targeting cannot be changed when editing** — clone or create a new release to change who is targeted.
 
 :::caution
 **Conclude**, **Revert**, and **Discard** are final and cannot be undone. Ramp gradually and watch the **Errors** and **Affected Users** metrics before concluding.
+:::
+
+## Deletion releases
+
+A targeted release keeps serving its slice of users forever — there is no "unship" button. To retire one, you delete it from its [View](/docs/dashboard/views), and Airborne creates a **deletion release**: an ordinary release targeted at the same dimensions, whose experimental arm previews **the default configuration** — whatever your global (untargeted) release ships. Rolling a deletion out is therefore as gradual and as reversible as rolling anything else out.
+
+These are marked with a **Deletion** badge in the Releases list and on the detail page, and they behave like any other release:
+
+- **Ramp** and **Conclude** it to complete the deletion. Concluding **removes the slice's configuration outright**, so those dimensions resolve like any untargeted user from then on — and keep tracking the default as you ship future global releases. The auto-generated View for that slice disappears.
+- **Revert** (conclude on control) cancels the deletion — the slice keeps its own configuration and its View stays.
+- **Discard** it before ramping to call the whole thing off.
+- **Clone is not offered.** A deletion release exists to retire one specific slice, so a copy of it would just ship the default configuration as an ordinary release. To delete another slice, use **Delete release** on that slice's view.
+
+Your dimensions themselves are untouched, so a later targeted release can take that slice over again.
+
+:::caution[A deletion release blocks global releases]
+While a deletion is ramping, the users in its experimental arm are being shown the default as it looked when the deletion was created. To stop that preview drifting, you cannot create a global (untargeted) release while a deletion is pending — conclude or discard the deletion first. The same applies in reverse: you cannot start a deletion while a global release is in flight.
 :::

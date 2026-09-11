@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import DeleteDimension from "@/components/dimensions/DeleteDimension";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 
@@ -31,7 +32,12 @@ const PAGE_AUTHZ = definePagePermissions({
   read_dimensions: permission("dimension", "read", "app"),
   create_dimension: permission("dimension", "create", "app"),
   update_dimension: permission("dimension", "update", "app"),
+  delete_dimension: permission("dimension", "delete", "app"),
 });
+
+/** Superposition's own dimension — the experimentation module targets variants through it, so it
+ * is not ours to delete. */
+const RESERVED_DIMENSIONS = new Set(["variantIds"]);
 
 export type Dimension = {
   dimension: string;
@@ -69,6 +75,7 @@ export default function DimensionsPage() {
   const [creating, setCreating] = useState(false);
   const canCreateDimensions = permissions.can("create_dimension");
   const canUpdateDimensions = permissions.can("update_dimension");
+  const canDeleteDimensions = permissions.can("delete_dimension");
 
   const load = () =>
     apiFetch<any>("/organisations/applications/dimension/list", {}, { token, org, app })
@@ -191,9 +198,10 @@ export default function DimensionsPage() {
                   <Input
                     id="key"
                     value={formData.key}
-                    onChange={(e) =>
-                      setFormData({ ...formData, key: e.target.value.toLowerCase().replace(/\s+/g, "_") })
-                    }
+                    placeholder="e.g. os, appVersion"
+                    // Case is preserved — Superposition treats dimension names as case-sensitive,
+                    // so camelCase keys are usable. Only whitespace is normalised.
+                    onChange={(e) => setFormData({ ...formData, key: e.target.value.replace(/\s+/g, "_") })}
                   />
                 </div>
 
@@ -378,14 +386,28 @@ export default function DimensionsPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{d.description || "—"}</TableCell>
                   <TableCell>
-                    {d.dimension_type === "cohort" && (
-                      <Link href={`/dashboard/${params.orgId}/${params.appId}/cohorts`}>
-                        <Button variant="outline" size="sm" className="flex items-center gap-1">
-                          <ExternalLink className="h-3 w-3" />
-                          Manage
-                        </Button>
-                      </Link>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {d.dimension_type === "cohort" && (
+                        <Link href={`/dashboard/${params.orgId}/${params.appId}/cohorts`}>
+                          <Button variant="outline" size="sm" className="flex items-center gap-1">
+                            <ExternalLink className="h-3 w-3" />
+                            Manage
+                          </Button>
+                        </Link>
+                      )}
+                      {canDeleteDimensions && !RESERVED_DIMENSIONS.has(d.dimension) && (
+                        <DeleteDimension
+                          dimension={d.dimension}
+                          onDimensionDeleted={(name) => {
+                            load();
+                            toast({
+                              title: "Dimension deleted",
+                              description: `Removed dimension "${name}"`,
+                            });
+                          }}
+                        />
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

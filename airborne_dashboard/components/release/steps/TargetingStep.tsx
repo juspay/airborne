@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, Lock } from "lucide-react";
+import { Target, Lock, AlertTriangle } from "lucide-react";
 import { useReleaseForm } from "../ReleaseFormContext";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
@@ -15,8 +15,16 @@ import { Dimension } from "@/types/release";
 
 export function TargetingStep() {
   const { token, org, app } = useAppContext();
-  const { mode, hasExistingReleases, targetingRules, addTargetingRule, removeTargetingRule, updateTargetingRule } =
-    useReleaseForm();
+  const {
+    mode,
+    hasExistingReleases,
+    targetingRules,
+    addTargetingRule,
+    removeTargetingRule,
+    updateTargetingRule,
+    setUnknownDimensions,
+  } = useReleaseForm();
+  const [dimensionsLoaded, setDimensionsLoaded] = useState(false);
 
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [cohorts, setCohorts] = useState<Record<string, string[]>>({});
@@ -42,10 +50,20 @@ export function TargetingStep() {
         setDimensions(data);
       } catch (err) {
         console.error("Error fetching dimensions:", err);
+      } finally {
+        setDimensionsLoaded(true);
       }
     };
     fetchDimensions();
   }, [token, org, app]);
+
+  // Cloning an old release can prefill a dimension that has since been deleted. Superposition
+  // rejects those at create time, so flag them here and let the context block the wizard.
+  useEffect(() => {
+    if (!dimensionsLoaded) return;
+    const known = new Set(dimensions.map((d) => d.dimension));
+    setUnknownDimensions(targetingRules.map((rule) => rule.dimension).filter((name) => name && !known.has(name)));
+  }, [dimensionsLoaded, dimensions, targetingRules, setUnknownDimensions]);
 
   const loadCohortsForDimension = useCallback(
     async (dimensionName: string) => {
@@ -110,9 +128,29 @@ export function TargetingStep() {
                   const selectedDim = dimensions.find((d) => d.dimension === rule.dimension);
                   const isCohortDimension = selectedDim?.dimension_type === "cohort";
                   const cohortOptions = isCohortDimension ? cohorts[rule.dimension] || [] : [];
+                  const isMissingDimension = dimensionsLoaded && !!rule.dimension && !selectedDim;
 
                   return (
-                    <Card key={idx} className={`p-4 ${isEditMode ? "opacity-75" : ""}`}>
+                    <Card
+                      key={idx}
+                      className={`p-4 ${isEditMode ? "opacity-75" : ""} ${
+                        isMissingDimension ? "border-destructive" : ""
+                      }`}
+                    >
+                      {isMissingDimension && (
+                        <div className="mb-3 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                          <div>
+                            <span className="font-medium">
+                              The dimension <span className="font-mono">{rule.dimension}</span> no longer exists.
+                            </span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              It was deleted after this release was created. Pick another dimension or remove this rule
+                              — a release cannot target a dimension that is gone.
+                            </span>
+                          </div>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
                           <Label>Dimension</Label>
