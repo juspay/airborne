@@ -30,17 +30,32 @@ public typealias AJPRedirectionBlock = @convention(block) (HTTPURLResponse, URLR
 // MARK: - Redirect-tracking session delegate
 
 /// A URLSessionTaskDelegate that intercepts HTTP redirects so callers can observe
-/// every redirect hop. Any other delegate calls are forwarded to an optional
-/// `forwardingDelegate`, which allows composition with SSL-pinning delegates.
+/// every redirect hop. Redirect blocks are registered per task, so one handler can
+/// serve a long-lived session shared by many requests. Any other delegate calls are
+/// forwarded to an optional `forwardingDelegate`, which allows composition with
+/// SSL-pinning delegates.
 private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
 
-    private let redirectionBlock: AJPRedirectionBlock
+    /// Redirect blocks keyed by `URLSessionTask.taskIdentifier` (unique within a session).
+    private var redirectionBlocks: [Int: AJPRedirectionBlock] = [:]
+    private let lock = NSLock()
     /// An existing delegate (e.g. SSL-pinning) whose non-redirect calls we forward.
     private let forwardingDelegate: URLSessionDelegate?
 
-    init(redirectionBlock: @escaping AJPRedirectionBlock, forwardingDelegate: URLSessionDelegate?) {
-        self.redirectionBlock = redirectionBlock
+    init(forwardingDelegate: URLSessionDelegate?) {
         self.forwardingDelegate = forwardingDelegate
+    }
+
+    func register(_ redirectionBlock: @escaping AJPRedirectionBlock, for task: URLSessionTask) {
+        lock.lock()
+        redirectionBlocks[task.taskIdentifier] = redirectionBlock
+        lock.unlock()
+    }
+
+    func unregister(taskIdentifier: Int) {
+        lock.lock()
+        redirectionBlocks[taskIdentifier] = nil
+        lock.unlock()
     }
 
     func urlSession(
@@ -50,7 +65,10 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        redirectionBlock(response, request)
+        lock.lock()
+        let redirectionBlock = redirectionBlocks[task.taskIdentifier]
+        lock.unlock()
+        redirectionBlock?(response, request)
         completionHandler(request)
     }
 
@@ -79,13 +97,20 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
     @objc public var defaultHeaders: NSMutableDictionary = NSMutableDictionary()
 
     /// A shared URLSession for requests that don't need a custom delegate or timeout.
+    /// Its delegate only observes redirects, so requests that ask for redirect tracking
+    /// still reuse this session's connection pool.
     private var sharedSession: URLSession
+
+    /// Redirect observer attached to `sharedSession`.
+    private let sharedRedirectHandler: AJPRedirectHandler
 
     // MARK: - Initialization
 
     public override init() {
         let config = URLSessionConfiguration.default
-        self.sharedSession = URLSession(configuration: config)
+        let redirectHandler = AJPRedirectHandler(forwardingDelegate: nil)
+        self.sharedRedirectHandler = redirectHandler
+        self.sharedSession = URLSession(configuration: config, delegate: redirectHandler, delegateQueue: nil)
         super.init()
     }
 
@@ -125,25 +150,28 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
             }
         }
 
-         // Reuse the shared session when no custom delegate, redirect tracking, or resource timeout
-        // is needed. Create a new session otherwise so our delegate receives the necessary callbacks.
+        // Reuse the shared session unless a custom delegate (e.g. SSL pinning) or a
+        // resource timeout needs a different session configuration. Redirect tracking
+        // alone must not create a session: a new session per request means a new
+        // TCP + TLS connection per request.
         let session: URLSession
-        if sessionDelegate != nil || redirectionBlock != nil || readTimeout != -1 {
+        let redirectHandler: AJPRedirectHandler?
+        if sessionDelegate != nil || readTimeout != -1 {
             let config = URLSessionConfiguration.default
             if readTimeout != -1 {
                 config.timeoutIntervalForResource = Double(readTimeout) / 1000.0
             }
-           // Wrap with AJPRedirectHandler when redirect tracking is requested so we capture every
-            // 3xx hop while still forwarding other callbacks (e.g. SSL pinning) to sessionDelegate.
-            let delegate: URLSessionDelegate?
-            if let redirectionBlock = redirectionBlock {
-                delegate = AJPRedirectHandler(redirectionBlock: redirectionBlock, forwardingDelegate: sessionDelegate)
+            if redirectionBlock != nil {
+                let handler = AJPRedirectHandler(forwardingDelegate: sessionDelegate)
+                redirectHandler = handler
+                session = URLSession(configuration: config, delegate: handler, delegateQueue: nil)
             } else {
-                delegate = sessionDelegate
+                redirectHandler = nil
+                session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
             }
-            session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         } else {
             session = sharedSession
+            redirectHandler = sharedRedirectHandler
         }
 
         guard let requestURL = URL(string: url) else {
@@ -186,8 +214,12 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         }
 
         // Execute request
+        var taskIdentifier = -1
         let task = session.dataTask(with: urlRequest) { [weak self] data, response, error in
-            defer { if session !== self?.sharedSession { session.finishTasksAndInvalidate() } }
+            defer {
+                redirectHandler?.unregister(taskIdentifier: taskIdentifier)
+                if session !== self?.sharedSession { session.finishTasksAndInvalidate() }
+            }
             let urlResponse = response ?? URLResponse()
 
             if let error = error {
@@ -213,6 +245,10 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
                 )
                 responseBlock(urlResponse, data, ["error": "Empty response received"])
             }
+        }
+        taskIdentifier = task.taskIdentifier
+        if let redirectionBlock = redirectionBlock {
+            redirectHandler?.register(redirectionBlock, for: task)
         }
         task.resume()
     }
