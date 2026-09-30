@@ -16,10 +16,11 @@ import Foundation
 
 /// A callback block invoked when a network request finishes.
 /// - Parameters:
-///   - response: The URL response received from the server.
+///   - response: The URL response received from the server, or nil when the
+///     request failed before a response was available (e.g. timeout, invalid URL).
 ///   - responseData: The raw response data, or nil if the request failed.
 ///   - error: An error dictionary if something went wrong, or nil on success.
-public typealias AJPAPIResponseBlock = @convention(block) (URLResponse, Data?, [String: Any]?) -> Void
+public typealias AJPAPIResponseBlock = @convention(block) (URLResponse?, Data?, [String: Any]?) -> Void
 
 /// A callback block invoked each time the server issues an HTTP redirect.
 /// - Parameters:
@@ -147,8 +148,7 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         }
 
         guard let requestURL = URL(string: url) else {
-            let emptyResponse = URLResponse()
-            responseBlock(emptyResponse, nil, ["error": "Invalid URL: \(url)"])
+            responseBlock(nil, nil, ["error": "Invalid URL: \(url)"])
             return
         }
 
@@ -188,7 +188,6 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         // Execute request
         let task = session.dataTask(with: urlRequest) { [weak self] data, response, error in
             defer { if session !== self?.sharedSession { session.finishTasksAndInvalidate() } }
-            let urlResponse = response ?? URLResponse()
 
             if let error = error {
                 self?.logger?.trackEvent(
@@ -199,9 +198,9 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
                     category: "api_call",
                     subcategory: "network"
                 )
-                responseBlock(urlResponse, data, ["error": error])
+                responseBlock(response, data, ["error": error])
             } else if let data = data {
-                responseBlock(urlResponse, data, nil)
+                responseBlock(response, data, nil)
             } else {
                 self?.logger?.trackEvent(
                     withLevel: "debug",
@@ -211,7 +210,7 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
                     category: "api_call",
                     subcategory: "network"
                 )
-                responseBlock(urlResponse, data, ["error": "Empty response received"])
+                responseBlock(response, data, ["error": "Empty response received"])
             }
         }
         task.resume()
@@ -243,7 +242,7 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
     ///   - headers: Additional HTTP headers.
     ///   - options: Configuration options like `connectionTimeout` and `readTimeout`.
     ///   - sessionDelegate: An optional NSURLSessionDelegate for custom behavior.
-    /// - Returns: A tuple of (URLResponse, optional Data, optional error dictionary).
+    /// - Returns: A tuple of (optional URL response, optional Data, optional error dictionary).
     public func apiCallAsync(
         for url: String,
         requestType: AJPRequestType,
@@ -251,7 +250,7 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         headers: NSDictionary? = nil,
         options: NSDictionary? = nil,
         sessionDelegate: URLSessionDelegate? = nil
-    ) async -> (URLResponse, Data?, [String: Any]?) {
+    ) async -> (URLResponse?, Data?, [String: Any]?) {
         return await withCheckedContinuation { continuation in
             apiCall(for: url, requestType: requestType, params: params, header: headers, options: options, responseBlock: { response, data, error in
                 continuation.resume(returning: (response, data, error))
@@ -260,12 +259,12 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
     }
 
     /// Async convenience for performing a GET request.
-    public func fetchResourceAsync(_ url: String) async -> (URLResponse, Data?, [String: Any]?) {
+    public func fetchResourceAsync(_ url: String) async -> (URLResponse?, Data?, [String: Any]?) {
         return await apiCallAsync(for: url, requestType: .get)
     }
 
     /// Async convenience for performing a HEAD request.
-    public func headResourceAsync(_ url: String) async -> (URLResponse, Data?, [String: Any]?) {
+    public func headResourceAsync(_ url: String) async -> (URLResponse?, Data?, [String: Any]?) {
         return await apiCallAsync(for: url, requestType: .head)
     }
 
