@@ -102,12 +102,43 @@ final class AJPNetworkClientTests: XCTestCase {
     func testInvalidURLReturnsError() {
         let expectation = expectation(description: "Error callback")
 
-        client.fetchResource("not a valid url %%%") { _, _, error in
+        client.fetchResource("not a valid url %%%") { response, _, error in
+            XCTAssertNil(response)
             XCTAssertNotNil(error)
             expectation.fulfill()
         }
 
         waitForExpectations(timeout: 5)
+    }
+
+    /// Verifies that a request which fails before receiving a response (e.g. a
+    /// timeout) reports a nil response instead of a fabricated URLResponse.
+    /// Downstream consumers type-cast the response to NSHTTPURLResponse and
+    /// read its status code; a default-constructed response can surface a
+    /// success-range status code on new OS versions, making failed requests
+    /// look successful.
+    func testNetworkFailureReturnsNilResponse() {
+        let expectation = expectation(description: "Error callback")
+
+        let options: NSDictionary = ["connectionTimeout": 1000]
+
+        // 192.0.2.1 is a non-routable documentation address (RFC 5737) — the
+        // request fails (times out) without a response.
+        client.apiCall(
+            for: "https://192.0.2.1",
+            requestType: .get,
+            params: nil,
+            header: nil,
+            options: options,
+            responseBlock: { response, _, error in
+                XCTAssertNil(response)
+                XCTAssertNotNil(error)
+                expectation.fulfill()
+            },
+            sessionDelegate: nil
+        )
+
+        waitForExpectations(timeout: 15)
     }
 
     // MARK: - Timeout Configuration
