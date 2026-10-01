@@ -2,6 +2,37 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.7.2 - 2026-10-01
+#### Bug Fixes
+- pass nil response in api call error cases - (b89a3d9) - Naman Agarwal
+- pass nil response in api call error cases - (2b37d63) - Naman Agarwal
+
+- - -
+
+## v0.43.3 - 2026-10-01
+#### Miscellaneous Chores
+- **(version)** v0.43.3 [skip ci] - (2ec99de) - Airborne Bot
+
+- - -
+
+## v0.43.2 - 2026-10-01
+#### Miscellaneous Chores
+- **(version)** v0.43.2 [skip ci] - (4f5c8aa) - Airborne Bot
+
+- - -
+
+## v0.43.1 - 2026-10-01
+#### Miscellaneous Chores
+- **(version)** v0.43.1 [skip ci] - (12393de) - Airborne Bot
+
+- - -
+
+## v0.43.0 - 2026-10-01
+#### Miscellaneous Chores
+- **(version)** v0.43.0 [skip ci] - (a9214fc) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.7.1 - 2026-08-13
 #### Bug Fixes
 - check for bundled paths - (369fcb3) - Yash Raput
