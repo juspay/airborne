@@ -545,6 +545,9 @@ async fn create_release(
         Value::Object(serde_json::Map::new())
     });
 
+    utils::refresh_unresolved_properties(&state, &organisation, &application, &workspace_name)
+        .await;
+
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
         created_at: now,
@@ -1000,6 +1003,9 @@ async fn ramp_release(
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    utils::refresh_unresolved_properties(&state, &organisation, &application, &workspace_name)
+        .await;
+
     Ok(Json(RampReleaseResponse {
         success: true,
         message: format!(
@@ -1113,7 +1119,7 @@ async fn conclude_release(
         .superposition_client
         .conclude_experiment()
         .org_id(superposition_org_id_from_env)
-        .workspace_id(workspace_name)
+        .workspace_id(workspace_name.clone())
         .id(experiment_id.to_string())
         .chosen_variant(transformed_variant_id.clone())
         .change_reason(req.change_reason.clone().unwrap_or_else(|| {
@@ -1147,6 +1153,9 @@ async fn conclude_release(
     {
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
+
+    utils::refresh_unresolved_properties(&state, &organisation, &application, &workspace_name)
+        .await;
 
     Ok(Json(ConcludeReleaseResponse {
         success: true,
@@ -1215,7 +1224,7 @@ async fn discard_release(
     state
         .superposition_client
         .discard_experiment()
-        .workspace_id(workspace_name)
+        .workspace_id(workspace_name.clone())
         .org_id(superposition_org_id_from_env)
         .id(experiment_id.to_string())
         .change_reason(
@@ -1233,6 +1242,9 @@ async fn discard_release(
         })?;
 
     info!("Successfully discarded experiment {}", experiment_id);
+
+    utils::refresh_unresolved_properties(&state, &organisation, &application, &workspace_name)
+        .await;
 
     Ok(Json(DiscardReleaseResponse {
         success: true,
@@ -1326,8 +1338,11 @@ async fn serve_release_handler(
         })
         .collect();
 
+    let query = query.into_inner();
+    let wants_extended = query.wants_extended();
+
     // If toss not sent fallback to
-    let toss = query.into_inner().toss.unwrap_or("99".into());
+    let toss = query.toss.unwrap_or("99".into());
 
     info!(
         "Got Toss for serving release: {}, workspace: {}, org: {}, app: {}",
@@ -1358,6 +1373,29 @@ async fn serve_release_handler(
     if of_release_config.config.version == "0.0.0" {
         return Err(ABError::NotFound("No release yet".to_string()));
     }
+
+    // The resolved release above is what the SDK boots from and must not be held
+    // hostage to the bundle fetch, so a failure here degrades to a plain response
+    // rather than failing the request.
+    let unresolved_properties = if wants_extended {
+        match utils::get_unresolved_properties(&state, &organisation, &application, &workspace_name)
+            .await
+        {
+            Ok(properties) => Some(properties),
+            Err(e) => {
+                log::error!(
+                    "[SERVE RELEASE] extended=true requested for {}/{} but the Superposition \
+                     bundle could not be fetched; serving the resolved release only: {}",
+                    organisation,
+                    application,
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
 
     let (index_file, important_files, lazy_files, resource_files) = {
         let all_files = of_release_config
@@ -1469,7 +1507,13 @@ async fn serve_release_handler(
     };
 
     let release_response = ServeReleaseResponse {
-        version: "2".to_string(),
+        // v3 is v2 plus `unresolved_properties`.
+        version: if unresolved_properties.is_some() {
+            "3"
+        } else {
+            "2"
+        }
+        .to_string(),
         config: of_release_config.config,
         package: ServePackage {
             name: of_release_config.package.name,
@@ -1480,6 +1524,7 @@ async fn serve_release_handler(
             lazy: lazy_files,
         },
         resources: resource_files,
+        unresolved_properties,
     };
 
     Ok(WithHeaders::new(Json(release_response))
@@ -1640,6 +1685,12 @@ async fn update_release(
         );
         Value::Object(serde_json::Map::new())
     });
+
+    // Not in the requested trigger list, but an updated release rewrites the same
+    // `config.properties.*` overrides a created one does — skipping it here would
+    // leave the cache holding the pre-update properties.
+    utils::refresh_unresolved_properties(&state, &organisation, &application, &workspace_name)
+        .await;
 
     Ok(Json(CreateReleaseResponse {
         id: release_id.clone(),

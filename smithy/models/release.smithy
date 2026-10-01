@@ -277,6 +277,37 @@ structure GetServeReleaseInput {
     @required
     @httpLabel
     application: String
+
+    /// Set to `true` to additionally return the unresolved Superposition bundle in `unresolved_properties`, so the caller can resolve `config.properties` itself instead of relying on the server-resolved result.
+    @httpQuery("extended")
+    extended: String
+}
+
+/// The unresolved Superposition bundle for the application's workspace, narrowed to the `config.properties` key space: the same targeting data the server resolved against, handed over so the caller can run the resolution itself.
+structure UnresolvedProperties {
+    /// The workspace config — `contexts`, `overrides`, `default_configs` and `dimensions` — with every config key other than `config.properties*` filtered out. `dimensions` is not filtered, so cohort dimensions still carry their JsonLogic `definitions` and cohort membership is derivable from this payload.
+    @required
+    config: Document
+
+    /// Version identifier of the workspace config.
+    @required
+    config_version: String
+
+    /// Time the workspace config was last modified, as an RFC 3339 timestamp.
+    @required
+    config_last_modified: String
+
+    /// Active experiments, used to resolve ramped releases. Each variant's overrides are narrowed to `config.properties*`; variant selection itself is unaffected.
+    @required
+    experiments: Document
+
+    /// Experiment groups, used to bucket a caller by its targeting key.
+    @required
+    experiment_groups: Document
+
+    /// Time the experiment config was last modified, as an RFC 3339 timestamp.
+    @required
+    experiments_last_modified: String
 }
 
 /// Release configuration
@@ -292,6 +323,9 @@ structure ReleaseConfig {
     /// Additional resources for the release, as a JSON document.
     @required
     resources: Document
+
+    /// Unresolved `config.properties` bundle. Present only when `extended=true` was requested and the bundle could be fetched.
+    unresolved_properties: UnresolvedProperties
 }
 
 /// Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.
@@ -336,11 +370,10 @@ operation GetRelease {
     ]
 }
 
-/// Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.
+/// Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Pass `extended=true` to also receive the unresolved `config.properties` bundle for client-side resolution. Public — no auth token required.
 @tags(["Release serving"])
 @http(method: "GET", uri: "/release/{organisation}/{application}")
 @readonly
-@requiresauth
 operation ServeRelease {
     input: GetServeReleaseInput
     output: ReleaseConfig
@@ -350,11 +383,10 @@ operation ServeRelease {
     ]
 }
 
-/// Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.
+/// Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Pass `extended=true` to also receive the unresolved `config.properties` bundle for client-side resolution. Public — no auth token required.
 @tags(["Release serving"])
 @http(method: "GET", uri: "/release/v2/{organisation}/{application}")
 @readonly
-@requiresauth
 operation ServeReleaseV2 {
     input: GetServeReleaseInput
     output: ReleaseConfig
