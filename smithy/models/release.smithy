@@ -277,6 +277,14 @@ structure GetServeReleaseInput {
     @required
     @httpLabel
     application: String
+
+    /// ID of the signing key to sign the response with. This is the readable ID chosen
+    /// when the key was created. Optional — when omitted, or sent with an empty value,
+    /// the application's default signing key is used. A non-empty key ID that is
+    /// invalid, unknown, disabled, or belongs to another application is rejected with
+    /// a 400.
+    @httpHeader("x-signing-key-id")
+    signingKeyId: SigningKeyId
 }
 
 /// Release configuration
@@ -292,6 +300,17 @@ structure ReleaseConfig {
     /// Additional resources for the release, as a JSON document.
     @required
     resources: Document
+
+    /// Signature over the response body, in the form
+    /// keyid="<key-id>",alg="es256",sig="<base64>".
+    ///
+    /// The signature is ECDSA P-256 over SHA-256 (ES256), DER-encoded and then Base64-encoded,
+    /// computed over the exact raw JSON response body bytes, uncompressed. Verify it with the
+    /// public key of the signing key named in keyid, downloadable via GetSigningKeyPublicKey.
+    ///
+    /// Absent if the application has no usable signing key.
+    @httpHeader("x-airborne-signature")
+    signature: String
 }
 
 /// Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.
@@ -337,6 +356,8 @@ operation GetRelease {
 }
 
 /// Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.
+///
+/// The response is signed: the x-airborne-signature response header carries an ES256 signature over the exact raw JSON response body bytes, so a client can verify the config was served by Airborne and not tampered with in transit. Send the x-signing-key-id header to choose which key signs the response; omit it to use the application's default key. See the "Signing keys" endpoints for managing keys and downloading the public key to verify against.
 @tags(["Release serving"])
 @http(method: "GET", uri: "/release/{organisation}/{application}")
 @readonly
@@ -345,12 +366,15 @@ operation ServeRelease {
     input: GetServeReleaseInput
     output: ReleaseConfig
     errors: [
+        BadRequestError
         NotFoundError
         InternalServerError
     ]
 }
 
 /// Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.
+///
+/// The response is signed: the x-airborne-signature response header carries an ES256 signature over the exact raw JSON response body bytes, so a client can verify the config was served by Airborne and not tampered with in transit. Send the x-signing-key-id header to choose which key signs the response; omit it to use the application's default key. See the "Signing keys" endpoints for managing keys and downloading the public key to verify against.
 @tags(["Release serving"])
 @http(method: "GET", uri: "/release/v2/{organisation}/{application}")
 @readonly
@@ -359,6 +383,7 @@ operation ServeReleaseV2 {
     input: GetServeReleaseInput
     output: ReleaseConfig
     errors: [
+        BadRequestError
         NotFoundError
         InternalServerError
     ]

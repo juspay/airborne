@@ -46,6 +46,8 @@ pub enum LockNamespace {
     SuperpositionMigration = 1,
     /// Lock for the Keycloak -> Casbin authz import
     KeycloakToCasbinMigration = 2,
+    /// Lock for the boot-time signing key backfill
+    SigningKeyBackfill = 3,
 }
 
 impl LockNamespace {

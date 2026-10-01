@@ -52,19 +52,22 @@ The server connects to PostgreSQL for application data **and** Casbin policies. 
 
 ## Redis
 
-Redis is an **optional** but recommended cache. It backs two things: the OIDC login **PKCE + nonce** hardening, and read caches for file, package, and workspace lookups.
+Redis is an **optional** but recommended cache. It backs the OIDC login **PKCE + nonce** hardening, distributed read caches, and release-config signing caches.
 
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
 | `REDIS_URL` | No | `redis://localhost:6379` | Redis connection string. When set, the server enables PKCE/nonce protection on the OIDC flow and caches hot reads. When unset, Redis is skipped entirely. |
+| `RC_SIGNATURE_CACHE_TTL` | No | `3600` | Time to live, in seconds, for each cached release-config signature. Only applies when `REDIS_URL` is set. |
 
 How it is used:
 
 - **Auth hardening.** When `REDIS_URL` is set, the login-initiation step generates a PKCE challenge and stores the code verifier and OIDC nonce in Redis (keyed by a hash of the OAuth `state`, 10-minute TTL, single-use). The callback consumes them to complete the PKCE exchange and verify the ID-token nonce.
 - **Read caches.** File-entry lookups (3-day TTL), package reads and workspace-name lookups (1-week TTL) are cached and invalidated on the corresponding writes.
+- **Release signatures.** Encrypted signing-key records are read from Redis first and fall back to PostgreSQL only on a miss. Completed signatures are cached by signing-key selector and `config.version` for `RC_SIGNATURE_CACHE_TTL` seconds. The default is one hour.
+- **Decrypted signing keys.** Private keys are never written back to Redis after decryption. Each server process keeps a bounded Moka cache of at most 1,024 decrypted keys, with a one-hour TTL and a 15-minute idle timeout. Concurrent misses for the same key share one decryption, and signing-key mutations invalidate the local entry immediately.
 
 :::info[What happens without Redis]
-If `REDIS_URL` is unset, OIDC login **still works**, but PKCE and nonce verification are silently skipped and no read caching happens. For production, deploy a Redis instance and set `REDIS_URL` to keep the auth flow hardened.
+If `REDIS_URL` is unset, OIDC login **still works**, but PKCE and nonce verification are silently skipped and distributed read caching is disabled. Release signing falls back to PostgreSQL for key lookups and can still reuse decrypted keys inside each server process. For production, deploy a Redis instance and set `REDIS_URL` to keep the auth flow hardened and PostgreSQL off the normal release-signing path.
 :::
 
 :::caution[Malformed URL panics on boot]
@@ -185,12 +188,14 @@ Enable this only while you still have Android clients that resolve the old `{org
 
 ## Encryption
 
-Airborne can store its secrets encrypted at rest in the environment using **envelope encryption**: a random Data Encryption Key (DEK, the "master key") encrypts each secret with AES-256-GCM, and the DEK itself is encrypted with **KMS**. At boot the server decrypts the master key via KMS, then uses it to decrypt each secret.
+Airborne can store its secrets encrypted at rest in the environment using **envelope encryption**: a random Data Encryption Key (DEK, the "master key") encrypts each secret with AES-256-GCM, and the DEK itself is encrypted with **KMS**. At boot the server decrypts the master key via KMS, then uses it to decrypt each secret and to protect release-config signing private keys stored in PostgreSQL and Redis.
 
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
-| `USE_ENCRYPTED_SECRETS` | No | `true` | Master switch. When `true`, secret variables are treated as KMS-envelope-encrypted and decrypted on boot. When `false`, secrets are read as plaintext. |
+| `USE_ENCRYPTED_SECRETS` | No | `true` | Master switch. When `true`, secret variables and release-config signing private keys are encrypted under the master key. When `false`, both are stored/read as plaintext. |
 | `MASTER_KEY` | Conditional (secret) | _(generated)_ | The **KMS-encrypted** Data Encryption Key. **Required when `USE_ENCRYPTED_SECRETS=true`** — the server errors with `MASTER_KEY must be set when USE_ENCRYPTED_SECRETS=true` if absent. Ignored when encryption is off. |
+
+Release-config signing keys follow the same switch as environment secrets. With encryption enabled, PostgreSQL and Redis store only AES-256-GCM ciphertext. Each server process decrypts a key on its first local use and may retain the plaintext PKCS#8 value in its bounded Moka cache for up to one hour, expiring it after 15 idle minutes. These cached values are ordinary Rust strings and are not zeroized when evicted. With encryption disabled, PostgreSQL and Redis also contain the plaintext private key; use that mode only for trusted local development.
 
 The secret variables that participate in encryption are:
 
@@ -249,6 +254,7 @@ Recognized tokens:
 | `db` | Runs pending **Diesel** database migrations (embedded in the binary) before serving. |
 | `superposition` | Reconciles Superposition default configs using `SUPERPOSITION_MIGRATION_STRATEGY`. Boot **panics** if this migration fails. |
 | `keycloaktocasbin` | Runs a one-time **Keycloak → Casbin** authorization import on boot (applies changes). This also triggers DB migrations first. |
+| `signingkeys` | Provisions a default [release-config signing key](/docs/guides/verify-the-release-config-signature) for every application that does not already have one. Applications created from now on get one automatically, so this only matters for applications that predate signing. Idempotent — safe to leave enabled. A failure here is logged and **does not** stop boot. |
 
 :::note
 The same Keycloak→Casbin import is also available as an explicit one-off command: run the server binary with `authz-import-keycloak --dry-run` (preview) or `authz-import-keycloak --apply` (apply). Use this instead of `keycloaktocasbin` in `MIGRATIONS_TO_RUN_ON_BOOT` when you want a controlled, out-of-band migration.
