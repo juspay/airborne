@@ -23,6 +23,14 @@ import Foundation
     /// The remote resource map keyed by filePath.
     public var resources: AJPApplicationResources
 
+    /// The unresolved Superposition bundle, present only when the release config was served
+    /// with `extended=true`. A top-level sibling of `config`/`package`/`resources`, not a wrapper.
+    ///
+    /// Backend-controlled and arbitrarily nested, so it is carried opaquely and never modelled:
+    /// the SDK only stores and forwards it. `nil` for responses that predate the flag, in which
+    /// case it is omitted from `toDictionary()` rather than emitted as null.
+    public var unresolvedProperties: NSDictionary?
+
     // MARK: - Initialization
 
     /// Restores `NSObject.init()` for ObjC callers; creates an empty manifest.
@@ -35,12 +43,22 @@ import Foundation
 
     /// Creates a manifest by composing already-parsed model objects.
     /// Used internally by `AJPApplicationManager` to snapshot the current state.
+    public convenience init(package: AJPApplicationPackage,
+                            config: AJPApplicationConfig,
+                            resources: AJPApplicationResources) {
+        self.init(package: package, config: config, resources: resources, unresolvedProperties: nil)
+    }
+
+    /// Creates a manifest by composing already-parsed model objects, carrying the opaque
+    /// unresolved properties alongside them.
     public init(package: AJPApplicationPackage,
                 config: AJPApplicationConfig,
-                resources: AJPApplicationResources) {
+                resources: AJPApplicationResources,
+                unresolvedProperties: NSDictionary?) {
         self.package = package
         self.config = config
         self.resources = resources
+        self.unresolvedProperties = unresolvedProperties
         super.init()
     }
 
@@ -69,6 +87,9 @@ import Foundation
             self.resources = AJPApplicationResources()
         }
 
+        // Kept verbatim: the inner structure is backend-owned, so it is neither parsed nor validated.
+        self.unresolvedProperties = dict["unresolved_properties"] as? NSDictionary
+
         super.init()
     }
 
@@ -76,11 +97,16 @@ import Foundation
 
     /// Serializes the manifest back to a dictionary, mirroring the server JSON shape.
     public func toDictionary() -> NSDictionary {
-        return [
+        var dict: [String: Any] = [
             "config": config.toDictionary(),
             "package": package.toDictionary(),
             "resources": resources.toDictionary()
         ]
+        // Omitted entirely when absent — never serialized as null.
+        if let unresolvedProperties = unresolvedProperties {
+            dict["unresolved_properties"] = unresolvedProperties
+        }
+        return dict as NSDictionary
     }
 
     // MARK: - NSSecureCoding
@@ -91,6 +117,10 @@ import Foundation
         self.config = coder.decodeObject(of: AJPApplicationConfig.self, forKey: "config") ?? AJPApplicationConfig()
         self.package = coder.decodeObject(of: AJPApplicationPackage.self, forKey: "package") ?? AJPApplicationPackage()
         self.resources = coder.decodeObject(of: AJPApplicationResources.self, forKey: "resources") ?? AJPApplicationResources()
+        // NSNull is allowed alongside the usual JSON classes: the payload is backend-controlled,
+        // and a single null anywhere inside it would otherwise fail the whole manifest decode.
+        let unresolvedClasses: [AnyClass] = [NSDictionary.self, NSArray.self, NSString.self, NSNumber.self, NSNull.self]
+        self.unresolvedProperties = coder.decodeObject(of: unresolvedClasses, forKey: "unresolved_properties") as? NSDictionary
         super.init()
     }
 
@@ -98,5 +128,6 @@ import Foundation
         coder.encode(config, forKey: "config")
         coder.encode(package, forKey: "package")
         coder.encode(resources, forKey: "resources")
+        coder.encode(unresolvedProperties, forKey: "unresolved_properties")
     }
 }

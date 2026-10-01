@@ -144,6 +144,24 @@ Fired when a new config block is loaded.
 }
 ```
 
+### unresolved_properties_updated
+
+iOS only. Fired when the `unresolved_properties` block of an extended release config changed and
+the new copy was cached. The extended payload is versioned independently of `config`, so this can
+fire on a fetch where `config_updated` did not (and vice versa). `new_config_version` is the
+version carried *inside* `unresolved_properties`, not `config.version`.
+
+```typescript
+{
+  category: "lifecycle",
+  subCategory: "hyperota",
+  level: "info",
+  label: "ota_update",
+  key: "unresolved_properties_updated",
+  value: { new_config_version: "7488203155491131392", app_update_id: "<UUID>" }
+}
+```
+
 ### package_update_result
 
 Fired on completion of package download.
