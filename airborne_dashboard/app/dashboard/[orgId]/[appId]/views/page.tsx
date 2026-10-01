@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Filter } from "lucide-react";
 import CreateReleaseView from "@/components/releaseViews/CreateReleaseView";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import EditReleaseView from "@/components/releaseViews/EditReleaseView";
 import DeleteReleaseView from "@/components/releaseViews/DeleteReleaseView";
+import DeleteSliceRelease from "@/components/releaseViews/DeleteSliceRelease";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ViewReleaseInfo from "@/components/releaseViews/ViewReleaseInfo";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
@@ -19,6 +24,10 @@ const PAGE_AUTHZ = definePagePermissions({
   delete_view: permission("release_view", "delete", "app"),
 });
 
+/** `custom` views are created by a user; `auto_generated` ones are created by Airborne for each
+ * release's dimensions. */
+export type ReleaseViewType = "custom" | "auto_generated";
+
 export type View = {
   id: string;
   name: string;
@@ -27,6 +36,9 @@ export type View = {
     value: string;
   }[];
   created_at: Date;
+  view_type: ReleaseViewType;
+  /** Set while a delete release for this slice is in flight. */
+  pending_delete_release_id?: string | null;
 };
 type ReleaseViewListResponse = {
   data: View[];
@@ -34,11 +46,26 @@ type ReleaseViewListResponse = {
   total_pages: number;
 };
 
+enum ViewTypeFilter {
+  ALL = "all",
+  CUSTOM = "custom",
+  AUTO_GENERATED = "auto_generated",
+}
+
+/** Lets other pages deep-link to a pre-filtered list, e.g. `/views?view_type=auto_generated`. */
+function filterFromQuery(value: string | null): ViewTypeFilter {
+  return Object.values(ViewTypeFilter).includes(value as ViewTypeFilter)
+    ? (value as ViewTypeFilter)
+    : ViewTypeFilter.ALL;
+}
+
 export default function ViewsPage() {
   const { token, org, app } = useAppContext();
   const permissions = usePagePermissions(PAGE_AUTHZ);
   const canManageViews = permissions.can("create_view") || permissions.can("update_view");
 
+  const searchParams = useSearchParams();
+  const [filterType, setFilterType] = useState<ViewTypeFilter>(() => filterFromQuery(searchParams.get("view_type")));
   const [viewsList, setViewsList] = useState<View[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
@@ -57,8 +84,14 @@ export default function ViewsPage() {
 
     try {
       const res: ReleaseViewListResponse = await apiFetch(
-        `/organisations/applications/dimension/release-view/list?page=${pageNum}&count=20`,
-        {},
+        `/organisations/applications/dimension/release-view/list`,
+        {
+          query: {
+            page: pageNum,
+            count: 20,
+            ...(filterType !== ViewTypeFilter.ALL ? { view_type: filterType } : {}),
+          },
+        },
         {
           token,
           org,
@@ -91,7 +124,7 @@ export default function ViewsPage() {
       setPage(nextPage);
       fetchViewsList(nextPage, true);
     }
-  }, [page, isLoadingMore, hasMore]);
+  }, [page, isLoadingMore, hasMore, filterType]);
 
   useEffect(() => {
     // Only create observer if element exists and we have content to observe
@@ -118,7 +151,9 @@ export default function ViewsPage() {
   }, [loadMore, hasMore, isLoadingMore, viewsList.length]);
 
   const onViewCreated = (view: View) => {
-    setViewsList((prev) => [...prev, view]);
+    // The list is newest-first, and a custom view is hidden while the auto-generated filter is on.
+    if (filterType === ViewTypeFilter.AUTO_GENERATED) return;
+    setViewsList((prev) => [view, ...prev]);
     setTotalItems((prev) => prev + 1);
   };
 
@@ -127,7 +162,7 @@ export default function ViewsPage() {
     setViewsList([]);
     setHasMore(true);
     fetchViewsList(1, false);
-  }, [app, org]);
+  }, [app, org, filterType]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -139,29 +174,60 @@ export default function ViewsPage() {
           {/* Page Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">
-                Custom Views
-              </h1>
-              <p className="text-muted-foreground mt-2">Create and manage custom filtered views for your dashboard</p>
+              <h1 className="text-3xl font-bold font-[family-name:var(--font-space-grotesk)] text-balance">Views</h1>
+              <p className="text-muted-foreground mt-2">
+                Custom views you create, plus a view generated for every release&apos;s dimensions
+              </p>
             </div>
             {canManageViews && <CreateReleaseView onViewCreated={onViewCreated} />}
           </div>
 
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <Select value={filterType} onValueChange={(value) => setFilterType(value as ViewTypeFilter)}>
+                  <SelectTrigger className="w-48">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Filter by type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ViewTypeFilter.ALL}>All</SelectItem>
+                    <SelectItem value={ViewTypeFilter.CUSTOM}>Custom</SelectItem>
+                    <SelectItem value={ViewTypeFilter.AUTO_GENERATED}>Auto-generated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="font-[family-name:var(--font-space-grotesk)]">Views ({totalItems})</CardTitle>
-              <CardDescription>All custom views and their filter configurations</CardDescription>
+              <CardDescription>All saved views and their filter configurations</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading && viewsList.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+              ) : viewsList.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  {filterType === ViewTypeFilter.CUSTOM
+                    ? "No custom views yet. Create one to save a dimension filter."
+                    : filterType === ViewTypeFilter.AUTO_GENERATED
+                      ? "No auto-generated views yet. One is created for each release's dimensions."
+                      : "No views yet."}
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto">
                   <div className="space-y-4">
                     {viewsList.map((view) => {
                       const isOpen = selectedView?.id === view.id;
+                      const isAutoGenerated = view.view_type === "auto_generated";
+                      const pendingDeleteReleaseId = view.pending_delete_release_id;
+                      // The dimension-less "default" view stands for the global release, which has
+                      // nothing to fall back to — the server refuses to delete it.
+                      const canDeleteRelease = isAutoGenerated && view.dimensions?.length > 0;
 
                       return (
                         <Card
@@ -170,12 +236,20 @@ export default function ViewsPage() {
                           onClick={() => setSelectedView(view)}
                         >
                           <CardHeader className="flex flex-row items-center justify-between space-y-0 pt-2 px-3">
-                            <CardTitle className="text-sm font-medium">{view.name}</CardTitle>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <CardTitle className="text-sm font-medium truncate">{view.name}</CardTitle>
+                              <Badge variant={isAutoGenerated ? "outline" : "secondary"} className="shrink-0 text-xs">
+                                {isAutoGenerated ? "Auto-generated" : "Custom"}
+                              </Badge>
+                            </div>
                             <div
                               className="flex items-center gap-1"
                               onClick={(e) => e.stopPropagation()} // prevent toggle when clicking actions
                             >
-                              {permissions.can("update_view") && (
+                              {/* Auto-generated views mirror a release's dimensions, so they can be
+                                  neither edited nor removed on their own — deleting the release they
+                                  stand for is what retires them. */}
+                              {permissions.can("update_view") && !isAutoGenerated && (
                                 <EditReleaseView
                                   view={view}
                                   onViewUpdated={(updatedView: View) => {
@@ -185,15 +259,38 @@ export default function ViewsPage() {
                                   }}
                                 />
                               )}
-                              {permissions.can("delete_view") && (
-                                <DeleteReleaseView
-                                  view={view}
-                                  onViewDeleted={(viewId: string) => {
-                                    setViewsList((prev) => prev.filter((v) => v.id !== viewId));
-                                    setTotalItems((prev) => prev - 1);
-                                    if (selectedView?.id === viewId) setSelectedView(null);
-                                  }}
-                                />
+                              {isAutoGenerated && pendingDeleteReleaseId ? (
+                                <Link
+                                  href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/${encodeURIComponent(pendingDeleteReleaseId)}`}
+                                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                                >
+                                  Deletion in progress
+                                </Link>
+                              ) : (
+                                permissions.can("delete_view") &&
+                                (isAutoGenerated ? (
+                                  canDeleteRelease && (
+                                    <DeleteSliceRelease
+                                      view={view}
+                                      onDeleteReleaseCreated={(viewId: string, releaseId: string) => {
+                                        setViewsList((prev) =>
+                                          prev.map((v) =>
+                                            v.id === viewId ? { ...v, pending_delete_release_id: releaseId } : v
+                                          )
+                                        );
+                                      }}
+                                    />
+                                  )
+                                ) : (
+                                  <DeleteReleaseView
+                                    view={view}
+                                    onViewDeleted={(viewId: string) => {
+                                      setViewsList((prev) => prev.filter((v) => v.id !== viewId));
+                                      setTotalItems((prev) => prev - 1);
+                                      if (selectedView?.id === viewId) setSelectedView(null);
+                                    }}
+                                  />
+                                ))
                               )}
                             </div>
                           </CardHeader>
@@ -229,13 +326,15 @@ export default function ViewsPage() {
                   <div ref={observerRef} className="flex justify-center py-4 min-h-[40px]">
                     {hasMore && isLoadingMore && (
                       <>
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                        <span className="ml-2 text-white/60">Loading more...</span>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        <span className="ml-2 text-muted-foreground">Loading more...</span>
                       </>
                     )}
-                    {hasMore && !isLoadingMore && <div className="text-white/40 text-sm">Scroll for more...</div>}
+                    {hasMore && !isLoadingMore && (
+                      <div className="text-muted-foreground text-sm">Scroll for more...</div>
+                    )}
                     {!hasMore && viewsList.length > 0 && (
-                      <div className="text-white/60">No more release views to load</div>
+                      <div className="text-muted-foreground">No more release views to load</div>
                     )}
                   </div>
                 </div>

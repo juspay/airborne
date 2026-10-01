@@ -28,7 +28,7 @@ Choose **Create Dimension**.
 
 Fill in the **Create New Dimension** dialog:
 
-- **Key** (required) — the dimension's identifier. Input is normalised to lowercase with underscores.
+- **Key** (required) — the dimension's identifier. Spaces become underscores; capitalisation is preserved, so `appVersion` and `app_version` are both valid (and are different dimensions — names are case-sensitive).
 - **Dimension Type** (required) — **Standard** or **Cohort**. The Cohort option is disabled until at least one standard dimension exists.
 - **Depends On** (required for cohorts) — appears only when you pick **Cohort**; choose the standard dimension this cohort segments on (for example `app_version`).
 - **Description** (required) — a short explanation of what the dimension represents.
@@ -38,6 +38,23 @@ Choose **Create Dimension** to save it.
 :::note
 You need at least one standard dimension before you can create a cohort, because a cohort is built on top of a standard dimension. Create the standard dimension first, then the cohort that depends on it.
 :::
+
+## Deleting a dimension
+
+Choose the **delete** icon in a dimension's **Actions** column. Because releases are targeted *by* dimension, Airborne first checks whether anything is still live on it.
+
+<Screenshot name="dimension-delete-blocked" width="720px" caption="Deleting is blocked while a release still targets the dimension; the dialog links to each one." />
+
+- **Something still targets it** — the dialog lists the live release for each slice using the dimension: one per [release view](/docs/dashboard/views), which is the release currently serving those users. Deleting is blocked until they are gone. Follow the links to each release, or **Go to Release Views**, and [delete the release](/docs/dashboard/views#deleting-a-release-from-a-view) for each slice. Once a deletion concludes, its view disappears and the dimension is one step closer to being free.
+- **Nothing targets it** — the dialog says so, and **Delete dimension** removes it. Existing releases are untouched; the dimension simply stops being available for targeting.
+
+`variantIds` has no delete action: it belongs to Superposition, which resolves every release's variants through it, so removing it would break targeting for the whole application. The API rejects it too.
+
+:::note
+The same check runs on the server, so a dimension cannot be deleted out from under a live release even by calling the API directly.
+:::
+
+The check covers what is *live*, not your history: past releases keep the deleted dimension in their targeting. Nothing breaks — they are already concluded — but [cloning](/docs/dashboard/releases#clone-and-edit) one will flag that rule and ask you to fix it before the clone can be created.
 
 ## Priority order (Weight)
 

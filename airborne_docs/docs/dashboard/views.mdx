@@ -7,11 +7,20 @@ import Screenshot from '@site/src/components/Screenshot';
 
 A **View** is a saved [dimension](/docs/dashboard/dimensions) filter. Rather than reconstructing the same set of dimension values every time you want to inspect a particular audience, you save them once as a named View and reuse it to slice your [releases](/docs/dashboard/releases) by that segment.
 
-<Screenshot name="views" caption="The Custom Views page lists each saved view and the dimension filters it captures." />
+Views come in two types:
 
-## The Custom Views page
+| Type | Where it comes from |
+| --- | --- |
+| **Custom** | You created it, from **Create View**. |
+| **Auto-generated** | Airborne created it when a release was created, from that release's dimensions. |
 
-The page is titled **Custom Views** and lists every saved view with the dimension filters it captures shown as `key: value` badges. Click a view to expand it and see the release information for that filter. Each view has **Edit** and **Delete** actions.
+<Screenshot name="views" caption="The Views page lists each saved view, its type, and the dimension filters it captures. Auto-generated views offer Delete release; one here already has a deletion in progress." />
+
+## The Views page
+
+The page lists every saved view with a **Custom** or **Auto-generated** badge and the dimension filters it captures shown as `key: value` badges. Click a view to expand it and see the release information for that filter. Use the **Filter by type** control to narrow the list to one type.
+
+Custom views have **Edit** and **Delete** actions. Auto-generated views have neither — they stand for a live dimension slice rather than a saved preference, so their only action is **Delete release** (see below). To keep a modified version of one, create a custom view instead.
 
 ## Creating a view
 
@@ -22,10 +31,40 @@ Choose **Create View**. In the **Create a new view** dialog:
 
 Choose **Create View** to save it.
 
+## Auto-generated views
+
+Every time a release is created, Airborne saves a view for that release's dimensions, so each slice you have ever shipped to is browsable without rebuilding the filter by hand.
+
+- **Name** — the release's dimensions sorted by key and joined as `key=value`, for example `city=blr, os=android`. A release that targets no dimensions produces a view named `default`.
+- **No duplicates** — if an auto-generated view already covers that exact set of dimension values, no new one is created. The dimension order does not matter for this comparison. A **custom** view over the same dimensions does not stand in for it: the two are independent, and only the auto-generated one can have its release deleted, so you may see both listed.
+
+:::note
+Auto-generated views appear only for releases created after this feature shipped — existing releases are not backfilled.
+:::
+
+## Deleting a release from a view
+
+Because an auto-generated view *is* a slice you have released to, it is where you go to retire that release. Choose **Delete release** on the view.
+
+<Screenshot name="views-delete-release" width="720px" caption="The Delete release dialog walks through what happens: a deletion release is created, you ramp it, then you conclude it." />
+
+This does not delete anything on its own — it creates a [deletion release](/docs/dashboard/releases#deletion-releases) targeted at the same dimensions, previewing the default configuration your global release ships. **Deleting is staggered like any other rollout**: the deletion release starts at 0% traffic, so you move these users back to the default gradually and can stop if something looks wrong.
+
+The view then shows **Deletion in progress**, linking to that release. Take it to the Releases page and ramp and conclude it as usual:
+
+- **Concluded** — the slice's own configuration is removed, so those dimensions resolve like any untargeted user and keep following the default as it changes. This view disappears.
+- **Reverted** (concluded on the control arm) or **discarded** — nothing changes and the view stays, ready to be deleted again later.
+
+The `default` view has no **Delete release** action: it stands for your global release, which has no default to fall back to.
+
+:::caution
+While a deletion is in progress you cannot create a global release, and vice versa — see the [note on the Releases page](/docs/dashboard/releases#deletion-releases) for why.
+:::
+
 ## Using views
 
 Once saved, a view captures "show me the releases that match these dimension values." Expanding a view surfaces the release information for that slice, so you can quickly answer questions like "what's currently shipping to this segment?" without rebuilding the filter each time.
 
 :::tip
-Create a view for each audience you care about — for example a region, a platform, or a beta [cohort](/docs/dashboard/cohorts) — so anyone on the team can check that segment's releases at a glance.
+Create a custom view for each audience you care about — for example a region, a platform, or a beta [cohort](/docs/dashboard/cohorts) — so anyone on the team can check that segment's releases at a glance.
 :::
