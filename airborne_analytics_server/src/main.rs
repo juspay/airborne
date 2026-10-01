@@ -8,24 +8,73 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use anyhow::Result;
 use axum::{
     error_handling::HandleErrorLayer,
+    http::{header, HeaderValue, Method},
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
 use tower::ServiceBuilder;
-use tower_http::{cors::CorsLayer, timeout::TimeoutLayer, trace::TraceLayer};
-use tracing::{error, info};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    timeout::TimeoutLayer,
+    trace::TraceLayer,
+};
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
     common::{
-        config::Config,
+        config::{Config, CorsPolicy},
         models::{AppState, ErrorResponse, LoggingInfra},
     },
     core::kafka,
     core::{bootstrap_clickhouse, victoria},
     handlers::{analytics, events, health},
 };
+
+/// Builds the CORS layer from the configured policy.
+///
+/// `AllowAny` reproduces the previous `CorsLayer::permissive()` behaviour and
+/// is correct when a CDN or gateway in front of this service owns CORS. When
+/// nothing sits in front, an allow-list is what stops an arbitrary site from
+/// reading another tenant's analytics out of a visitor's browser.
+fn build_cors_layer(policy: &CorsPolicy) -> Result<CorsLayer> {
+    match policy {
+        CorsPolicy::AllowAny => {
+            warn!(
+                "CORS is allowing any origin. Set CORS_ALLOWED_ORIGINS to an \
+                 allow-list if this service is exposed without a CDN or gateway \
+                 that enforces CORS on its behalf."
+            );
+            Ok(CorsLayer::permissive())
+        }
+        CorsPolicy::AllowList(origins) => {
+            let parsed = origins
+                .iter()
+                .map(|origin| {
+                    HeaderValue::from_str(origin).map_err(|e| {
+                        anyhow::anyhow!(
+                            "Invalid origin {:?} in CORS_ALLOWED_ORIGINS: {}",
+                            origin,
+                            e
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            info!(
+                "CORS restricted to {} origin(s): {:?}",
+                parsed.len(),
+                origins
+            );
+
+            Ok(CorsLayer::new()
+                .allow_origin(AllowOrigin::list(parsed))
+                .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                .allow_headers([header::CONTENT_TYPE]))
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -109,6 +158,10 @@ async fn main() -> Result<()> {
 
     let server_port = config.server.port;
 
+    // Built before the listener binds so a malformed allow-list fails startup
+    // loudly rather than silently degrading to a policy nobody chose.
+    let cors_layer = build_cors_layer(&config.server.cors)?;
+
     let safe_layer = ServiceBuilder::new()
         .layer(HandleErrorLayer::new(|err| async move {
             ErrorResponse::internal(err).into_response()
@@ -132,7 +185,7 @@ async fn main() -> Result<()> {
             "/analytics/performance",
             get(analytics::get_performance_metrics),
         )
-        .layer(CorsLayer::permissive())
+        .layer(cors_layer)
         .layer(TraceLayer::new_for_http())
         .layer(safe_layer)
         .with_state(app_state.clone());
@@ -168,4 +221,85 @@ async fn main() -> Result<()> {
     info!("OTA Analytics Server stopped");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod cors_tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tower::ServiceExt;
+
+    const ALLOWED: &str = "https://airborne.example.com";
+    const OTHER: &str = "https://evil.example.com";
+
+    /// Drives a real request through the configured CORS layer and returns the
+    /// `access-control-allow-origin` the browser would receive, if any.
+    async fn allow_origin_header_for(policy: &CorsPolicy, request_origin: &str) -> Option<String> {
+        let app = Router::new()
+            .route("/analytics/adoption", get(|| async { "{}" }))
+            .layer(build_cors_layer(policy).expect("layer should build"));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/analytics/adoption")
+                    .header("origin", request_origin)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        response
+            .headers()
+            .get("access-control-allow-origin")
+            .map(|value| value.to_str().unwrap().to_string())
+    }
+
+    /// The security property: an origin outside the allow-list must not receive
+    /// permission to read the response, or any site a user visits can pull
+    /// another tenant's analytics out of their browser.
+    #[tokio::test]
+    async fn allow_list_rejects_unlisted_origin() {
+        let policy = CorsPolicy::AllowList(vec![ALLOWED.to_string()]);
+
+        assert_eq!(
+            allow_origin_header_for(&policy, ALLOWED).await.as_deref(),
+            Some(ALLOWED),
+            "the listed origin should be permitted"
+        );
+        assert_eq!(
+            allow_origin_header_for(&policy, OTHER).await,
+            None,
+            "an unlisted origin must not be granted access"
+        );
+    }
+
+    /// The documented default must keep behaving exactly as the previous
+    /// `CorsLayer::permissive()` did, so CDN-fronted deployments are unaffected.
+    #[tokio::test]
+    async fn allow_any_permits_arbitrary_origins() {
+        let policy = CorsPolicy::AllowAny;
+
+        assert_eq!(
+            allow_origin_header_for(&policy, OTHER).await.as_deref(),
+            Some("*"),
+            "AllowAny should keep permitting every origin"
+        );
+    }
+
+    /// A malformed origin must fail startup rather than degrade to some other
+    /// policy the operator did not choose.
+    #[test]
+    fn malformed_origin_fails_to_build() {
+        let policy = CorsPolicy::AllowList(vec!["ht\ntp://broken".to_string()]);
+
+        assert!(
+            build_cors_layer(&policy).is_err(),
+            "an unparseable origin must be rejected at startup"
+        );
+    }
 }
