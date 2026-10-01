@@ -322,17 +322,34 @@ async fn bulk_create_files(
         let pool = state.db_pool.clone();
         let file_url = res.url.clone();
         let res_id = res.id;
+        let res_path = res.file_path.clone();
         task::spawn(async move {
-            if let Ok((file_size, file_checksum)) = utils::download_and_checksum(&file_url).await {
-                let mut conn = pool.get()?;
-                diesel::update(files.find(res_id))
-                    .set((size.eq(file_size as i64), checksum.eq(file_checksum)))
-                    .execute(&mut conn)?;
-                Ok(())
-            } else {
-                Err(ABError::InternalServerError(
-                    "Failed to download file".into(),
-                ))
+            match utils::download_and_checksum(&file_url).await {
+                Ok((file_size, file_checksum)) => match pool.get() {
+                    Ok(mut conn) => {
+                        if let Err(e) = diesel::update(files.find(res_id))
+                            .set((size.eq(file_size as i64), checksum.eq(file_checksum)))
+                            .execute(&mut conn)
+                        {
+                            log::error!(
+                                "[BULK CREATE] Downloaded {} but failed to record its size and checksum: {}. It stays unusable until re-created.",
+                                res_path,
+                                e
+                            );
+                        }
+                    }
+                    Err(e) => log::error!(
+                        "[BULK CREATE] Downloaded {} but could not get a DB connection to record it: {}. It stays unusable until re-created.",
+                        res_path,
+                        e
+                    ),
+                },
+                Err(e) => log::error!(
+                    "[BULK CREATE] Failed to download {} from {}: {}. It stays unusable until re-created.",
+                    res_path,
+                    file_url,
+                    e
+                ),
             }
         });
     }
