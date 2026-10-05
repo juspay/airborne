@@ -5,14 +5,19 @@ const AirborneClient_1 = require("./AirborneClient");
 const CreateApplicationCommand_1 = require("./commands/CreateApplicationCommand");
 const CreateDimensionCommand_1 = require("./commands/CreateDimensionCommand");
 const CreateFileCommand_1 = require("./commands/CreateFileCommand");
+const CreateFileSetCommand_1 = require("./commands/CreateFileSetCommand");
+const CreateFileSetVersionCommand_1 = require("./commands/CreateFileSetVersionCommand");
 const CreateOrganisationCommand_1 = require("./commands/CreateOrganisationCommand");
 const CreatePackageCommand_1 = require("./commands/CreatePackageCommand");
 const CreateReleaseCommand_1 = require("./commands/CreateReleaseCommand");
 const DeleteDimensionCommand_1 = require("./commands/DeleteDimensionCommand");
+const GetFileSetCommand_1 = require("./commands/GetFileSetCommand");
+const GetFileSetVersionCommand_1 = require("./commands/GetFileSetVersionCommand");
 const GetReleaseCommand_1 = require("./commands/GetReleaseCommand");
 const GetUserCommand_1 = require("./commands/GetUserCommand");
 const ListDimensionsCommand_1 = require("./commands/ListDimensionsCommand");
 const ListFileGroupsCommand_1 = require("./commands/ListFileGroupsCommand");
+const ListFileSetsCommand_1 = require("./commands/ListFileSetsCommand");
 const ListFilesCommand_1 = require("./commands/ListFilesCommand");
 const ListOrganisationsCommand_1 = require("./commands/ListOrganisationsCommand");
 const ListPackagesCommand_1 = require("./commands/ListPackagesCommand");
@@ -29,15 +34,20 @@ const commands = {
     CreateApplicationCommand: CreateApplicationCommand_1.CreateApplicationCommand,
     CreateDimensionCommand: CreateDimensionCommand_1.CreateDimensionCommand,
     CreateFileCommand: CreateFileCommand_1.CreateFileCommand,
+    CreateFileSetCommand: CreateFileSetCommand_1.CreateFileSetCommand,
+    CreateFileSetVersionCommand: CreateFileSetVersionCommand_1.CreateFileSetVersionCommand,
     CreateOrganisationCommand: CreateOrganisationCommand_1.CreateOrganisationCommand,
     CreatePackageCommand: CreatePackageCommand_1.CreatePackageCommand,
     CreateReleaseCommand: CreateReleaseCommand_1.CreateReleaseCommand,
     DeleteDimensionCommand: DeleteDimensionCommand_1.DeleteDimensionCommand,
+    GetFileSetCommand: GetFileSetCommand_1.GetFileSetCommand,
+    GetFileSetVersionCommand: GetFileSetVersionCommand_1.GetFileSetVersionCommand,
     GetReleaseCommand: GetReleaseCommand_1.GetReleaseCommand,
     GetUserCommand: GetUserCommand_1.GetUserCommand,
     ListDimensionsCommand: ListDimensionsCommand_1.ListDimensionsCommand,
     ListFileGroupsCommand: ListFileGroupsCommand_1.ListFileGroupsCommand,
     ListFilesCommand: ListFilesCommand_1.ListFilesCommand,
+    ListFileSetsCommand: ListFileSetsCommand_1.ListFileSetsCommand,
     ListOrganisationsCommand: ListOrganisationsCommand_1.ListOrganisationsCommand,
     ListPackagesCommand: ListPackagesCommand_1.ListPackagesCommand,
     ListReleasesCommand: ListReleasesCommand_1.ListReleasesCommand,

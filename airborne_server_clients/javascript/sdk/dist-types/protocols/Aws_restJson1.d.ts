@@ -1,14 +1,19 @@
 import { CreateApplicationCommandInput, CreateApplicationCommandOutput } from "../commands/CreateApplicationCommand";
 import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "../commands/CreateDimensionCommand";
 import { CreateFileCommandInput, CreateFileCommandOutput } from "../commands/CreateFileCommand";
+import { CreateFileSetCommandInput, CreateFileSetCommandOutput } from "../commands/CreateFileSetCommand";
+import { CreateFileSetVersionCommandInput, CreateFileSetVersionCommandOutput } from "../commands/CreateFileSetVersionCommand";
 import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from "../commands/CreateOrganisationCommand";
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "../commands/CreatePackageCommand";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "../commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "../commands/DeleteDimensionCommand";
+import { GetFileSetCommandInput, GetFileSetCommandOutput } from "../commands/GetFileSetCommand";
+import { GetFileSetVersionCommandInput, GetFileSetVersionCommandOutput } from "../commands/GetFileSetVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "../commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "../commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "../commands/ListDimensionsCommand";
 import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "../commands/ListFileGroupsCommand";
+import { ListFileSetsCommandInput, ListFileSetsCommandOutput } from "../commands/ListFileSetsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "../commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "../commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "../commands/ListPackagesCommand";
@@ -35,6 +40,14 @@ export declare const se_CreateDimensionCommand: (input: CreateDimensionCommandIn
  */
 export declare const se_CreateFileCommand: (input: CreateFileCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1CreateFileSetCommand
+ */
+export declare const se_CreateFileSetCommand: (input: CreateFileSetCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1CreateFileSetVersionCommand
+ */
+export declare const se_CreateFileSetVersionCommand: (input: CreateFileSetVersionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1CreateOrganisationCommand
  */
 export declare const se_CreateOrganisationCommand: (input: CreateOrganisationCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -50,6 +63,14 @@ export declare const se_CreateReleaseCommand: (input: CreateReleaseCommandInput,
  * serializeAws_restJson1DeleteDimensionCommand
  */
 export declare const se_DeleteDimensionCommand: (input: DeleteDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetFileSetCommand
+ */
+export declare const se_GetFileSetCommand: (input: GetFileSetCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetFileSetVersionCommand
+ */
+export declare const se_GetFileSetVersionCommand: (input: GetFileSetVersionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1GetReleaseCommand
  */
@@ -70,6 +91,10 @@ export declare const se_ListFileGroupsCommand: (input: ListFileGroupsCommandInpu
  * serializeAws_restJson1ListFilesCommand
  */
 export declare const se_ListFilesCommand: (input: ListFilesCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1ListFileSetsCommand
+ */
+export declare const se_ListFileSetsCommand: (input: ListFileSetsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1ListOrganisationsCommand
  */
@@ -123,6 +148,14 @@ export declare const de_CreateDimensionCommand: (output: __HttpResponse, context
  */
 export declare const de_CreateFileCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateFileCommandOutput>;
 /**
+ * deserializeAws_restJson1CreateFileSetCommand
+ */
+export declare const de_CreateFileSetCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateFileSetCommandOutput>;
+/**
+ * deserializeAws_restJson1CreateFileSetVersionCommand
+ */
+export declare const de_CreateFileSetVersionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateFileSetVersionCommandOutput>;
+/**
  * deserializeAws_restJson1CreateOrganisationCommand
  */
 export declare const de_CreateOrganisationCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateOrganisationCommandOutput>;
@@ -138,6 +171,14 @@ export declare const de_CreateReleaseCommand: (output: __HttpResponse, context: 
  * deserializeAws_restJson1DeleteDimensionCommand
  */
 export declare const de_DeleteDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<DeleteDimensionCommandOutput>;
+/**
+ * deserializeAws_restJson1GetFileSetCommand
+ */
+export declare const de_GetFileSetCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetFileSetCommandOutput>;
+/**
+ * deserializeAws_restJson1GetFileSetVersionCommand
+ */
+export declare const de_GetFileSetVersionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetFileSetVersionCommandOutput>;
 /**
  * deserializeAws_restJson1GetReleaseCommand
  */
@@ -158,6 +199,10 @@ export declare const de_ListFileGroupsCommand: (output: __HttpResponse, context:
  * deserializeAws_restJson1ListFilesCommand
  */
 export declare const de_ListFilesCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListFilesCommandOutput>;
+/**
+ * deserializeAws_restJson1ListFileSetsCommand
+ */
+export declare const de_ListFileSetsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListFileSetsCommandOutput>;
 /**
  * deserializeAws_restJson1ListOrganisationsCommand
  */
