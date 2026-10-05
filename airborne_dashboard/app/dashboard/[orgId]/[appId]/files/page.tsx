@@ -18,6 +18,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Search, ChevronDown, ChevronRight, File, Filter, Plus, Loader2, Pencil } from "lucide-react";
 import { FileCreationModal } from "@/components/file-creation-modal";
+import { FileSetsTable } from "@/components/file-sets-table";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -278,10 +279,17 @@ export default function FilesPage() {
         )}
       </div>
 
-      {/* Filters Card - Same pattern as releases/packages pages */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
+      {/* Files Table - Same pattern as packages/releases pages */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
+            Files ({isLoading ? "..." : groupsData?.total_items || 0})
+          </CardTitle>
+          <CardDescription>All files with version history and tags</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Filters sit inside the card they filter; the File Sets card below has its own search */}
+          <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -307,18 +315,6 @@ export default function FilesPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Files Table - Same pattern as packages/releases pages */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-[family-name:var(--font-space-grotesk)]">
-            Files ({isLoading ? "..." : groupsData?.total_items || 0})
-          </CardTitle>
-          <CardDescription>All files with version history and tags</CardDescription>
-        </CardHeader>
-        <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-3">
@@ -377,8 +373,13 @@ export default function FilesPage() {
                         <TableCell>
                           <div className="flex items-center gap-1 flex-wrap">
                             {group.tags.slice(0, 2).map((t) => (
-                              <Badge key={t.tag} variant="outline" className="text-[10px]">
-                                {t.tag}
+                              <Badge
+                                key={t.tag}
+                                variant="outline"
+                                className="text-[10px] max-w-56 overflow-hidden"
+                                title={t.tag}
+                              >
+                                <span className="truncate">{t.tag}</span>
                               </Badge>
                             ))}
                             {group.tags.length > 2 && (
@@ -413,8 +414,12 @@ export default function FilesPage() {
                                         <TableCell className="pl-10 font-medium">{version.version}</TableCell>
                                         <TableCell>
                                           {versionTag ? (
-                                            <Badge variant="secondary" className="text-[10px]">
-                                              {versionTag}
+                                            <Badge
+                                              variant="secondary"
+                                              className="text-[10px] max-w-56 overflow-hidden"
+                                              title={versionTag}
+                                            >
+                                              <span className="truncate">{versionTag}</span>
                                             </Badge>
                                           ) : (
                                             <span className="text-muted-foreground">—</span>
@@ -495,6 +500,9 @@ export default function FilesPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* File Sets — a peer of files: named collections you can select together */}
+      <FileSetsTable />
 
       <FileCreationModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} onCreated={() => mutate()} />
 
