@@ -57,3 +57,50 @@ export type ListTagsQuery = {
   count?: number;
   search?: string;
 };
+
+// File sets — a file set is a peer of a file: a named, reusable
+// collection of files. Membership references rows in the files table, so a file
+// does not belong to a set and may appear in any number of sets, or none.
+/** A file of a set version, parsed from its key (`path@version:N`). */
+export type FileSetMember = {
+  file_path: string;
+  version: number;
+};
+
+export type FileSetVersion = {
+  version: number;
+  metadata: Record<string, unknown>;
+  /** File keys (`path@version:N`), ordered by path then version */
+  files: string[];
+  created_at: string;
+};
+
+/** List summary: fetch a version for its files. */
+export type FileSet = {
+  /** Unique within the application — the set's identity */
+  name: string;
+  total_versions: number;
+  latest_version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** A set picked in the file chooser: pinned to a version, with that version's files. */
+export type SelectedFileSet = {
+  name: string;
+  version: number;
+  files: FileSetMember[];
+};
+
+export type FileSetDetail = {
+  name: string;
+  versions: FileSetVersion[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type FileSetsResponse = {
+  data: FileSet[];
+  total_items: number;
+  total_pages: number;
+};

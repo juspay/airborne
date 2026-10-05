@@ -519,6 +519,11 @@ async fn main() -> std::io::Result<()> {
                     .service(token::add_scopes("token"))
                     .service(web::scope("/file").wrap(Auth).service(file::add_routes()))
                     .service(
+                        web::scope("/file-sets")
+                            .wrap(Auth)
+                            .service(file::file_sets::add_routes()),
+                    )
+                    .service(
                         web::scope("/packages")
                             .wrap(Auth)
                             .service(package::add_routes()),
