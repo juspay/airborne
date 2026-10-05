@@ -2,15 +2,17 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import useSWR from "swr";
+import useSWRInfinite from "swr/infinite";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ChevronDown, ChevronRight, File, X, Tag, Loader2 } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, File, X, Tag, Loader2, FolderPlus } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { cn } from "@/lib/utils";
+import { cn, fileKeysToMembers } from "@/lib/utils";
+import { toastError } from "@/hooks/use-toast";
 
 import type {
   FileGroup,
@@ -19,6 +21,11 @@ import type {
   TagInfo,
   TagsResponse,
   SelectedFile,
+  FileSet,
+  FileSetsResponse,
+  FileSetMember,
+  FileSetVersion,
+  SelectedFileSet,
 } from "@/types/files";
 
 // Re-export for backward compatibility
@@ -32,9 +39,19 @@ export interface FileChooserProps {
   className?: string;
   disabled?: boolean;
   excludeFiles?: string[]; // File paths to exclude from selection
+  /** Show the File Sets quick-select panel (multi mode). Off inside the set editor itself. */
+  showFileSets?: boolean;
+  /**
+   * Set-reference mode: when provided, checking a set selects the set
+   * itself (pinned to its latest version) instead of copying its files into
+   * `selected`. Used by package creation so packages remember their sets.
+   */
+  selectedSets?: SelectedFileSet[];
+  onSetsChange?: (sets: SelectedFileSet[]) => void;
 }
 
 const GROUPS_PER_PAGE = 15;
+const FILE_SETS_PER_PAGE = 20;
 const TAGS_PER_PAGE = 20;
 
 export function FileChooser({
@@ -45,6 +62,9 @@ export function FileChooser({
   className,
   disabled = false,
   excludeFiles = [],
+  showFileSets = true,
+  selectedSets,
+  onSetsChange,
 }: FileChooserProps) {
   const { token, org, app } = useAppContext();
 
@@ -76,6 +96,191 @@ export function FileChooser({
   // Stable references
   const excludeFilesSet = useMemo(() => new Set(excludeFiles), [excludeFiles]);
   const tagsFilterKey = useMemo(() => selectedTagFilters.join(","), [selectedTagFilters]);
+
+  // File sets (multi mode): one click adds all of a set's files. Searched on
+  // the server with the same search box as files, and paged with "Load more".
+  // The key prefix differs from the File Sets table's so their pages (of a
+  // different size) never share a cache entry.
+  const setsEnabled = Boolean(token && org && app && mode === "multi" && showFileSets);
+  const setsSearch = debouncedSearch.trim();
+  const {
+    data: setPages,
+    size: setPagesLoaded,
+    setSize: setSetPagesLoaded,
+  } = useSWRInfinite(
+    (index: number, previous: FileSetsResponse | null) => {
+      if (!setsEnabled) return null;
+      if (previous && index + 1 > previous.total_pages) return null;
+      return ["/file-sets/chooser", org, app, setsSearch, index + 1];
+    },
+    ([, , , search, page]: [string, string, string, string, number]) =>
+      apiFetch<FileSetsResponse>(
+        "/file-sets",
+        { method: "GET", query: { page, count: FILE_SETS_PER_PAGE, search: search || undefined } },
+        { token, org, app }
+      ),
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+  const namedGroups = useMemo(() => (setPages || []).flatMap((p) => p.data), [setPages]);
+  const setsTotalPages = setPages?.[setPages.length - 1]?.total_pages ?? 1;
+  const hasMoreSets = Boolean(setPages) && setPagesLoaded < setsTotalPages;
+  const isLoadingMoreSets = setPagesLoaded > 0 && setPages?.[setPagesLoaded - 1] === undefined;
+
+  // The list only carries each set's latest version number; its files are
+  // fetched (as keys) the first time the set is ticked, then cached.
+  const [setMembers, setSetMembers] = useState<Record<string, FileSetMember[]>>({});
+  const [loadingSet, setLoadingSet] = useState<string | null>(null);
+  const memberKey = (group: FileSet) => `${group.name}@${group.latest_version}`;
+  const membersOf = useCallback(
+    (group: FileSet): FileSetMember[] | undefined => setMembers[memberKey(group)],
+    [setMembers]
+  );
+  const fetchMembers = useCallback(
+    async (group: FileSet): Promise<FileSetMember[]> => {
+      const cached = setMembers[memberKey(group)];
+      if (cached) return cached;
+      setLoadingSet(group.name);
+      try {
+        const version = await apiFetch<FileSetVersion>(
+          `/file-sets/${encodeURIComponent(group.name)}/versions/${group.latest_version}`,
+          { method: "GET" },
+          { token, org, app }
+        );
+        const members = fileKeysToMembers(version.files);
+        setSetMembers((prev) => ({ ...prev, [memberKey(group)]: members }));
+        return members;
+      } finally {
+        setLoadingSet(null);
+      }
+    },
+    [setMembers, token, org, app]
+  );
+
+  /** Files of a set that are actually selectable here (not excluded, e.g. the package index). */
+  const selectableOf = useCallback(
+    (members: FileSetMember[]) => members.filter((f) => !excludeFilesSet.has(f.file_path)),
+    [excludeFilesSet]
+  );
+
+  const refMode = Boolean(onSetsChange);
+  const groupRefs = useMemo(() => selectedSets || [], [selectedSets]);
+
+  /** Paths covered by the selected set references: path -> the version and set it comes from. */
+  const coveredByGroup = useMemo(() => {
+    const map = new Map<string, { version: number; set: string }>();
+    for (const g of groupRefs) {
+      for (const f of g.files) {
+        if (!map.has(f.file_path)) map.set(f.file_path, { version: f.version, set: g.name });
+      }
+    }
+    return map;
+  }, [groupRefs]);
+
+  /** A group counts as selected when every selectable file of it is in the selection. */
+  const isGroupSelected = useCallback(
+    (group: FileSet) => {
+      if (refMode) return groupRefs.some((g) => g.name === group.name);
+      const members = membersOf(group);
+      if (!members) return false;
+      const candidates = selectableOf(members);
+      if (candidates.length === 0) return false;
+      return candidates.every((f) => selected.some((s) => s.file_path === f.file_path && s.version === f.version));
+    },
+    [selected, selectableOf, membersOf, refMode, groupRefs]
+  );
+
+  /** Partially selected: some but not all selectable files are chosen. */
+  const isGroupPartiallySelected = useCallback(
+    (group: FileSet) => {
+      const members = membersOf(group);
+      if (!members) return false;
+      const candidates = selectableOf(members);
+      if (candidates.length === 0) return false;
+      const chosen = candidates.filter((f) =>
+        selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+      ).length;
+      return chosen > 0 && chosen < candidates.length;
+    },
+    [selected, selectableOf, membersOf]
+  );
+
+  const toggleGroup = useCallback(
+    async (group: FileSet) => {
+      if (refMode && onSetsChange) {
+        if (groupRefs.some((g) => g.name === group.name)) {
+          onSetsChange(groupRefs.filter((g) => g.name !== group.name));
+          return;
+        }
+
+        const members = await fetchMembers(group);
+        // Same rules as the server: the index file can't also come from a
+        // set, and a package holds one version per path. The identical file
+        // version from two sources is fine — it is included once.
+        const indexFile = members.find((f) => excludeFilesSet.has(f.file_path));
+        if (indexFile) {
+          toastError(
+            `Cannot add file set "${group.name}"`,
+            `It contains ${indexFile.file_path}, which is this package's index file. Pick a different index file or set.`
+          );
+          return;
+        }
+        for (const f of members) {
+          const fromSet = coveredByGroup.get(f.file_path);
+          const individual = selected.find((s) => s.file_path === f.file_path);
+          const other = fromSet
+            ? { version: fromSet.version, source: `file set "${fromSet.set}"` }
+            : individual
+              ? { version: individual.version, source: "your individually selected files" }
+              : undefined;
+          if (other && other.version !== f.version) {
+            toastError(
+              `Cannot add file set "${group.name}"`,
+              `It includes ${f.file_path}@v${f.version}, but ${other.source} already include${other.source.startsWith("file set") ? "s" : ""} v${other.version}. A package can contain only one version of a file.`
+            );
+            return;
+          }
+        }
+
+        onSetsChange([...groupRefs, { name: group.name, version: group.latest_version, files: members }]);
+        return;
+      }
+
+      const members = await fetchMembers(group);
+      const candidates = selectableOf(members);
+      if (candidates.length === 0) {
+        toastError(`Cannot add file set "${group.name}"`, "All of its files are already in the package.");
+        return;
+      }
+
+      const isSelected = candidates.every((f) =>
+        selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+      );
+      if (isSelected) {
+        // Deselect: drop exactly this group's selectable file versions
+        const groupKeys = new Set(candidates.map((f) => `${f.file_path}@${f.version}`));
+        onChange(selected.filter((s) => !groupKeys.has(`${s.file_path}@${s.version}`)));
+        return;
+      }
+
+      // Rule: the exact same file (path AND version) cannot enter the
+      // selection twice — e.g. from two overlapping file sets. The same
+      // path at a different version is allowed.
+      const duplicates = candidates.filter((f) =>
+        selected.some((s) => s.file_path === f.file_path && s.version === f.version)
+      );
+      if (duplicates.length > 0) {
+        const sample = `${duplicates[0].file_path}@v${duplicates[0].version}`;
+        toastError(
+          `Cannot add file set "${group.name}"`,
+          `${duplicates.length} of its file${duplicates.length === 1 ? " is" : "s are"} already selected (e.g. ${sample}). The same file version cannot be included twice.`
+        );
+        return;
+      }
+
+      onChange([...selected, ...candidates.map((f) => ({ file_path: f.file_path, version: f.version, url: "" }))]);
+    },
+    [selected, onChange, selectableOf, fetchMembers, refMode, onSetsChange, groupRefs, coveredByGroup, excludeFilesSet]
+  );
 
   const computeHasMorePages = useCallback((result: FileGroupsResponse, page: number) => {
     if (typeof result.total_items === "number" && result.total_items >= 0) {
@@ -316,6 +521,16 @@ export function FileChooser({
       if (mode === "single") {
         onChange([selectedFile]);
       } else {
+        const coveredBy = refMode ? coveredByGroup.get(group.file_path) : undefined;
+        if (coveredBy) {
+          toastError(
+            "Already included via a file set",
+            coveredBy.version === version.version
+              ? `${group.file_path}@v${version.version} is part of the selected set "${coveredBy.set}".`
+              : `The selected set "${coveredBy.set}" includes ${group.file_path}@v${coveredBy.version}. A package can contain only one version of a file.`
+          );
+          return;
+        }
         const isSelected = isVersionSelected(group.file_path, version.version);
         if (isSelected) {
           onChange(selected.filter((s) => !(s.file_path === group.file_path && s.version === version.version)));
@@ -325,7 +540,7 @@ export function FileChooser({
         }
       }
     },
-    [mode, selected, onChange, isVersionSelected, getVersionTag]
+    [mode, selected, onChange, isVersionSelected, getVersionTag, refMode, coveredByGroup]
   );
 
   const handleTagFilterToggle = useCallback((tag: string) => {
@@ -364,7 +579,7 @@ export function FileChooser({
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
         <Input
-          placeholder="Search files..."
+          placeholder={mode === "multi" && showFileSets ? "Search files and sets..." : "Search files..."}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9 h-9 text-sm"
@@ -459,6 +674,85 @@ export function FileChooser({
         )}
       </div>
 
+      {/* File Sets — selectable alongside individual files */}
+      {mode === "multi" && showFileSets && namedGroups.length > 0 && (
+        <div className="border rounded-md bg-background">
+          <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-muted/40">
+            <FolderPlus className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">File Sets</span>
+            <span className="text-xs text-muted-foreground">— select a whole set, or pick individual files below</span>
+          </div>
+          <div className="divide-y divide-border/50 max-h-40 overflow-y-auto">
+            {namedGroups.map((g) => {
+              // Files are known only once the set has been ticked (fetched).
+              const members = membersOf(g);
+              const candidates = members ? selectableOf(members) : undefined;
+              const noneSelectable = Boolean(members && candidates && candidates.length === 0);
+              const checked = isGroupSelected(g);
+              const partial = isGroupPartiallySelected(g);
+              const isLoading = loadingSet === g.name;
+              return (
+                <div
+                  key={g.name}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 transition-colors",
+                    noneSelectable || disabled ? "opacity-50" : "cursor-pointer hover:bg-accent/50",
+                    checked && "bg-green-500/5"
+                  )}
+                  onClick={() => !disabled && !isLoading && toggleGroup(g)}
+                  title={noneSelectable ? "All files of this set are already in the package" : undefined}
+                >
+                  <Checkbox
+                    checked={checked}
+                    className="h-4 w-4"
+                    onClick={(e) => e.stopPropagation()}
+                    onCheckedChange={() => toggleGroup(g)}
+                    disabled={disabled || noneSelectable || isLoading}
+                  />
+                  <FolderPlus className="h-4 w-4 text-muted-foreground/60 flex-shrink-0" />
+                  <span className="flex-1 min-w-0 truncate">
+                    <span className="text-sm font-medium">{g.name}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground">v{g.latest_version}</span>
+                  </span>
+                  {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                  {partial && (
+                    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                      partial
+                    </Badge>
+                  )}
+                  {noneSelectable && (
+                    <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+                      all in package
+                    </Badge>
+                  )}
+                  {members && candidates && (
+                    <span className="text-xs text-muted-foreground">
+                      {candidates.length < members.length
+                        ? `${candidates.length} of ${members.length} selectable`
+                        : `${members.length} file${members.length === 1 ? "" : "s"}`}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            {hasMoreSets && (
+              <div className="px-3 py-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-full text-xs"
+                  disabled={isLoadingMoreSets}
+                  onClick={() => setSetPagesLoaded(setPagesLoaded + 1)}
+                >
+                  {isLoadingMoreSets ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Load more sets"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Select All / Actions Bar */}
       {groups.length > 0 && mode === "multi" && (
         <div className="flex items-center justify-between px-1">
@@ -473,6 +767,7 @@ export function FileChooser({
                     const existing = selected.find((s) => s.file_path === g.file_path);
                     if (existing) return;
                     const v = g.versions[0];
+                    if (v && refMode && coveredByGroup.has(g.file_path)) return;
                     if (v) {
                       newFiles.push({
                         file_path: g.file_path,
@@ -502,8 +797,8 @@ export function FileChooser({
         </div>
       )}
 
-      {/* File Groups List */}
-      <div className="border rounded-md bg-background">
+      {/* File Groups List — scrolls internally so the page/dialog doesn't grow as pages load */}
+      <div className="border rounded-md bg-background max-h-80 overflow-y-auto">
         {initialLoading && accumulatedGroups.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -584,10 +879,15 @@ export function FileChooser({
                       <div className="text-xs text-muted-foreground/70 truncate">{group.file_path}</div>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-1">
+                    <div className="hidden sm:flex items-center gap-1 min-w-0 flex-shrink overflow-hidden">
                       {group.tags.slice(0, 2).map((t) => (
-                        <Badge key={t.tag} variant="outline" className="text-[10px] h-5 px-1.5">
-                          {t.tag}
+                        <Badge
+                          key={t.tag}
+                          variant="outline"
+                          className="text-[10px] h-5 px-1.5 max-w-40 overflow-hidden"
+                          title={t.tag}
+                        >
+                          <span className="truncate">{t.tag}</span>
                         </Badge>
                       ))}
                       {group.tags.length > 2 && (
@@ -631,8 +931,12 @@ export function FileChooser({
                                   v{version.version}
                                 </span>
                                 {versionTag && (
-                                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
-                                    {versionTag}
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-[10px] h-5 px-1.5 max-w-40 overflow-hidden"
+                                    title={versionTag}
+                                  >
+                                    <span className="truncate">{versionTag}</span>
                                   </Badge>
                                 )}
                               </div>

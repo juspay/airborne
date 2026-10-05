@@ -19,6 +19,16 @@ import {
   CreateFileCommandOutput,
 } from "./commands/CreateFileCommand";
 import {
+  CreateFileSetCommand,
+  CreateFileSetCommandInput,
+  CreateFileSetCommandOutput,
+} from "./commands/CreateFileSetCommand";
+import {
+  CreateFileSetVersionCommand,
+  CreateFileSetVersionCommandInput,
+  CreateFileSetVersionCommandOutput,
+} from "./commands/CreateFileSetVersionCommand";
+import {
   CreateOrganisationCommand,
   CreateOrganisationCommandInput,
   CreateOrganisationCommandOutput,
@@ -39,6 +49,16 @@ import {
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
 import {
+  GetFileSetCommand,
+  GetFileSetCommandInput,
+  GetFileSetCommandOutput,
+} from "./commands/GetFileSetCommand";
+import {
+  GetFileSetVersionCommand,
+  GetFileSetVersionCommandInput,
+  GetFileSetVersionCommandOutput,
+} from "./commands/GetFileSetVersionCommand";
+import {
   GetReleaseCommand,
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
@@ -58,6 +78,11 @@ import {
   ListFileGroupsCommandInput,
   ListFileGroupsCommandOutput,
 } from "./commands/ListFileGroupsCommand";
+import {
+  ListFileSetsCommand,
+  ListFileSetsCommandInput,
+  ListFileSetsCommandOutput,
+} from "./commands/ListFileSetsCommand";
 import {
   ListFilesCommand,
   ListFilesCommandInput,
@@ -120,15 +145,20 @@ const commands = {
   CreateApplicationCommand,
   CreateDimensionCommand,
   CreateFileCommand,
+  CreateFileSetCommand,
+  CreateFileSetVersionCommand,
   CreateOrganisationCommand,
   CreatePackageCommand,
   CreateReleaseCommand,
   DeleteDimensionCommand,
+  GetFileSetCommand,
+  GetFileSetVersionCommand,
   GetReleaseCommand,
   GetUserCommand,
   ListDimensionsCommand,
   ListFileGroupsCommand,
   ListFilesCommand,
+  ListFileSetsCommand,
   ListOrganisationsCommand,
   ListPackagesCommand,
   ListReleasesCommand,
@@ -191,6 +221,40 @@ export interface Airborne {
     args: CreateFileCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: CreateFileCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link CreateFileSetCommand}
+   */
+  createFileSet(
+    args: CreateFileSetCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<CreateFileSetCommandOutput>;
+  createFileSet(
+    args: CreateFileSetCommandInput,
+    cb: (err: any, data?: CreateFileSetCommandOutput) => void
+  ): void;
+  createFileSet(
+    args: CreateFileSetCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: CreateFileSetCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link CreateFileSetVersionCommand}
+   */
+  createFileSetVersion(
+    args: CreateFileSetVersionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<CreateFileSetVersionCommandOutput>;
+  createFileSetVersion(
+    args: CreateFileSetVersionCommandInput,
+    cb: (err: any, data?: CreateFileSetVersionCommandOutput) => void
+  ): void;
+  createFileSetVersion(
+    args: CreateFileSetVersionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: CreateFileSetVersionCommandOutput) => void
   ): void;
 
   /**
@@ -259,6 +323,40 @@ export interface Airborne {
     args: DeleteDimensionCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: DeleteDimensionCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link GetFileSetCommand}
+   */
+  getFileSet(
+    args: GetFileSetCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<GetFileSetCommandOutput>;
+  getFileSet(
+    args: GetFileSetCommandInput,
+    cb: (err: any, data?: GetFileSetCommandOutput) => void
+  ): void;
+  getFileSet(
+    args: GetFileSetCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: GetFileSetCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link GetFileSetVersionCommand}
+   */
+  getFileSetVersion(
+    args: GetFileSetVersionCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<GetFileSetVersionCommandOutput>;
+  getFileSetVersion(
+    args: GetFileSetVersionCommandInput,
+    cb: (err: any, data?: GetFileSetVersionCommandOutput) => void
+  ): void;
+  getFileSetVersion(
+    args: GetFileSetVersionCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: GetFileSetVersionCommandOutput) => void
   ): void;
 
   /**
@@ -345,6 +443,23 @@ export interface Airborne {
     args: ListFilesCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: ListFilesCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link ListFileSetsCommand}
+   */
+  listFileSets(
+    args: ListFileSetsCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<ListFileSetsCommandOutput>;
+  listFileSets(
+    args: ListFileSetsCommandInput,
+    cb: (err: any, data?: ListFileSetsCommandOutput) => void
+  ): void;
+  listFileSets(
+    args: ListFileSetsCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: ListFileSetsCommandOutput) => void
   ): void;
 
   /**

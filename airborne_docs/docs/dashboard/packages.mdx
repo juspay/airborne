@@ -13,6 +13,8 @@ A **package** bundles together the [files](/docs/dashboard/files) your app needs
 
 The page summarises your `Total Packages Versions`, `Total Files` across all packages, and `Release Usage` (how many deployments use packages). The table lists each package version with its `Tag`, its `Index` file, the `Version` number, and the count of `Files` it contains. Use **Search packages by index file name…** to filter the list.
 
+**Expand a package row** (click it) to view its contents. The index file is pinned on top, and the files are organised into **collapsible sections — one per file set the package was created from** (each labelled with the set version it snapshotted), with individually added files under *Other files*. Packages created without sets simply show a flat *Files* section. Packages with more than a handful of files get a search box that looks across all sections.
+
 ## Creating a package
 
 Choose **Create Package** (on the Packages page, or via the header's **`+ Create` → Create Package`**). This opens the **Create Package Version** flow, which has two steps.
@@ -28,6 +30,12 @@ Choose **Next Step** to continue. (You cannot proceed until an index file is sel
 ### Step 2 — Select package files
 
 Now choose any additional **package files** to include. The file chooser supports search and tag filtering, lets you select multiple files at once, and lets you pick a specific version per file. The index file you chose in step 1 is automatically excluded from the list.
+
+You can also check whole **file sets**: the package then includes every file of the set's latest version and **remembers the set** (pinned to that set version). The same rules apply in the dashboard and on the server, so they hold for API callers too:
+
+- **One version per file.** A package can contain only one version of each file path — a device keeps one file per path. Two sets (or a set and an individually picked file) that bring the same path at different versions are rejected.
+- **The index file stays separate.** A set (or an individual file) can't also bring the package's index file; pick a different index file or set.
+- **Identical files are included once.** If two sets contain the exact same file version, the package lists it once; each set's section still shows it.
 
 Adding package files is optional — a package can contain just its index file.
 

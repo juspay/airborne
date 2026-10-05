@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { toastWarning } from "@/hooks/use-toast";
 import { notFound } from "next/navigation";
 import { FileChooser, SelectedFile } from "@/components/file-chooser";
+import type { SelectedFileSet } from "@/types/files";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 
@@ -34,6 +35,7 @@ export default function CreatePackagePage() {
 
   // Step 2: Package Files
   const [selectedPackageFiles, setSelectedPackageFiles] = useState<SelectedFile[]>([]);
+  const [selectedFileSets, setSelectedFileSets] = useState<SelectedFileSet[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -94,6 +96,7 @@ export default function CreatePackagePage() {
             tag: tag || undefined,
             properties,
             files: filteredFileIds,
+            file_sets: selectedFileSets.map((g) => ({ name: g.name, version: g.version })),
           },
         },
         { token, org, app }
@@ -216,7 +219,17 @@ export default function CreatePackagePage() {
                   selected={selectedPackageFiles}
                   onChange={handlePackageFilesChange}
                   excludeFiles={selectedIndexFile ? [selectedIndexFile.file_path] : []}
+                  selectedSets={selectedFileSets}
+                  onSetsChange={setSelectedFileSets}
                 />
+                {selectedFileSets.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {selectedFileSets.length} file set{selectedFileSets.length === 1 ? "" : "s"} selected —{" "}
+                    {selectedFileSets.map((g) => `${g.name} (v${g.version})`).join(", ")} — contributing{" "}
+                    {selectedFileSets.reduce((n, g) => n + g.files.length, 0)} files. The package will remember these
+                    sets.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

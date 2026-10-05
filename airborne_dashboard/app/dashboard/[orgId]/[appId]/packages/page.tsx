@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, PlugIcon as PkgIcon, Rocket, Plus, Package } from "lucide-react";
+import { Search, PlugIcon as PkgIcon, Rocket, Plus, Package, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
@@ -25,11 +25,19 @@ import { useParams } from "next/navigation";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 
+type PackageFileSetSnapshot = {
+  name: string;
+  version: number;
+  files: string[];
+};
+
 type ApiPackage = {
   index: string;
   tag?: string;
   version: number;
   files: string[];
+  /** File sets the package was built from, snapshotted at creation. Empty for older packages. */
+  file_sets?: PackageFileSetSnapshot[];
 };
 
 const PAGE_AUTHZ = definePagePermissions({
@@ -37,8 +45,20 @@ const PAGE_AUTHZ = definePagePermissions({
   create_package: permission("package", "create", "app"),
 });
 
+function parseFileKey(key: string): { path: string; ref: string } {
+  const at = key.lastIndexOf("@");
+  if (at < 0) return { path: key, ref: "" };
+  const suffix = key.slice(at + 1);
+  if (suffix.startsWith("version:")) return { path: key.slice(0, at), ref: `v${suffix.slice("version:".length)}` };
+  if (suffix.startsWith("tag:")) return { path: key.slice(0, at), ref: suffix.slice("tag:".length) };
+  return { path: key, ref: "" };
+}
+
 export default function PackagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedPkg, setExpandedPkg] = useState<number | null>(null);
+  const [pkgFileSearch, setPkgFileSearch] = useState("");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const count = 10;
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
@@ -275,6 +295,7 @@ export default function PackagesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead>Tag</TableHead>
                   <TableHead>Index</TableHead>
                   <TableHead>Version</TableHead>
@@ -283,13 +304,30 @@ export default function PackagesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {packages.map((pkg, i) => (
-                  <TableRow key={`${pkg.tag}-${pkg.version}-${i}`}>
-                    <TableCell>{pkg.tag && <Badge variant="outline">{pkg.tag}</Badge>}</TableCell>
-                    <TableCell className="font-mono text-sm">{pkg.index}</TableCell>
-                    <TableCell className="text-muted-foreground">{pkg.version}</TableCell>
-                    <TableCell className="text-muted-foreground">{pkg.files.length} files</TableCell>
-                    {/* <TableCell>
+                {packages.map((pkg, i) => {
+                  const isExpanded = expandedPkg === pkg.version;
+                  return [
+                    <TableRow
+                      key={`${pkg.tag}-${pkg.version}-${i}`}
+                      className="cursor-pointer hover:bg-muted"
+                      onClick={() => {
+                        setExpandedPkg(isExpanded ? null : pkg.version);
+                        setPkgFileSearch("");
+                        setOpenSections(new Set());
+                      }}
+                    >
+                      <TableCell>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </TableCell>
+                      <TableCell>{pkg.tag && <Badge variant="outline">{pkg.tag}</Badge>}</TableCell>
+                      <TableCell className="font-mono text-sm">{pkg.index}</TableCell>
+                      <TableCell className="text-muted-foreground">{pkg.version}</TableCell>
+                      <TableCell className="text-muted-foreground">{pkg.files.length} files</TableCell>
+                      {/* <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -312,8 +350,133 @@ export default function PackagesPage() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell> */}
-                  </TableRow>
-                ))}
+                    </TableRow>,
+                    isExpanded && (
+                      <TableRow key={`${pkg.version}-files`} className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={5} className="p-0">
+                          <div className="py-3 px-10 space-y-3">
+                            {pkg.files.length > 5 && (
+                              <div className="relative max-w-sm">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70" />
+                                <Input
+                                  placeholder="Search files in this package..."
+                                  value={pkgFileSearch}
+                                  onChange={(e) => setPkgFileSearch(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="pl-8 h-8 text-sm"
+                                />
+                              </div>
+                            )}
+                            {(() => {
+                              const q = pkgFileSearch.trim().toLowerCase();
+                              const matches = (key: string) => !q || key.toLowerCase().includes(q);
+
+                              // Sections come from the package's own stored snapshot: the
+                              // file sets it was created from. Files added individually
+                              // (and all files of packages created without sets) fall under "Files".
+                              const storedGroups = pkg.file_sets || [];
+                              const groupedKeys = new Set(storedGroups.flatMap((g) => g.files));
+                              const ungrouped = pkg.files.filter((f) => !groupedKeys.has(f));
+                              const orderedSections: [string, string[]][] = storedGroups
+                                .map((g): [string, string[]] => [`${g.name} (v${g.version})`, g.files])
+                                .sort((a, b) => a[0].localeCompare(b[0]));
+                              if (ungrouped.length > 0)
+                                orderedSections.push([storedGroups.length > 0 ? "Other files" : "Files", ungrouped]);
+
+                              const indexKey = parseFileKey(pkg.index);
+
+                              const renderFileRow = (f: string) => {
+                                const parsed = parseFileKey(f);
+                                return (
+                                  <div
+                                    key={f}
+                                    className="flex items-center gap-2 pl-9 pr-3 py-1.5 border-t border-border/40"
+                                  >
+                                    <span className="font-mono text-xs truncate flex-1 min-w-0" title={f}>
+                                      {parsed.path}
+                                    </span>
+                                    {parsed.ref && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] max-w-36 overflow-hidden flex-shrink-0"
+                                        title={parsed.ref}
+                                      >
+                                        <span className="truncate">{parsed.ref}</span>
+                                      </Badge>
+                                    )}
+                                  </div>
+                                );
+                              };
+
+                              return (
+                                <div className="border rounded-md bg-background overflow-hidden">
+                                  {/* Index file pinned on top */}
+                                  <div className="flex items-center gap-2 px-3 py-2 bg-primary/5">
+                                    <Badge className="text-[10px] flex-shrink-0">index</Badge>
+                                    <span className="font-mono text-xs truncate flex-1 min-w-0" title={pkg.index}>
+                                      {indexKey.path}
+                                    </span>
+                                    {indexKey.ref && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] max-w-36 overflow-hidden flex-shrink-0"
+                                        title={indexKey.ref}
+                                      >
+                                        <span className="truncate">{indexKey.ref}</span>
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {orderedSections.map(([name, sectionFiles]) => {
+                                    const visible = sectionFiles.filter(matches);
+                                    if (q && visible.length === 0) return null;
+                                    const isOpen = q ? true : openSections.has(name);
+                                    return (
+                                      <div key={name} className="border-t border-border/60">
+                                        <button
+                                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-accent/40 transition-colors text-left"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenSections((prev) => {
+                                              const next = new Set(prev);
+                                              if (next.has(name)) next.delete(name);
+                                              else next.add(name);
+                                              return next;
+                                            });
+                                          }}
+                                        >
+                                          {isOpen ? (
+                                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                          ) : (
+                                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                          )}
+                                          <span className="text-sm font-medium">{name}</span>
+                                          <span className="text-xs text-muted-foreground ml-auto">
+                                            {visible.length} file{visible.length === 1 ? "" : "s"}
+                                          </span>
+                                        </button>
+                                        {isOpen && visible.map(renderFileRow)}
+                                      </div>
+                                    );
+                                  })}
+
+                                  {q &&
+                                    orderedSections.every(
+                                      ([, sectionFiles]) => sectionFiles.filter(matches).length === 0
+                                    ) && (
+                                      <p className="text-xs text-muted-foreground px-3 py-3 border-t border-border/60">
+                                        No files match your search.
+                                      </p>
+                                    )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  ];
+                })}
               </TableBody>
             </Table>
           )}
