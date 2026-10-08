@@ -10,6 +10,9 @@ use crate::{
     utils::metrics::{CACHE_FAILS, CACHE_HITS, CACHE_KEY_LEVELS, CACHE_MISSES, INSTANCE_ID},
 };
 
+/// Maximum number of keys sent in a single MGET by [`RedisCache::mget`].
+const MGET_CHUNK_SIZE: usize = 500;
+
 #[derive(Debug)]
 pub struct RedisKey {
     key: String,
@@ -85,8 +88,24 @@ impl RedisCache {
     /// can still appear in the key string that is logged, so callers should
     /// pass a non-secret token (e.g. a hash) rather than the raw secret.
     pub fn key_unlabeled(&self, organisation: &str, application: &str, parts: &[&str]) -> RedisKey {
+        self.key_with_labeled_levels(organisation, application, parts, 0)
+    }
+
+    /// Like [`key`](Self::key), but only the first `labeled_levels` of `parts`
+    /// are recorded as metric labels; deeper levels are reported as `"none"`.
+    ///
+    /// Use this when the leading parts are a low-cardinality namespace (e.g.
+    /// `"file_entry"`) but a later part is high-cardinality (e.g. a file key),
+    /// so metrics stay grouped by namespace without one series per value.
+    pub fn key_with_labeled_levels(
+        &self,
+        organisation: &str,
+        application: &str,
+        parts: &[&str],
+        labeled_levels: usize,
+    ) -> RedisKey {
         let mut redis_key = self.key(organisation, application, parts);
-        for level in redis_key.labels.iter_mut().skip(4) {
+        for level in redis_key.labels.iter_mut().skip(4 + labeled_levels) {
             *level = "none".to_string();
         }
         redis_key
@@ -121,6 +140,40 @@ impl RedisCache {
                 Ok(Some(val))
             }
         }
+    }
+
+    /// GET many keys in one round trip and JSON-deserialize each into T.
+    ///
+    /// Returns one entry per key, in the same order as `keys`. `None` means a
+    /// miss, or a cached value that failed to decode (treated as a miss). Keys
+    /// are sent as MGETs of at most [`MGET_CHUNK_SIZE`] keys, all in a single
+    /// pipeline, so no one command holds the Redis event loop for long.
+    pub async fn mget<T: DeserializeOwned>(
+        &self,
+        keys: &[RedisKey],
+    ) -> Result<Vec<Option<T>>, ABError> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut r = (*self.conn).clone();
+        let mut pipe = redis::pipe();
+        for chunk in keys.chunks(MGET_CHUNK_SIZE) {
+            pipe.cmd("MGET");
+            for redis_key in chunk {
+                pipe.arg(&redis_key.key);
+            }
+        }
+
+        let replies: Vec<Vec<Option<Vec<u8>>>> = pipe.query_async(&mut r).await.map_err(|e| {
+            error!("Failed to MGET {} keys: {e}", keys.len());
+            for redis_key in keys {
+                CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+            }
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        decode_mget_replies(keys, replies)
     }
 
     /// Atomically GET and DELETE (Redis `GETDEL`), JSON-deserializing into T.
@@ -185,6 +238,49 @@ impl RedisCache {
         Ok(())
     }
 
+    /// SET with TTL (seconds) for many keys in one round trip (pipelined),
+    /// JSON-serializing each value. A value that fails to encode is skipped
+    /// and the rest are still written.
+    pub async fn set_ex_many<T: Serialize>(
+        &self,
+        entries: &[(RedisKey, &T)],
+        ttl_secs: usize,
+    ) -> Result<(), ABError> {
+        let mut pipe = redis::pipe();
+        let mut queued: Vec<&RedisKey> = Vec::with_capacity(entries.len());
+        for (redis_key, value) in entries {
+            match serde_json::to_vec(value) {
+                Ok(payload) => {
+                    pipe.cmd("SET")
+                        .arg(&redis_key.key)
+                        .arg(payload)
+                        .arg("EX")
+                        .arg(ttl_secs)
+                        .ignore();
+                    queued.push(redis_key);
+                }
+                Err(e) => {
+                    error!("Failed to encode cache {}: {e}", redis_key.key);
+                    CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+                }
+            }
+        }
+
+        if queued.is_empty() {
+            return Ok(());
+        }
+
+        let mut r = (*self.conn).clone();
+        let _: () = pipe.query_async(&mut r).await.map_err(|e| {
+            error!("Failed to SET {} keys: {e}", queued.len());
+            for redis_key in &queued {
+                CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+            }
+            ABError::InternalServerError("service error".to_string())
+        })?;
+        Ok(())
+    }
+
     #[allow(unused)]
     pub async fn del(&self, redis_key: &RedisKey) -> Result<(), ABError> {
         let mut r = (*self.conn).clone();
@@ -222,5 +318,101 @@ impl RedisCache {
         let _ = self.set_ex(key, &val, ttl_secs).await;
 
         Ok(val)
+    }
+}
+
+/// Flatten the per-chunk MGET replies into one value per key, in key order,
+/// decoding each and recording hit/miss/fail metrics. A nil or undecodable
+/// value becomes `None`. A reply whose length doesn't match `keys` is an
+/// error, since pairing it with the keys would mislabel values.
+fn decode_mget_replies<T: DeserializeOwned>(
+    keys: &[RedisKey],
+    replies: Vec<Vec<Option<Vec<u8>>>>,
+) -> Result<Vec<Option<T>>, ABError> {
+    let values: Vec<Option<Vec<u8>>> = replies.into_iter().flatten().collect();
+    if values.len() != keys.len() {
+        error!(
+            "MGET returned {} values for {} keys",
+            values.len(),
+            keys.len()
+        );
+        for redis_key in keys {
+            CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+        }
+        return Err(ABError::InternalServerError("service error".to_string()));
+    }
+
+    Ok(keys
+        .iter()
+        .zip(values)
+        .map(|(redis_key, bytes)| match bytes {
+            None => {
+                CACHE_MISSES.with_label_values(&redis_key.labels).inc();
+                None
+            }
+            Some(b) => match serde_json::from_slice::<T>(&b) {
+                Ok(val) => {
+                    CACHE_HITS.with_label_values(&redis_key.labels).inc();
+                    Some(val)
+                }
+                Err(e) => {
+                    error!("Failed to decode cache {}: {e}", redis_key.key);
+                    CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+                    None
+                }
+            },
+        })
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_key(name: &str) -> RedisKey {
+        RedisKey {
+            key: name.to_string(),
+            labels: vec!["test".to_string(); 4 + CACHE_KEY_LEVELS],
+        }
+    }
+
+    fn json(value: &str) -> Option<Vec<u8>> {
+        Some(serde_json::to_vec(value).unwrap())
+    }
+
+    #[test]
+    fn test_decode_mget_replies_preserves_key_order_across_chunks() {
+        let keys = vec![test_key("a"), test_key("b"), test_key("c"), test_key("d")];
+        let replies = vec![vec![json("A"), None], vec![json("C"), json("D")]];
+
+        let values = decode_mget_replies::<String>(&keys, replies).unwrap();
+
+        assert_eq!(
+            values,
+            vec![
+                Some("A".to_string()),
+                None,
+                Some("C".to_string()),
+                Some("D".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn test_decode_mget_replies_treats_undecodable_value_as_miss() {
+        let keys = vec![test_key("a"), test_key("b")];
+        let replies = vec![vec![Some(b"not json".to_vec()), json("B")]];
+
+        let values = decode_mget_replies::<String>(&keys, replies).unwrap();
+
+        assert_eq!(values, vec![None, Some("B".to_string())]);
+    }
+
+    #[test]
+    fn test_decode_mget_replies_rejects_length_mismatch() {
+        let keys = vec![test_key("a"), test_key("b")];
+        let replies = vec![vec![json("A")]];
+
+        assert!(decode_mget_replies::<String>(&keys, replies).is_err());
     }
 }

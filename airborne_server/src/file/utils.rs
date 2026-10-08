@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256 as checksum_algorithm};
 
 use crate::types as airborne_types;
 use crate::types::ABError;
+use crate::utils::redis::{RedisCache, RedisKey};
 
 pub async fn download_and_checksum(file_url: &str) -> airborne_types::Result<(u64, String)> {
     let bytes = download_and_calculate_filesize(file_url, &None).await?;
@@ -66,6 +67,18 @@ pub fn create_s3_file_path(
         "assets/{}/{}/{}/{}/{}",
         org_id, app_id, file_id, version, file_name
     )
+}
+
+/// Redis key for a cached `FileEntry`, where `file_key` is `path@version:N` or
+/// `path@tag:T`. Only the `"file_entry"` namespace is a metric label; the file
+/// key itself is not, so cache metrics don't grow a series per file version.
+pub fn file_entry_cache_key(
+    cache: &RedisCache,
+    organisation: &str,
+    application: &str,
+    file_key: &str,
+) -> RedisKey {
+    cache.key_with_labeled_levels(organisation, application, &["file_entry", file_key], 1)
 }
 
 pub fn parse_file_key(spec: &str) -> (String, Option<i32>, Option<String>) {

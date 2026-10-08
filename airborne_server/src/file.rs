@@ -208,13 +208,11 @@ async fn create_file(
     // remove this tag file_entry from redis cache if exists
     if let Some(file_tag) = request.tag.clone() {
         if let Some(ref cache) = state.redis_cache {
-            let cache_key = cache.key(
+            let cache_key = utils::file_entry_cache_key(
+                cache,
                 &organisation,
                 &application,
-                &[
-                    "file_entry",
-                    &format!("{}@tag:{}", &request.file_path, &file_tag),
-                ],
+                &format!("{}@tag:{}", &request.file_path, &file_tag),
             );
             let _ = cache.del(&cache_key).await;
         }
@@ -702,23 +700,19 @@ async fn update_file(
 
     // remove both tags for file_entry (old and new) from redis cache if exists
     if let Some(ref cache) = state.redis_cache {
-        let cache_key = cache.key(
+        let cache_key = utils::file_entry_cache_key(
+            cache,
             &organisation,
             &application,
-            &[
-                "file_entry",
-                &format!("{}@tag:{}", &input_file_path, &request.tag),
-            ],
+            &format!("{}@tag:{}", &input_file_path, &request.tag),
         );
         let _ = cache.del(&cache_key).await;
         if let Some(old_tag) = opt_old_tag {
-            let old_cache_key = cache.key(
+            let old_cache_key = utils::file_entry_cache_key(
+                cache,
                 &organisation,
                 &application,
-                &[
-                    "file_entry",
-                    &format!("{}@tag:{}", &input_file_path, &old_tag),
-                ],
+                &format!("{}@tag:{}", &input_file_path, &old_tag),
             );
             let _ = cache.del(&old_cache_key).await;
         }

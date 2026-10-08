@@ -34,14 +34,14 @@ use superposition_sdk::{
 use url::form_urlencoded;
 
 use crate::{
-    file::utils::parse_file_key,
+    file::utils::{file_entry_cache_key, parse_file_key},
     package::utils::parse_package_key,
     release::types::*,
     run_blocking, types as airborne_types,
     types::{ABError, AppState},
     utils::db::{models::FileEntry, DbPool},
     utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
-    utils::redis::RedisCache,
+    utils::redis::{RedisCache, RedisKey},
 };
 
 pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<Vec<String>> {
@@ -182,28 +182,32 @@ pub async fn get_files_by_file_keys_async(
     let mut cached_files: Vec<FileEntry> = Vec::new();
     let mut missing_file_keys: Vec<String> = Vec::new();
 
-    // Check Redis cache for each file
+    // Check Redis cache for all files in one round trip
     match redis_cache {
         Some(cache) => {
-            for file_key in &file_paths {
-                let cache_key = cache.key(&organisation, &application, &["file_entry", file_key]);
+            let cache_keys: Vec<RedisKey> = file_paths
+                .iter()
+                .map(|file_key| file_entry_cache_key(cache, &organisation, &application, file_key))
+                .collect();
 
-                match cache.get::<FileEntry>(&cache_key).await {
-                    Ok(Some(file_entry)) => {
-                        debug!("Cache hit for file: {}", file_key);
-                        cached_files.push(file_entry);
+            match cache.mget::<FileEntry>(&cache_keys).await {
+                Ok(entries) => {
+                    // `mget` returns one entry per key, in key order
+                    for (file_key, entry) in file_paths.iter().zip(entries) {
+                        match entry {
+                            Some(file_entry) => cached_files.push(file_entry),
+                            None => missing_file_keys.push(file_key.clone()),
+                        }
                     }
-                    Ok(None) => {
-                        debug!("Cache miss for file: {}", file_key);
-                        missing_file_keys.push(file_key.clone());
-                    }
-                    Err(e) => {
-                        debug!(
-                            "Cache error for file {}: {:?}, falling back to DB",
-                            file_key, e
-                        );
-                        missing_file_keys.push(file_key.clone());
-                    }
+                    debug!(
+                        "File cache hits: {}, misses: {}",
+                        cached_files.len(),
+                        missing_file_keys.len()
+                    );
+                }
+                Err(e) => {
+                    debug!("Cache error for files: {:?}, falling back to DB", e);
+                    missing_file_keys = file_paths.clone();
                 }
             }
         }
@@ -270,42 +274,30 @@ pub async fn get_files_by_file_keys_async(
 
         // Cache the fetched files in Redis
         if let Some(cache) = redis_cache {
-            debug!("Caching {} files in Redis", db_result.len());
+            // Cache for 3 days
+            const FILE_CACHE_TTL: usize = 259200;
 
+            // Cache each file under its version key, and its tag key if tagged
+            let mut entries: Vec<(RedisKey, &FileEntry)> = Vec::with_capacity(db_result.len() * 2);
             for file_entry in &db_result {
                 let file_key = format!("{}@version:{}", file_entry.file_path, file_entry.version);
+                entries.push((
+                    file_entry_cache_key(cache, &organisation, &application, &file_key),
+                    file_entry,
+                ));
 
-                let file_key_tag = file_entry
-                    .tag
-                    .as_ref()
-                    .map(|tag| format!("{}@tag:{}", file_entry.file_path, tag));
-
-                let cache_key = cache.key(&organisation, &application, &["file_entry", &file_key]);
-                debug!("Caching file {}: {:?}", file_key, file_entry);
-
-                // Cache for 3 days
-                const FILE_CACHE_TTL: usize = 259200;
-
-                if let Err(e) = cache.set_ex(&cache_key, file_entry, FILE_CACHE_TTL).await {
-                    debug!("Failed to cache file {}: {:?}", file_key, e);
-                } else {
-                    debug!("Cached file: {}", file_key);
+                if let Some(tag) = &file_entry.tag {
+                    let file_key_tag = format!("{}@tag:{}", file_entry.file_path, tag);
+                    entries.push((
+                        file_entry_cache_key(cache, &organisation, &application, &file_key_tag),
+                        file_entry,
+                    ));
                 }
+            }
 
-                if let Some(fk_tag) = file_key_tag {
-                    let cache_key_tag =
-                        cache.key(&organisation, &application, &["file_entry", &fk_tag]);
-                    debug!("Caching file {}: {:?}", fk_tag, file_entry);
-
-                    if let Err(e) = cache
-                        .set_ex(&cache_key_tag, file_entry, FILE_CACHE_TTL)
-                        .await
-                    {
-                        debug!("Failed to cache file {}: {:?}", fk_tag, e);
-                    } else {
-                        debug!("Cached file: {}", fk_tag);
-                    }
-                }
+            debug!("Caching {} file entries in Redis", entries.len());
+            if let Err(e) = cache.set_ex_many(&entries, FILE_CACHE_TTL).await {
+                debug!("Failed to cache files: {:?}", e);
             }
         } else {
             debug!("Redis cache not available, skipping caching of DB fetched files");
