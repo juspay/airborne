@@ -493,6 +493,21 @@ pub async fn invalidate_cf(
     Ok(())
 }
 
+/// Best-effort: drop the CDN's cached release-config responses for an application.
+pub async fn invalidate_release_cache(state: &AppState, organisation: &str, application: &str) {
+    let path = format!("/release/{organisation}/{application}*");
+
+    if let Err(e) = invalidate_cf(
+        &state.cf_client,
+        path,
+        &state.env.cloudfront_distribution_id,
+    )
+    .await
+    {
+        info!("Failed to invalidate CloudFront cache: {:?}", e);
+    }
+}
+
 pub async fn check_non_concluded_releases(
     superposition_org_id: String,
     dims: HashMap<String, Value>,
