@@ -4,6 +4,7 @@ import {
   readReleaseConfig,
   getFileContent,
   getBundlePath,
+  checkForUpdate,
 } from 'airborne-react-native';
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
   const [bundlePath, setBundlePath] = useState<string | undefined>();
   const [fileContent, setFileContent] = useState<string | undefined>();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState("");
 
   // Airborne is initialized in native code (MainApplication.kt for Android, AppDelegate.swift for iOS)
   // This ensures the instance is ready before React Native starts
@@ -21,6 +23,15 @@ export default function App() {
       .then(() => setIsInitialized(true))
       .catch(() => setIsInitialized(false));
   }, []);
+
+  const handleCheckForUpdate = async () => {
+    try {
+      const resp = await checkForUpdate("airborne-example");
+      setUpdateMessage(resp);
+    }catch(err: any) {
+      Alert.alert('Error', err.message || 'Failed to check for update');
+    }
+  }
 
   const handleReadReleaseConfig = async () => {
     try {
@@ -63,6 +74,16 @@ export default function App() {
         <Button title="Read Release Config" onPress={handleReadReleaseConfig} />
         {releaseConfig && (
           <Text style={styles.result}>Release Config: {releaseConfig}</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Button
+          title="Check for update"
+          onPress={handleCheckForUpdate}
+        />
+        {updateMessage && (
+          <Text style={styles.result}>File Content: {updateMessage}</Text>
         )}
       </View>
 

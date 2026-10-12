@@ -19,6 +19,7 @@ export interface Spec extends TurboModule {
   readReleaseConfig(nameSpace: string): Promise<string>;
   getFileContent(nameSpace: string, filePath: string): Promise<string>;
   getBundlePath(nameSpace: string): Promise<string>;
+  checkForUpdate(nameSpace: string): Promise<string>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>('Airborne');
