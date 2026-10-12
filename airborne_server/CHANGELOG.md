@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.24.0 - 2026-10-12
+#### Features
+- use juspay diesel - (8871692) - yuvrajjsingh0
+
+- - -
+
 ## airborne_server-v0.23.2 - 2026-09-02
 #### Bug Fixes
 - use superposition bearer token - (a2b0be2) - yuvrajjsingh0
