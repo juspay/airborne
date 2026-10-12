@@ -16,9 +16,14 @@ use crate::{
     file::utils::parse_file_key,
     middleware::auth::{require_org_and_app, Auth, AuthResponse},
     release::types::*,
-    types as airborne_types,
+    run_blocking, types as airborne_types,
     types::{ABError, AppState, PaginatedQuery, PaginatedResponse, WithHeaders},
-    utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
+    utils::{
+        db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
+        document::dotted_docs_to_nested,
+        release_view::{self, ReleaseViewType},
+        workspace::get_workspace_name_for_application,
+    },
 };
 use actix_web::{
     error, get, post, put,
@@ -28,6 +33,7 @@ use actix_web::{
 use airborne_authz_macros::authz;
 use aws_smithy_types::Document;
 use chrono::{DateTime, Utc};
+use diesel::prelude::*;
 use http::{HeaderValue, StatusCode};
 use log::info;
 use open_feature::EvaluationContext;
@@ -37,8 +43,180 @@ use superposition_provider::{AllFeatureProvider, SuperpositionAPIProvider};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
-mod types;
+pub mod types;
 pub mod utils;
+
+/// Every release experiment is named `<app>-<org>-release-exp`; a delete release adds this suffix
+/// so it is recognisable in Superposition's own tooling.
+const DELETE_RELEASE_NAME_SUFFIX: &str = "-delete";
+
+/// A deletion is a DELETE_OVERRIDES experiment: concluding it drops the slice's overrides instead
+/// of writing new ones. That type is what produces the behaviour, so it is also what identifies it.
+fn is_delete_experiment(experiment_type: &superposition_sdk::types::ExperimentType) -> bool {
+    *experiment_type == superposition_sdk::types::ExperimentType::DeleteOverrides
+}
+
+/// Whether a release was reverted: concluded on its control variant, so the pre-release
+/// configuration was kept rather than the new one being rolled out. Superposition records which
+/// variant won, so this needs no bookkeeping of ours and holds for releases concluded long ago.
+fn is_reverted_conclusion(
+    status: &ExperimentStatusType,
+    variants: &[superposition_sdk::types::Variant],
+    chosen_variant: Option<&str>,
+) -> bool {
+    *status == ExperimentStatusType::Concluded
+        && chosen_variant.is_some_and(|chosen| {
+            variants.iter().any(|variant| {
+                variant.id == chosen
+                    && variant.variant_type == superposition_sdk::types::VariantType::Control
+            })
+        })
+}
+
+fn is_experimental_variant(
+    variants: &[superposition_sdk::types::Variant],
+    variant_id: &str,
+) -> bool {
+    variants
+        .iter()
+        .any(|variant| variant.id == variant_id && variant.variant_type == Experimental)
+}
+
+/// Looks up the release a view is waiting on, clearing the marker when that release does not exist.
+async fn live_pending_delete(
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+    superposition_org_id: &str,
+    release_id: &str,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<Option<superposition_sdk::operation::get_experiment::GetExperimentOutput>>
+{
+    if release_id.parse::<i64>().is_err() {
+        info!("Clearing stale delete reservation {}", release_id);
+        release_view::settle_pending_delete(
+            state.db_pool.clone(),
+            organisation.to_string(),
+            application.to_string(),
+            release_id.to_string(),
+            false,
+        )
+        .await?;
+        return Ok(None);
+    }
+
+    match state
+        .superposition_client
+        .get_experiment()
+        .org_id(superposition_org_id.to_string())
+        .workspace_id(workspace_name.to_string())
+        .id(release_id.to_string())
+        .send()
+        .await
+    {
+        Ok(experiment) => Ok(Some(experiment)),
+        Err(e) => {
+            let missing = e
+                .as_service_error()
+                .is_some_and(|err| err.is_resource_not_found())
+                || e.raw_response()
+                    .is_some_and(|response| response.status().as_u16() == 404);
+
+            if !missing {
+                info!(
+                    "Failed to fetch pending delete release {}: {:?}",
+                    release_id, e
+                );
+                return Err(ABError::InternalServerError(
+                    "Failed to look up the pending deletion in Superposition".to_string(),
+                ));
+            }
+
+            info!("Clearing stale delete reservation {}", release_id);
+            release_view::settle_pending_delete(
+                state.db_pool.clone(),
+                organisation.to_string(),
+                application.to_string(),
+                release_id.to_string(),
+                false,
+            )
+            .await?;
+            Ok(None)
+        }
+    }
+}
+
+/// A delete release carries a snapshot of the default config, so a global release must not be
+/// created while one is in flight: whichever concluded second would leave the slice pinned to a
+/// stale default. Markers left behind by out-of-band Superposition activity are reconciled here
+/// rather than blocking global releases forever.
+async fn ensure_no_pending_deletion(
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+    superposition_org_id: &str,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<()> {
+    let in_progress = |view_name: &str| {
+        ABError::BadRequest(format!(
+            "A release deletion is in progress for '{}'. Conclude or discard it before creating a global release.",
+            view_name
+        ))
+    };
+
+    let pending = release_view::pending_delete_releases(
+        state.db_pool.clone(),
+        organisation.to_string(),
+        application.to_string(),
+    )
+    .await?;
+
+    for (_, view_name, release_id) in pending {
+        let experiment = match live_pending_delete(
+            organisation,
+            application,
+            workspace_name,
+            superposition_org_id,
+            &release_id,
+            state,
+        )
+        .await?
+        {
+            Some(experiment) => experiment,
+            // The marker pointed at nothing and has been cleared; it blocks nobody.
+            None => continue,
+        };
+
+        if matches!(
+            experiment.status,
+            ExperimentStatusType::Created | ExperimentStatusType::Inprogress
+        ) {
+            return Err(in_progress(&view_name));
+        }
+
+        let deletion_applied = experiment.status == ExperimentStatusType::Concluded
+            && experiment
+                .chosen_variant
+                .as_deref()
+                .map(|chosen| is_experimental_variant(&experiment.variants, chosen))
+                .unwrap_or(false);
+
+        info!(
+            "Reconciling delete release {} settled outside the API (applied: {})",
+            release_id, deletion_applied
+        );
+        release_view::settle_pending_delete(
+            state.db_pool.clone(),
+            organisation.to_string(),
+            application.to_string(),
+            release_id,
+            deletion_applied,
+        )
+        .await?;
+    }
+
+    Ok(())
+}
 
 fn encode_url_path(raw_url: &str) -> String {
     match url::Url::parse(raw_url) {
@@ -79,6 +257,7 @@ pub fn add_routes(path: &str) -> Scope {
             .wrap(Auth)
             .service(create_release)
             .service(list_releases)
+            .service(delete_release_for_view)
             .service(ramp_release)
             .service(conclude_release)
             .service(get_release)
@@ -307,6 +486,12 @@ async fn get_release(
 
     let resp = GetReleaseResponse {
         id: release_key.clone(),
+        is_delete_release: is_delete_experiment(&exp_details.experiment_type),
+        is_reverted: is_reverted_conclusion(
+            &exp_details.status,
+            &exp_details.variants,
+            exp_details.chosen_variant.as_deref(),
+        ),
         created_at: DateTime::parse_from_rfc3339(&utils::dt(&exp_details.created_at))
             .map(|dt| dt.with_timezone(&Utc))
             .map_err(|_| ABError::InternalServerError("Failed to parse created_at".to_string()))?,
@@ -390,6 +575,25 @@ async fn create_release(
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
+
+    utils::validate_dimensions_exist(
+        superposition_org_id_from_env.clone(),
+        &dimensions,
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?;
+
+    if dimensions.is_empty() {
+        ensure_no_pending_deletion(
+            &organisation,
+            &application,
+            &workspace_name,
+            &superposition_org_id_from_env,
+            &state,
+        )
+        .await?;
+    }
 
     if utils::check_non_concluded_releases(
         superposition_org_id_from_env.clone(),
@@ -489,7 +693,8 @@ async fn create_release(
 
     if is_first_release {
         // For first ever release -> Directly conclude the experiment to make it live
-        let transformed_variant_id = format!("{}-experimental_1", experiment_id_for_ramping);
+        let transformed_variant_id =
+            format!("{}-experimental_{}", experiment_id_for_ramping, pkg_version);
         info!(
             "Concluding first release experiment with variant id: {}",
             transformed_variant_id
@@ -535,6 +740,21 @@ async fn create_release(
         info!("Failed to invalidate CloudFront cache: {:?}", e);
     }
 
+    // Best-effort: make this release's dimension slice browsable as a view. The release already
+    // exists at this point, so a failure here must not fail the request.
+    match crate::utils::release_view::ensure_auto_generated_view(
+        state.db_pool.clone(),
+        organisation.clone(),
+        application.clone(),
+        &dimensions,
+    )
+    .await
+    {
+        Ok(Some(view)) => info!("Created auto-generated release view '{}'", view.name),
+        Ok(None) => {}
+        Err(e) => info!("Failed to create auto-generated release view: {:?}", e),
+    }
+
     let now = Utc::now();
     let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
     let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
@@ -548,6 +768,8 @@ async fn create_release(
     Ok(Json(CreateReleaseResponse {
         id: experiment_id_for_ramping.clone(),
         created_at: now,
+        is_delete_release: is_delete_experiment(&created_experiment_response.experiment_type),
+        is_reverted: false,
         config: Config {
             boot_timeout: req.config.boot_timeout as u32,
             release_config_timeout: req.config.release_config_timeout as u32,
@@ -686,6 +908,9 @@ async fn list_releases(
         count: None,
         all: false,
         status,
+        // Superposition applies this before paging, so a page cannot come back short and
+        // `total_items` counts releases rather than every experiment in the workspace.
+        experiment_name: Some(format!("{}-{}-release-exp", application, organisation)),
     };
 
     match *pagination_query {
@@ -700,15 +925,7 @@ async fn list_releases(
 
     let experiments_list = utils::list_experiments_by_context(query, state.clone()).await?;
 
-    let experiments = experiments_list.data();
-
-    let release_experiments: Vec<_> = experiments
-        .iter()
-        .filter(|exp| {
-            exp.name
-                .contains(&format!("{}-{}-release-exp", application, organisation))
-        })
-        .collect();
+    let release_experiments = experiments_list.data();
 
     let mut releases = Vec::new();
 
@@ -903,6 +1120,12 @@ async fn list_releases(
         let release_response = CreateReleaseResponse {
             id: experiment.id.to_string(),
             created_at,
+            is_delete_release: is_delete_experiment(&experiment.experiment_type),
+            is_reverted: is_reverted_conclusion(
+                &experiment.status,
+                &experiment.variants,
+                experiment.chosen_variant.as_deref(),
+            ),
             config: Config {
                 boot_timeout: rc_boot_timeout as u32,
                 release_config_timeout: rc_release_config_timeout as u32,
@@ -932,6 +1155,262 @@ async fn list_releases(
         data: releases,
         total_items: experiments_list.total_items as u64,
         total_pages: experiments_list.total_pages as u32,
+    }))
+}
+
+/// Deletes the release covering a dimension slice by shipping a release that carries the default,
+/// dimension-less config. Nothing is removed from Superposition — once this concludes on its
+/// experimental variant the slice resolves exactly as the global release does, and the
+/// auto-generated view that tracked the slice is dropped.
+#[authz(
+    resource = "release",
+    action = "create",
+    org_roles = ["owner", "admin", "write"],
+    app_roles = ["admin", "write"]
+)]
+#[post("/views/{view_id}/delete")]
+async fn delete_release_for_view(
+    path: Path<String>,
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<CreateDeleteReleaseResponse>> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
+
+    let view_id = uuid::Uuid::parse_str(&path.into_inner())
+        .map_err(|_| ABError::BadRequest("Invalid view_id format".to_string()))?;
+
+    let workspace_name = get_workspace_name_for_application(
+        state.db_pool.clone(),
+        &state.redis_cache,
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
+    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+    let view = {
+        let pool = state.db_pool.clone();
+        let org = organisation.clone();
+        let app = application.clone();
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            release_views::table
+                .filter(release_views::app_id.eq(&app))
+                .filter(release_views::org_id.eq(&org))
+                .filter(release_views::id.eq(&view_id))
+                .first::<ReleaseViewEntry>(&mut conn)
+                .optional()
+                .map_err(|e| ABError::InternalServerError(format!("Failed to fetch view: {}", e)))?
+                .ok_or_else(|| ABError::NotFound("View not found".to_string()))
+        })?
+    };
+
+    if ReleaseViewType::from(view.view_type.as_str()) != ReleaseViewType::AutoGenerated {
+        return Err(ABError::BadRequest(
+            "Only auto-generated views track a released dimension slice and can be deleted"
+                .to_string(),
+        ));
+    }
+
+    if let Some(pending) = &view.pending_delete_release_id {
+        // Only a marker whose release actually exists stands in the way; a reservation stranded by
+        // a crashed request is cleared here rather than locking the view out of deletion for good.
+        if live_pending_delete(
+            &organisation,
+            &application,
+            &workspace_name,
+            &superposition_org_id_from_env,
+            pending,
+            &state,
+        )
+        .await?
+        .is_some()
+        {
+            return Err(ABError::BadRequest(format!(
+                "A deletion is already in progress for this view (release {})",
+                pending
+            )));
+        }
+    }
+
+    let dimensions = release_view::view_dimensions_to_context(&view.dimensions);
+
+    if dimensions.is_empty() {
+        return Err(ABError::BadRequest(
+            "The default release has no dimensions to fall back to and cannot be deleted"
+                .to_string(),
+        ));
+    }
+
+    if utils::check_non_concluded_releases(
+        superposition_org_id_from_env.clone(),
+        dimensions.clone(),
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "There is already an ongoing release for the given dimensions. Please conclude it before deleting."
+                .to_string(),
+        ));
+    }
+
+    if utils::check_non_concluded_releases(
+        superposition_org_id_from_env.clone(),
+        HashMap::new(),
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "A global release is in progress. Conclude or discard it first so this deletion previews the final default config."
+                .to_string(),
+        ));
+    }
+
+    if !utils::slice_has_override(
+        superposition_org_id_from_env.clone(),
+        &dimensions,
+        state.clone(),
+        workspace_name.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "These dimensions have no configuration of their own, so there is nothing to delete"
+                .to_string(),
+        ));
+    }
+
+    let control_overrides = utils::config_document_to_overrides(
+        &utils::resolve_config_document(
+            superposition_org_id_from_env.clone(),
+            &dimensions,
+            state.clone(),
+            workspace_name.clone(),
+        )
+        .await?,
+    )?;
+
+    let experimental_overrides = utils::config_document_to_overrides(
+        &utils::resolve_config_document(
+            superposition_org_id_from_env.clone(),
+            &HashMap::new(),
+            state.clone(),
+            workspace_name.clone(),
+        )
+        .await?,
+    )?;
+
+    let control_variant = VariantBuilder::default()
+        .id("control".to_string())
+        .variant_type(superposition_sdk::types::VariantType::Control)
+        .set_overrides(Some(control_overrides))
+        .build()
+        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+
+    let experimental_variant = VariantBuilder::default()
+        .id("experimental_delete".to_string())
+        .variant_type(Experimental)
+        .set_overrides(Some(experimental_overrides))
+        .build()
+        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+
+    let reservation = uuid::Uuid::new_v4().to_string();
+
+    if !release_view::mark_delete_release_pending(
+        state.db_pool.clone(),
+        view.id,
+        reservation.clone(),
+    )
+    .await?
+    {
+        return Err(ABError::BadRequest(
+            "A deletion is already in progress for this view".to_string(),
+        ));
+    }
+
+    let created_experiment_response = state
+        .superposition_client
+        .create_experiment()
+        .org_id(superposition_org_id_from_env.clone())
+        .workspace_id(workspace_name.clone())
+        .name(format!(
+            "{}-{}-release-exp{}",
+            application, organisation, DELETE_RELEASE_NAME_SUFFIX
+        ))
+        .experiment_type(superposition_sdk::types::ExperimentType::DeleteOverrides)
+        .description(format!(
+            "Deleting the release overrides for view '{}'",
+            view.name
+        ))
+        .change_reason(format!(
+            "Deleting targeted release overrides for application {}",
+            application
+        ))
+        .idempotency_key(reservation.clone())
+        .variants(control_variant)
+        .variants(experimental_variant)
+        .set_context(Some(
+            dimensions
+                .iter()
+                .map(|(k, v)| (k.clone(), utils::value_to_document(v)))
+                .collect::<HashMap<_, _>>(),
+        ))
+        .send()
+        .await;
+
+    let created_experiment_response = match created_experiment_response {
+        Ok(created) => created,
+        Err(e) => {
+            info!("Failed to create delete release experiment: {:?}", e);
+            // Release the claim, matching on the reservation so a deletion that started meanwhile
+            // is left alone.
+            if let Err(e) = release_view::settle_pending_delete(
+                state.db_pool.clone(),
+                organisation.clone(),
+                application.clone(),
+                reservation.clone(),
+                false,
+            )
+            .await
+            {
+                info!(
+                    "Failed to release delete reservation {}: {:?}",
+                    reservation, e
+                );
+            }
+
+            return Err(ABError::InternalServerError(
+                "Failed to create experiment in Superposition".to_string(),
+            ));
+        }
+    };
+
+    let release_id = created_experiment_response.id.to_string();
+
+    // Swap the reservation for the id everything downstream keys off: conclude and discard settle
+    // the view by looking the release up through this marker.
+    release_view::adopt_delete_release_id(
+        state.db_pool.clone(),
+        reservation.clone(),
+        release_id.clone(),
+    )
+    .await?;
+
+    Ok(Json(CreateDeleteReleaseResponse {
+        release_id,
+        view_id: view.id,
+        dimensions,
+        status: "CREATED".to_string(),
     }))
 }
 
@@ -1136,6 +1615,21 @@ async fn conclude_release(
         experiment_id, transformed_variant_id
     );
 
+    // If this was a delete release, its view goes away only when the deletion actually took effect;
+    // concluding on control means the slice kept its overrides. Best-effort — the conclude already
+    // happened in Superposition, so a bookkeeping failure must not fail the request.
+    if let Err(e) = release_view::settle_pending_delete(
+        state.db_pool.clone(),
+        organisation.clone(),
+        application.clone(),
+        experiment_id.clone(),
+        is_experimental_variant(&experiment_details.variants, &transformed_variant_id),
+    )
+    .await
+    {
+        info!("Failed to settle pending release view deletion: {:?}", e);
+    }
+
     let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
 
     if let Err(e) = utils::invalidate_cf(
@@ -1233,6 +1727,20 @@ async fn discard_release(
         })?;
 
     info!("Successfully discarded experiment {}", experiment_id);
+
+    // A discarded delete release leaves the slice untouched, so its view stays and becomes
+    // deletable again.
+    if let Err(e) = release_view::settle_pending_delete(
+        state.db_pool.clone(),
+        organisation.clone(),
+        application.clone(),
+        experiment_id.clone(),
+        false,
+    )
+    .await
+    {
+        info!("Failed to clear pending release view deletion: {:?}", e);
+    }
 
     Ok(Json(DiscardReleaseResponse {
         success: true,
@@ -1644,6 +2152,9 @@ async fn update_release(
     Ok(Json(CreateReleaseResponse {
         id: release_id.clone(),
         created_at,
+        is_delete_release: is_delete_experiment(&updated_experiment_response.experiment_type),
+        // An update is only possible while CREATED, so nothing has been concluded yet.
+        is_reverted: false,
         config: Config {
             boot_timeout: req.config.boot_timeout as u32,
             release_config_timeout: req.config.release_config_timeout as u32,

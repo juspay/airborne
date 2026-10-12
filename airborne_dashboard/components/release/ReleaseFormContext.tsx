@@ -28,6 +28,7 @@ const defaultState: ReleaseFormState = {
   releaseConfigTimeout: 4000,
   configProperties: "{}",
   targetingRules: [],
+  unknownDimensions: [],
   schemaFields: [],
   remoteConfigValues: {},
   selectedPackage: null,
@@ -99,6 +100,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
   const [releaseConfigTimeout, setReleaseConfigTimeout] = useState(initialState.releaseConfigTimeout);
   const [configProperties, setConfigProperties] = useState(initialState.configProperties);
   const [targetingRules, setTargetingRules] = useState<TargetingRule[]>(initialState.targetingRules);
+  const [unknownDimensions, setUnknownDimensions] = useState<string[]>(initialState.unknownDimensions);
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
   const [remoteConfigValues, setRemoteConfigValues] = useState<Record<string, any>>(initialState.remoteConfigValues);
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -208,7 +210,9 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
         case 1:
           return true;
         case 2:
-          return true;
+          // A cloned release can carry a dimension that has since been deleted; Superposition would
+          // reject it at create time, so stop it here where the rule can still be fixed.
+          return unknownDimensions.length === 0;
         case 3:
           if (schemaFields.length > 0) {
             const validation = validateAllRemoteConfigValues(remoteConfigValues, schemaFields);
@@ -225,7 +229,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
           return false;
       }
     },
-    [schemaFields, remoteConfigValues, selectedPackage]
+    [schemaFields, remoteConfigValues, selectedPackage, unknownDimensions]
   );
 
   const createReleaseConfig = useCallback((): ReleaseConfigRequest | undefined => {
@@ -281,6 +285,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       releaseConfigTimeout,
       configProperties,
       targetingRules,
+      unknownDimensions,
       schemaFields,
       remoteConfigValues,
       selectedPackage,
@@ -288,6 +293,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       filePriority,
       selectedResources,
 
+      setUnknownDimensions,
       setCurrentStep,
       goToNextStep,
       goToPreviousStep,
@@ -318,6 +324,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       releaseConfigTimeout,
       configProperties,
       targetingRules,
+      unknownDimensions,
       schemaFields,
       remoteConfigValues,
       selectedPackage,
