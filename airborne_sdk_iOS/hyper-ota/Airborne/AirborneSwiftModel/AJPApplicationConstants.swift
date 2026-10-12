@@ -28,6 +28,8 @@ import Foundation
     public static let APP_OLD_RESOURCES_DATA_FILE_NAME = "app-resources-old.dat"
     public static let APP_TEMP_RESOURCES_DATA_FILE_NAME = "app-resources-temp.dat"
 
+    public static let APP_UNRESOLVED_PROPERTIES_DATA_FILE_NAME = "app-unresolved-properties.dat"
+
     // MARK: - Notification Names
     public static let BOOT_TIMEOUT_NOTIFICATION = Notification.Name("AJPBootTimeoutNotification")
     public static let PACKAGE_RESOURCE_NOTIFICATION = Notification.Name("AJPPackageResourceNotification")

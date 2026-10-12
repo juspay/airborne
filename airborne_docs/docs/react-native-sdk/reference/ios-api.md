@@ -32,6 +32,17 @@ init(releaseConfigURL: String, delegate: AirborneDelegate? = nil)
 | `getFileContent` | `func getFileContent(_ filePath: String) -> String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. |
 | `getReleaseConfig` | `func getReleaseConfig() -> String` | Returns the current release config as a stringified JSON. |
 
+:::info[`unresolved_properties` in the release config]
+The SDK always requests the release config with `extended=true`. When the backend honours it, the
+response carries an extra top-level key, `unresolved_properties`, alongside `config`, `package` and
+`resources` — the unresolved targeting bundle, for clients that resolve releases locally.
+
+`getReleaseConfig()` passes it through verbatim without interpreting it, and the SDK caches it
+across launches so it stays available on the next boot. The key is **absent** (not `null`) when the
+backend does not serve it, so treat it as optional. `config`, `package` and `resources` are
+unchanged either way.
+:::
+
 ## AirborneDelegate
 
 The protocol you conform to (typically in an `AppDelegate` extension) to customize behavior and receive callbacks. **All methods are optional** — sensible defaults apply when a method is not implemented.
