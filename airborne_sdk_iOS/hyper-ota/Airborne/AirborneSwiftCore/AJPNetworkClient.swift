@@ -125,14 +125,25 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
                 readTimeout = rt.intValue
             }
         }
+        let tlsOption = options?["tlsVersions"]
+        let tlsVersions = tlsOption as? [String] ?? []
+        // A supplied value that is not a string array fails the call rather than dropping the restriction.
+        if let tlsOption = tlsOption, !(tlsOption is NSNull), !(tlsOption is [String]) {
+            responseBlock(URLResponse(), nil, ["error": "Invalid tlsVersions: \(tlsOption)"])
+            return
+        }
 
          // Reuse the shared session when no custom delegate, redirect tracking, or resource timeout
         // is needed. Create a new session otherwise so our delegate receives the necessary callbacks.
         let session: URLSession
-        if sessionDelegate != nil || redirectionBlock != nil || readTimeout != -1 {
+        if sessionDelegate != nil || redirectionBlock != nil || readTimeout != -1 || !tlsVersions.isEmpty {
             let config = URLSessionConfiguration.default
             if readTimeout != -1 {
                 config.timeoutIntervalForResource = Double(readTimeout) / 1000.0
+            }
+            if !tlsVersions.isEmpty && !AJPNetworkClient.restrictTLS(config, to: tlsVersions) {
+                responseBlock(URLResponse(), nil, ["error": "Unsupported TLS versions: \(tlsVersions)"])
+                return
             }
            // Wrap with AJPRedirectHandler when redirect tracking is requested so we capture every
             // 3xx hop while still forwarding other callbacks (e.g. SSL pinning) to sessionDelegate.
@@ -269,6 +280,26 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
     }
 
     // MARK: - Private Helpers
+
+    /// Restricts the session to the given TLS versions, e.g. ["TLSv1.3"]. Returns false when a
+    /// version is unknown or the OS cannot enforce it, so the caller fails the request instead of
+    /// negotiating a lower version.
+    static func restrictTLS(_ config: URLSessionConfiguration, to versions: [String]) -> Bool {
+        guard #available(iOS 13.0, *) else { return false }
+        var parsed: [tls_protocol_version_t] = []
+        for version in versions {
+            switch version {
+            case "TLSv1.2": parsed.append(.TLSv12)
+            case "TLSv1.3": parsed.append(.TLSv13)
+            default: return false
+            }
+        }
+        guard let min = parsed.min(by: { $0.rawValue < $1.rawValue }),
+              let max = parsed.max(by: { $0.rawValue < $1.rawValue }) else { return false }
+        config.tlsMinimumSupportedProtocolVersion = min
+        config.tlsMaximumSupportedProtocolVersion = max
+        return true
+    }
 
     /// Converts an `AJPRequestType` enum to the corresponding HTTP method string.
     private func httpMethodString(for type: AJPRequestType) -> String {
