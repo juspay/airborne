@@ -13,6 +13,8 @@ A **package** bundles together the [files](/docs/dashboard/files) your app needs
 
 The page summarises your `Total Packages Versions`, `Total Files` across all packages, and `Release Usage` (how many deployments use packages). The table lists each package version with its `Tag`, its `Index` file, the `Version` number, and the count of `Files` it contains. Use **Search packages by index file name…** to filter the list.
 
+**Expand a package row** (click it) to view its contents. The index file is pinned on top, and the files are organised into **collapsible sections — one per file set the package was created from** (each labelled with the set version it snapshotted), with individually added files under *Other files*. Packages created without sets simply show a flat *Files* section. Packages with more than a handful of files get a search box that looks across all sections.
+
 ## Creating a package
 
 Choose **Create Package** (on the Packages page, or via the header's **`+ Create` → Create Package`**). This opens the **Create Package Version** flow, which has two steps.
@@ -28,6 +30,8 @@ Choose **Next Step** to continue. (You cannot proceed until an index file is sel
 ### Step 2 — Select package files
 
 Now choose any additional **package files** to include. The file chooser supports search and tag filtering, lets you select multiple files at once, and lets you pick a specific version per file. The index file you chose in step 1 is automatically excluded from the list.
+
+You can also check whole **file sets**: the package then includes every file of the set's latest version and **remembers the set** (pinned to that set version). One rule is enforced — the exact same file version cannot enter the package twice, whether via two overlapping sets or a set plus an individually picked file; the same path at a different version is fine. The server rejects violations too, so the rule holds for API callers. A package can include at most **50 file sets**; the server rejects requests with more.
 
 Adding package files is optional — a package can contain just its index file.
 

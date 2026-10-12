@@ -451,3 +451,328 @@ operation ListFileGroups {
         BadRequestError
     ]
 }
+
+// ─── File Sets ───
+// A file set is a peer of a file: a named, reusable collection of file keys.
+// Files do not belong to a set; a file may appear in any number of sets, or none.
+
+/// List of file keys, e.g. "path/to/file@version:3" or "path/to/file@tag:latest"
+list FileKeyList {
+    /// A file key
+    member: String
+}
+
+/// A file belonging to a file set, resolved from the files table
+structure FileSetMember {
+    /// File key, e.g. "path/to/file@version:3"
+    @required
+    id: String
+
+    /// Logical path of the file
+    @required
+    file_path: String
+
+    /// Version of the file
+    @required
+    version: Integer
+
+    /// Tag of the file, if any
+    tag: String
+
+    /// URL the file content is served from
+    @required
+    url: String
+
+    /// File size in bytes
+    @required
+    size: Long
+
+    /// SHA256 checksum in hex
+    @required
+    checksum: String
+}
+
+/// Files belonging to a file set
+list FileSetMemberList {
+    /// A member file
+    member: FileSetMember
+}
+
+/// One immutable version of a file set: its files plus its own metadata
+structure FileSetVersion {
+    /// Version number, starting at 1
+    @required
+    version: Integer
+
+    /// Metadata attached to this version (arbitrary JSON object)
+    @required
+    metadata: Document
+
+    /// Files snapshotted by this version, resolved from the files table
+    @required
+    files: FileSetMemberList
+
+    /// When the version was created (RFC 3339)
+    @required
+    created_at: String
+}
+
+/// List of file set versions, newest first
+list FileSetVersionList {
+    /// A file set version
+    member: FileSetVersion
+}
+
+/// A file set summary: identity plus its latest version
+structure FileSet {
+    /// Name of the set — its identity, unique within the application
+    @required
+    name: String
+
+    /// Total number of versions
+    @required
+    total_versions: Long
+
+    /// The latest version of the set
+    latest: FileSetVersion
+
+    /// When the set was created (RFC 3339)
+    @required
+    created_at: String
+
+    /// When the set was last updated (RFC 3339)
+    @required
+    updated_at: String
+}
+
+/// A file set with its full version history
+structure FileSetDetail {
+    /// Name of the set — its identity, unique within the application
+    @required
+    name: String
+
+    /// Every version of the set, newest first
+    @required
+    versions: FileSetVersionList
+
+    /// When the set was created (RFC 3339)
+    @required
+    created_at: String
+
+    /// When the set was last updated (RFC 3339)
+    @required
+    updated_at: String
+}
+
+/// List of file sets
+list FileSetList {
+    /// A file set
+    member: FileSet
+}
+
+/// Create file set request
+structure CreateFileSetRequest {
+    /// Name of the file set, unique within the application
+    @required
+    name: String
+
+    /// File keys snapshotted as version 1; at least one is required
+    @required
+    @length(min: 1)
+    files: FileKeyList
+
+    /// Metadata attached to version 1 (arbitrary JSON object)
+    metadata: Document
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// Get file set request
+structure GetFileSetRequest {
+    /// Name of the file set
+    @required
+    @httpLabel
+    name: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// List file sets request
+structure ListFileSetsRequest {
+    /// Page number for pagination
+    @httpQuery("page")
+    page: Integer
+
+    /// Number of sets per page
+    @httpQuery("count")
+    count: Integer
+
+    /// If true, fetch all sets without pagination
+    @httpQuery("all")
+    all: Boolean
+
+    /// Search query to filter sets by name
+    @httpQuery("search")
+    search: String
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// List file sets response
+structure ListFileSetsResponse {
+    /// List of file sets
+    @required
+    data: FileSetList
+
+    /// Total number of sets
+    @required
+    total_items: Long
+
+    /// Total number of pages
+    @required
+    total_pages: Integer
+}
+
+/// Create file set version request
+structure CreateFileSetVersionRequest {
+    /// Name of the file set
+    @required
+    @httpLabel
+    name: String
+
+    /// File keys this version snapshots; at least one is required
+    @required
+    @length(min: 1)
+    files: FileKeyList
+
+    /// Metadata for this version (arbitrary JSON object; defaults to {})
+    metadata: Document
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// Get file set version request
+structure GetFileSetVersionRequest {
+    /// Name of the file set
+    @required
+    @httpLabel
+    name: String
+
+    /// Version number
+    @required
+    @httpLabel
+    version: Integer
+
+    /// Name of the organisation
+    @httpHeader("x-organisation")
+    @required
+    organisation: String
+
+    /// Name of the application
+    @httpHeader("x-application")
+    @required
+    application: String
+}
+
+/// Create a new immutable version of a file set, snapshotting the given files with its own metadata. The version number is assigned automatically. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "POST", uri: "/api/file-sets/{name}/versions")
+@requiresauth
+operation CreateFileSetVersion {
+    input: CreateFileSetVersionRequest
+    output: FileSetVersion
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
+    ]
+}
+
+/// Get one version of a file set with its resolved files and metadata. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "GET", uri: "/api/file-sets/{name}/versions/{version}")
+@requiresauth
+@readonly
+operation GetFileSetVersion {
+    input: GetFileSetVersionRequest
+    output: FileSetVersion
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
+    ]
+}
+
+/// Create a file set: a named, versioned collection of files that can be selected together when building packages and releases. Names are unique within the application; the given files and metadata become version 1. Every file key must resolve to an existing file. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "POST", uri: "/api/file-sets")
+@requiresauth
+operation CreateFileSet {
+    input: CreateFileSetRequest
+    output: FileSet
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+/// List the file sets of the application, ordered by name. Supports pagination and an optional name search. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "GET", uri: "/api/file-sets")
+@requiresauth
+@readonly
+operation ListFileSets {
+    input: ListFileSetsRequest
+    output: ListFileSetsResponse
+    errors: [
+        Unauthorized
+        BadRequestError
+    ]
+}
+
+/// Get a file set and its full version history by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
+@tags(["Files"])
+@http(method: "GET", uri: "/api/file-sets/{name}")
+@requiresauth
+@readonly
+operation GetFileSet {
+    input: GetFileSetRequest
+    output: FileSetDetail
+    errors: [
+        Unauthorized
+        BadRequestError
+        NotFoundError
+    ]
+}

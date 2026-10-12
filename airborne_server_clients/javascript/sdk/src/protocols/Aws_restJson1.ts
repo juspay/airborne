@@ -12,6 +12,14 @@ import {
   CreateFileCommandOutput,
 } from "../commands/CreateFileCommand";
 import {
+  CreateFileSetCommandInput,
+  CreateFileSetCommandOutput,
+} from "../commands/CreateFileSetCommand";
+import {
+  CreateFileSetVersionCommandInput,
+  CreateFileSetVersionCommandOutput,
+} from "../commands/CreateFileSetVersionCommand";
+import {
   CreateOrganisationCommandInput,
   CreateOrganisationCommandOutput,
 } from "../commands/CreateOrganisationCommand";
@@ -28,6 +36,14 @@ import {
   DeleteDimensionCommandOutput,
 } from "../commands/DeleteDimensionCommand";
 import {
+  GetFileSetCommandInput,
+  GetFileSetCommandOutput,
+} from "../commands/GetFileSetCommand";
+import {
+  GetFileSetVersionCommandInput,
+  GetFileSetVersionCommandOutput,
+} from "../commands/GetFileSetVersionCommand";
+import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
 } from "../commands/GetReleaseCommand";
@@ -43,6 +59,10 @@ import {
   ListFileGroupsCommandInput,
   ListFileGroupsCommandOutput,
 } from "../commands/ListFileGroupsCommand";
+import {
+  ListFileSetsCommandInput,
+  ListFileSetsCommandOutput,
+} from "../commands/ListFileSetsCommand";
 import {
   ListFilesCommandInput,
   ListFilesCommandOutput,
@@ -95,6 +115,8 @@ import {
   CreateReleaseRequestConfig,
   CreateReleaseRequestPackage,
   DimensionResponse,
+  FileSet,
+  FileSetVersion,
   ForbiddenError,
   GetReleaseConfig,
   GetReleaseResponse,
@@ -215,6 +237,58 @@ export const se_CreateFileCommand = async(
 }
 
 /**
+ * serializeAws_restJson1CreateFileSetCommand
+ */
+export const se_CreateFileSetCommand = async(
+  input: CreateFileSetCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-sets");
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'files': _ => _json(_),
+    'metadata': _ => se_Document(_, context),
+    'name': [],
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1CreateFileSetVersionCommand
+ */
+export const se_CreateFileSetVersionCommand = async(
+  input: CreateFileSetVersionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-sets/{name}/versions");
+  b.p('name', () => input.name!, '{name}', false)
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'files': _ => _json(_),
+    'metadata': _ => se_Document(_, context),
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1CreateOrganisationCommand
  */
 export const se_CreateOrganisationCommand = async(
@@ -306,6 +380,49 @@ export const se_DeleteDimensionCommand = async(
   b.p('dimension', () => input.dimension!, '{dimension}', false)
   let body: any;
   b.m("DELETE")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1GetFileSetCommand
+ */
+export const se_GetFileSetCommand = async(
+  input: GetFileSetCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-sets/{name}");
+  b.p('name', () => input.name!, '{name}', false)
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1GetFileSetVersionCommand
+ */
+export const se_GetFileSetVersionCommand = async(
+  input: GetFileSetVersionCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-sets/{name}/versions/{version}");
+  b.p('name', () => input.name!, '{name}', false)
+  b.p('version', () => input.version!.toString(), '{version}', false)
+  let body: any;
+  b.m("GET")
   .h(headers)
   .b(body);
   return b.build();
@@ -420,6 +537,33 @@ export const se_ListFilesCommand = async(
     [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
     [_s]: [,input[_s]!],
     [_t]: [,input[_t]!],
+  });
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .q(query)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1ListFileSetsCommand
+ */
+export const se_ListFileSetsCommand = async(
+  input: ListFileSetsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/file-sets");
+  const query: any = map({
+    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
+    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
+    [_s]: [,input[_s]!],
   });
   let body: any;
   b.m("GET")
@@ -752,6 +896,55 @@ export const de_CreateFileCommand = async(
 }
 
 /**
+ * deserializeAws_restJson1CreateFileSetCommand
+ */
+export const de_CreateFileSetCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<CreateFileSetCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'latest': _ => de_FileSetVersion(_, context),
+    'name': __expectString,
+    'total_versions': __expectLong,
+    'updated_at': __expectString,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1CreateFileSetVersionCommand
+ */
+export const de_CreateFileSetVersionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<CreateFileSetVersionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'files': _json,
+    'metadata': _ => de_Document(_, context),
+    'version': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
  * deserializeAws_restJson1CreateOrganisationCommand
  */
 export const de_CreateOrganisationCommand = async(
@@ -838,6 +1031,54 @@ export const de_DeleteDimensionCommand = async(
     $metadata: deserializeMetadata(output),
   });
   await collectBody(output.body, context);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetFileSetCommand
+ */
+export const de_GetFileSetCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetFileSetCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'name': __expectString,
+    'updated_at': __expectString,
+    'versions': _ => de_FileSetVersionList(_, context),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetFileSetVersionCommand
+ */
+export const de_GetFileSetVersionCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetFileSetVersionCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'created_at': __expectString,
+    'files': _json,
+    'metadata': _ => de_Document(_, context),
+    'version': __expectInt32,
+  });
+  Object.assign(contents, doc);
   return contents;
 }
 
@@ -960,6 +1201,29 @@ export const de_ListFilesCommand = async(
     'page': __expectInt32,
     'per_page': __expectInt32,
     'total': __expectInt32,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1ListFileSetsCommand
+ */
+export const de_ListFileSetsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ListFileSetsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'data': _ => de_FileSetList(_, context),
+    'total_items': __expectLong,
+    'total_pages': __expectInt32,
   });
   Object.assign(contents, doc);
   return contents;
@@ -1399,6 +1663,8 @@ const de_CommandError = async(
     }, {});
   }
 
+  // se_FileKeyList omitted.
+
   // se_StringList omitted.
 
   /**
@@ -1515,6 +1781,67 @@ const de_CommandError = async(
   ): (CreateFileResponse)[] => {
     const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
       return de_CreateFileResponse(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1FileSet
+   */
+  const de_FileSet = (
+    output: any,
+    context: __SerdeContext
+  ): FileSet => {
+    return take(output, {
+      'created_at': __expectString,
+      'latest': (_: any) => de_FileSetVersion(_, context),
+      'name': __expectString,
+      'total_versions': __expectLong,
+      'updated_at': __expectString,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1FileSetList
+   */
+  const de_FileSetList = (
+    output: any,
+    context: __SerdeContext
+  ): (FileSet)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_FileSet(entry, context);
+    });
+    return retVal;
+  }
+
+  // de_FileSetMember omitted.
+
+  // de_FileSetMemberList omitted.
+
+  /**
+   * deserializeAws_restJson1FileSetVersion
+   */
+  const de_FileSetVersion = (
+    output: any,
+    context: __SerdeContext
+  ): FileSetVersion => {
+    return take(output, {
+      'created_at': __expectString,
+      'files': _json,
+      'metadata': (_: any) => de_Document(_, context),
+      'version': __expectInt32,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1FileSetVersionList
+   */
+  const de_FileSetVersionList = (
+    output: any,
+    context: __SerdeContext
+  ): (FileSetVersion)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_FileSetVersion(entry, context);
     });
     return retVal;
   }

@@ -7,6 +7,10 @@ import Screenshot from '@site/src/components/Screenshot';
 
 A **file** is a single artifact your app downloads over the air — a JavaScript bundle, an image, a JSON blob, and so on. Each file is identified by a **file path** and hosted at a **URL**. Airborne keeps the full **version history** for every file path, so you can see exactly what was served and when. Files are later combined into [packages](/docs/dashboard/packages) and shipped in [releases](/docs/dashboard/releases).
 
+A **file set** is a named, versioned collection of files — the name is its identity, unique within the application. Sets sit alongside files rather than owning them: a file does not belong to a set, and the same file may appear in any number of sets, or none. Sets exist so that you can select a whole collection of files at once when building a package or a release — for example a set per micro-app (`hyperpay`, `ec`) and one for its configuration (`hyperpay-config`, `ec-config`).
+
+Like files, sets have **versions**. Each version is an immutable snapshot: its own list of file versions plus its own **metadata** (arbitrary JSON — release notes, ticket ids, whatever describes that cut). Changing a set's contents means creating a new version; old versions stay browsable.
+
 <Screenshot name="files-list" caption="The Files page lists every file path with its latest version, tags, and size." />
 
 ## The Files page
@@ -48,10 +52,39 @@ A few rules the modal enforces:
 - **Checksum** must be exactly 64 hexadecimal characters, and it must be provided **together with Size** (supply both or neither).
 - **Metadata** must be valid JSON.
 
-Choose **Create File** to register it. If the file path already exists, the new entry becomes the next version in that path's history.
+Choose **Create File** to register it. If the file path already exists, the new entry becomes the next version in that path's history — unless the URL and checksum are identical to the latest version, in which case the existing version is returned instead of creating a duplicate.
 
 :::note
 Checksum and size are only required for authenticated or private files, where the SDK verifies integrity on download. For public assets you can leave them blank.
+:::
+
+## File sets
+
+Below the files table, the **File Sets** section lists every set in the application with its latest version, file count, total versions, and when it was last updated. Expand a row to browse the full version history — each version shows its files, metadata, and creation time.
+
+### Creating and editing a set
+
+Choose **Create File Set**, give the set a name (unique within the application), pick its files with the file chooser, and optionally attach metadata — this becomes **version 1**.
+
+The layers icon creates a **new version** (pre-filled with the latest version's files, with its own metadata). Sets are append-only: they cannot be renamed or deleted from the dashboard, and versions themselves are immutable.
+
+A few rules:
+
+- A set is a collection of **files**, not of file versions: each file path can appear only once per set version, pinned to exactly one version. Two versions of the same file are rejected.
+- Membership references rows in the files table by id, so a set never stores its own copy of a file — renaming or re-tagging a file is reflected everywhere.
+- The name is the set's identity and appears in URLs, so it may only contain letters, digits, `-`, `_` and `.`.
+- Each member is a specific version, e.g. `dist/app-bundle.js@version:3`, so a set is a stable snapshot rather than a moving target.
+- A file that cannot be resolved is rejected when saving the set.
+- Every version must contain at least one file — since versions are immutable, an empty one could never be fixed.
+
+### Using a set
+
+Anywhere you select a list of files — **Select Package Files** when creating a package, and **Resources** when creating a release — a **File Sets** panel appears above the file list. Checking a set adds all files of its **latest version** to your selection in one click. You can still add or remove individual files afterwards.
+
+One rule applies: the exact same file — same path **and** same version — cannot enter the selection twice, so a set that overlaps with files you already selected (for example via another set) is rejected with an explanation. The same path at a *different* version is allowed.
+
+:::note[Sets are a selection shortcut]
+Adding a set copies its files into your selection; it does not create a live link. Changing the set later does not change packages or releases you already created.
 :::
 
 ## Where files go next

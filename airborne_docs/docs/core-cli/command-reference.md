@@ -282,6 +282,118 @@ airborne-core-cli ListFileGroups \
 | `--tags`         | string  | No       | Comma-separated tags to filter by.   |
 | `--token`        | string  | Yes      | Bearer token for authentication.     |
 
+## File set
+
+A file set is a named, versioned collection of files that can be picked as a unit when building a package. Set versions are immutable; each new version is a fresh snapshot of file keys (`path@version:N` or `path@tag:T`) with its own metadata.
+
+### CreateFileSet
+
+Create a file set. The given files and metadata become version 1. Names are unique within the application, at least one file is required, and every file key must resolve to an existing file.
+
+```bash
+airborne-core-cli CreateFileSet \
+  --name <name> \
+  --files <file-key-1> <file-key-2> \
+  --organisation <organisation> \
+  --application <application> \
+  --token <access-token> \
+  [--metadata <json>]
+```
+
+| Parameter        | Type     | Required | Description                                                        |
+| ---------------- | -------- | -------- | ------------------------------------------------------------------ |
+| `--name`         | string   | Yes      | Name of the file set, unique within the application.               |
+| `--files`        | string[] | Yes      | Space-separated file keys snapshotted as version 1 (at least one). |
+| `--metadata`     | document | No       | Metadata as a stringified JSON object or a `@file.json` attachment. |
+| `--organisation` | string   | Yes      | Name of the organisation.                                          |
+| `--application`  | string   | Yes      | Name of the application.                                           |
+| `--token`        | string   | Yes      | Bearer token for authentication.                                   |
+
+### ListFileSets
+
+List the file sets of an application, ordered by name. Each set includes its version count and its latest version.
+
+```bash
+airborne-core-cli ListFileSets \
+  --organisation <organisation> \
+  --application <application> \
+  --token <access-token> \
+  [--page <page>]
+```
+
+| Parameter        | Type    | Required | Description                               |
+| ---------------- | ------- | -------- | ----------------------------------------- |
+| `--organisation` | string  | Yes      | Name of the organisation.                 |
+| `--application`  | string  | Yes      | Name of the application.                  |
+| `--page`         | integer | No       | Page number for pagination (default: 1).  |
+| `--count`        | integer | No       | Number of sets per page (default: 10).    |
+| `--search`       | string  | No       | Filter sets by name.                      |
+| `--all`          | boolean | No       | Fetch all sets without pagination.        |
+| `--token`        | string  | Yes      | Bearer token for authentication.          |
+
+### GetFileSet
+
+Get a file set and its full version history, newest first.
+
+```bash
+airborne-core-cli GetFileSet \
+  --name <name> \
+  --organisation <organisation> \
+  --application <application> \
+  --token <access-token>
+```
+
+| Parameter        | Type   | Required | Description                      |
+| ---------------- | ------ | -------- | -------------------------------- |
+| `--name`         | string | Yes      | Name of the file set.            |
+| `--organisation` | string | Yes      | Name of the organisation.        |
+| `--application`  | string | Yes      | Name of the application.         |
+| `--token`        | string | Yes      | Bearer token for authentication. |
+
+### CreateFileSetVersion
+
+Create a new immutable version of a file set. The version number is assigned automatically, and at least one file is required.
+
+```bash
+airborne-core-cli CreateFileSetVersion \
+  --name <name> \
+  --files <file-key-1> <file-key-2> \
+  --organisation <organisation> \
+  --application <application> \
+  --token <access-token> \
+  [--metadata <json>]
+```
+
+| Parameter        | Type     | Required | Description                                                        |
+| ---------------- | -------- | -------- | ------------------------------------------------------------------ |
+| `--name`         | string   | Yes      | Name of the file set.                                              |
+| `--files`        | string[] | Yes      | Space-separated file keys this version snapshots (at least one).   |
+| `--metadata`     | document | No       | Metadata for this version (defaults to `{}`).                      |
+| `--organisation` | string   | Yes      | Name of the organisation.                                          |
+| `--application`  | string   | Yes      | Name of the application.                                           |
+| `--token`        | string   | Yes      | Bearer token for authentication.                                   |
+
+### GetFileSetVersion
+
+Get one version of a file set with its resolved files and metadata.
+
+```bash
+airborne-core-cli GetFileSetVersion \
+  --name <name> \
+  --version <version> \
+  --organisation <organisation> \
+  --application <application> \
+  --token <access-token>
+```
+
+| Parameter        | Type    | Required | Description                      |
+| ---------------- | ------- | -------- | -------------------------------- |
+| `--name`         | string  | Yes      | Name of the file set.            |
+| `--version`      | integer | Yes      | Version number.                  |
+| `--organisation` | string  | Yes      | Name of the organisation.        |
+| `--application`  | string  | Yes      | Name of the application.         |
+| `--token`        | string  | Yes      | Bearer token for authentication. |
+
 ## Package
 
 ### CreatePackage

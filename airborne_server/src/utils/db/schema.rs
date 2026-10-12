@@ -92,6 +92,19 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.file_sets (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            name -> Text,
+            version -> Int4,
+            metadata -> Jsonb,
+            file_ids -> Array<Uuid>,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         use diesel::sql_types::*;
         use super::sql_types::InviteRole;
         use super::sql_types::InviteStatus;
@@ -132,6 +145,7 @@ pub mod hyperotaserver {
             files -> Array<Nullable<Text>>,
             tag -> Nullable<Text>,
             created_at -> Timestamptz,
+            file_sets -> Jsonb,
         }
     }
 
@@ -185,6 +199,7 @@ pub mod hyperotaserver {
         cleanup_outbox,
         builds,
         configs,
+        file_sets,
         files,
         organisation_invites,
         packages,

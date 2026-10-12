@@ -1859,6 +1859,12 @@
                     "target": "io.airborne.server#CreateFile"
                 },
                 {
+                    "target": "io.airborne.server#CreateFileSet"
+                },
+                {
+                    "target": "io.airborne.server#CreateFileSetVersion"
+                },
+                {
                     "target": "io.airborne.server#CreateOrganisation"
                 },
                 {
@@ -1869,6 +1875,12 @@
                 },
                 {
                     "target": "io.airborne.server#DeleteDimension"
+                },
+                {
+                    "target": "io.airborne.server#GetFileSet"
+                },
+                {
+                    "target": "io.airborne.server#GetFileSetVersion"
                 },
                 {
                     "target": "io.airborne.server#GetRelease"
@@ -1884,6 +1896,9 @@
                 },
                 {
                     "target": "io.airborne.server#ListFiles"
+                },
+                {
+                    "target": "io.airborne.server#ListFileSets"
                 },
                 {
                     "target": "io.airborne.server#ListOrganisations"
@@ -2333,6 +2348,160 @@
             },
             "traits": {
                 "smithy.api#documentation": "Create file response"
+            }
+        },
+        "io.airborne.server#CreateFileSet": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreateFileSetRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#FileSet"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Create a file set: a named, versioned collection of files that can be selected together when building packages and releases. Names are unique within the application; the given files and metadata become version 1. Every file key must resolve to an existing file. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/file-sets"
+                },
+                "smithy.api#tags": [
+                    "Files"
+                ]
+            }
+        },
+        "io.airborne.server#CreateFileSetRequest": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the file set, unique within the application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "files": {
+                    "target": "io.airborne.server#FileKeyList",
+                    "traits": {
+                        "smithy.api#documentation": "File keys snapshotted as version 1; at least one is required",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "metadata": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Metadata attached to version 1 (arbitrary JSON object)"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Create file set request"
+            }
+        },
+        "io.airborne.server#CreateFileSetVersion": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreateFileSetVersionRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#FileSetVersion"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Create a new immutable version of a file set, snapshotting the given files with its own metadata. The version number is assigned automatically. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/file-sets/{name}/versions"
+                },
+                "smithy.api#tags": [
+                    "Files"
+                ]
+            }
+        },
+        "io.airborne.server#CreateFileSetVersionRequest": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the file set",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "files": {
+                    "target": "io.airborne.server#FileKeyList",
+                    "traits": {
+                        "smithy.api#documentation": "File keys this version snapshots; at least one is required",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "metadata": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Metadata for this version (arbitrary JSON object; defaults to {})"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Create file set version request"
             }
         },
         "io.airborne.server#CreateOrganisation": {
@@ -2969,6 +3138,18 @@
                 "smithy.api#documentation": "List of file group versions"
             }
         },
+        "io.airborne.server#FileKeyList": {
+            "type": "list",
+            "member": {
+                "target": "smithy.api#String",
+                "traits": {
+                    "smithy.api#documentation": "A file key"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file keys, e.g. \"path/to/file@version:3\" or \"path/to/file@tag:latest\""
+            }
+        },
         "io.airborne.server#FileResponseList": {
             "type": "list",
             "member": {
@@ -2979,6 +3160,212 @@
             },
             "traits": {
                 "smithy.api#documentation": "List of file responses"
+            }
+        },
+        "io.airborne.server#FileSet": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the set — its identity, unique within the application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_versions": {
+                    "target": "smithy.api#Long",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of versions",
+                        "smithy.api#required": {}
+                    }
+                },
+                "latest": {
+                    "target": "io.airborne.server#FileSetVersion",
+                    "traits": {
+                        "smithy.api#documentation": "The latest version of the set"
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "When the set was created (RFC 3339)",
+                        "smithy.api#required": {}
+                    }
+                },
+                "updated_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "When the set was last updated (RFC 3339)",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A file set summary: identity plus its latest version"
+            }
+        },
+        "io.airborne.server#FileSetDetail": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the set — its identity, unique within the application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "versions": {
+                    "target": "io.airborne.server#FileSetVersionList",
+                    "traits": {
+                        "smithy.api#documentation": "Every version of the set, newest first",
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "When the set was created (RFC 3339)",
+                        "smithy.api#required": {}
+                    }
+                },
+                "updated_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "When the set was last updated (RFC 3339)",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A file set with its full version history"
+            }
+        },
+        "io.airborne.server#FileSetList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileSet",
+                "traits": {
+                    "smithy.api#documentation": "A file set"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file sets"
+            }
+        },
+        "io.airborne.server#FileSetMember": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "File key, e.g. \"path/to/file@version:3\"",
+                        "smithy.api#required": {}
+                    }
+                },
+                "file_path": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Logical path of the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Version of the file",
+                        "smithy.api#required": {}
+                    }
+                },
+                "tag": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Tag of the file, if any"
+                    }
+                },
+                "url": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "URL the file content is served from",
+                        "smithy.api#required": {}
+                    }
+                },
+                "size": {
+                    "target": "smithy.api#Long",
+                    "traits": {
+                        "smithy.api#documentation": "File size in bytes",
+                        "smithy.api#required": {}
+                    }
+                },
+                "checksum": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "SHA256 checksum in hex",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A file belonging to a file set, resolved from the files table"
+            }
+        },
+        "io.airborne.server#FileSetMemberList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileSetMember",
+                "traits": {
+                    "smithy.api#documentation": "A member file"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Files belonging to a file set"
+            }
+        },
+        "io.airborne.server#FileSetVersion": {
+            "type": "structure",
+            "members": {
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Version number, starting at 1",
+                        "smithy.api#required": {}
+                    }
+                },
+                "metadata": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Metadata attached to this version (arbitrary JSON object)",
+                        "smithy.api#required": {}
+                    }
+                },
+                "files": {
+                    "target": "io.airborne.server#FileSetMemberList",
+                    "traits": {
+                        "smithy.api#documentation": "Files snapshotted by this version, resolved from the files table",
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "When the version was created (RFC 3339)",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "One immutable version of a file set: its files plus its own metadata"
+            }
+        },
+        "io.airborne.server#FileSetVersionList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#FileSetVersion",
+                "traits": {
+                    "smithy.api#documentation": "A file set version"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List of file set versions, newest first"
             }
         },
         "io.airborne.server#FileTagResponse": {
@@ -3028,6 +3415,142 @@
             "traits": {
                 "smithy.api#error": "client",
                 "smithy.api#httpError": 403
+            }
+        },
+        "io.airborne.server#GetFileSet": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetFileSetRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#FileSetDetail"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Get a file set and its full version history by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/file-sets/{name}"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Files"
+                ]
+            }
+        },
+        "io.airborne.server#GetFileSetRequest": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the file set",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Get file set request"
+            }
+        },
+        "io.airborne.server#GetFileSetVersion": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetFileSetVersionRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#FileSetVersion"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Get one version of a file set with its resolved files and metadata. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/file-sets/{name}/versions/{version}"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Files"
+                ]
+            }
+        },
+        "io.airborne.server#GetFileSetVersionRequest": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the file set",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "version": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Version number",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Get file set version request"
             }
         },
         "io.airborne.server#GetRelease": {
@@ -3470,6 +3993,116 @@
             },
             "traits": {
                 "smithy.api#documentation": "List file groups response"
+            }
+        },
+        "io.airborne.server#ListFileSets": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListFileSetsRequest"
+            },
+            "output": {
+                "target": "io.airborne.server#ListFileSetsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List the file sets of the application, ordered by name. Supports pagination and an optional name search. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/file-sets"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Files"
+                ]
+            }
+        },
+        "io.airborne.server#ListFileSetsRequest": {
+            "type": "structure",
+            "members": {
+                "page": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Page number for pagination",
+                        "smithy.api#httpQuery": "page"
+                    }
+                },
+                "count": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of sets per page",
+                        "smithy.api#httpQuery": "count"
+                    }
+                },
+                "all": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "If true, fetch all sets without pagination",
+                        "smithy.api#httpQuery": "all"
+                    }
+                },
+                "search": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Search query to filter sets by name",
+                        "smithy.api#httpQuery": "search"
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List file sets request"
+            }
+        },
+        "io.airborne.server#ListFileSetsResponse": {
+            "type": "structure",
+            "members": {
+                "data": {
+                    "target": "io.airborne.server#FileSetList",
+                    "traits": {
+                        "smithy.api#documentation": "List of file sets",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_items": {
+                    "target": "smithy.api#Long",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of sets",
+                        "smithy.api#required": {}
+                    }
+                },
+                "total_pages": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Total number of pages",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List file sets response"
             }
         },
         "io.airborne.server#ListFileTags": {

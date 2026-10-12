@@ -34,6 +34,7 @@ The available operations are:
 - **Application** — `CreateApplication`, `GetUser`
 - **Dimension** — `CreateDimension`, `UpdateDimension`, `DeleteDimension`, `ListDimensions`
 - **File** — `CreateFile`, `UploadFile`, `ListFiles`, `ListFileGroups`
+- **File set** — `CreateFileSet`, `ListFileSets`, `GetFileSet`, `CreateFileSetVersion`, `GetFileSetVersion`
 - **Package** — `CreatePackage`, `ListPackages`
 - **Release** — `CreateRelease`, `GetRelease`, `ListReleases`, `ServeRelease`, `ServeReleaseV2`
 

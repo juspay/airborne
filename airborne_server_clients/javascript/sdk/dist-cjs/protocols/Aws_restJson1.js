@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.de_UploadFileCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_ServeReleaseCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFileSetsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_GetFileSetVersionCommand = exports.de_GetFileSetCommand = exports.de_DeleteDimensionCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileSetVersionCommand = exports.de_CreateFileSetCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFileSetsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_GetFileSetVersionCommand = exports.se_GetFileSetCommand = exports.se_DeleteDimensionCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileSetVersionCommand = exports.se_CreateFileSetCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateApplicationCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_ServeReleaseV2Command = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
@@ -65,6 +66,46 @@ const se_CreateFileCommand = async (input, context) => {
     return b.build();
 };
 exports.se_CreateFileCommand = se_CreateFileCommand;
+const se_CreateFileSetCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-sets");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'files': _ => (0, smithy_client_1._json)(_),
+        'metadata': _ => se_Document(_, context),
+        'name': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CreateFileSetCommand = se_CreateFileSetCommand;
+const se_CreateFileSetVersionCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-sets/{name}/versions");
+    b.p('name', () => input.name, '{name}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'files': _ => (0, smithy_client_1._json)(_),
+        'metadata': _ => se_Document(_, context),
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CreateFileSetVersionCommand = se_CreateFileSetVersionCommand;
 const se_CreateOrganisationCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = {
@@ -138,6 +179,37 @@ const se_DeleteDimensionCommand = async (input, context) => {
     return b.build();
 };
 exports.se_DeleteDimensionCommand = se_DeleteDimensionCommand;
+const se_GetFileSetCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-sets/{name}");
+    b.p('name', () => input.name, '{name}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetFileSetCommand = se_GetFileSetCommand;
+const se_GetFileSetVersionCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-sets/{name}/versions/{version}");
+    b.p('name', () => input.name, '{name}', false);
+    b.p('version', () => input.version.toString(), '{version}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetFileSetVersionCommand = se_GetFileSetVersionCommand;
 const se_GetReleaseCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -225,6 +297,27 @@ const se_ListFilesCommand = async (input, context) => {
     return b.build();
 };
 exports.se_ListFilesCommand = se_ListFilesCommand;
+const se_ListFileSetsCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/file-sets");
+    const query = (0, smithy_client_1.map)({
+        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
+        [_s]: [, input[_s]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_ListFileSetsCommand = se_ListFileSetsCommand;
 const se_ListOrganisationsCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = {};
@@ -466,6 +559,43 @@ const de_CreateFileCommand = async (output, context) => {
     return contents;
 };
 exports.de_CreateFileCommand = de_CreateFileCommand;
+const de_CreateFileSetCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'created_at': smithy_client_1.expectString,
+        'latest': _ => de_FileSetVersion(_, context),
+        'name': smithy_client_1.expectString,
+        'total_versions': smithy_client_1.expectLong,
+        'updated_at': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CreateFileSetCommand = de_CreateFileSetCommand;
+const de_CreateFileSetVersionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'created_at': smithy_client_1.expectString,
+        'files': smithy_client_1._json,
+        'metadata': _ => de_Document(_, context),
+        'version': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CreateFileSetVersionCommand = de_CreateFileSetVersionCommand;
 const de_CreateOrganisationCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -532,6 +662,42 @@ const de_DeleteDimensionCommand = async (output, context) => {
     return contents;
 };
 exports.de_DeleteDimensionCommand = de_DeleteDimensionCommand;
+const de_GetFileSetCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'created_at': smithy_client_1.expectString,
+        'name': smithy_client_1.expectString,
+        'updated_at': smithy_client_1.expectString,
+        'versions': _ => de_FileSetVersionList(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetFileSetCommand = de_GetFileSetCommand;
+const de_GetFileSetVersionCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'created_at': smithy_client_1.expectString,
+        'files': smithy_client_1._json,
+        'metadata': _ => de_Document(_, context),
+        'version': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetFileSetVersionCommand = de_GetFileSetVersionCommand;
 const de_GetReleaseCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -626,6 +792,23 @@ const de_ListFilesCommand = async (output, context) => {
     return contents;
 };
 exports.de_ListFilesCommand = de_ListFilesCommand;
+const de_ListFileSetsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'data': _ => de_FileSetList(_, context),
+        'total_items': smithy_client_1.expectLong,
+        'total_pages': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ListFileSetsCommand = de_ListFileSetsCommand;
 const de_ListOrganisationsCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -982,6 +1165,35 @@ const de_DimensionsMap = (output, context) => {
 const de_FileResponseList = (output, context) => {
     const retVal = (output || []).filter((e) => e != null).map((entry) => {
         return de_CreateFileResponse(entry, context);
+    });
+    return retVal;
+};
+const de_FileSet = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'created_at': smithy_client_1.expectString,
+        'latest': (_) => de_FileSetVersion(_, context),
+        'name': smithy_client_1.expectString,
+        'total_versions': smithy_client_1.expectLong,
+        'updated_at': smithy_client_1.expectString,
+    });
+};
+const de_FileSetList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_FileSet(entry, context);
+    });
+    return retVal;
+};
+const de_FileSetVersion = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'created_at': smithy_client_1.expectString,
+        'files': smithy_client_1._json,
+        'metadata': (_) => de_Document(_, context),
+        'version': smithy_client_1.expectInt32,
+    });
+};
+const de_FileSetVersionList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_FileSetVersion(entry, context);
     });
     return retVal;
 };

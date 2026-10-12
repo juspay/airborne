@@ -275,6 +275,166 @@ export interface CreateFileResponse {
     created_at: string | undefined;
 }
 /**
+ * Create file set request
+ * @public
+ */
+export interface CreateFileSetRequest {
+    /**
+     * Name of the file set, unique within the application
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * File keys snapshotted as version 1; at least one is required
+     * @public
+     */
+    files: (string)[] | undefined;
+    /**
+     * Metadata attached to version 1 (arbitrary JSON object)
+     * @public
+     */
+    metadata?: __DocumentType | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * A file belonging to a file set, resolved from the files table
+ * @public
+ */
+export interface FileSetMember {
+    /**
+     * File key, e.g. "path/to/file@version:3"
+     * @public
+     */
+    id: string | undefined;
+    /**
+     * Logical path of the file
+     * @public
+     */
+    file_path: string | undefined;
+    /**
+     * Version of the file
+     * @public
+     */
+    version: number | undefined;
+    /**
+     * Tag of the file, if any
+     * @public
+     */
+    tag?: string | undefined;
+    /**
+     * URL the file content is served from
+     * @public
+     */
+    url: string | undefined;
+    /**
+     * File size in bytes
+     * @public
+     */
+    size: number | undefined;
+    /**
+     * SHA256 checksum in hex
+     * @public
+     */
+    checksum: string | undefined;
+}
+/**
+ * One immutable version of a file set: its files plus its own metadata
+ * @public
+ */
+export interface FileSetVersion {
+    /**
+     * Version number, starting at 1
+     * @public
+     */
+    version: number | undefined;
+    /**
+     * Metadata attached to this version (arbitrary JSON object)
+     * @public
+     */
+    metadata: __DocumentType | undefined;
+    /**
+     * Files snapshotted by this version, resolved from the files table
+     * @public
+     */
+    files: (FileSetMember)[] | undefined;
+    /**
+     * When the version was created (RFC 3339)
+     * @public
+     */
+    created_at: string | undefined;
+}
+/**
+ * A file set summary: identity plus its latest version
+ * @public
+ */
+export interface FileSet {
+    /**
+     * Name of the set — its identity, unique within the application
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * Total number of versions
+     * @public
+     */
+    total_versions: number | undefined;
+    /**
+     * The latest version of the set
+     * @public
+     */
+    latest?: FileSetVersion | undefined;
+    /**
+     * When the set was created (RFC 3339)
+     * @public
+     */
+    created_at: string | undefined;
+    /**
+     * When the set was last updated (RFC 3339)
+     * @public
+     */
+    updated_at: string | undefined;
+}
+/**
+ * Create file set version request
+ * @public
+ */
+export interface CreateFileSetVersionRequest {
+    /**
+     * Name of the file set
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * File keys this version snapshots; at least one is required
+     * @public
+     */
+    files: (string)[] | undefined;
+    /**
+     * Metadata for this version (arbitrary JSON object; defaults to \{\})
+     * @public
+     */
+    metadata?: __DocumentType | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
  * Organisation creation request
  * @public
  */
@@ -626,6 +786,79 @@ export interface DeleteDimensionRequest {
      * @public
      */
     dimension: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * A file set with its full version history
+ * @public
+ */
+export interface FileSetDetail {
+    /**
+     * Name of the set — its identity, unique within the application
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * Every version of the set, newest first
+     * @public
+     */
+    versions: (FileSetVersion)[] | undefined;
+    /**
+     * When the set was created (RFC 3339)
+     * @public
+     */
+    created_at: string | undefined;
+    /**
+     * When the set was last updated (RFC 3339)
+     * @public
+     */
+    updated_at: string | undefined;
+}
+/**
+ * Get file set request
+ * @public
+ */
+export interface GetFileSetRequest {
+    /**
+     * Name of the file set
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * Get file set version request
+ * @public
+ */
+export interface GetFileSetVersionRequest {
+    /**
+     * Name of the file set
+     * @public
+     */
+    name: string | undefined;
+    /**
+     * Version number
+     * @public
+     */
+    version: number | undefined;
     /**
      * Name of the organisation
      * @public
@@ -1040,6 +1273,63 @@ export interface ListFilesResponse {
      * @public
      */
     per_page: number | undefined;
+}
+/**
+ * List file sets request
+ * @public
+ */
+export interface ListFileSetsRequest {
+    /**
+     * Page number for pagination
+     * @public
+     */
+    page?: number | undefined;
+    /**
+     * Number of sets per page
+     * @public
+     */
+    count?: number | undefined;
+    /**
+     * If true, fetch all sets without pagination
+     * @public
+     */
+    all?: boolean | undefined;
+    /**
+     * Search query to filter sets by name
+     * @public
+     */
+    search?: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+}
+/**
+ * List file sets response
+ * @public
+ */
+export interface ListFileSetsResponse {
+    /**
+     * List of file sets
+     * @public
+     */
+    data: (FileSet)[] | undefined;
+    /**
+     * Total number of sets
+     * @public
+     */
+    total_items: number | undefined;
+    /**
+     * Total number of pages
+     * @public
+     */
+    total_pages: number | undefined;
 }
 /**
  * List organisations response

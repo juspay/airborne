@@ -5,10 +5,13 @@ use crate::{
     run_blocking,
     types::{ABError, PaginatedQuery, PaginatedResponse, WithHeaders},
     utils::db::{
-        models::{NewPackageV2Entry, PackageV2Entry},
-        schema::hyperotaserver::packages_v2::{
-            app_id as package_app_id, index as package_index, org_id as package_org_id,
-            table as packages_table, tag as package_tag, version as package_version,
+        models::{FileEntry, FileSetEntry, NewPackageV2Entry, PackageV2Entry},
+        schema::hyperotaserver::{
+            file_sets, files as files_table_mod,
+            packages_v2::{
+                app_id as package_app_id, index as package_index, org_id as package_org_id,
+                table as packages_table, tag as package_tag, version as package_version,
+            },
         },
         DbPool,
     },
@@ -29,6 +32,21 @@ use diesel::RunQueryDsl;
 use diesel::{dsl::count_star, prelude::*};
 
 pub mod types;
+
+/// Upper bound on file sets per package: each referenced set costs its own
+/// lookups while the package is created, so the count must stay bounded.
+pub const MAX_FILE_SETS_PER_PACKAGE: usize = 100;
+
+fn validate_file_set_count(set_refs: &[FileSetRef]) -> airborne_types::Result<()> {
+    if set_refs.len() > MAX_FILE_SETS_PER_PACKAGE {
+        return Err(ABError::BadRequest(format!(
+            "A package can include at most {} file sets, got {}",
+            MAX_FILE_SETS_PER_PACKAGE,
+            set_refs.len()
+        )));
+    }
+    Ok(())
+}
 
 pub fn add_routes() -> Scope {
     Scope::new("")
@@ -57,6 +75,8 @@ async fn create_package(
 
     let pool = state.db_pool.clone();
     let request = req.into_inner();
+    let set_refs = request.file_sets.clone().unwrap_or_default();
+    validate_file_set_count(&set_refs)?;
 
     let files = get_files_by_file_keys_async(
         state.db_pool.clone(),
@@ -78,6 +98,63 @@ async fn create_package(
     let package = run_blocking!({
         let mut conn = pool.get()?;
 
+        // Resolve each referenced file set version to its member files and
+        // snapshot them: the package remembers exactly which sets (at which
+        // set version) contributed which files.
+        let mut set_snapshots: Vec<PackageFileSet> = Vec::new();
+        // Rule: the exact same file (path AND version) must not enter the
+        // package twice — across sets, or a set vs an individually
+        // chosen file. The same path at a different version is allowed.
+        let mut seen: std::collections::HashMap<String, String> = files
+            .iter()
+            .map(|f| {
+                (
+                    format!("{}@version:{}", f.file_path, f.version),
+                    "individually selected files".to_string(),
+                )
+            })
+            .collect();
+
+        for set_ref in &set_refs {
+            let set: FileSetEntry = file_sets::table
+                .filter(file_sets::org_id.eq(&db_organisation))
+                .filter(file_sets::app_id.eq(&db_application))
+                .filter(file_sets::name.eq(&set_ref.name))
+                .filter(file_sets::version.eq(set_ref.version))
+                .select(FileSetEntry::as_select())
+                .first(&mut conn)
+                .optional()?
+                .ok_or_else(|| {
+                    ABError::BadRequest(format!(
+                        "Version {} of file set '{}' not found",
+                        set_ref.version, set_ref.name
+                    ))
+                })?;
+
+            let member_files: Vec<FileEntry> = files_table_mod::table
+                .filter(files_table_mod::id.eq_any(&set.file_ids))
+                .select(FileEntry::as_select())
+                .load(&mut conn)?;
+
+            let mut keys: Vec<String> = Vec::new();
+            for f in &member_files {
+                let key = format!("{}@version:{}", f.file_path, f.version);
+                if let Some(source) = seen.insert(key.clone(), format!("file set '{}'", set.name)) {
+                    return Err(ABError::BadRequest(format!(
+                        "Duplicate file '{}': included by both {} and file set '{}'",
+                        key, source, set.name
+                    )));
+                }
+                keys.push(key);
+            }
+
+            set_snapshots.push(PackageFileSet {
+                name: set.name,
+                version: set.version,
+                files: keys,
+            });
+        }
+
         let latest_package = packages_table
             .filter(package_org_id.eq(&db_organisation))
             .filter(package_app_id.eq(&db_application))
@@ -92,16 +169,25 @@ async fn create_package(
             1
         };
 
+        let all_files: Vec<Option<String>> = files
+            .iter()
+            .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
+            .chain(
+                set_snapshots
+                    .iter()
+                    .flat_map(|g| g.files.iter().cloned().map(Some)),
+            )
+            .collect();
+
         let new_package = NewPackageV2Entry {
             index: db_pkg_index.clone(),
             org_id: db_organisation.clone(),
             app_id: db_application.clone(),
             tag: opt_pkg_tag.clone(),
             version: new_version,
-            files: files
-                .iter()
-                .map(|f| Some(format!("{}@version:{}", f.file_path, f.version)))
-                .collect(),
+            files: all_files,
+            file_sets: serde_json::to_value(&set_snapshots)
+                .map_err(|e| ABError::InternalServerError(e.to_string()))?,
         };
 
         let result = diesel::insert_into(packages_table)
@@ -310,4 +396,47 @@ async fn list_packages(
     })?;
 
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn refs(n: usize) -> Vec<FileSetRef> {
+        (0..n)
+            .map(|i| FileSetRef {
+                name: format!("set-{}", i),
+                version: 1,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn accepts_no_file_sets() {
+        assert!(validate_file_set_count(&refs(0)).is_ok());
+    }
+
+    #[test]
+    fn accepts_up_to_the_limit() {
+        assert!(validate_file_set_count(&refs(MAX_FILE_SETS_PER_PACKAGE)).is_ok());
+    }
+
+    #[test]
+    fn rejects_more_than_the_limit() {
+        match validate_file_set_count(&refs(MAX_FILE_SETS_PER_PACKAGE + 1)) {
+            Err(ABError::BadRequest(msg)) => {
+                assert!(
+                    msg.contains(&MAX_FILE_SETS_PER_PACKAGE.to_string()),
+                    "{}",
+                    msg
+                );
+                assert!(
+                    msg.contains(&(MAX_FILE_SETS_PER_PACKAGE + 1).to_string()),
+                    "{}",
+                    msg
+                );
+            }
+            other => panic!("expected BadRequest, got {:?}", other.map(|_| ())),
+        }
+    }
 }

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UpdateFileAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateFileSetAction, CreateFileSetVersionAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetFileSetAction, GetFileSetVersionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListFileSetsAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UpdateFileAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -364,6 +364,186 @@ JSON file format (params.json):
 
 
 program
+  .command("CreateFileSet")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--name <name>", "name parameter")
+ .option("--files <files...>", "files parameter", [])
+ .option("--metadata <metadata>", "metadata parameter", (value) => {
+  try {
+    if (value.startsWith("@")) {
+      return readJsonFile(value.slice(1));
+    }
+    return JSON.parse(value);
+  } catch (err) {
+    throw new Error("--metadata must be valid JSON or a @file.json path");
+  }
+})
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Create a file set: a named, versioned collection of files that can be selected together when building packages and releases. Names are unique within the application; the given files and metadata become version 1. Every file key must resolve to an existing file. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli CreateFileSet \\
+     --name <name> \\
+     --files <files> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--metadata <json|@file.json>]
+
+Usage 2 - JSON file:
+  airborne-core-cli CreateFileSet @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli CreateFileSet @params.json --name <value> --files <value> --token <value>
+
+Parameters:
+    --name <string> (required) : Name of the file set, unique within the application
+    --files [<string>] (required) : File keys snapshotted as version 1; at least one is required
+    --metadata <document> (optional) : Metadata attached to version 1 (arbitrary JSON object)
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli CreateFileSet \\
+     --name <name> \\
+     --files <files> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--metadata <json|@file.json>]
+
+2. Using JSON file:
+   $ airborne-core-cli CreateFileSet @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli CreateFileSet @params.json --name <value> --files <value> --token <value>
+
+JSON file format (params.json):
+{
+  "name": "example_name",
+  "files": "example_files",
+  "metadata": {
+    "example_key": "example_value",
+    "version": "1.0.0"
+  },
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await CreateFileSetAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("CreateFileSetVersion")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--name <name>", "name parameter")
+ .option("--files <files...>", "files parameter", [])
+ .option("--metadata <metadata>", "metadata parameter", (value) => {
+  try {
+    if (value.startsWith("@")) {
+      return readJsonFile(value.slice(1));
+    }
+    return JSON.parse(value);
+  } catch (err) {
+    throw new Error("--metadata must be valid JSON or a @file.json path");
+  }
+})
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Create a new immutable version of a file set, snapshotting the given files with its own metadata. The version number is assigned automatically. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli CreateFileSetVersion \\
+     --name <name> \\
+     --files <files> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--metadata <json|@file.json>]
+
+Usage 2 - JSON file:
+  airborne-core-cli CreateFileSetVersion @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli CreateFileSetVersion @params.json --name <value> --files <value> --token <value>
+
+Parameters:
+    --name <string> (required) : Name of the file set
+    --files [<string>] (required) : File keys this version snapshots; at least one is required
+    --metadata <document> (optional) : Metadata for this version (arbitrary JSON object; defaults to {})
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli CreateFileSetVersion \\
+     --name <name> \\
+     --files <files> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--metadata <json|@file.json>]
+
+2. Using JSON file:
+   $ airborne-core-cli CreateFileSetVersion @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli CreateFileSetVersion @params.json --name <value> --files <value> --token <value>
+
+JSON file format (params.json):
+{
+  "name": "example_name",
+  "files": "example_files",
+  "metadata": {
+    "example_key": "example_value",
+    "version": "1.0.0"
+  },
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await CreateFileSetVersionAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("CreateOrganisation")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--name <name>", "name parameter")
@@ -647,6 +827,153 @@ JSON file format (params.json):
     try {
       
       const output = await DeleteDimensionAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetFileSet")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--name <name>", "name parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Get a file set and its full version history by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetFileSet \\
+     --name <name> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetFileSet @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetFileSet @params.json --name <value> --organisation <value> --token <value>
+
+Parameters:
+    --name <string> (required) : Name of the file set
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetFileSet \\
+     --name <name> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetFileSet @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetFileSet @params.json --name <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "name": "example_name",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetFileSetAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetFileSetVersion")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--name <name>", "name parameter")
+ .option("--version <version>", "version parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--version must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Get one version of a file set with its resolved files and metadata. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetFileSetVersion \\
+     --name <name> \\
+     --version <version> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetFileSetVersion @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetFileSetVersion @params.json --name <value> --version <value> --token <value>
+
+Parameters:
+    --name <string> (required) : Name of the file set
+    --version <integer> (required) : Version number
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetFileSetVersion \\
+     --name <name> \\
+     --version <version> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetFileSetVersion @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetFileSetVersion @params.json --name <value> --version <value> --token <value>
+
+JSON file format (params.json):
+{
+  "name": "example_name",
+  "version": 123,
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetFileSetVersionAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
@@ -1030,6 +1357,99 @@ JSON file format (params.json):
     try {
       
       const output = await ListFilesAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("ListFileSets")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--page <page>", "page parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--page must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--count <count>", "count parameter", (value) => {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new Error("--count must be a valid integer");
+  }
+  return parsed;
+})
+ .option("--all <all>", "all parameter", (value) => {
+  if (value.toLowerCase() === 'true') return true;
+  if (value.toLowerCase() === 'false') return false;
+  throw new Error("--all must be true or false");
+})
+ .option("--search <search>", "search parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List the file sets of the application, ordered by name. Supports pagination and an optional name search. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListFileSets \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ListFileSets @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListFileSets @params.json --page <value> --count <value> --token <value>
+
+Parameters:
+    --page <integer> (optional) : Page number for pagination
+    --count <integer> (optional) : Number of sets per page
+    --all <boolean> (optional) : If true, fetch all sets without pagination
+    --search <string> (optional) : Search query to filter sets by name
+    --organisation <string> (required) : Name of the organisation
+    --application <string> (required) : Name of the application
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListFileSets \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--page <page>]
+
+2. Using JSON file:
+   $ airborne-core-cli ListFileSets @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListFileSets @params.json --page <value> --count <value> --token <value>
+
+JSON file format (params.json):
+{
+  "page": 123,
+  "count": 123,
+  "all": "example_all",
+  "search": "example_search",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListFileSetsAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
