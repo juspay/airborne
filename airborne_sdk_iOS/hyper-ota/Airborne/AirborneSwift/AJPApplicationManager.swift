@@ -1194,7 +1194,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         let currentSplits = currentManifest.allImportantSplits()
         let newSplits = newManifest.allImportantSplits()
-        let toDownload = utils.getResourcesFrom(newSplits, filtering: currentSplits, isFirstRunAfterInstallation: AJPApplicationManager.isFirstRunAfterInstallation)
+        let toDownload = utils.getResourcesFrom(newSplits, filtering: currentSplits, isFirstRunAfterInstallation: AJPApplicationManager.isFirstRunAfterInstallation, requiringPresenceInMain: true)
         
         self.tracker.trackInfo("important_package_download_started", value: NSMutableDictionary(dictionary: ["package_version": newManifest.version]))
         let packageStartTime = Date().timeIntervalSince1970 * 1000

@@ -110,19 +110,46 @@ class AJPApplicationManagerUtils {
     
     // MARK: - Resources and Strings
     
-    func getResourcesFrom(_ newSplits: [AJPResource], filtering currentSplits: [AJPResource], isFirstRunAfterInstallation: Bool) -> [AJPResource] {
+    /// Filters `newSplits` down to the ones that actually need downloading.
+    ///
+    /// - Parameter requiringPresenceInMain: also queue a split whose file is missing from the
+    ///   package's `main` directory. Pass `true` for important splits, whose installation is
+    ///   gated on the file being present; leave it `false` for lazy splits, which are absent
+    ///   from disk until they are downloaded and track that through `isDownloaded`.
+    func getResourcesFrom(_ newSplits: [AJPResource], filtering currentSplits: [AJPResource], isFirstRunAfterInstallation: Bool, requiringPresenceInMain: Bool = false) -> [AJPResource] {
         if isFirstRunAfterInstallation {
             return newSplits
         }
-        
+
         var currentResourcesDict: [String: AJPResource] = [:]
         for currentResource in currentSplits {
             currentResourcesDict[currentResource.filePath] = currentResource
         }
-        
+
+        // Listed once up front rather than stat-ing per split. Comparing manifests cannot tell
+        // whether a file survived on disk, and a split that is missing from main/ will never be
+        // re-fetched by the diff alone — `isAppInstalled` then rejects the package on this and
+        // every later boot, pinning the app to its current version for good.
+        var filesInMain = Set<String>()
+        if requiringPresenceInMain {
+            filesInMain = Set(getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+                                                     subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR,
+                                                     includeSubfolders: true))
+        }
+
         return newSplits.filter { newResource in
             let currentResource = currentResourcesDict[newResource.filePath]
-            return shouldDownloadResource(newResource, existingResource: currentResource)
+            if shouldDownloadResource(newResource, existingResource: currentResource) {
+                return true
+            }
+
+            guard requiringPresenceInMain else { return false }
+
+            // Either name counts as present: the downloader writes `filePath` verbatim while
+            // `isAppInstalled` looks for the `.jsa` -> `.js` form, and honouring only one of them
+            // would re-download such a split on every single boot.
+            return !filesInMain.contains(newResource.filePath)
+                && !filesInMain.contains(jsFileName(for: newResource.filePath))
         }
     }
     
@@ -212,19 +239,28 @@ class AJPApplicationManagerUtils {
     func moveAllPackagesFromTempToMain() {
         let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.JUSPAY_TEMP_DIR, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
 
-        guard let tempFiles = try? FileManager.default.contentsOfDirectory(atPath: tempDirPath) else {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: tempDirPath, isDirectory: &isDirectory), isDirectory.boolValue else {
             let map = NSMutableDictionary()
             map["error"] = "Could not read temp directory"
             tracker.trackError("temp_directory_read_failed", value: map)
             return
         }
 
+        // Enumerated recursively so every entry handed to `movePackageFromTempToMain` is a file.
+        // Moving a top-level entry instead would hand it a *directory*, and that call deletes the
+        // destination before moving: `main/assets` would lose every file this update's delta did
+        // not re-download. This is the enumeration `handleTempPackageInstallation` already uses
+        // when installing a package staged after a boot timeout.
+        let tempFiles = getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+                                               subFolder: AJPApplicationConstants.JUSPAY_TEMP_DIR,
+                                               includeSubfolders: true)
+
+        var movedCount = 0
         for fileName in tempFiles {
             do {
                 try movePackageFromTempToMain(fileName)
-                let map = NSMutableDictionary()
-                map["file"] = fileName
-                tracker.trackInfo("file_moved_to_main", value: map)
+                movedCount += 1
             } catch {
                 let map = NSMutableDictionary()
                 map["file"] = fileName
@@ -232,6 +268,13 @@ class AJPApplicationManagerUtils {
                 tracker.trackError("file_move_failed", value: map)
             }
         }
+
+        // Reported once with a count rather than once per file: a package can carry hundreds of
+        // nested assets and this runs on the boot path. Failures are still logged individually.
+        let map = NSMutableDictionary()
+        map["count"] = NSNumber(value: movedCount)
+        map["total"] = NSNumber(value: tempFiles.count)
+        tracker.trackInfo("file_moved_to_main", value: map)
     }
 
     func moveResourceToMain(_ resource: AJPResource) {
