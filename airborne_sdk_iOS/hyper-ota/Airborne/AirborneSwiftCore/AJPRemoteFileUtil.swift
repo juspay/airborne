@@ -48,19 +48,25 @@ public typealias AJPDownloadCallback = @convention(block) (Bool, Data?, String?,
     ///   - remoteURL: The URL string of the remote file.
     ///   - localURL: The local file path where the downloaded file should be saved.
     ///   - expectedChecksum: An optional SHA256 checksum to validate against. Pass nil to skip validation.
+    ///   - requestHeaders: Additional HTTP headers to include in the request (e.g. `If-None-Match`).
+    ///   - options: Configuration options like `connectionTimeout`, `readTimeout` (in milliseconds) and `cachePolicy`.
     ///   - callback: A callback invoked with the result of the download operation.
-    @objc(downloadFileFromURL:andSaveFileAtUrl:checksum:callback:)
+    @objc(downloadFileFromURL:andSaveFileAtUrl:checksum:requestHeaders:options:callback:)
     open func downloadFile(
         from remoteURL: String,
         andSaveFileAtUrl localURL: String,
         checksum expectedChecksum: String?,
+        requestHeaders: NSDictionary? = nil,
+        options: NSDictionary? = nil,
         callback: @escaping AJPDownloadCallback
     ) {
         Task {
             let (status, data, error, response) = await self.downloadFile(
                 from: remoteURL,
                 andSaveFileAtUrl: localURL,
-                checksum: expectedChecksum
+                checksum: expectedChecksum,
+                requestHeaders: requestHeaders,
+                options: options
             )
             callback(status, data, error, response)
         }
@@ -71,12 +77,16 @@ public typealias AJPDownloadCallback = @convention(block) (Bool, Data?, String?,
     ///   - remoteURL: The URL string of the remote file.
     ///   - localURL: The local file path where the downloaded file should be saved.
     ///   - expectedChecksum: An optional SHA256 checksum to validate against.
+    ///   - requestHeaders: Additional HTTP headers to include in the request (e.g. `If-None-Match`).
+    ///   - options: Configuration options like `connectionTimeout`, `readTimeout` (in milliseconds) and `cachePolicy`.
     ///   - callback: A callback invoked with the result of the download operation.
-    @objc(downloadFileWithCheckFromURL:andSaveFileAtUrl:checksum:callback:)
+    @objc(downloadFileWithCheckFromURL:andSaveFileAtUrl:checksum:requestHeaders:options:callback:)
     open func downloadFileWithCheck(
         from remoteURL: String,
         andSaveFileAtUrl localURL: String,
         checksum expectedChecksum: String?,
+        requestHeaders: NSDictionary? = nil,
+        options: NSDictionary? = nil,
         callback: @escaping AJPDownloadCallback
     ) {
         Task {
@@ -89,11 +99,13 @@ public typealias AJPDownloadCallback = @convention(block) (Bool, Data?, String?,
                 callback(false, nil, "File doesn't exist at url: \(remoteURL)", nil)
                 return
             }
-            
+
             let (status, data, error, response) = await self.downloadFile(
                 from: remoteURL,
                 andSaveFileAtUrl: localURL,
-                checksum: expectedChecksum
+                checksum: expectedChecksum,
+                requestHeaders: requestHeaders,
+                options: options
             )
             callback(status, data, error, response)
         }
@@ -112,21 +124,38 @@ public typealias AJPDownloadCallback = @convention(block) (Bool, Data?, String?,
         return false
     }
 
-    /// Downloads a file from a remote URL and saves it to a local path.
+    /// Downloads a file from a remote URL and saves it to a local path, with optional headers and options.
+    /// Optionally validates the downloaded data against an expected SHA256 checksum.
     /// - Parameters:
     ///   - remoteURL: The URL string of the remote file.
     ///   - localURL: The local file path to save the file to.
     ///   - expectedChecksum: An optional SHA256 checksum to validate against.
+    ///   - requestHeaders: Additional HTTP headers to include in the request (e.g. `If-None-Match`).
+    ///   - options: Configuration options like `connectionTimeout`, `readTimeout` (in milliseconds) and `cachePolicy`.
     /// - Returns: A tuple of (success, data, error message, response).
     open func downloadFile(
         from remoteURL: String,
         andSaveFileAtUrl localURL: String,
-        checksum expectedChecksum: String?
+        checksum expectedChecksum: String?,
+        requestHeaders: NSDictionary? = nil,
+        options: NSDictionary? = nil
     ) async -> (Bool, Data?, String?, URLResponse?) {
-        let (response, responseData, networkError) = await networkClient.fetchResourceAsync(remoteURL)
-        
-        if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
-            return (false, nil, "HTTP error \(httpResponse.statusCode) while downloading file from \(remoteURL)", response)
+        let (response, responseData, networkError) = await networkClient.apiCallAsync(
+            for: remoteURL,
+            requestType: .get,
+            params: nil,
+            headers: requestHeaders,
+            options: options
+        )
+
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 304 {
+                // Conditional request (e.g. If-None-Match): file is already up to date, nothing to download
+                return (true, nil, nil, response)
+            }
+            if !(200...299).contains(httpResponse.statusCode) {
+                return (false, nil, "HTTP error \(httpResponse.statusCode) while downloading file from \(remoteURL)", response)
+            }
         }
 
         guard let fileData = responseData else {
