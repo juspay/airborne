@@ -156,7 +156,12 @@ private final class AJPRedirectHandler: NSObject, URLSessionTaskDelegate {
         if connectionTimeout != -1 {
             urlRequest.timeoutInterval = Double(connectionTimeout) / 1000.0
         }
-
+        
+        if let cachePolicyValue = options?["cachePolicy"] as? NSNumber,
+           let cachePolicy = URLRequest.CachePolicy(rawValue: cachePolicyValue.uintValue) {
+            urlRequest.cachePolicy = cachePolicy
+        }
+        
         // Merge default headers with request-specific headers
         var allHeaders: [String: String] = [:]
         for (key, value) in defaultHeaders {
