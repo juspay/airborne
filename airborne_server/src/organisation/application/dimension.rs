@@ -14,10 +14,13 @@ use crate::{
     utils::{
         db::{models::ReleaseViewEntry, schema::hyperotaserver::release_views},
         document::{hashmap_to_json_value, schema_doc_to_hashmap, value_to_document},
+        release_view::{self, ReleaseViewType},
     },
 };
 use diesel::prelude::*;
-use release_views::dsl::{app_id, created_at, dimensions as dimensions_col, id, name, org_id};
+use release_views::dsl::{
+    app_id, created_at, dimensions as dimensions_col, id, name, org_id, view_type as view_type_col,
+};
 use serde_json::Value;
 use types::*;
 use uuid::Uuid;
@@ -25,11 +28,16 @@ use uuid::Uuid;
 mod cohort;
 mod types;
 
+/// Dimensions Superposition owns rather than the app: the experimentation module resolves every
+/// variant through `variantIds`, so deleting it would break variant targeting workspace-wide.
+const RESERVED_DIMENSIONS: [&str; 1] = ["variantIds"];
+
 pub fn add_routes() -> Scope {
     Scope::new("")
         .service(create_dimension_api)
         .service(list_dimensions_api)
         .service(update_dimension_api)
+        .service(list_dimension_active_releases_api)
         .service(delete_dimension_api)
         .service(create_release_view_api)
         .service(list_release_views_api)
@@ -329,6 +337,166 @@ async fn update_dimension_api(
     }))
 }
 
+/// The live release of every dimension slice that targets `dimension`.
+///
+/// A release view is one slice that has been released to, and the newest release in it is the one
+/// serving that slice today — so those are exactly the releases that have to go before the
+/// dimension can be deleted. Discarded releases never served anything and are skipped.
+async fn active_releases_using_dimension(
+    dimension: &str,
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+    state: &web::Data<AppState>,
+) -> airborne_types::Result<Vec<DimensionActiveRelease>> {
+    let affected_views = {
+        let pool = state.db_pool.clone();
+        let org = organisation.to_string();
+        let app = application.to_string();
+        let dimension = dimension.to_string();
+
+        run_blocking!({
+            let mut conn = pool.get()?;
+            let views = release_views::table
+                .filter(app_id.eq(&app))
+                .filter(org_id.eq(&org))
+                .load::<ReleaseViewEntry>(&mut conn)
+                .map_err(|e| {
+                    ABError::InternalServerError(format!("Failed to list release views: {}", e))
+                })?;
+
+            Ok(views
+                .into_iter()
+                .filter_map(|view| {
+                    let context = release_view::view_dimensions_to_context(&view.dimensions);
+                    context.contains_key(&dimension).then_some((view, context))
+                })
+                .collect::<Vec<_>>())
+        })?
+    };
+
+    if affected_views.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // One listing of this app's releases, matched against each view's context here rather than
+    // asking Superposition to filter per view — that keeps this correct regardless of how context
+    // filtering behaves, and costs one call instead of one per view.
+    let experiments = crate::release::utils::list_experiments_by_context(
+        crate::release::types::ListExperimentsQuery {
+            superposition_org_id: state.env.superposition_org_id.clone(),
+            workspace_name: workspace_name.to_string(),
+            context: std::collections::HashMap::new(),
+            strict_mode: false,
+            page: None,
+            count: None,
+            all: true,
+            status: None,
+            experiment_name: Some(format!("{}-{}-release-exp", application, organisation)),
+        },
+        state.clone(),
+    )
+    .await?;
+
+    // Already sorted newest-first by the listing, so the first match per view is its active release.
+    let releases: Vec<_> = experiments
+        .data()
+        .iter()
+        .filter(|exp| exp.status != superposition_sdk::types::ExperimentStatusType::Discarded)
+        .map(|exp| {
+            let context: std::collections::HashMap<String, String> = exp
+                .context
+                .iter()
+                .map(|(key, value)| {
+                    let value = crate::utils::document::document_to_json_value(value);
+                    (
+                        key.clone(),
+                        value.as_str().map(str::to_string).unwrap_or_default(),
+                    )
+                })
+                .collect();
+            (exp, context)
+        })
+        .collect();
+
+    // Several views can describe the same slice — a hand-made one alongside the auto-generated one
+    // — but they share a single live release, and it should be listed once.
+    let mut seen = std::collections::HashSet::new();
+
+    Ok(affected_views
+        .into_iter()
+        .filter_map(|(view, view_context)| {
+            let view_context: std::collections::HashMap<String, String> = view_context
+                .into_iter()
+                .map(|(key, value)| (key, value.as_str().unwrap_or_default().to_string()))
+                .collect();
+
+            releases
+                .iter()
+                .find(|(_, context)| *context == view_context)
+                .filter(|(exp, _)| seen.insert(exp.id.to_string()))
+                .map(|(exp, _)| {
+                    let experimental_variant = exp.variants.iter().find(|variant| {
+                        variant.variant_type == superposition_sdk::types::VariantType::Experimental
+                    });
+
+                    DimensionActiveRelease {
+                        release_id: exp.id.to_string(),
+                        view_id: view.id,
+                        view_name: view.name.clone(),
+                        dimensions: view.dimensions.clone(),
+                        status: exp.status.to_string(),
+                        package_version: crate::release::utils::extract_integer_from_experiment::<
+                            i64,
+                        >(
+                            &experimental_variant, "package.version"
+                        ) as i32,
+                    }
+                })
+        })
+        .collect())
+}
+
+#[authz(
+    resource = "dimension",
+    action = "read",
+    org_roles = ["owner", "admin", "write", "read"],
+    app_roles = ["admin", "write", "read"]
+)]
+#[get("/{dimension_name}/active-releases")]
+async fn list_dimension_active_releases_api(
+    path: Path<String>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<DimensionActiveReleasesResponse>> {
+    let auth_response = auth_response.into_inner();
+    let (organisation, application) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
+    let dimension = path.into_inner();
+
+    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+        state.db_pool.clone(),
+        &state.redis_cache,
+        application.clone(),
+        organisation.clone(),
+    )
+    .await
+    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+
+    let data = active_releases_using_dimension(
+        &dimension,
+        &organisation,
+        &application,
+        &workspace_name,
+        &state,
+    )
+    .await?;
+
+    Ok(Json(DimensionActiveReleasesResponse { dimension, data }))
+}
+
 #[authz(
     resource = "dimension",
     action = "delete",
@@ -346,6 +514,14 @@ async fn delete_dimension_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    let dimension = path.into_inner();
+
+    if RESERVED_DIMENSIONS.contains(&dimension.as_str()) {
+        return Err(ABError::BadRequest(format!(
+            "'{}' is an internal dimension and cannot be deleted",
+            dimension
+        )));
+    }
 
     // Get workspace name for this application
     let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
@@ -357,12 +533,35 @@ async fn delete_dimension_api(
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
 
+    // Same check the delete dialog runs, enforced here too so a release created in between (or a
+    // caller that skipped the dialog) cannot strand a slice on a dimension that no longer exists.
+    let blocking = active_releases_using_dimension(
+        &dimension,
+        &organisation,
+        &application,
+        &workspace_name,
+        &state,
+    )
+    .await?;
+
+    if !blocking.is_empty() {
+        return Err(ABError::BadRequest(format!(
+            "{} release(s) still target this dimension ({}). Delete them from their release views first.",
+            blocking.len(),
+            blocking
+                .iter()
+                .map(|release| release.view_name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )));
+    }
+
     state
         .superposition_client
         .delete_dimension()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name.clone())
-        .dimension(path.into_inner())
+        .dimension(dimension)
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;
@@ -457,18 +656,20 @@ async fn create_release_view_api(
                 org_id.eq(organisation),
                 name.eq(req_name),
                 dimensions_col.eq(req_dimensions),
+                view_type_col.eq(ReleaseViewType::Custom.as_str()),
             ))
             .get_result::<ReleaseViewEntry>(&mut conn)
-            .map_err(|e| ABError::InternalServerError(format!("DB insert failed: {}", e)))?;
+            .map_err(|e| match e {
+                diesel::result::Error::DatabaseError(
+                    diesel::result::DatabaseErrorKind::UniqueViolation,
+                    _,
+                ) => ABError::BadRequest("A view with this name already exists".to_string()),
+                other => ABError::InternalServerError(format!("DB insert failed: {}", other)),
+            })?;
         Ok(result)
     })?;
 
-    Ok(Json(ReleaseView {
-        id: created_view.id,
-        name: created_view.name,
-        dimensions: created_view.dimensions,
-        created_at: created_view.created_at,
-    }))
+    Ok(Json(created_view.into()))
 }
 
 #[authz(
@@ -492,20 +693,29 @@ async fn list_release_views_api(
     let page = query.page.unwrap_or(1).max(1);
     let count = query.count.unwrap_or(20);
     let offset = (page - 1) * count;
+    let type_filter = query.view_type;
     let pool = state.db_pool.clone();
 
     let (total_items, rows) = run_blocking!({
         let mut conn = pool.get()?;
 
-        let total_items: i64 = release_views::table
+        let mut count_query = release_views::table
             .filter(app_id.eq(&application))
             .filter(org_id.eq(&organisation))
-            .count()
-            .get_result(&mut conn)?;
+            .into_boxed();
+        let mut rows_query = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .into_boxed();
 
-        let rows = release_views::table
-            .filter(app_id.eq(&application))
-            .filter(org_id.eq(&organisation))
+        if let Some(view_type) = type_filter {
+            count_query = count_query.filter(view_type_col.eq(view_type.as_str()));
+            rows_query = rows_query.filter(view_type_col.eq(view_type.as_str()));
+        }
+
+        let total_items: i64 = count_query.count().get_result(&mut conn)?;
+
+        let rows = rows_query
             .order(created_at.desc())
             .offset(offset.into())
             .limit(count.into())
@@ -517,15 +727,7 @@ async fn list_release_views_api(
     let total_pages = ((total_items as f64) / (count as f64)).ceil() as i64;
 
     Ok(Json(ListReleaseViewsResponse {
-        data: rows
-            .into_iter()
-            .map(|row| ReleaseView {
-                id: row.id,
-                name: row.name,
-                dimensions: row.dimensions,
-                created_at: row.created_at,
-            })
-            .collect(),
+        data: rows.into_iter().map(ReleaseView::from).collect(),
         total_items: Some(total_items),
         total_pages: Some(total_pages),
     }))
@@ -562,21 +764,12 @@ async fn get_release_view_api(
             .filter(org_id.eq(&organisation))
             .filter(id.eq(&view_id))
             .first::<ReleaseViewEntry>(&mut conn)
-            .map_err(|e| {
-                if e.to_string().contains("NotFound") {
-                    ABError::NotFound("View not found".to_string())
-                } else {
-                    ABError::InternalServerError(format!("Failed to fetch view: {}", e))
-                }
-            })
+            .optional()
+            .map_err(|e| ABError::InternalServerError(format!("Failed to fetch view: {}", e)))?
+            .ok_or_else(|| ABError::NotFound("View not found".to_string()))
     })?;
 
-    Ok(Json(ReleaseView {
-        id: view.id,
-        name: view.name,
-        dimensions: view.dimensions,
-        created_at: view.created_at,
-    }))
+    Ok(Json(view.into()))
 }
 
 #[authz(
@@ -661,6 +854,24 @@ async fn update_release_view_api(
 
     let updated_view = run_blocking!({
         let mut conn = pool.get()?;
+
+        let existing = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .filter(id.eq(&view_id))
+            .first::<ReleaseViewEntry>(&mut conn)
+            .optional()
+            .map_err(|e| ABError::InternalServerError(format!("Failed to fetch view: {}", e)))?
+            .ok_or_else(|| ABError::NotFound("View not found".to_string()))?;
+
+        // Auto-generated views mirror a release's dimensions, so editing them would make the name
+        // and filter lie about where they came from. Users delete them or create a custom view.
+        if ReleaseViewType::from(existing.view_type.as_str()) == ReleaseViewType::AutoGenerated {
+            return Err(ABError::BadRequest(
+                "Auto-generated views cannot be edited. Create a custom view instead.".to_string(),
+            ));
+        }
+
         let result = diesel::update(
             release_views::table.filter(
                 app_id
@@ -671,22 +882,18 @@ async fn update_release_view_api(
         )
         .set((dimensions_col.eq(&req_dimensions), name.eq(&req_name)))
         .get_result::<ReleaseViewEntry>(&mut conn)
-        .map_err(|e| {
-            if e.to_string().contains("NotFound") {
-                ABError::NotFound("View not found".to_string())
-            } else {
-                ABError::InternalServerError(format!("Failed to update view: {}", e))
-            }
+        .map_err(|e| match e {
+            diesel::result::Error::NotFound => ABError::NotFound("View not found".to_string()),
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                _,
+            ) => ABError::BadRequest("A view with this name already exists".to_string()),
+            other => ABError::InternalServerError(format!("Failed to update view: {}", other)),
         })?;
         Ok(result)
     })?;
 
-    Ok(Json(ReleaseView {
-        id: updated_view.id,
-        name: updated_view.name,
-        dimensions: updated_view.dimensions,
-        created_at: updated_view.created_at,
-    }))
+    Ok(Json(updated_view.into()))
 }
 
 #[authz(
@@ -715,6 +922,24 @@ async fn delete_release_view_api(
 
     let deleted_rows = run_blocking!({
         let mut conn = pool.get()?;
+
+        let existing = release_views::table
+            .filter(app_id.eq(&application))
+            .filter(org_id.eq(&organisation))
+            .filter(id.eq(&view_id))
+            .first::<ReleaseViewEntry>(&mut conn)
+            .optional()
+            .map_err(|e| ABError::InternalServerError(format!("Failed to fetch view: {}", e)))?
+            .ok_or_else(|| ABError::NotFound("View not found".to_string()))?;
+
+        // An auto-generated view stands for a live dimension slice, so it goes away only when that
+        // slice's release is deleted (POST /releases/views/{view_id}/delete), not on its own.
+        if ReleaseViewType::from(existing.view_type.as_str()) == ReleaseViewType::AutoGenerated {
+            return Err(ABError::BadRequest(
+                "Auto-generated views are removed when their release is deleted".to_string(),
+            ));
+        }
+
         let rows = diesel::delete(
             release_views::table
                 .filter(app_id.eq(&application))
