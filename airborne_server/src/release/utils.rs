@@ -18,7 +18,7 @@ use std::{
 
 use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use diesel::{
     prelude::*,
     sql_query,
@@ -27,6 +27,7 @@ use diesel::{
 use http::{uri::PathAndQuery, Uri};
 use log::{debug, info};
 use serde_json::Value;
+use superposition_provider::utils::ConversionUtils;
 use superposition_sdk::{
     operation::list_experiment::ListExperimentOutput,
     types::{ExperimentSortOn, SortBy, Variant, VariantType},
@@ -491,6 +492,197 @@ pub async fn invalidate_cf(
         });
 
     Ok(())
+}
+
+fn smithy_time_to_chrono(ts: &aws_smithy_types::DateTime) -> DateTime<Utc> {
+    Utc.timestamp_nanos(ts.as_nanos() as i64)
+}
+
+/// Superposition config-key prefix the unresolved bundle is narrowed to.
+const PROPERTIES_PREFIX: &str = "config.properties";
+
+/// Redis key part for the cached bundle, under the shared `<prefix>:<org>:<app>:`
+/// namespace.
+const UNRESOLVED_PROPERTIES_KEY: &str = "unresolved_properties";
+
+/// Backstop only — every mutation that can change the bundle refreshes it
+/// explicitly (see [`refresh_unresolved_properties`]).
+const UNRESOLVED_PROPERTIES_TTL: usize = 7 * 24 * 60 * 60;
+
+/// Fetches the unresolved Superposition bundle for a workspace, narrowed to the
+/// `config.properties` key space, in the shape `superposition_core` consumes.
+pub async fn fetch_unresolved_properties(
+    state: &web::Data<AppState>,
+    workspace_name: &str,
+) -> airborne_types::Result<UnresolvedProperties> {
+    let superposition_org_id = state.env.superposition_org_id.clone();
+
+    let config_fut = state
+        .superposition_client
+        .get_config()
+        .org_id(superposition_org_id.clone())
+        .workspace_id(workspace_name.to_string())
+        .prefix(PROPERTIES_PREFIX)
+        .send();
+
+    let experiments_fut = state
+        .superposition_client
+        .get_experiment_config()
+        .org_id(superposition_org_id)
+        .workspace_id(workspace_name.to_string())
+        .prefix(PROPERTIES_PREFIX)
+        .send();
+
+    let (config_output, experiment_output) = tokio::join!(config_fut, experiments_fut);
+
+    let config_output = config_output.map_err(|e| {
+        ABError::InternalServerError(format!("Failed to fetch config from Superposition: {}", e))
+    })?;
+    let experiment_output = experiment_output.map_err(|e| {
+        ABError::InternalServerError(format!(
+            "Failed to fetch experiment config from Superposition: {}",
+            e
+        ))
+    })?;
+
+    let config_version = config_output.version.clone();
+    let config_last_modified = smithy_time_to_chrono(&config_output.last_modified);
+    let experiments_last_modified = smithy_time_to_chrono(&experiment_output.last_modified);
+
+    // Reuse the SDK -> superposition_types conversion the local-resolution
+    // provider uses, so the payload is byte-identical to what a client that
+    // talked to Superposition directly would have received.
+    let config = ConversionUtils::convert_get_config_response(config_output)
+        .map_err(|e| ABError::InternalServerError(format!("Failed to convert config: {}", e)))?;
+    let experiment_config = ConversionUtils::convert_experiment_config_response(experiment_output)
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to convert experiment config: {}", e))
+        })?;
+
+    fn to_value<T: serde::Serialize>(what: &str, v: &T) -> airborne_types::Result<Value> {
+        serde_json::to_value(v).map_err(|e| {
+            ABError::InternalServerError(format!("Failed to serialise {}: {}", what, e))
+        })
+    }
+
+    Ok(UnresolvedProperties {
+        config: to_value("config", &config)?,
+        config_version,
+        config_last_modified,
+        experiments: to_value("experiments", &experiment_config.experiments)?,
+        experiment_groups: to_value("experiment groups", &experiment_config.experiment_groups)?,
+        experiments_last_modified,
+    })
+}
+
+/// Redis-first read of the unresolved bundle for an (org, app).
+///
+/// Cache-aside rather than [`RedisCache::get_or_try_set`] on purpose: that helper
+/// propagates a Redis error instead of falling through, and losing Redis should
+/// cost latency, not the bundle. A Redis failure is logged and treated as a miss.
+///
+/// Populates with `SET … NX` so that a reader whose fetch raced a mutation cannot
+/// clobber the newer bundle [`refresh_unresolved_properties`] wrote. Writers still
+/// overwrite unconditionally — theirs is always the authoritative value.
+pub async fn get_unresolved_properties(
+    state: &web::Data<AppState>,
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+) -> airborne_types::Result<UnresolvedProperties> {
+    let cached_key = state
+        .redis_cache
+        .as_ref()
+        .map(|cache| cache.key(organisation, application, &[UNRESOLVED_PROPERTIES_KEY]));
+
+    if let (Some(cache), Some(key)) = (state.redis_cache.as_ref(), cached_key.as_ref()) {
+        match cache.get::<UnresolvedProperties>(key).await {
+            Ok(Some(hit)) => return Ok(hit),
+            Ok(None) => {}
+            Err(e) => log::warn!(
+                "[UNRESOLVED PROPERTIES] cache read failed for {}/{}, falling back to \
+                 Superposition: {}",
+                organisation,
+                application,
+                e
+            ),
+        }
+    }
+
+    let fresh = fetch_unresolved_properties(state, workspace_name).await?;
+
+    if let (Some(cache), Some(key)) = (state.redis_cache.as_ref(), cached_key.as_ref()) {
+        match cache
+            .set_ex_nx(key, &fresh, UNRESOLVED_PROPERTIES_TTL)
+            .await
+        {
+            Ok(true) => {}
+            Ok(false) => debug!(
+                "[UNRESOLVED PROPERTIES] cache was populated concurrently for {}/{}; keeping \
+                 the stored bundle",
+                organisation, application
+            ),
+            Err(e) => log::warn!(
+                "[UNRESOLVED PROPERTIES] cache write failed for {}/{}: {}",
+                organisation,
+                application,
+                e
+            ),
+        }
+    }
+
+    Ok(fresh)
+}
+
+/// Re-reads the bundle from Superposition and writes it back to the cache.
+///
+/// Call this from every mutation that can change what the bundle contains
+pub async fn refresh_unresolved_properties(
+    state: &web::Data<AppState>,
+    organisation: &str,
+    application: &str,
+    workspace_name: &str,
+) {
+    let Some(cache) = state.redis_cache.as_ref() else {
+        return;
+    };
+
+    let key = cache.key(organisation, application, &[UNRESOLVED_PROPERTIES_KEY]);
+
+    let outcome = match fetch_unresolved_properties(state, workspace_name).await {
+        Err(e) => Err(format!("could not re-read from Superposition: {}", e)),
+        Ok(fresh) => cache
+            .set_ex(&key, &fresh, UNRESOLVED_PROPERTIES_TTL)
+            .await
+            .map_err(|e| format!("cache write failed: {}", e)),
+    };
+
+    let Err(reason) = outcome else {
+        info!(
+            "[UNRESOLVED PROPERTIES] refreshed cache for {}/{}",
+            organisation, application
+        );
+        return;
+    };
+
+    // Whatever went wrong, the pre-mutation bundle must not survive in the cache.
+    log::error!(
+        "[UNRESOLVED PROPERTIES] {} for {}/{}; dropping the cached entry so the next reader \
+         refills it",
+        reason,
+        organisation,
+        application
+    );
+    if let Err(e) = cache.del(&key).await {
+        log::error!(
+            "[UNRESOLVED PROPERTIES] dropping the cached entry for {}/{} also failed; stale \
+             properties may be served until the {}s TTL expires: {}",
+            organisation,
+            application,
+            UNRESOLVED_PROPERTIES_TTL,
+            e
+        );
+    }
 }
 
 pub async fn check_non_concluded_releases(
