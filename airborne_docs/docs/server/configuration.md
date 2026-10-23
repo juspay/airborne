@@ -271,6 +271,7 @@ The analytics server (`airborne_analytics_server`) is an **optional, separate** 
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
 | `SERVER_PORT` | No | `6400` | Port the analytics HTTP server binds on. |
+| `CORS_ALLOWED_ORIGINS` | No | _(unset — any origin)_ | Comma-separated list of browser origins allowed to call the analytics endpoints, for example `https://airborne.example.com,https://admin.example.com`. Unset (or `*`) allows **any** origin. See [Analytics CORS](#analytics-cors) below. |
 | `LOGGING_INFRASTRUCTURE` | No | `victoria-metrics` | Backend selector: `kafka-clickhouse` or `victoria-metrics`. Defaults to Victoria Metrics. |
 | `KAFKA_BROKERS` | No | `localhost:9092` | Kafka bootstrap brokers. |
 | `KAFKA_TOPIC` | No | `ota-events` | Kafka topic consumed for OTA events. |
@@ -287,4 +288,25 @@ The analytics server (`airborne_analytics_server`) is an **optional, separate** 
 
 :::caution
 The analytics `.env.example` also lists `DEFAULT_TENANT_ID`, and the stack-specific env files (`.env.victoria-metrics`, `.env.kafka-clickhouse`) use `KAFKA_BROKER_URL` and `VICTORIA_METRICS_URL`. These names are **not read** by `config.rs` in the current code — the parser reads `KAFKA_BROKERS` (not `KAFKA_BROKER_URL`) and has no Victoria-Metrics URL variable. Treat the table above (the variables `config.rs` actually parses) as authoritative, and the extra names as scaffolding for the Docker stacks.
+:::
+
+### Analytics CORS
+
+`CORS_ALLOWED_ORIGINS` controls which browser origins may call the analytics endpoints.
+
+| Value | Effect |
+| --- | --- |
+| unset, empty, or `*` | Any origin is allowed. |
+| `https://a.example.com,https://b.example.com` | Only the listed origins are allowed, for `GET`, `POST`, and `OPTIONS` with a `Content-Type` header. |
+
+Origins are compared exactly, so include the scheme and any non-default port (`http://localhost:3000`). A value the parser cannot read as an HTTP header fails startup rather than silently falling back to a different policy.
+
+:::caution[Set an allow-list if nothing in front enforces CORS]
+The default allows **any** origin, which is what you want when a CDN or gateway terminates in front of the service and owns CORS itself — the Airborne-hosted deployment does this at CloudFront.
+
+If you self-host and expose the analytics service directly, set `CORS_ALLOWED_ORIGINS`. Without it, any website a signed-in user visits can read your analytics endpoints from their browser. The service starts with a warning in its logs whenever it is running in allow-any mode, so check for that line after deploying.
+:::
+
+:::note[CORS is not authentication]
+CORS is a browser-enforced control. It does not stop a direct request from `curl` or a server, and the analytics endpoints do not currently authenticate callers or check that you are entitled to the `org_id` you ask for. Keep the service on a private network, or behind a gateway that authenticates, if the data is sensitive.
 :::
