@@ -7,6 +7,10 @@ import Screenshot from '@site/src/components/Screenshot';
 
 A **file** is a single artifact your app downloads over the air — a JavaScript bundle, an image, a JSON blob, and so on. Each file is identified by a **file path** and hosted at a **URL**. Airborne keeps the full **version history** for every file path, so you can see exactly what was served and when. Files are later combined into [packages](/docs/dashboard/packages) and shipped in [releases](/docs/dashboard/releases).
 
+A **file set** is a named, versioned collection of files — the name is its identity, unique within the application. Sets sit alongside files rather than owning them: a file does not belong to a set, and the same file may appear in any number of sets, or none. Sets exist so that you can select a whole collection of files at once when building a package or a release — for example a set per micro-app (`hyperpay`, `ec`) and one for its configuration (`hyperpay-config`, `ec-config`).
+
+Like files, sets have **versions**. Each version is an immutable snapshot: its own list of file versions plus its own **metadata** (arbitrary JSON — release notes, ticket ids, whatever describes that cut). Changing a set's contents means creating a new version; old versions stay browsable.
+
 <Screenshot name="files-list" caption="The Files page lists every file path with its latest version, tags, and size." />
 
 ## The Files page
@@ -52,6 +56,36 @@ Choose **Create File** to register it. If the file path already exists, the new 
 
 :::note
 Checksum and size are only required for authenticated or private files, where the SDK verifies integrity on download. For public assets you can leave them blank.
+:::
+
+## File sets
+
+Below the files table, the **File Sets** section lists the sets in the application, 15 per page, with each set's latest version number, total versions, and when it was last updated. Search finds sets by name across all pages. Expand a row to browse the full version history — each version shows its files (path and version), metadata, and creation time.
+
+### Creating and editing a set
+
+Choose **Create File Set**, give the set a name (unique within the application), pick its files with the file chooser, and optionally attach metadata — this becomes **version 1**.
+
+The layers icon creates a **new version** (pre-filled with the latest version's files, with its own metadata). Sets are append-only: they cannot be renamed or deleted from the dashboard, and versions themselves are immutable.
+
+A few rules:
+
+- A set is a collection of **files**, not of file versions: each file path can appear only once per set version, pinned to exactly one version. Two versions of the same file are rejected.
+- A set version stores each member as a file key pinned to a version (`path@version:N`), never its own copy of the file. A file picked by tag is pinned to the version the tag pointed at when the set version was created, so moving that tag later doesn't change the set.
+- The name is the set's identity and appears in URLs, so it may only contain letters, digits, `-`, `_` and `.`.
+- Each member is a specific version, e.g. `dist/app-bundle.js@version:3`, so a set is a stable snapshot rather than a moving target.
+- A file that cannot be resolved is rejected when saving the set.
+- Every version must contain at least one file — since versions are immutable, an empty one could never be fixed.
+
+### Using a set
+
+Anywhere you select a list of files — **Select Package Files** when creating a package, and **Resources** when creating a release — a **File Sets** panel appears above the file list. What checking a set does depends on where you are:
+
+- **Packages reference the set.** Checking a set pins its **latest version** to the package, and the package remembers it: its files are shown under that set's section on the package. The set's files can't be removed one by one — uncheck the set instead. See [Packages](/docs/dashboard/packages) for the rules (one version per file, the index file stays separate, identical files included once).
+- **Release resources copy the files.** Checking a set adds the files of its latest version to your resource selection in one click; you can still add or remove individual files afterward. The release does not remember the set. The exact same file version can't be selected twice, so a set that overlaps files you already selected is rejected with an explanation.
+
+:::note[Set versions are immutable]
+A package stays pinned to the set version it was built from, and copied resources don't follow the set either. Creating a new version of a set later does not change packages or releases you already created.
 :::
 
 ## Where files go next
