@@ -71,6 +71,8 @@ async fn create_package(
         return Err(ABError::BadRequest("Some files not found".to_string()));
     }
 
+    crate::file::utils::ensure_files_ready(&files)?;
+
     let opt_pkg_tag = request.tag.clone();
     let db_organisation = organisation.clone();
     let db_application = application.clone();
