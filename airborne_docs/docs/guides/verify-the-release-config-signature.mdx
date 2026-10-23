@@ -1,0 +1,165 @@
+---
+title: Verify the release config signature
+description: Airborne signs every release config with your application's key. Verify the X-Airborne-Signature header with the public key to prove the config was not tampered with.
+---
+
+The release config tells your app **which bundle to boot**. Anything that can rewrite it in transit — a hostile network, a misconfigured proxy, a compromised CDN edge — can point your app at a bundle you never shipped. TLS protects the connection, but it says nothing about a cache that sits inside it.
+
+So Airborne signs the config. Every release-config response carries an **`X-Airborne-Signature`** header, computed with a private key that never leaves the server. You verify it with the matching **public key**, which you can download at any time. If the body was altered by so much as one byte, verification fails.
+
+:::info[The mental model]
+Each application owns one or more **ECDSA P-256** keypairs. One of them is the **default**. Airborne signs each response with the default key — or with a specific key if you ask for one — and names the key it used in the response header. You pin the public key in your app and check every config against it.
+:::
+
+## The signature header
+
+```
+X-Airborne-Signature: keyid="release-signing-2026",alg="es256",sig="MEYCIQDo8ilSZIKZCDfIi6EhKX1A563aRgESPIuaU0Bj..."
+```
+
+| Field | Meaning |
+| --- | --- |
+| `keyid` | Which key signed this response. Use it to pick the right public key — this is what makes rotation safe. |
+| `alg` | Always `es256` today: ECDSA on the NIST P-256 curve, over a SHA-256 digest. |
+| `sig` | Base64 of the **DER-encoded** signature. |
+
+The signature covers **the exact raw JSON body bytes** of the response — nothing else. No headers, no timestamp, no canonicalization step. Verify the bytes you received, as you received them.
+
+:::warning[Verify the *uncompressed* body]
+Airborne gzips the response when a client asks for it. The signature is computed over the **uncompressed** JSON, so verify **after** decompression. Most HTTP clients (`curl`, `fetch`, OkHttp, `URLSession`) decompress transparently and hand you the decoded bytes, which is exactly what you want — but do not verify a raw gzip stream.
+:::
+
+If an application has no usable signing key, the response simply arrives **without** the header. It is never an error.
+
+## Get the public key
+
+In the dashboard, open **Settings → [Integrity](/docs/dashboard/integrity)**. Each key shows its readable **key ID** and lets you download the **public key** as a PEM file (SPKI, `BEGIN PUBLIC KEY`). The private key is never downloadable and is never returned by the API — it exists only on the server. The key ID is chosen when the key is created; Airborne does not expose a separate UUID.
+
+You can also list keys through the API — see [Signing keys](/docs/api-reference/endpoints/list-signing-keys) in the API reference.
+
+## Verify it
+
+### Shell (openssl)
+
+```bash
+# Fetch the config, keeping headers and the exact body bytes.
+curl -sS -D headers.txt -o body.json https://your-host/release/<organisation>/<application>
+
+# Pull the base64 signature out of the header and decode it to DER.
+sed -n 's/.*sig="\([^"]*\)".*/\1/p' headers.txt | base64 -d > sig.der
+
+# Verify against the downloaded public key.
+openssl dgst -sha256 -verify public-key.pem -signature sig.der body.json
+# -> Verified OK
+```
+
+### Node
+
+DER is Node's default signature encoding for ECDSA, so no conversion is needed.
+
+```js
+import crypto from "node:crypto";
+
+const res = await fetch(`https://your-host/release/${org}/${app}`);
+const body = Buffer.from(await res.arrayBuffer()); // decompressed by fetch
+
+const header = res.headers.get("x-airborne-signature");
+const fields = Object.fromEntries(
+  [...header.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]]),
+);
+
+const ok = crypto
+  .createVerify("SHA256")
+  .update(body)
+  .verify(publicKeyPem, Buffer.from(fields.sig, "base64"));
+
+if (!ok) throw new Error("Release config signature is invalid — refusing to boot it");
+```
+
+### Android (Kotlin)
+
+`SHA256withECDSA` expects a DER signature and an X.509/SPKI public key — both exactly what Airborne emits. This works on every API level Airborne supports.
+
+```kotlin
+val pemBody = pem
+    .replace("-----BEGIN PUBLIC KEY-----", "")
+    .replace("-----END PUBLIC KEY-----", "")
+    .replace("\\s".toRegex(), "")
+
+val publicKey = KeyFactory.getInstance("EC")
+    .generatePublic(X509EncodedKeySpec(Base64.decode(pemBody, Base64.DEFAULT)))
+
+val ok = Signature.getInstance("SHA256withECDSA").run {
+    initVerify(publicKey)
+    update(bodyBytes)                                   // the raw, decompressed response body
+    verify(Base64.decode(sigField, Base64.DEFAULT))     // the `sig` field, base64-decoded
+}
+```
+
+### iOS (Swift)
+
+On iOS 14+, CryptoKit reads both the PEM and the DER signature directly:
+
+```swift
+let publicKey = try P256.Signing.PublicKey(pemRepresentation: pem)
+let signature = try P256.Signing.ECDSASignature(derRepresentation: derBytes)
+let ok = publicKey.isValidSignature(signature, for: bodyData)
+```
+
+On iOS 13, `pemRepresentation` is unavailable. Use the Security framework instead — `.ecdsaSignatureMessageX962SHA256` consumes the same DER signature:
+
+```swift
+let ok = SecKeyVerifySignature(
+    secPublicKey, .ecdsaSignatureMessageX962SHA256,
+    bodyData as CFData, derBytes as CFData, nil
+)
+```
+
+## Choosing which key signs
+
+Omit the header and Airborne signs with the application's **default** key. To pin a specific key, send its key ID:
+
+```
+X-Signing-Key-Id: release-signing-2026
+```
+
+Sending the header with an **empty** value is the same as omitting it: the default key signs. A *non-empty* key ID that is unknown or disabled — or that belongs to a different application — is rejected with **400**.
+
+Key IDs contain only lowercase letters (`a-z`), digits (`0-9`), and single dashes. They cannot start or end with a dash.
+
+:::caution[Pinning a key ID couples your app to that key's lifetime]
+If you send `X-Signing-Key-Id` and someone later disables that key, those requests start failing with a 400 and the app gets **no config at all**. Most apps should omit the header, sign with the default, and read `keyid` from the response to select the right public key. That way rotation costs you nothing.
+:::
+
+## Rotating a key
+
+Because the response names the key that signed it, rotation is a rolling operation rather than a flag day:
+
+1. **Create** a new key in **Settings → Integrity**.
+2. **Ship** its public key to your apps, so they trust both the old and the new key. Select by `keyid`.
+3. **Promote** the new key to default. New responses are signed with it immediately.
+4. **Disable** the old key once you are confident no client still needs it.
+
+:::danger[Disable is a breaking action for clients still pinned to that key]
+Only disable a key after clients have picked up the replacement public key. A client that has only the old public key will reject every config signed by the new one — and refuse to boot the update.
+
+Airborne will not let you disable the **default** key for exactly this reason: promote another key first.
+:::
+
+## Behind a CDN
+
+The release-config response is cacheable (`Cache-Control: public, s-maxage=86400`) and its body already varies by the caller's targeting dimensions. Adding a signature adds one more thing it varies by. Airborne sends:
+
+```
+Vary: x-dimension, x-signing-key-id
+```
+
+:::warning[CloudFront ignores `Vary` — fix the cache key]
+If you front Airborne with CloudFront, **`X-Signing-Key-Id` must be part of the cache policy's cache key** (alongside `x-dimension`). CloudFront does not honour `Vary`, so without this it can serve a body signed by one key to a caller who asked for a different one — and every honest client will reject a perfectly valid config. This is a distribution-config change; the header alone does not solve it.
+:::
+
+## What signing does and does not protect
+
+Signing proves the config you received is byte-for-byte the config Airborne produced. It defends against a tampered CDN edge, a hostile proxy, and a spoofed response.
+
+It is **not** a defence against a compromised Airborne control plane: the server holds the private key, so anything able to sign is also able to sign something malicious. And because the config is resolved *per request* from the caller's dimensions, only the server is in a position to sign it — a release cannot be pre-signed at publish time.

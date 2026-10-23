@@ -41,3 +41,11 @@ structure ForbiddenError {
     @required
     message: String
 }
+
+/// Conflict error, returned when a request conflicts with the current state of the resource — for example, creating something whose name is already taken.
+@error("client")
+@httpError(409)
+structure ConflictError {
+    @required
+    message: String
+}
