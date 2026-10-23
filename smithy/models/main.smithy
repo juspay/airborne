@@ -36,6 +36,12 @@ service Airborne {
         ListDimensions
         UpdateDimension
         DeleteDimension
+        // signing keys
+        ListSigningKeys
+        CreateSigningKey
+        GetSigningKeyPublicKey
+        UpdateSigningKey
+        SetDefaultSigningKey
     ]
     errors: [
         Unauthorized
@@ -43,5 +49,6 @@ service Airborne {
         NotFoundError
         InternalServerError
         ForbiddenError
+        ConflictError
     ]
 }
