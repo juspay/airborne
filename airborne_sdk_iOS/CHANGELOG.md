@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.8.0 - 2026-10-23
+#### Features
+- support request headers and options in api request - (3705e2b) - Yash Raput
+
+- - -
+
+## v0.44.0 - 2026-10-23
+#### Miscellaneous Chores
+- **(version)** v0.44.0 [skip ci] - (3a67232) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.7.2 - 2026-10-01
 #### Bug Fixes
 - pass nil response in api call error cases - (b89a3d9) - Naman Agarwal
