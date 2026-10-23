@@ -11,10 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use actix_web::web::{self, Json};
 use aws_smithy_types::Document;
@@ -24,24 +21,27 @@ use diesel::{
     sql_query,
     sql_types::{Array, Integer, Text},
 };
-use http::{uri::PathAndQuery, Uri};
 use log::{debug, info};
 use serde_json::Value;
 use superposition_sdk::{
     operation::list_experiment::ListExperimentOutput,
     types::{ExperimentSortOn, SortBy, Variant, VariantType},
 };
-use url::form_urlencoded;
 
 use crate::{
     file::utils::parse_file_key,
     package::utils::parse_package_key,
     release::types::*,
-    run_blocking, types as airborne_types,
-    types::{ABError, AppState},
-    utils::db::{models::FileEntry, DbPool},
-    utils::db::{models::PackageV2Entry, schema::hyperotaserver::packages_v2::dsl as packages_dsl},
-    utils::redis::RedisCache,
+    run_blocking,
+    types::{self as airborne_types, ABError, AppState},
+    utils::{
+        db::{
+            models::{FileEntry, PackageV2Entry},
+            schema::hyperotaserver::packages_v2::dsl as packages_dsl,
+            DbPool,
+        },
+        redis::RedisCache,
+    },
 };
 
 pub fn extract_files_from_configs(opt_obj: &Option<Document>, key: &str) -> Option<Vec<String>> {
@@ -501,8 +501,8 @@ pub async fn check_non_concluded_releases(
 ) -> airborne_types::Result<bool> {
     let experiments_list = list_experiments_by_context(
         ListExperimentsQuery {
-            superposition_org_id: superposition_org_id.clone(),
-            workspace_name: workspace.clone(),
+            superposition_org_id,
+            workspace_name: workspace,
             context: dims,
             strict_mode: true,
             page: None,
@@ -510,18 +510,17 @@ pub async fn check_non_concluded_releases(
             all: true,
             status: None,
         },
-        state.clone(),
+        state,
     )
     .await?;
 
-    let non_concluded_exists = experiments_list.data().iter().any(|exp| {
+    Ok(experiments_list.data().iter().any(|exp| {
         matches!(
             exp.status,
             superposition_sdk::types::ExperimentStatusType::Created
                 | superposition_sdk::types::ExperimentStatusType::Inprogress
         )
-    });
-    Ok(non_concluded_exists)
+    }))
 }
 
 pub async fn build_overrides(
@@ -936,15 +935,26 @@ pub async fn list_experiments_by_context(
     experiment_query: ListExperimentsQuery,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<ListExperimentOutput> {
+    let global_experiments_only =
+        experiment_query.context.is_empty() && experiment_query.strict_mode;
+    let context_docs: HashMap<String, Document> = experiment_query
+        .context
+        .iter()
+        .map(|(k, v)| (k.clone(), value_to_document(v)))
+        .collect();
+
     let mut experiments_builder = state
         .superposition_client
         .list_experiment()
         .org_id(experiment_query.superposition_org_id)
         .workspace_id(experiment_query.workspace_name)
-        .dimension_match_strategy(superposition_sdk::types::DimensionMatchStrategy::Exact)
-        .global_experiments_only(
-            experiment_query.context.is_empty() && experiment_query.strict_mode,
-        )
+        .dimension_match_strategy(if experiment_query.strict_mode {
+            superposition_sdk::types::DimensionMatchStrategy::Exact
+        } else {
+            superposition_sdk::types::DimensionMatchStrategy::Subset
+        })
+        .global_experiments_only(global_experiments_only)
+        .set_context(Some(context_docs))
         .sort_on(ExperimentSortOn::CreatedAt)
         .sort_by(SortBy::Desc);
 
@@ -964,70 +974,8 @@ pub async fn list_experiments_by_context(
         experiments_builder = experiments_builder.status(s);
     }
 
-    let experiments_builder = experiments_builder.customize().mutate_request(move |req| {
-        let uri: http::Uri = match req.uri().parse() {
-            Ok(uri) => uri,
-            Err(e) => {
-                info!("Failed to parse URI from request: {:?}", e);
-                return;
-            }
-        };
-
-        let mut parts = uri.into_parts();
-        let (path, existing_q) = match parts.path_and_query.take() {
-            Some(pq) => {
-                let s = pq.as_str();
-                match s.split_once('?') {
-                    Some((p, q)) => (p.to_string(), Some(q.to_string())),
-                    None => (s.to_string(), None),
-                }
-            }
-            None => ("/".to_string(), None),
-        };
-
-        let mut ser = form_urlencoded::Serializer::new(String::new());
-        if let Some(eq) = existing_q {
-            for (k, v) in form_urlencoded::parse(eq.as_bytes()) {
-                ser.append_pair(&k, &v);
-            }
-        }
-        for (k, v) in &experiment_query.context {
-            if let Some(val_str) = v.as_str() {
-                ser.append_pair(&format!("dimension[{k}]"), val_str);
-            }
-        }
-
-        let new_q = ser.finish();
-        let pq = if new_q.is_empty() {
-            path
-        } else {
-            format!("{path}?{new_q}")
-        };
-
-        let path_and_query = match PathAndQuery::from_str(&pq) {
-            Ok(pq) => pq,
-            Err(e) => {
-                info!("Failed to create valid path/query from '{}': {:?}", pq, e);
-                return; // Skip URI modification on error
-            }
-        };
-
-        parts.path_and_query = Some(path_and_query);
-
-        let new_uri = match Uri::from_parts(parts) {
-            Ok(uri) => uri,
-            Err(e) => {
-                info!("Failed to create valid URI from parts: {:?}", e);
-                return;
-            }
-        };
-
-        *req.uri_mut() = new_uri.into();
-    });
-
-    let experiments_list = experiments_builder.send().await.map_err(|e| {
+    experiments_builder.send().await.map_err(|e| {
         info!("Failed to list experiments: {:?}", e);
         ABError::InternalServerError("Failed to list experiments from Superposition".to_string())
-    })?;
-    Ok(experiments_list)
+    })
 }
