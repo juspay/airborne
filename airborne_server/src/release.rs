@@ -1598,7 +1598,7 @@ async fn serve_release_handler(
         )
         .header(
             actix_web::http::header::CACHE_CONTROL,
-            HeaderValue::from_static("public, s-maxage=86400, max-age=0"),
+            HeaderValue::from_static("public, s-maxage=60, max-age=0, stale-if-error=300"),
         )
         .status(StatusCode::OK))
 }
