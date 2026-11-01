@@ -6,9 +6,33 @@ import {
   resolveHttpAuthSchemeConfig,
 } from "./auth/httpAuthSchemeProvider";
 import {
+  AcknowledgeEmergencyRollbackCommandInput,
+  AcknowledgeEmergencyRollbackCommandOutput,
+} from "./commands/AcknowledgeEmergencyRollbackCommand";
+import {
+  ApproveControlCenterDeploymentRequestCommandInput,
+  ApproveControlCenterDeploymentRequestCommandOutput,
+} from "./commands/ApproveControlCenterDeploymentRequestCommand";
+import {
+  CancelControlCenterDeploymentRequestCommandInput,
+  CancelControlCenterDeploymentRequestCommandOutput,
+} from "./commands/CancelControlCenterDeploymentRequestCommand";
+import {
+  ConcludeReleaseCommandInput,
+  ConcludeReleaseCommandOutput,
+} from "./commands/ConcludeReleaseCommand";
+import {
   CreateApplicationCommandInput,
   CreateApplicationCommandOutput,
 } from "./commands/CreateApplicationCommand";
+import {
+  CreateCohortRangeCommandInput,
+  CreateCohortRangeCommandOutput,
+} from "./commands/CreateCohortRangeCommand";
+import {
+  CreateControlCenterDeploymentRequestCommandInput,
+  CreateControlCenterDeploymentRequestCommandOutput,
+} from "./commands/CreateControlCenterDeploymentRequestCommand";
 import {
   CreateControlCenterGroupCommandInput,
   CreateControlCenterGroupCommandOutput,
@@ -42,6 +66,18 @@ import {
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
 import {
+  DiscardReleaseCommandInput,
+  DiscardReleaseCommandOutput,
+} from "./commands/DiscardReleaseCommand";
+import {
+  GetControlCenterApprovalPolicyCommandInput,
+  GetControlCenterApprovalPolicyCommandOutput,
+} from "./commands/GetControlCenterApprovalPolicyCommand";
+import {
+  GetControlCenterDeploymentRequestCommandInput,
+  GetControlCenterDeploymentRequestCommandOutput,
+} from "./commands/GetControlCenterDeploymentRequestCommand";
+import {
   GetControlCenterOverviewCommandInput,
   GetControlCenterOverviewCommandOutput,
 } from "./commands/GetControlCenterOverviewCommand";
@@ -58,9 +94,25 @@ import {
   GetReleaseCommandOutput,
 } from "./commands/GetReleaseCommand";
 import {
+  GetServingPolicyCommandInput,
+  GetServingPolicyCommandOutput,
+} from "./commands/GetServingPolicyCommand";
+import {
+  GetTelemetrySummaryCommandInput,
+  GetTelemetrySummaryCommandOutput,
+} from "./commands/GetTelemetrySummaryCommand";
+import {
   GetUserCommandInput,
   GetUserCommandOutput,
 } from "./commands/GetUserCommand";
+import {
+  IngestTelemetryReportsCommandInput,
+  IngestTelemetryReportsCommandOutput,
+} from "./commands/IngestTelemetryReportsCommand";
+import {
+  ListControlCenterDeploymentRequestsCommandInput,
+  ListControlCenterDeploymentRequestsCommandOutput,
+} from "./commands/ListControlCenterDeploymentRequestsCommand";
 import {
   ListControlCenterGroupsCommandInput,
   ListControlCenterGroupsCommandOutput,
@@ -98,6 +150,22 @@ import {
   PostLoginCommandOutput,
 } from "./commands/PostLoginCommand";
 import {
+  PreviewServingPolicyCommandInput,
+  PreviewServingPolicyCommandOutput,
+} from "./commands/PreviewServingPolicyCommand";
+import {
+  PutServingPolicyCommandInput,
+  PutServingPolicyCommandOutput,
+} from "./commands/PutServingPolicyCommand";
+import {
+  RampReleaseCommandInput,
+  RampReleaseCommandOutput,
+} from "./commands/RampReleaseCommand";
+import {
+  RejectControlCenterDeploymentRequestCommandInput,
+  RejectControlCenterDeploymentRequestCommandOutput,
+} from "./commands/RejectControlCenterDeploymentRequestCommand";
+import {
   RequestOrganisationCommandInput,
   RequestOrganisationCommandOutput,
 } from "./commands/RequestOrganisationCommand";
@@ -117,6 +185,10 @@ import {
   ServeReleaseV2CommandInput,
   ServeReleaseV2CommandOutput,
 } from "./commands/ServeReleaseV2Command";
+import {
+  UpdateControlCenterApprovalPolicyCommandInput,
+  UpdateControlCenterApprovalPolicyCommandOutput,
+} from "./commands/UpdateControlCenterApprovalPolicyCommand";
 import {
   UpdateControlCenterGroupCommandInput,
   UpdateControlCenterGroupCommandOutput,
@@ -199,7 +271,13 @@ export { __Client }
  * @public
  */
 export type ServiceInputTypes =
+  | AcknowledgeEmergencyRollbackCommandInput
+  | ApproveControlCenterDeploymentRequestCommandInput
+  | CancelControlCenterDeploymentRequestCommandInput
+  | ConcludeReleaseCommandInput
   | CreateApplicationCommandInput
+  | CreateCohortRangeCommandInput
+  | CreateControlCenterDeploymentRequestCommandInput
   | CreateControlCenterGroupCommandInput
   | CreateDimensionCommandInput
   | CreateFileCommandInput
@@ -208,11 +286,18 @@ export type ServiceInputTypes =
   | CreateReleaseCommandInput
   | DeleteControlCenterGroupCommandInput
   | DeleteDimensionCommandInput
+  | DiscardReleaseCommandInput
+  | GetControlCenterApprovalPolicyCommandInput
+  | GetControlCenterDeploymentRequestCommandInput
   | GetControlCenterOverviewCommandInput
   | GetControlCenterReleaseEventsCommandInput
   | GetControlCenterRollbackPreviewCommandInput
   | GetReleaseCommandInput
+  | GetServingPolicyCommandInput
+  | GetTelemetrySummaryCommandInput
   | GetUserCommandInput
+  | IngestTelemetryReportsCommandInput
+  | ListControlCenterDeploymentRequestsCommandInput
   | ListControlCenterGroupsCommandInput
   | ListControlCenterOperationsCommandInput
   | ListDimensionsCommandInput
@@ -222,11 +307,16 @@ export type ServiceInputTypes =
   | ListPackagesCommandInput
   | ListReleasesCommandInput
   | PostLoginCommandInput
+  | PreviewServingPolicyCommandInput
+  | PutServingPolicyCommandInput
+  | RampReleaseCommandInput
+  | RejectControlCenterDeploymentRequestCommandInput
   | RequestOrganisationCommandInput
   | ResolveControlCenterOperationCommandInput
   | RollbackReleaseCommandInput
   | ServeReleaseCommandInput
   | ServeReleaseV2CommandInput
+  | UpdateControlCenterApprovalPolicyCommandInput
   | UpdateControlCenterGroupCommandInput
   | UpdateDimensionCommandInput
   | UpdateFileCommandInput
@@ -236,7 +326,13 @@ export type ServiceInputTypes =
  * @public
  */
 export type ServiceOutputTypes =
+  | AcknowledgeEmergencyRollbackCommandOutput
+  | ApproveControlCenterDeploymentRequestCommandOutput
+  | CancelControlCenterDeploymentRequestCommandOutput
+  | ConcludeReleaseCommandOutput
   | CreateApplicationCommandOutput
+  | CreateCohortRangeCommandOutput
+  | CreateControlCenterDeploymentRequestCommandOutput
   | CreateControlCenterGroupCommandOutput
   | CreateDimensionCommandOutput
   | CreateFileCommandOutput
@@ -245,11 +341,18 @@ export type ServiceOutputTypes =
   | CreateReleaseCommandOutput
   | DeleteControlCenterGroupCommandOutput
   | DeleteDimensionCommandOutput
+  | DiscardReleaseCommandOutput
+  | GetControlCenterApprovalPolicyCommandOutput
+  | GetControlCenterDeploymentRequestCommandOutput
   | GetControlCenterOverviewCommandOutput
   | GetControlCenterReleaseEventsCommandOutput
   | GetControlCenterRollbackPreviewCommandOutput
   | GetReleaseCommandOutput
+  | GetServingPolicyCommandOutput
+  | GetTelemetrySummaryCommandOutput
   | GetUserCommandOutput
+  | IngestTelemetryReportsCommandOutput
+  | ListControlCenterDeploymentRequestsCommandOutput
   | ListControlCenterGroupsCommandOutput
   | ListControlCenterOperationsCommandOutput
   | ListDimensionsCommandOutput
@@ -259,11 +362,16 @@ export type ServiceOutputTypes =
   | ListPackagesCommandOutput
   | ListReleasesCommandOutput
   | PostLoginCommandOutput
+  | PreviewServingPolicyCommandOutput
+  | PutServingPolicyCommandOutput
+  | RampReleaseCommandOutput
+  | RejectControlCenterDeploymentRequestCommandOutput
   | RequestOrganisationCommandOutput
   | ResolveControlCenterOperationCommandOutput
   | RollbackReleaseCommandOutput
   | ServeReleaseCommandOutput
   | ServeReleaseV2CommandOutput
+  | UpdateControlCenterApprovalPolicyCommandOutput
   | UpdateControlCenterGroupCommandOutput
   | UpdateDimensionCommandOutput
   | UpdateFileCommandOutput

@@ -60,6 +60,10 @@ export interface AirborneHttpAuthSchemeProvider extends HttpAuthSchemeProvider<A
 export const defaultAirborneHttpAuthSchemeProvider: AirborneHttpAuthSchemeProvider = (authParameters) => {
   const options: HttpAuthOption[] = [];
   switch (authParameters.operation) {
+    case "IngestTelemetryReports": {
+      options.push(createSmithyApiNoAuthHttpAuthOption(authParameters));
+      break;
+    };
     case "PostLogin": {
       options.push(createSmithyApiNoAuthHttpAuthOption(authParameters));
       break;

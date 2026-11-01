@@ -2,12 +2,37 @@ import { AirborneServiceException as __BaseException } from "./AirborneServiceEx
 import { ExceptionOptionType as __ExceptionOptionType } from "@smithy/smithy-client";
 import { StreamingBlobTypes, DocumentType as __DocumentType } from "@smithy/types";
 /**
+ * @public
+ */
+export interface AcknowledgeEmergencyRollbackInput {
+    release_id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+    /**
+     * Independent review explanation; must be nonblank.
+     * @public
+     */
+    reason: string | undefined;
+}
+/**
+ * @public
+ */
+export interface AcknowledgeEmergencyRollbackResponse {
+    success: boolean | undefined;
+}
+/**
  * Bad request error
  * @public
  */
 export declare class BadRequestError extends __BaseException {
     readonly name: "BadRequestError";
     readonly $fault: "client";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
     /**
      * Airborne error code (AB_005).
      * @public
@@ -17,6 +42,415 @@ export declare class BadRequestError extends __BaseException {
      * @internal
      */
     constructor(opts: __ExceptionOptionType<BadRequestError, __BaseException>);
+}
+/**
+ * Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.
+ * @public
+ */
+export declare class ConflictError extends __BaseException {
+    readonly name: "ConflictError";
+    readonly $fault: "client";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    /**
+     * Airborne error code (AB_007).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<ConflictError, __BaseException>);
+}
+/**
+ * @public
+ */
+export declare class ForbiddenError extends __BaseException {
+    readonly name: "ForbiddenError";
+    readonly $fault: "client";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    /**
+     * Airborne error code (AB_006).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<ForbiddenError, __BaseException>);
+}
+/**
+ * Internal server error
+ * @public
+ */
+export declare class InternalServerError extends __BaseException {
+    readonly name: "InternalServerError";
+    readonly $fault: "server";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    /**
+     * Airborne error code (AB_003).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<InternalServerError, __BaseException>);
+}
+/**
+ * Not found error
+ * @public
+ */
+export declare class NotFoundError extends __BaseException {
+    readonly name: "NotFoundError";
+    readonly $fault: "client";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    /**
+     * Airborne error code (AB_001).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<NotFoundError, __BaseException>);
+}
+/**
+ * Unauthorized error
+ * @public
+ */
+export declare class Unauthorized extends __BaseException {
+    readonly name: "Unauthorized";
+    readonly $fault: "client";
+    /**
+     * Airborne error code (for example, AB_004).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<Unauthorized, __BaseException>);
+}
+/**
+ * @public
+ */
+export interface ApproveControlCenterDeploymentRequestInput {
+    id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+    reason?: string | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const DeploymentRequestAction: {
+    readonly CONCLUDE: "conclude";
+    readonly CREATE: "create";
+    readonly DISCARD: "discard";
+    readonly RAMP: "ramp";
+    readonly ROLLBACK: "rollback";
+    readonly SET_ROLLBACK_SENSITIVE: "set_rollback_sensitive";
+    readonly SET_STRICT_SERVING: "set_strict_serving";
+    readonly UPDATE: "update";
+};
+/**
+ * @public
+ */
+export type DeploymentRequestAction = typeof DeploymentRequestAction[keyof typeof DeploymentRequestAction];
+/**
+ * Frozen action payload returned by the server, including its resolved immutable snapshot.
+ * @public
+ */
+export interface DeploymentRequestPayload {
+    body?: __DocumentType | undefined;
+    release_id?: string | undefined;
+    snapshot?: __DocumentType | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const DeploymentRequestStatus: {
+    readonly CANCELLED: "cancelled";
+    readonly EXECUTED: "executed";
+    readonly EXECUTING: "executing";
+    readonly EXPIRED: "expired";
+    readonly FAILED: "failed";
+    readonly PENDING: "pending";
+    readonly REJECTED: "rejected";
+    readonly STALE: "stale";
+};
+/**
+ * @public
+ */
+export type DeploymentRequestStatus = typeof DeploymentRequestStatus[keyof typeof DeploymentRequestStatus];
+/**
+ * Immutable deployment request and its latest decision/result.
+ * @public
+ */
+export interface ControlCenterDeploymentRequest {
+    /**
+     * UUID.
+     * @public
+     */
+    id: string | undefined;
+    org: string | undefined;
+    application: string | undefined;
+    /**
+     * Supported approved release mutation.
+     * @public
+     */
+    action: DeploymentRequestAction | undefined;
+    /**
+     * Frozen action payload returned by the server, including its resolved immutable snapshot.
+     * @public
+     */
+    payload: DeploymentRequestPayload | undefined;
+    /**
+     * Lowercase hexadecimal SHA-256 digest of the immutable approved content.
+     * @public
+     */
+    payload_hash: string | undefined;
+    /**
+     * Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body.
+     * @public
+     */
+    base_state: __DocumentType | undefined;
+    requester: string | undefined;
+    reason: string | undefined;
+    status: DeploymentRequestStatus | undefined;
+    expires_at: Date | undefined;
+    /**
+     * Subject of the latest decision, or JSON null.
+     * @public
+     */
+    decided_by: __DocumentType | undefined;
+    /**
+     * Decision explanation, or JSON null.
+     * @public
+     */
+    decision_reason: __DocumentType | undefined;
+    created_at: Date | undefined;
+    updated_at: Date | undefined;
+    /**
+     * Existing action execution result or JSON null.
+     * @public
+     */
+    result: __DocumentType | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const RollbackFailureStage: {
+    readonly CONCLUDE: "conclude";
+    /**
+     * The server is creating or recovering the replacement before recording its identifier.
+     */
+    readonly CREATE: "create";
+    readonly RAMP: "ramp";
+};
+/**
+ * @public
+ */
+export type RollbackFailureStage = typeof RollbackFailureStage[keyof typeof RollbackFailureStage];
+/**
+ * Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.
+ * @public
+ */
+export declare class RollbackPartialFailureError extends __BaseException {
+    readonly name: "RollbackPartialFailureError";
+    readonly $fault: "server";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    /**
+     * Airborne error code (AB_003).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * Identifier of the replacement release, or JSON null when no replacement was created.
+     * @public
+     */
+    replacement_release_id: __DocumentType | undefined;
+    /**
+     * Durable rollback operation identifier.
+     * @public
+     */
+    rollback_operation_id: string | undefined;
+    /**
+     * Step that failed.
+     * @public
+     */
+    stage: RollbackFailureStage | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<RollbackPartialFailureError, __BaseException>);
+}
+/**
+ * Returned by rollback when no earlier live release exists or the historical package and config cannot be reconciled. Nothing is created.
+ * @public
+ */
+export declare class RollbackUnprocessableError extends __BaseException {
+    readonly name: "RollbackUnprocessableError";
+    readonly $fault: "client";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    /**
+     * Rollback block code: `no_predecessor` or `incompatible`.
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * The live release for this dimensions context, or JSON null.
+     * @public
+     */
+    current_live_release_id: __DocumentType | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<RollbackUnprocessableError, __BaseException>);
+}
+/**
+ * A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.
+ * @public
+ */
+export declare class UnresolvedOperationError extends __BaseException {
+    readonly name: "UnresolvedOperationError";
+    readonly $fault: "client";
+    code: string | undefined;
+    operation_id: string | undefined;
+    /**
+     * The exact state expected after the upstream write.
+     * @public
+     */
+    expected: __DocumentType | undefined;
+    /**
+     * The state observed before dispatch.
+     * @public
+     */
+    before: __DocumentType | undefined;
+    upstream_workspace: __DocumentType | undefined;
+    upstream_org: __DocumentType | undefined;
+    /**
+     * True when this request itself may have changed upstream state; absent when an earlier write is blocking this request.
+     * @public
+     */
+    own_attempt?: boolean | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<UnresolvedOperationError, __BaseException>);
+}
+/**
+ * @public
+ */
+export interface CancelControlCenterDeploymentRequestInput {
+    id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+    reason?: string | undefined;
+}
+/**
+ * A direct release write was refused because this application requires an approved deployment request.
+ * @public
+ */
+export declare class ApprovalRequiredError extends __BaseException {
+    readonly name: "ApprovalRequiredError";
+    readonly $fault: "client";
+    code: string | undefined;
+    application: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<ApprovalRequiredError, __BaseException>);
+}
+/**
+ * Request to conclude a release.
+ * @public
+ */
+export interface ConcludeReleaseInput {
+    /**
+     * ID of the release (the experiment id returned by CreateRelease).
+     * @public
+     */
+    release_id: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+    /**
+     * Variant to make permanent: the control variant keeps the previous release live, an experimental variant promotes this release. Take the id from experiment.experiment_variants on GetRelease; the experiment service generates the ids, so they cannot be guessed. An unknown variant returns 400 and names the available ones.
+     * @public
+     */
+    chosen_variant: string | undefined;
+    /**
+     * Optional reason recorded upstream. It must not contain the reserved, case-sensitive text "Airborne operation", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+     * @public
+     */
+    change_reason?: string | undefined;
+}
+/**
+ * Result of concluding a release.
+ * @public
+ */
+export interface ConcludeReleaseResponse {
+    /**
+     * Always true; failures are returned as errors.
+     * @public
+     */
+    success: boolean | undefined;
+    /**
+     * Human-readable summary.
+     * @public
+     */
+    message: string | undefined;
+    /**
+     * ID of the concluded release.
+     * @public
+     */
+    experiment_id: string | undefined;
+    /**
+     * Variant that was made permanent.
+     * @public
+     */
+    chosen_variant: string | undefined;
 }
 /**
  * Application information
@@ -58,69 +492,54 @@ export interface CreateApplicationRequest {
 /**
  * @public
  */
-export declare class ForbiddenError extends __BaseException {
-    readonly name: "ForbiddenError";
-    readonly $fault: "client";
-    /**
-     * Airborne error code (AB_006).
-     * @public
-     */
-    code: string | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<ForbiddenError, __BaseException>);
+export interface CreateCohortRangeInput {
+    organisation: string | undefined;
+    application: string | undefined;
+    dimension: string | undefined;
+    name: string | undefined;
+    lower: string | undefined;
+    upper: string | undefined;
+    priority: number | undefined;
 }
 /**
- * Internal server error
  * @public
  */
-export declare class InternalServerError extends __BaseException {
-    readonly name: "InternalServerError";
-    readonly $fault: "server";
-    /**
-     * Airborne error code (AB_003).
-     * @public
-     */
-    code: string | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<InternalServerError, __BaseException>);
+export interface CreateCohortRangeOutput {
+    name: string | undefined;
+    lower: string | undefined;
+    upper: string | undefined;
+    priority: number | undefined;
 }
 /**
- * Not found error
+ * Request payload accepted from the maker. The body is action-specific and is frozen by the server.
  * @public
  */
-export declare class NotFoundError extends __BaseException {
-    readonly name: "NotFoundError";
-    readonly $fault: "client";
-    /**
-     * Airborne error code (AB_001).
-     * @public
-     */
-    code: string | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<NotFoundError, __BaseException>);
+export interface DeploymentRequestInputPayload {
+    body?: __DocumentType | undefined;
+    release_id?: string | undefined;
 }
 /**
- * Unauthorized error
+ * Create a deployment request. The client may send only action, payload and reason; the server resolves requester, snapshot and base state.
  * @public
  */
-export declare class Unauthorized extends __BaseException {
-    readonly name: "Unauthorized";
-    readonly $fault: "client";
+export interface CreateControlCenterDeploymentRequestInput {
+    organisation: string | undefined;
+    application: string | undefined;
     /**
-     * Airborne error code (for example, AB_004).
+     * Supported approved release mutation.
      * @public
      */
-    code: string | undefined;
+    action: DeploymentRequestAction | undefined;
     /**
-     * @internal
+     * Request payload accepted from the maker. The body is action-specific and is frozen by the server.
+     * @public
      */
-    constructor(opts: __ExceptionOptionType<Unauthorized, __BaseException>);
+    payload: DeploymentRequestInputPayload | undefined;
+    /**
+     * Nonblank maker explanation. Reserved "Airborne operation" text is refused.
+     * @public
+     */
+    reason: string | undefined;
 }
 /**
  * @public
@@ -437,23 +856,6 @@ export interface Package {
     files: (string)[] | undefined;
 }
 /**
- * Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.
- * @public
- */
-export declare class ConflictError extends __BaseException {
-    readonly name: "ConflictError";
-    readonly $fault: "client";
-    /**
-     * Airborne error code (AB_007).
-     * @public
-     */
-    code: string | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<ConflictError, __BaseException>);
-}
-/**
  * Create release request config
  * @public
  */
@@ -496,6 +898,18 @@ export interface CreateReleaseRequestPackage {
     lazy?: (string)[] | undefined;
 }
 /**
+ * @public
+ * @enum
+ */
+export declare const RollbackSensitiveReason: {
+    readonly ONE_WAY_MIGRATION: "one_way_migration";
+    readonly SECURITY: "security";
+};
+/**
+ * @public
+ */
+export type RollbackSensitiveReason = typeof RollbackSensitiveReason[keyof typeof RollbackSensitiveReason];
+/**
  * Request body for creating a release.
  * @public
  */
@@ -525,6 +939,11 @@ export interface CreateReleaseRequest {
      * @public
      */
     resources?: (string)[] | undefined;
+    /**
+     * Optional declared reason this release needs additional rollback protection.
+     * @public
+     */
+    rollback_sensitive?: RollbackSensitiveReason | undefined;
     /**
      * Name of the organisation
      * @public
@@ -558,12 +977,12 @@ export interface GetReleaseConfig {
      */
     version: string | undefined;
     /**
-     * Time allowed for fetching the release config, in seconds.
+     * Time allowed for fetching the release config, in milliseconds.
      * @public
      */
     release_config_timeout: number | undefined;
     /**
-     * Time allowed for the app to boot, in seconds.
+     * Time allowed for the app to boot, in milliseconds.
      * @public
      */
     boot_timeout: number | undefined;
@@ -572,6 +991,22 @@ export interface GetReleaseConfig {
      * @public
      */
     properties: ConfigProperties | undefined;
+}
+/**
+ * Variant ids of the experiment backing a release. Pass one of these as chosen_variant when concluding.
+ * @public
+ */
+export interface ExperimentVariants {
+    /**
+     * Id of the control variant, which keeps the previous release live. The experiment service prefixes it with the release id, for example "7522252134449025024-control".
+     * @public
+     */
+    control?: string | undefined;
+    /**
+     * Ids of the experimental variants, which promote this release, for example "7522252134449025024-experimental_1". A release created by Airborne has exactly one.
+     * @public
+     */
+    experimentals?: (string)[] | undefined;
 }
 /**
  * Details of the experiment backing a release, used to ramp it out gradually.
@@ -583,6 +1018,11 @@ export interface ReleaseExperiment {
      * @public
      */
     experiment_id?: string | undefined;
+    /**
+     * Variant ids that can be chosen when concluding the release.
+     * @public
+     */
+    experiment_variants?: ExperimentVariants | undefined;
     /**
      * Package version served by the experiment.
      * @public
@@ -713,37 +1153,6 @@ export interface CreateReleaseResponse {
     dimensions: Record<string, __DocumentType> | undefined;
 }
 /**
- * A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.
- * @public
- */
-export declare class UnresolvedOperationError extends __BaseException {
-    readonly name: "UnresolvedOperationError";
-    readonly $fault: "client";
-    code: string | undefined;
-    operation_id: string | undefined;
-    /**
-     * The exact state expected after the upstream write.
-     * @public
-     */
-    expected: __DocumentType | undefined;
-    /**
-     * The state observed before dispatch.
-     * @public
-     */
-    before: __DocumentType | undefined;
-    upstream_workspace: __DocumentType | undefined;
-    upstream_org: __DocumentType | undefined;
-    /**
-     * True when this request itself may have changed upstream state; absent when an earlier write is blocking this request.
-     * @public
-     */
-    own_attempt?: boolean | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<UnresolvedOperationError, __BaseException>);
-}
-/**
  * A group UUID path parameter and the organisation whose group is being changed.
  * @public
  */
@@ -778,6 +1187,91 @@ export interface DeleteDimensionRequest {
     application: string | undefined;
 }
 /**
+ * Request to discard a release.
+ * @public
+ */
+export interface DiscardReleaseInput {
+    /**
+     * ID of the release (the experiment id returned by CreateRelease).
+     * @public
+     */
+    release_id: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+    /**
+     * Optional reason recorded upstream. It must not contain the reserved, case-sensitive text "Airborne operation", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+     * @public
+     */
+    change_reason?: string | undefined;
+}
+/**
+ * Result of discarding a release.
+ * @public
+ */
+export interface DiscardReleaseResponse {
+    /**
+     * Always true; failures are returned as errors.
+     * @public
+     */
+    success: boolean | undefined;
+    /**
+     * Human-readable summary.
+     * @public
+     */
+    message: string | undefined;
+    /**
+     * ID of the discarded release.
+     * @public
+     */
+    experiment_id: string | undefined;
+}
+/**
+ * Complete application approval policy. PUT replaces the policy; omitted fields use server defaults.
+ * @public
+ */
+export interface ControlCenterApprovalPolicy {
+    enabled: boolean | undefined;
+    /**
+     * Sorted unique canonical identity subjects.
+     * @public
+     */
+    makers: (string)[] | undefined;
+    /**
+     * Sorted unique canonical identity subjects.
+     * @public
+     */
+    checkers: (string)[] | undefined;
+    /**
+     * Request lifetime in hours, from 1 through 720.
+     * @public
+     */
+    request_ttl_hours: number | undefined;
+    emergency_rollback: boolean | undefined;
+}
+/**
+ * @public
+ */
+export interface GetControlCenterApprovalPolicyInput {
+    organisation: string | undefined;
+    application: string | undefined;
+}
+/**
+ * @public
+ */
+export interface GetControlCenterDeploymentRequestInput {
+    id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+}
+/**
  * Overview is user-scoped and does not require organisation/application scope headers.
  * @public
  */
@@ -802,6 +1296,28 @@ export interface ControlCenterActiveRelease {
     created_by: string | undefined;
 }
 /**
+ * A pending emergency rollback awaiting an independent review.
+ * @public
+ */
+export interface EmergencyReview {
+    /**
+     * Present for new successful emergencies; absent on legacy rows.
+     * @public
+     */
+    rollback_finished?: boolean | undefined;
+    rolled_back_to_package_version?: __DocumentType | undefined;
+    rollback_result?: __DocumentType | undefined;
+    new_release_id?: __DocumentType | undefined;
+    id: string | undefined;
+    release_id: string | undefined;
+    actor: string | undefined;
+    acknowledged_by: __DocumentType | undefined;
+    reason: string | undefined;
+    confirm_sensitive_risk: boolean | undefined;
+    plan: __DocumentType | undefined;
+    created_at: Date | undefined;
+}
+/**
  * A release that is currently live for one dimensions context.
  * @public
  */
@@ -817,21 +1333,49 @@ export interface ControlCenterLiveRelease {
     concluded_at: Date | undefined;
 }
 /**
+ * @public
+ */
+export interface ReleaseProtection {
+    release_id: string | undefined;
+    /**
+     * Explicitly cleared markers are represented as JSON null.
+     * @public
+     */
+    rollback_sensitive: __DocumentType | undefined;
+}
+/**
+ * @public
+ */
+export interface ServingPolicy {
+    strict: boolean | undefined;
+    deployment_override: boolean | undefined;
+    effective_strict: boolean | undefined;
+}
+/**
  * An upstream write whose outcome has not been confirmed.
  * @public
  */
 export interface ControlCenterUnresolvedOperation {
     operation_id: string | undefined;
     message: string | undefined;
-    expected: __DocumentType | undefined;
-    before: __DocumentType | undefined;
-    upstream_workspace: __DocumentType | undefined;
 }
 /**
  * Release state for one application, including per-application lookup failures.
  * @public
  */
 export interface ControlCenterAppStatus {
+    /**
+     * Local auxiliary data unavailable or deadline exceeded; corresponding fields are null.
+     * @public
+     */
+    auxiliary_error?: string | undefined;
+    telemetry?: __DocumentType | undefined;
+    cache_invalidation?: __DocumentType | undefined;
+    /**
+     * Stored policy plus deployment force-on override.
+     * @public
+     */
+    serving_policy?: ServingPolicy | undefined;
     application: string | undefined;
     /**
      * Platform label from the containing group; JSON null for an ungrouped application.
@@ -844,7 +1388,7 @@ export interface ControlCenterAppStatus {
      * Unresolved upstream writes. While any item exists, writes are paused for this application.
      * @public
      */
-    unresolved_operations: (ControlCenterUnresolvedOperation)[] | undefined;
+    unresolved_operations?: (ControlCenterUnresolvedOperation)[] | undefined;
     /**
      * RFC 3339 timestamp, or JSON null when the application has no release activity.
      * @public
@@ -855,6 +1399,26 @@ export interface ControlCenterAppStatus {
      * @public
      */
     error: __DocumentType | undefined;
+    /**
+     * Whether this application currently requires a separate checker for protected writes.
+     * @public
+     */
+    approval_required?: boolean | undefined;
+    /**
+     * Number of pending requests. This count is not capped by the queue list limit.
+     * @public
+     */
+    pending_requests?: number | undefined;
+    /**
+     * Emergency rollbacks waiting for independent checker acknowledgement.
+     * @public
+     */
+    emergency_needs_review?: (EmergencyReview)[] | undefined;
+    /**
+     * Local rollback sensitivity markers for releases.
+     * @public
+     */
+    release_protections?: (ReleaseProtection)[] | undefined;
 }
 /**
  * A group and its release status entries in the overview response.
@@ -894,12 +1458,23 @@ export interface ControlCenterReleaseEventsInput {
  * @enum
  */
 export declare const ControlCenterReleaseEventAction: {
+    readonly APPROVED: "approved";
+    readonly CANCELLED: "cancelled";
     readonly CONCLUDED: "concluded";
     readonly CREATED: "created";
     readonly DISCARDED: "discarded";
+    readonly EMERGENCY_ACKNOWLEDGED: "emergency_acknowledged";
+    readonly EMERGENCY_ROLLBACK: "emergency_rollback";
+    readonly EXECUTED: "executed";
+    readonly EXPIRED: "expired";
+    readonly FAILED: "failed";
     readonly OPERATION_RESOLVED: "operation_resolved";
+    readonly POLICY_CHANGED: "policy_changed";
     readonly RAMPED: "ramped";
+    readonly REJECTED: "rejected";
+    readonly REQUESTED: "requested";
     readonly ROLLED_BACK: "rolled_back";
+    readonly STALE: "stale";
 };
 /**
  * @public
@@ -974,6 +1549,11 @@ export interface RollbackPreviewInput {
  * @public
  */
 export interface RollbackPreviewResponse {
+    /**
+     * List of strings
+     * @public
+     */
+    blocked_package_versions?: (string)[] | undefined;
     action: __DocumentType | undefined;
     current_package_version: __DocumentType | undefined;
     resulting_package_version: __DocumentType | undefined;
@@ -1048,6 +1628,33 @@ export interface GetReleaseResponse {
     dimensions?: Record<string, __DocumentType> | undefined;
 }
 /**
+ * @public
+ */
+export interface GetServingPolicyInput {
+    organisation: string | undefined;
+    application: string | undefined;
+}
+/**
+ * Advisory only; reports never change releases. Native versions and rows are bounded.
+ * @public
+ */
+export interface TelemetrySummary {
+    window_days?: number | undefined;
+    verification?: string | undefined;
+    automatic_action?: string | undefined;
+    adoption_definition?: string | undefined;
+    releases?: __DocumentType | undefined;
+    release_totals?: __DocumentType | undefined;
+    blocked_package_versions?: __DocumentType | undefined;
+}
+/**
+ * @public
+ */
+export interface TelemetrySummaryInput {
+    organisation: string | undefined;
+    application: string | undefined;
+}
+/**
  * Tokens returned after a successful login.
  * @public
  */
@@ -1100,6 +1707,76 @@ export interface User {
     user_token?: UserToken | undefined;
 }
 /**
+ * @public
+ */
+export declare class ServiceUnavailableError extends __BaseException {
+    readonly name: "ServiceUnavailableError";
+    readonly $fault: "server";
+    /**
+     * Present when an approved action failed and its failed status was saved.
+     * @public
+     */
+    request_id?: string | undefined;
+    request_status?: string | undefined;
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<ServiceUnavailableError, __BaseException>);
+}
+/**
+ * @public
+ */
+export interface TelemetryAccepted {
+    accepted: boolean | undefined;
+    verification: string | undefined;
+}
+/**
+ * @public
+ */
+export interface TelemetryEvent {
+    id: string | undefined;
+    kind: string | undefined;
+}
+/**
+ * @public
+ */
+export interface TelemetryBatch {
+    receipt: string | undefined;
+    install_id: string | undefined;
+    events: (TelemetryEvent)[] | undefined;
+}
+/**
+ * @public
+ */
+export declare class TooManyRequestsError extends __BaseException {
+    readonly name: "TooManyRequestsError";
+    readonly $fault: "client";
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<TooManyRequestsError, __BaseException>);
+}
+/**
+ * @public
+ */
+export interface ListControlCenterDeploymentRequestsInput {
+    organisation: string | undefined;
+    /**
+     * Optional: omit x-application to list readable requests across the organisation. Filter is applied before the 1,000 newest-row cap.
+     * @public
+     */
+    application?: string | undefined;
+    status?: DeploymentRequestStatus | undefined;
+}
+/**
+ * @public
+ */
+export interface ListControlCenterDeploymentRequestsResponse {
+    requests: (ControlCenterDeploymentRequest)[] | undefined;
+}
+/**
  * Path and organisation header for listing groups.
  * @public
  */
@@ -1113,7 +1790,7 @@ export interface ListControlCenterGroupsResponse {
     groups: (ControlCenterGroup)[] | undefined;
 }
 /**
- * List unresolved write operations for one application. `status` is currently `unresolved`.
+ * List unresolved write operations for one application. "status" is currently "unresolved".
  * @public
  */
 export interface ListControlCenterOperationsInput {
@@ -1128,10 +1805,6 @@ export interface ControlCenterUnresolvedOperationDetails {
     code: string | undefined;
     operation_id: string | undefined;
     message: string | undefined;
-    expected: __DocumentType | undefined;
-    before: __DocumentType | undefined;
-    upstream_workspace: __DocumentType | undefined;
-    upstream_org: __DocumentType | undefined;
 }
 /**
  * @public
@@ -1576,6 +2249,103 @@ export interface UserCredentials {
     client_secret: string | undefined;
 }
 /**
+ * @public
+ */
+export interface PreviewServingPolicyInput {
+    organisation: string | undefined;
+    application: string | undefined;
+    context: Record<string, string> | undefined;
+    toss: string | undefined;
+}
+/**
+ * @public
+ */
+export interface ServingPreviewOutput {
+    serving_policy: ServingPolicy | undefined;
+    context: Record<string, string> | undefined;
+    toss: string | undefined;
+    config_version?: string | undefined;
+    package_version?: __DocumentType | undefined;
+    targeted: boolean | undefined;
+    would_stop_serving: boolean | undefined;
+    strict_status: number | undefined;
+    scope: string | undefined;
+}
+/**
+ * @public
+ */
+export interface PutServingPolicyInput {
+    organisation: string | undefined;
+    application: string | undefined;
+    strict: boolean | undefined;
+}
+/**
+ * Request to ramp a release's traffic.
+ * @public
+ */
+export interface RampReleaseInput {
+    /**
+     * ID of the release (the experiment id returned by CreateRelease).
+     * @public
+     */
+    release_id: string | undefined;
+    /**
+     * Name of the organisation
+     * @public
+     */
+    organisation: string | undefined;
+    /**
+     * Name of the application
+     * @public
+     */
+    application: string | undefined;
+    /**
+     * Percentage of traffic to route to the release, from 0 to 50. Values outside this range return 400 before any write is attempted. Setting it to 0 pauses the release without discarding it. Lowering it needs no approval, raising it does when approvals are enabled.
+     * @public
+     */
+    traffic_percentage: number | undefined;
+    /**
+     * Optional reason recorded upstream. It must not contain the reserved, case-sensitive text "Airborne operation", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+     * @public
+     */
+    change_reason?: string | undefined;
+}
+/**
+ * Result of ramping a release.
+ * @public
+ */
+export interface RampReleaseResponse {
+    /**
+     * Always true; failures are returned as errors.
+     * @public
+     */
+    success: boolean | undefined;
+    /**
+     * Human-readable summary.
+     * @public
+     */
+    message: string | undefined;
+    /**
+     * ID of the ramped release.
+     * @public
+     */
+    experiment_id: string | undefined;
+    /**
+     * Traffic percentage now routed to the release.
+     * @public
+     */
+    traffic_percentage: number | undefined;
+}
+/**
+ * @public
+ */
+export interface RejectControlCenterDeploymentRequestInput {
+    id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+    reason: string | undefined;
+}
+/**
  * Request organisation request
  * @public
  */
@@ -1648,7 +2418,7 @@ export interface ResolveControlCenterOperationInput {
     application: string | undefined;
     finding: OperationRecoveryFinding | undefined;
     /**
-     * Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400.
+     * Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text "Airborne operation"; such a reason returns 400.
      * @public
      */
     reason: string | undefined;
@@ -1701,54 +2471,6 @@ export declare class ReleaseSupersededError extends __BaseException {
     constructor(opts: __ExceptionOptionType<ReleaseSupersededError, __BaseException>);
 }
 /**
- * @public
- * @enum
- */
-export declare const RollbackFailureStage: {
-    readonly CONCLUDE: "conclude";
-    /**
-     * The server is creating or recovering the replacement before recording its identifier.
-     */
-    readonly CREATE: "create";
-    readonly RAMP: "ramp";
-};
-/**
- * @public
- */
-export type RollbackFailureStage = typeof RollbackFailureStage[keyof typeof RollbackFailureStage];
-/**
- * Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.
- * @public
- */
-export declare class RollbackPartialFailureError extends __BaseException {
-    readonly name: "RollbackPartialFailureError";
-    readonly $fault: "server";
-    /**
-     * Airborne error code (AB_003).
-     * @public
-     */
-    code: string | undefined;
-    /**
-     * Identifier of the replacement release, or JSON null when no replacement was created.
-     * @public
-     */
-    replacement_release_id: __DocumentType | undefined;
-    /**
-     * Durable rollback operation identifier.
-     * @public
-     */
-    rollback_operation_id: string | undefined;
-    /**
-     * Step that failed.
-     * @public
-     */
-    stage: RollbackFailureStage | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<RollbackPartialFailureError, __BaseException>);
-}
-/**
  * Path, scope headers, and reason for a release rollback request.
  * @public
  */
@@ -1757,10 +2479,20 @@ export interface RollbackReleaseInput {
     organisation: string | undefined;
     application: string | undefined;
     /**
-     * The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+     * The reason must not contain the reserved, case-sensitive text "Airborne operation": Airborne appends a generated suffix made of "[Airborne operation ", a canonical UUID and "]" to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
      * @public
      */
     reason: string | undefined;
+    /**
+     * Use only for the constrained emergency rollback path.
+     * @public
+     */
+    emergency?: boolean | undefined;
+    /**
+     * Required when the latest live source is marked rollback-sensitive.
+     * @public
+     */
+    confirm_sensitive_risk?: boolean | undefined;
 }
 /**
  * @public
@@ -1832,39 +2564,19 @@ export declare class RollbackReplacementChangedError extends __BaseException {
     readonly $fault: "client";
     code: string | undefined;
     operation_id: string | undefined;
-    replacement_release_id: string | undefined;
+    replacement_release_id: __DocumentType | undefined;
     /**
      * @internal
      */
     constructor(opts: __ExceptionOptionType<RollbackReplacementChangedError, __BaseException>);
 }
 /**
- * Returned by rollback when no earlier live release exists or the historical package and config cannot be reconciled. Nothing is created.
- * @public
- */
-export declare class RollbackUnprocessableError extends __BaseException {
-    readonly name: "RollbackUnprocessableError";
-    readonly $fault: "client";
-    /**
-     * Rollback block code: `no_predecessor` or `incompatible`.
-     * @public
-     */
-    code: string | undefined;
-    /**
-     * The live release for this dimensions context, or JSON null.
-     * @public
-     */
-    current_live_release_id: __DocumentType | undefined;
-    /**
-     * @internal
-     */
-    constructor(opts: __ExceptionOptionType<RollbackUnprocessableError, __BaseException>);
-}
-/**
  * Input for get release operations
  * @public
  */
 export interface GetServeReleaseInput {
+    telemetry_platform?: string | undefined;
+    native_version?: string | undefined;
     /**
      * Name of the organisation.
      * @public
@@ -1882,6 +2594,12 @@ export interface GetServeReleaseInput {
  */
 export interface ReleaseConfig {
     /**
+     * List of strings
+     * @public
+     */
+    blocked_package_versions?: (string)[] | undefined;
+    telemetry?: __DocumentType | undefined;
+    /**
      * Resolved release config.
      * @public
      */
@@ -1896,6 +2614,26 @@ export interface ReleaseConfig {
      * @public
      */
     resources: __DocumentType | undefined;
+}
+/**
+ * @public
+ */
+export interface UpdateControlCenterApprovalPolicyInput {
+    organisation: string | undefined;
+    application: string | undefined;
+    enabled?: boolean | undefined;
+    /**
+     * List of strings
+     * @public
+     */
+    makers?: (string)[] | undefined;
+    /**
+     * List of strings
+     * @public
+     */
+    checkers?: (string)[] | undefined;
+    request_ttl_hours?: number | undefined;
+    emergency_rollback?: boolean | undefined;
 }
 /**
  * Input for replacing a group's name and members.

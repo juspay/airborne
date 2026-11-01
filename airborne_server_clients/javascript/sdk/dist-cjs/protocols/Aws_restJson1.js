@@ -1,12 +1,89 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_ListControlCenterOperationsCommand = exports.de_ListControlCenterGroupsCommand = exports.de_GetUserCommand = exports.de_GetReleaseCommand = exports.de_GetControlCenterRollbackPreviewCommand = exports.de_GetControlCenterReleaseEventsCommand = exports.de_GetControlCenterOverviewCommand = exports.de_DeleteDimensionCommand = exports.de_DeleteControlCenterGroupCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateControlCenterGroupCommand = exports.de_CreateApplicationCommand = exports.se_UploadFileCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_UpdateControlCenterGroupCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RollbackReleaseCommand = exports.se_ResolveControlCenterOperationCommand = exports.se_RequestOrganisationCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_ListControlCenterOperationsCommand = exports.se_ListControlCenterGroupsCommand = exports.se_GetUserCommand = exports.se_GetReleaseCommand = exports.se_GetControlCenterRollbackPreviewCommand = exports.se_GetControlCenterReleaseEventsCommand = exports.se_GetControlCenterOverviewCommand = exports.se_DeleteDimensionCommand = exports.se_DeleteControlCenterGroupCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateControlCenterGroupCommand = exports.se_CreateApplicationCommand = void 0;
-exports.de_UploadFileCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_UpdateControlCenterGroupCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RollbackReleaseCommand = exports.de_ResolveControlCenterOperationCommand = exports.de_RequestOrganisationCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = void 0;
+exports.se_UploadFileCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_UpdateControlCenterGroupCommand = exports.se_UpdateControlCenterApprovalPolicyCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RollbackReleaseCommand = exports.se_ResolveControlCenterOperationCommand = exports.se_RequestOrganisationCommand = exports.se_RejectControlCenterDeploymentRequestCommand = exports.se_RampReleaseCommand = exports.se_PutServingPolicyCommand = exports.se_PreviewServingPolicyCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_ListControlCenterOperationsCommand = exports.se_ListControlCenterGroupsCommand = exports.se_ListControlCenterDeploymentRequestsCommand = exports.se_IngestTelemetryReportsCommand = exports.se_GetUserCommand = exports.se_GetTelemetrySummaryCommand = exports.se_GetServingPolicyCommand = exports.se_GetReleaseCommand = exports.se_GetControlCenterRollbackPreviewCommand = exports.se_GetControlCenterReleaseEventsCommand = exports.se_GetControlCenterOverviewCommand = exports.se_GetControlCenterDeploymentRequestCommand = exports.se_GetControlCenterApprovalPolicyCommand = exports.se_DiscardReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_DeleteControlCenterGroupCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateControlCenterGroupCommand = exports.se_CreateControlCenterDeploymentRequestCommand = exports.se_CreateCohortRangeCommand = exports.se_CreateApplicationCommand = exports.se_ConcludeReleaseCommand = exports.se_CancelControlCenterDeploymentRequestCommand = exports.se_ApproveControlCenterDeploymentRequestCommand = exports.se_AcknowledgeEmergencyRollbackCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_UpdateControlCenterGroupCommand = exports.de_UpdateControlCenterApprovalPolicyCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RollbackReleaseCommand = exports.de_ResolveControlCenterOperationCommand = exports.de_RequestOrganisationCommand = exports.de_RejectControlCenterDeploymentRequestCommand = exports.de_RampReleaseCommand = exports.de_PutServingPolicyCommand = exports.de_PreviewServingPolicyCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_ListControlCenterOperationsCommand = exports.de_ListControlCenterGroupsCommand = exports.de_ListControlCenterDeploymentRequestsCommand = exports.de_IngestTelemetryReportsCommand = exports.de_GetUserCommand = exports.de_GetTelemetrySummaryCommand = exports.de_GetServingPolicyCommand = exports.de_GetReleaseCommand = exports.de_GetControlCenterRollbackPreviewCommand = exports.de_GetControlCenterReleaseEventsCommand = exports.de_GetControlCenterOverviewCommand = exports.de_GetControlCenterDeploymentRequestCommand = exports.de_GetControlCenterApprovalPolicyCommand = exports.de_DiscardReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_DeleteControlCenterGroupCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateControlCenterGroupCommand = exports.de_CreateControlCenterDeploymentRequestCommand = exports.de_CreateCohortRangeCommand = exports.de_CreateApplicationCommand = exports.de_ConcludeReleaseCommand = exports.de_CancelControlCenterDeploymentRequestCommand = exports.de_ApproveControlCenterDeploymentRequestCommand = exports.de_AcknowledgeEmergencyRollbackCommand = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
 const core_2 = require("@smithy/core");
 const smithy_client_1 = require("@smithy/smithy-client");
+const se_AcknowledgeEmergencyRollbackCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/releases/{release_id}/acknowledge-emergency");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_AcknowledgeEmergencyRollbackCommand = se_AcknowledgeEmergencyRollbackCommand;
+const se_ApproveControlCenterDeploymentRequestCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/deployment-requests/{id}/approve");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_ApproveControlCenterDeploymentRequestCommand = se_ApproveControlCenterDeploymentRequestCommand;
+const se_CancelControlCenterDeploymentRequestCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/deployment-requests/{id}/cancel");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CancelControlCenterDeploymentRequestCommand = se_CancelControlCenterDeploymentRequestCommand;
+const se_ConcludeReleaseCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/releases/{release_id}/conclude");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'change_reason': [],
+        'chosen_variant': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_ConcludeReleaseCommand = se_ConcludeReleaseCommand;
 const se_CreateApplicationCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -24,6 +101,48 @@ const se_CreateApplicationCommand = async (input, context) => {
     return b.build();
 };
 exports.se_CreateApplicationCommand = se_CreateApplicationCommand;
+const se_CreateCohortRangeCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/organisations/applications/dimension/{dimension}/cohort/range");
+    b.p('dimension', () => input.dimension, '{dimension}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'lower': [],
+        'name': [],
+        'priority': [],
+        'upper': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CreateCohortRangeCommand = se_CreateCohortRangeCommand;
+const se_CreateControlCenterDeploymentRequestCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/deployment-requests");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'action': [],
+        'payload': _ => se_DeploymentRequestInputPayload(_, context),
+        'reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_CreateControlCenterDeploymentRequestCommand = se_CreateControlCenterDeploymentRequestCommand;
 const se_CreateControlCenterGroupCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -135,6 +254,7 @@ const se_CreateReleaseCommand = async (input, context) => {
         'package': _ => se_CreateReleaseRequestPackage(_, context),
         'package_id': [],
         'resources': _ => (0, smithy_client_1._json)(_),
+        'rollback_sensitive': [],
     }));
     b.m("POST")
         .h(headers)
@@ -171,6 +291,54 @@ const se_DeleteDimensionCommand = async (input, context) => {
     return b.build();
 };
 exports.se_DeleteDimensionCommand = se_DeleteDimensionCommand;
+const se_DiscardReleaseCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/releases/{release_id}/discard");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'change_reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_DiscardReleaseCommand = se_DiscardReleaseCommand;
+const se_GetControlCenterApprovalPolicyCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/approval-policy");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetControlCenterApprovalPolicyCommand = se_GetControlCenterApprovalPolicyCommand;
+const se_GetControlCenterDeploymentRequestCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/deployment-requests/{id}");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetControlCenterDeploymentRequestCommand = se_GetControlCenterDeploymentRequestCommand;
 const se_GetControlCenterOverviewCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = {};
@@ -227,6 +395,34 @@ const se_GetReleaseCommand = async (input, context) => {
     return b.build();
 };
 exports.se_GetReleaseCommand = se_GetReleaseCommand;
+const se_GetServingPolicyCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/serving-policy");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetServingPolicyCommand = se_GetServingPolicyCommand;
+const se_GetTelemetrySummaryCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/telemetry");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_GetTelemetrySummaryCommand = se_GetTelemetrySummaryCommand;
 const se_GetUserCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = {};
@@ -238,6 +434,42 @@ const se_GetUserCommand = async (input, context) => {
     return b.build();
 };
 exports.se_GetUserCommand = se_GetUserCommand;
+const se_IngestTelemetryReportsCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = {
+        'content-type': 'application/json',
+    };
+    b.bp("/api/telemetry/reports");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'events': _ => (0, smithy_client_1._json)(_),
+        'install_id': [],
+        'receipt': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_IngestTelemetryReportsCommand = se_IngestTelemetryReportsCommand;
+const se_ListControlCenterDeploymentRequestsCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/deployment-requests");
+    const query = (0, smithy_client_1.map)({
+        [_s]: [, input[_s]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_ListControlCenterDeploymentRequestsCommand = se_ListControlCenterDeploymentRequestsCommand;
 const se_ListControlCenterGroupsCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -401,6 +633,82 @@ const se_PostLoginCommand = async (input, context) => {
     return b.build();
 };
 exports.se_PostLoginCommand = se_PostLoginCommand;
+const se_PreviewServingPolicyCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/serving-policy/preview");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'context': _ => (0, smithy_client_1._json)(_),
+        'toss': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_PreviewServingPolicyCommand = se_PreviewServingPolicyCommand;
+const se_PutServingPolicyCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/serving-policy");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'strict': [],
+    }));
+    b.m("PUT")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_PutServingPolicyCommand = se_PutServingPolicyCommand;
+const se_RampReleaseCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/releases/{release_id}/ramp");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'change_reason': [],
+        'traffic_percentage': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_RampReleaseCommand = se_RampReleaseCommand;
+const se_RejectControlCenterDeploymentRequestCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/deployment-requests/{id}/reject");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_RejectControlCenterDeploymentRequestCommand = se_RejectControlCenterDeploymentRequestCommand;
 const se_RequestOrganisationCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = {
@@ -454,6 +762,8 @@ const se_RollbackReleaseCommand = async (input, context) => {
     b.p('release_id', () => input.release_id, '{release_id}', false);
     let body;
     body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'confirm_sensitive_risk': [],
+        'emergency': [],
         'reason': [],
     }));
     b.m("POST")
@@ -468,9 +778,14 @@ const se_ServeReleaseCommand = async (input, context) => {
     b.bp("/release/{organisation}/{application}");
     b.p('organisation', () => input.organisation, '{organisation}', false);
     b.p('application', () => input.application, '{application}', false);
+    const query = (0, smithy_client_1.map)({
+        [_tp]: [, input[_tp]],
+        [_nv]: [, input[_nv]],
+    });
     let body;
     b.m("GET")
         .h(headers)
+        .q(query)
         .b(body);
     return b.build();
 };
@@ -481,13 +796,40 @@ const se_ServeReleaseV2Command = async (input, context) => {
     b.bp("/release/v2/{organisation}/{application}");
     b.p('organisation', () => input.organisation, '{organisation}', false);
     b.p('application', () => input.application, '{application}', false);
+    const query = (0, smithy_client_1.map)({
+        [_tp]: [, input[_tp]],
+        [_nv]: [, input[_nv]],
+    });
     let body;
     b.m("GET")
         .h(headers)
+        .q(query)
         .b(body);
     return b.build();
 };
 exports.se_ServeReleaseV2Command = se_ServeReleaseV2Command;
+const se_UpdateControlCenterApprovalPolicyCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/approval-policy");
+    let body;
+    body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'checkers': _ => (0, smithy_client_1._json)(_),
+        'emergency_rollback': [],
+        'enabled': [],
+        'makers': _ => (0, smithy_client_1._json)(_),
+        'request_ttl_hours': [],
+    }));
+    b.m("PUT")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+exports.se_UpdateControlCenterApprovalPolicyCommand = se_UpdateControlCenterApprovalPolicyCommand;
 const se_UpdateControlCenterGroupCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = (0, smithy_client_1.map)({}, smithy_client_1.isSerializableHeaderValue, {
@@ -570,6 +912,99 @@ const se_UploadFileCommand = async (input, context) => {
     return b.build();
 };
 exports.se_UploadFileCommand = se_UploadFileCommand;
+const de_AcknowledgeEmergencyRollbackCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'success': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_AcknowledgeEmergencyRollbackCommand = de_AcknowledgeEmergencyRollbackCommand;
+const de_ApproveControlCenterDeploymentRequestCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'action': smithy_client_1.expectString,
+        'application': smithy_client_1.expectString,
+        'base_state': _ => de_Document(_, context),
+        'created_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'decided_by': _ => de_Document(_, context),
+        'decision_reason': _ => de_Document(_, context),
+        'expires_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'org': smithy_client_1.expectString,
+        'payload': _ => de_DeploymentRequestPayload(_, context),
+        'payload_hash': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+        'requester': smithy_client_1.expectString,
+        'result': _ => de_Document(_, context),
+        'status': smithy_client_1.expectString,
+        'updated_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ApproveControlCenterDeploymentRequestCommand = de_ApproveControlCenterDeploymentRequestCommand;
+const de_CancelControlCenterDeploymentRequestCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'action': smithy_client_1.expectString,
+        'application': smithy_client_1.expectString,
+        'base_state': _ => de_Document(_, context),
+        'created_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'decided_by': _ => de_Document(_, context),
+        'decision_reason': _ => de_Document(_, context),
+        'expires_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'org': smithy_client_1.expectString,
+        'payload': _ => de_DeploymentRequestPayload(_, context),
+        'payload_hash': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+        'requester': smithy_client_1.expectString,
+        'result': _ => de_Document(_, context),
+        'status': smithy_client_1.expectString,
+        'updated_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CancelControlCenterDeploymentRequestCommand = de_CancelControlCenterDeploymentRequestCommand;
+const de_ConcludeReleaseCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'chosen_variant': smithy_client_1.expectString,
+        'experiment_id': smithy_client_1.expectString,
+        'message': smithy_client_1.expectString,
+        'success': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ConcludeReleaseCommand = de_ConcludeReleaseCommand;
 const de_CreateApplicationCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -587,6 +1022,54 @@ const de_CreateApplicationCommand = async (output, context) => {
     return contents;
 };
 exports.de_CreateApplicationCommand = de_CreateApplicationCommand;
+const de_CreateCohortRangeCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'lower': smithy_client_1.expectString,
+        'name': smithy_client_1.expectString,
+        'priority': smithy_client_1.expectInt32,
+        'upper': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CreateCohortRangeCommand = de_CreateCohortRangeCommand;
+const de_CreateControlCenterDeploymentRequestCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'action': smithy_client_1.expectString,
+        'application': smithy_client_1.expectString,
+        'base_state': _ => de_Document(_, context),
+        'created_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'decided_by': _ => de_Document(_, context),
+        'decision_reason': _ => de_Document(_, context),
+        'expires_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'org': smithy_client_1.expectString,
+        'payload': _ => de_DeploymentRequestPayload(_, context),
+        'payload_hash': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+        'requester': smithy_client_1.expectString,
+        'result': _ => de_Document(_, context),
+        'status': smithy_client_1.expectString,
+        'updated_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_CreateControlCenterDeploymentRequestCommand = de_CreateControlCenterDeploymentRequestCommand;
 const de_CreateControlCenterGroupCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -729,6 +1212,72 @@ const de_DeleteDimensionCommand = async (output, context) => {
     return contents;
 };
 exports.de_DeleteDimensionCommand = de_DeleteDimensionCommand;
+const de_DiscardReleaseCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'experiment_id': smithy_client_1.expectString,
+        'message': smithy_client_1.expectString,
+        'success': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_DiscardReleaseCommand = de_DiscardReleaseCommand;
+const de_GetControlCenterApprovalPolicyCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'checkers': smithy_client_1._json,
+        'emergency_rollback': smithy_client_1.expectBoolean,
+        'enabled': smithy_client_1.expectBoolean,
+        'makers': smithy_client_1._json,
+        'request_ttl_hours': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetControlCenterApprovalPolicyCommand = de_GetControlCenterApprovalPolicyCommand;
+const de_GetControlCenterDeploymentRequestCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'action': smithy_client_1.expectString,
+        'application': smithy_client_1.expectString,
+        'base_state': _ => de_Document(_, context),
+        'created_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'decided_by': _ => de_Document(_, context),
+        'decision_reason': _ => de_Document(_, context),
+        'expires_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'org': smithy_client_1.expectString,
+        'payload': _ => de_DeploymentRequestPayload(_, context),
+        'payload_hash': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+        'requester': smithy_client_1.expectString,
+        'result': _ => de_Document(_, context),
+        'status': smithy_client_1.expectString,
+        'updated_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetControlCenterDeploymentRequestCommand = de_GetControlCenterDeploymentRequestCommand;
 const de_GetControlCenterOverviewCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -772,6 +1321,7 @@ const de_GetControlCenterRollbackPreviewCommand = async (output, context) => {
     const doc = (0, smithy_client_1.take)(data, {
         'action': _ => de_Document(_, context),
         'blocked': _ => de_Document(_, context),
+        'blocked_package_versions': smithy_client_1._json,
         'current_package_version': _ => de_Document(_, context),
         'reconciled_keys': _ => de_Document(_, context),
         'resulting_package_version': _ => de_Document(_, context),
@@ -802,6 +1352,44 @@ const de_GetReleaseCommand = async (output, context) => {
     return contents;
 };
 exports.de_GetReleaseCommand = de_GetReleaseCommand;
+const de_GetServingPolicyCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'deployment_override': smithy_client_1.expectBoolean,
+        'effective_strict': smithy_client_1.expectBoolean,
+        'strict': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetServingPolicyCommand = de_GetServingPolicyCommand;
+const de_GetTelemetrySummaryCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'adoption_definition': smithy_client_1.expectString,
+        'automatic_action': smithy_client_1.expectString,
+        'blocked_package_versions': _ => de_Document(_, context),
+        'release_totals': _ => de_Document(_, context),
+        'releases': _ => de_Document(_, context),
+        'verification': smithy_client_1.expectString,
+        'window_days': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetTelemetrySummaryCommand = de_GetTelemetrySummaryCommand;
 const de_GetUserCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -819,6 +1407,37 @@ const de_GetUserCommand = async (output, context) => {
     return contents;
 };
 exports.de_GetUserCommand = de_GetUserCommand;
+const de_IngestTelemetryReportsCommand = async (output, context) => {
+    if (output.statusCode !== 202 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'accepted': smithy_client_1.expectBoolean,
+        'verification': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_IngestTelemetryReportsCommand = de_IngestTelemetryReportsCommand;
+const de_ListControlCenterDeploymentRequestsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'requests': _ => de_ControlCenterDeploymentRequestList(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_ListControlCenterDeploymentRequestsCommand = de_ListControlCenterDeploymentRequestsCommand;
 const de_ListControlCenterGroupsCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -843,7 +1462,7 @@ const de_ListControlCenterOperationsCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
-        'operations': _ => de_ControlCenterUnresolvedOperationDetailsList(_, context),
+        'operations': smithy_client_1._json,
     });
     Object.assign(contents, doc);
     return contents;
@@ -973,6 +1592,94 @@ const de_PostLoginCommand = async (output, context) => {
     return contents;
 };
 exports.de_PostLoginCommand = de_PostLoginCommand;
+const de_PreviewServingPolicyCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'config_version': smithy_client_1.expectString,
+        'context': smithy_client_1._json,
+        'package_version': _ => de_Document(_, context),
+        'scope': smithy_client_1.expectString,
+        'serving_policy': smithy_client_1._json,
+        'strict_status': smithy_client_1.expectInt32,
+        'targeted': smithy_client_1.expectBoolean,
+        'toss': smithy_client_1.expectString,
+        'would_stop_serving': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_PreviewServingPolicyCommand = de_PreviewServingPolicyCommand;
+const de_PutServingPolicyCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'deployment_override': smithy_client_1.expectBoolean,
+        'effective_strict': smithy_client_1.expectBoolean,
+        'strict': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_PutServingPolicyCommand = de_PutServingPolicyCommand;
+const de_RampReleaseCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'experiment_id': smithy_client_1.expectString,
+        'message': smithy_client_1.expectString,
+        'success': smithy_client_1.expectBoolean,
+        'traffic_percentage': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_RampReleaseCommand = de_RampReleaseCommand;
+const de_RejectControlCenterDeploymentRequestCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'action': smithy_client_1.expectString,
+        'application': smithy_client_1.expectString,
+        'base_state': _ => de_Document(_, context),
+        'created_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'decided_by': _ => de_Document(_, context),
+        'decision_reason': _ => de_Document(_, context),
+        'expires_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'org': smithy_client_1.expectString,
+        'payload': _ => de_DeploymentRequestPayload(_, context),
+        'payload_hash': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+        'requester': smithy_client_1.expectString,
+        'result': _ => de_Document(_, context),
+        'status': smithy_client_1.expectString,
+        'updated_at': _ => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_RejectControlCenterDeploymentRequestCommand = de_RejectControlCenterDeploymentRequestCommand;
 const de_RequestOrganisationCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -1036,9 +1743,11 @@ const de_ServeReleaseCommand = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
+        'blocked_package_versions': smithy_client_1._json,
         'config': _ => de_GetReleaseConfig(_, context),
         'package': smithy_client_1._json,
         'resources': _ => de_Document(_, context),
+        'telemetry': _ => de_Document(_, context),
     });
     Object.assign(contents, doc);
     return contents;
@@ -1053,14 +1762,35 @@ const de_ServeReleaseV2Command = async (output, context) => {
     });
     const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
     const doc = (0, smithy_client_1.take)(data, {
+        'blocked_package_versions': smithy_client_1._json,
         'config': _ => de_GetReleaseConfig(_, context),
         'package': smithy_client_1._json,
         'resources': _ => de_Document(_, context),
+        'telemetry': _ => de_Document(_, context),
     });
     Object.assign(contents, doc);
     return contents;
 };
 exports.de_ServeReleaseV2Command = de_ServeReleaseV2Command;
+const de_UpdateControlCenterApprovalPolicyCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'checkers': smithy_client_1._json,
+        'emergency_rollback': smithy_client_1.expectBoolean,
+        'enabled': smithy_client_1.expectBoolean,
+        'makers': smithy_client_1._json,
+        'request_ttl_hours': smithy_client_1.expectInt32,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_UpdateControlCenterApprovalPolicyCommand = de_UpdateControlCenterApprovalPolicyCommand;
 const de_UpdateControlCenterGroupCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -1156,6 +1886,9 @@ const de_CommandError = async (output, context) => {
         case "BadRequestError":
         case "io.airborne.server#BadRequestError":
             throw await de_BadRequestErrorRes(parsedOutput, context);
+        case "ConflictError":
+        case "io.airborne.server#ConflictError":
+            throw await de_ConflictErrorRes(parsedOutput, context);
         case "ForbiddenError":
         case "io.airborne.server#ForbiddenError":
             throw await de_ForbiddenErrorRes(parsedOutput, context);
@@ -1168,24 +1901,30 @@ const de_CommandError = async (output, context) => {
         case "Unauthorized":
         case "io.airborne.server#Unauthorized":
             throw await de_UnauthorizedRes(parsedOutput, context);
-        case "ConflictError":
-        case "io.airborne.server#ConflictError":
-            throw await de_ConflictErrorRes(parsedOutput, context);
-        case "UnresolvedOperationError":
-        case "io.airborne.server#UnresolvedOperationError":
-            throw await de_UnresolvedOperationErrorRes(parsedOutput, context);
-        case "ReleaseSupersededError":
-        case "io.airborne.server#ReleaseSupersededError":
-            throw await de_ReleaseSupersededErrorRes(parsedOutput, context);
         case "RollbackPartialFailureError":
         case "io.airborne.server#RollbackPartialFailureError":
             throw await de_RollbackPartialFailureErrorRes(parsedOutput, context);
-        case "RollbackReplacementChangedError":
-        case "io.airborne.server#RollbackReplacementChangedError":
-            throw await de_RollbackReplacementChangedErrorRes(parsedOutput, context);
         case "RollbackUnprocessableError":
         case "io.airborne.server#RollbackUnprocessableError":
             throw await de_RollbackUnprocessableErrorRes(parsedOutput, context);
+        case "UnresolvedOperationError":
+        case "io.airborne.server#UnresolvedOperationError":
+            throw await de_UnresolvedOperationErrorRes(parsedOutput, context);
+        case "ApprovalRequiredError":
+        case "io.airborne.server#ApprovalRequiredError":
+            throw await de_ApprovalRequiredErrorRes(parsedOutput, context);
+        case "ServiceUnavailableError":
+        case "io.airborne.server#ServiceUnavailableError":
+            throw await de_ServiceUnavailableErrorRes(parsedOutput, context);
+        case "TooManyRequestsError":
+        case "io.airborne.server#TooManyRequestsError":
+            throw await de_TooManyRequestsErrorRes(parsedOutput, context);
+        case "ReleaseSupersededError":
+        case "io.airborne.server#ReleaseSupersededError":
+            throw await de_ReleaseSupersededErrorRes(parsedOutput, context);
+        case "RollbackReplacementChangedError":
+        case "io.airborne.server#RollbackReplacementChangedError":
+            throw await de_RollbackReplacementChangedErrorRes(parsedOutput, context);
         default:
             const parsedBody = parsedOutput.body;
             return throwDefaultError({
@@ -1196,12 +1935,29 @@ const de_CommandError = async (output, context) => {
     }
 };
 const throwDefaultError = (0, smithy_client_1.withBaseException)(AirborneServiceException_1.AirborneServiceException);
+const de_ApprovalRequiredErrorRes = async (parsedOutput, context) => {
+    const contents = (0, smithy_client_1.map)({});
+    const data = parsedOutput.body;
+    const doc = (0, smithy_client_1.take)(data, {
+        'application': smithy_client_1.expectString,
+        'code': smithy_client_1.expectString,
+        'message': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new models_0_1.ApprovalRequiredError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return (0, smithy_client_1.decorateServiceException)(exception, parsedOutput.body);
+};
 const de_BadRequestErrorRes = async (parsedOutput, context) => {
     const contents = (0, smithy_client_1.map)({});
     const data = parsedOutput.body;
     const doc = (0, smithy_client_1.take)(data, {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.BadRequestError({
@@ -1216,6 +1972,8 @@ const de_ConflictErrorRes = async (parsedOutput, context) => {
     const doc = (0, smithy_client_1.take)(data, {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.ConflictError({
@@ -1230,6 +1988,8 @@ const de_ForbiddenErrorRes = async (parsedOutput, context) => {
     const doc = (0, smithy_client_1.take)(data, {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.ForbiddenError({
@@ -1244,6 +2004,8 @@ const de_InternalServerErrorRes = async (parsedOutput, context) => {
     const doc = (0, smithy_client_1.take)(data, {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.InternalServerError({
@@ -1258,6 +2020,8 @@ const de_NotFoundErrorRes = async (parsedOutput, context) => {
     const doc = (0, smithy_client_1.take)(data, {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.NotFoundError({
@@ -1288,6 +2052,8 @@ const de_RollbackPartialFailureErrorRes = async (parsedOutput, context) => {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
         'replacement_release_id': _ => de_Document(_, context),
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
         'rollback_operation_id': smithy_client_1.expectString,
         'stage': smithy_client_1.expectString,
     });
@@ -1305,7 +2071,7 @@ const de_RollbackReplacementChangedErrorRes = async (parsedOutput, context) => {
         'code': smithy_client_1.expectString,
         'message': smithy_client_1.expectString,
         'operation_id': smithy_client_1.expectString,
-        'replacement_release_id': smithy_client_1.expectString,
+        'replacement_release_id': _ => de_Document(_, context),
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.RollbackReplacementChangedError({
@@ -1321,9 +2087,41 @@ const de_RollbackUnprocessableErrorRes = async (parsedOutput, context) => {
         'code': smithy_client_1.expectString,
         'current_live_release_id': _ => de_Document(_, context),
         'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
     });
     Object.assign(contents, doc);
     const exception = new models_0_1.RollbackUnprocessableError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return (0, smithy_client_1.decorateServiceException)(exception, parsedOutput.body);
+};
+const de_ServiceUnavailableErrorRes = async (parsedOutput, context) => {
+    const contents = (0, smithy_client_1.map)({});
+    const data = parsedOutput.body;
+    const doc = (0, smithy_client_1.take)(data, {
+        'code': smithy_client_1.expectString,
+        'message': smithy_client_1.expectString,
+        'request_id': smithy_client_1.expectString,
+        'request_status': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new models_0_1.ServiceUnavailableError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return (0, smithy_client_1.decorateServiceException)(exception, parsedOutput.body);
+};
+const de_TooManyRequestsErrorRes = async (parsedOutput, context) => {
+    const contents = (0, smithy_client_1.map)({});
+    const data = parsedOutput.body;
+    const doc = (0, smithy_client_1.take)(data, {
+        'code': smithy_client_1.expectString,
+        'message': smithy_client_1.expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new models_0_1.TooManyRequestsError({
         $metadata: deserializeMetadata(parsedOutput),
         ...contents
     });
@@ -1377,6 +2175,12 @@ const se_CreateReleaseRequestPackage = (input, context) => {
         'properties': _ => se_Document(_, context),
     });
 };
+const se_DeploymentRequestInputPayload = (input, context) => {
+    return (0, smithy_client_1.take)(input, {
+        'body': _ => se_Document(_, context),
+        'release_id': [],
+    });
+};
 const se_DimensionsMap = (input, context) => {
     return Object.entries(input).reduce((acc, [key, value]) => {
         if (value === null) {
@@ -1416,16 +2220,50 @@ const de_ControlCenterAppStatus = (output, context) => {
     return (0, smithy_client_1.take)(output, {
         'active': (_) => de_ControlCenterActiveReleaseList(_, context),
         'application': smithy_client_1.expectString,
+        'approval_required': smithy_client_1.expectBoolean,
+        'auxiliary_error': smithy_client_1.expectString,
+        'cache_invalidation': (_) => de_Document(_, context),
+        'emergency_needs_review': (_) => de_EmergencyReviewList(_, context),
         'error': (_) => de_Document(_, context),
         'last_activity_at': (_) => de_Document(_, context),
         'live': (_) => de_ControlCenterLiveReleaseList(_, context),
+        'pending_requests': smithy_client_1.expectInt32,
         'platform': (_) => de_Document(_, context),
-        'unresolved_operations': (_) => de_ControlCenterUnresolvedOperationList(_, context),
+        'release_protections': (_) => de_ReleaseProtectionList(_, context),
+        'serving_policy': smithy_client_1._json,
+        'telemetry': (_) => de_Document(_, context),
+        'unresolved_operations': smithy_client_1._json,
     });
 };
 const de_ControlCenterAppStatusList = (output, context) => {
     const retVal = (output || []).filter((e) => e != null).map((entry) => {
         return de_ControlCenterAppStatus(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterDeploymentRequest = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'action': smithy_client_1.expectString,
+        'application': smithy_client_1.expectString,
+        'base_state': (_) => de_Document(_, context),
+        'created_at': (_) => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'decided_by': (_) => de_Document(_, context),
+        'decision_reason': (_) => de_Document(_, context),
+        'expires_at': (_) => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'org': smithy_client_1.expectString,
+        'payload': (_) => de_DeploymentRequestPayload(_, context),
+        'payload_hash': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+        'requester': smithy_client_1.expectString,
+        'result': (_) => de_Document(_, context),
+        'status': smithy_client_1.expectString,
+        'updated_at': (_) => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+    });
+};
+const de_ControlCenterDeploymentRequestList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterDeploymentRequest(entry, context);
     });
     return retVal;
 };
@@ -1485,38 +2323,6 @@ const de_ControlCenterReleaseEventList = (output, context) => {
     });
     return retVal;
 };
-const de_ControlCenterUnresolvedOperation = (output, context) => {
-    return (0, smithy_client_1.take)(output, {
-        'before': (_) => de_Document(_, context),
-        'expected': (_) => de_Document(_, context),
-        'message': smithy_client_1.expectString,
-        'operation_id': smithy_client_1.expectString,
-        'upstream_workspace': (_) => de_Document(_, context),
-    });
-};
-const de_ControlCenterUnresolvedOperationDetails = (output, context) => {
-    return (0, smithy_client_1.take)(output, {
-        'before': (_) => de_Document(_, context),
-        'code': smithy_client_1.expectString,
-        'expected': (_) => de_Document(_, context),
-        'message': smithy_client_1.expectString,
-        'operation_id': smithy_client_1.expectString,
-        'upstream_org': (_) => de_Document(_, context),
-        'upstream_workspace': (_) => de_Document(_, context),
-    });
-};
-const de_ControlCenterUnresolvedOperationDetailsList = (output, context) => {
-    const retVal = (output || []).filter((e) => e != null).map((entry) => {
-        return de_ControlCenterUnresolvedOperationDetails(entry, context);
-    });
-    return retVal;
-};
-const de_ControlCenterUnresolvedOperationList = (output, context) => {
-    const retVal = (output || []).filter((e) => e != null).map((entry) => {
-        return de_ControlCenterUnresolvedOperation(entry, context);
-    });
-    return retVal;
-};
 const de_CreateFileResponse = (output, context) => {
     return (0, smithy_client_1.take)(output, {
         'checksum': smithy_client_1.expectString,
@@ -1529,6 +2335,13 @@ const de_CreateFileResponse = (output, context) => {
         'tag': smithy_client_1.expectString,
         'url': smithy_client_1.expectString,
         'version': smithy_client_1.expectInt32,
+    });
+};
+const de_DeploymentRequestPayload = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'body': (_) => de_Document(_, context),
+        'release_id': smithy_client_1.expectString,
+        'snapshot': (_) => de_Document(_, context),
     });
 };
 const de_DimensionList = (output, context) => {
@@ -1555,6 +2368,28 @@ const de_DimensionsMap = (output, context) => {
         acc[key] = de_Document(value, context);
         return acc;
     }, {});
+};
+const de_EmergencyReview = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'acknowledged_by': (_) => de_Document(_, context),
+        'actor': smithy_client_1.expectString,
+        'confirm_sensitive_risk': smithy_client_1.expectBoolean,
+        'created_at': (_) => (0, smithy_client_1.expectNonNull)((0, smithy_client_1.parseEpochTimestamp)((0, smithy_client_1.expectNumber)(_))),
+        'id': smithy_client_1.expectString,
+        'new_release_id': (_) => de_Document(_, context),
+        'plan': (_) => de_Document(_, context),
+        'reason': smithy_client_1.expectString,
+        'release_id': smithy_client_1.expectString,
+        'rollback_finished': smithy_client_1.expectBoolean,
+        'rollback_result': (_) => de_Document(_, context),
+        'rolled_back_to_package_version': (_) => de_Document(_, context),
+    });
+};
+const de_EmergencyReviewList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_EmergencyReview(entry, context);
+    });
+    return retVal;
 };
 const de_FileResponseList = (output, context) => {
     const retVal = (output || []).filter((e) => e != null).map((entry) => {
@@ -1588,6 +2423,18 @@ const de_GetReleaseResponseList = (output, context) => {
     });
     return retVal;
 };
+const de_ReleaseProtection = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'release_id': smithy_client_1.expectString,
+        'rollback_sensitive': (_) => de_Document(_, context),
+    });
+};
+const de_ReleaseProtectionList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ReleaseProtection(entry, context);
+    });
+    return retVal;
+};
 const de_ServePackage = (output, context) => {
     return (0, smithy_client_1.take)(output, {
         'important': smithy_client_1._json,
@@ -1614,6 +2461,7 @@ const _c = "count";
 const _ch = "checksum";
 const _d = "dimension";
 const _fp = "file_path";
+const _nv = "native_version";
 const _o = "organisation";
 const _p = "page";
 const _pp = "per_page";
@@ -1621,6 +2469,7 @@ const _s = "status";
 const _se = "search";
 const _t = "tags";
 const _ta = "tag";
+const _tp = "telemetry_platform";
 const _xa = "x-application";
 const _xc = "x-checksum";
 const _xd = "x-dimension";
