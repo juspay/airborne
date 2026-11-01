@@ -736,3 +736,32 @@ pub async fn refresh_access_token_common(
 
     to_user_token(&token_response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::rewrite_to_external_endpoint;
+
+    #[test]
+    fn rewrites_authorization_endpoint_to_external_issuer() {
+        let rewritten = rewrite_to_external_endpoint(
+            "http://internal-idp/realms/demo/protocol/openid-connect/auth",
+            "http://internal-idp/realms/demo",
+            "https://public-idp.example.com/realms/demo",
+        );
+        assert_eq!(
+            rewritten,
+            "https://public-idp.example.com/realms/demo/protocol/openid-connect/auth"
+        );
+    }
+
+    #[test]
+    fn keeps_authorization_endpoint_when_prefix_does_not_match() {
+        let endpoint = "https://accounts.example.com/oauth2/v1/authorize";
+        let rewritten = rewrite_to_external_endpoint(
+            endpoint,
+            "http://internal-idp/realms/demo",
+            "https://public-idp.example.com/realms/demo",
+        );
+        assert_eq!(rewritten, endpoint);
+    }
+}

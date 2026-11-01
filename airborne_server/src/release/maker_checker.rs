@@ -959,3 +959,84 @@ mod review_version_tests {
 #[cfg(test)]
 #[path = "review_tests.rs"]
 mod review_tests;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn roster_requires_a_distinct_checker_for_every_maker() {
+        for makers in [vec![], vec!["a"], vec!["a", "b"]] {
+            for checkers in [vec![], vec!["a"], vec!["b"], vec!["a", "b"]] {
+                let p = Policy {
+                    makers: makers.iter().map(|s| s.to_string()).collect(),
+                    checkers: checkers.iter().map(|s| s.to_string()).collect(),
+                    ..Policy::default()
+                };
+                assert_eq!(
+                    valid_roster(&p),
+                    makers
+                        .iter()
+                        .chain(checkers.iter())
+                        .collect::<BTreeSet<_>>()
+                        .len()
+                        >= 2
+                        && makers.iter().all(|m| checkers.iter().any(|c| c != m))
+                );
+            }
+        }
+    }
+    #[test]
+    fn request_state_machine_all_pairs() {
+        let states = [
+            "pending",
+            "executing",
+            "executed",
+            "failed",
+            "rejected",
+            "cancelled",
+            "expired",
+            "stale",
+        ];
+        for from in states {
+            for to in states {
+                let expected = match from {
+                    "pending" => {
+                        ["executing", "rejected", "cancelled", "expired", "stale"].contains(&to)
+                    }
+                    "executing" => ["executed", "failed"].contains(&to),
+                    "failed" => ["executing", "expired", "stale"].contains(&to),
+                    _ => false,
+                };
+                assert_eq!(transition_allowed(from, to), expected, "{from} -> {to}");
+            }
+        }
+    }
+    #[test]
+    fn defaults_and_entire_gating_table() {
+        assert!(!Policy::default().enabled);
+        assert_eq!(Policy::default().request_ttl_hours, 24);
+        assert!(Policy::default().emergency_rollback);
+        for sensitive in [false, true] {
+            for action in ["create", "update", "conclude", "set_rollback_sensitive"] {
+                assert!(needs_approval(action, "CREATED", 0, 0, sensitive));
+            }
+            assert!(!needs_approval("discard", "CREATED", 0, 0, sensitive));
+            assert!(needs_approval("ramp", "INPROGRESS", 10, 20, sensitive));
+            assert_eq!(
+                needs_approval("ramp", "INPROGRESS", 20, 10, sensitive),
+                sensitive
+            );
+            assert_eq!(
+                needs_approval("rollback", "INPROGRESS", 20, 0, sensitive),
+                sensitive
+            );
+            assert!(!needs_approval("rollback", "CREATED", 0, 0, sensitive));
+            assert!(needs_approval("rollback", "CONCLUDED", 50, 0, sensitive));
+        }
+    }
+    #[test]
+    fn payload_hash_is_order_independent_and_content_bound() {
+        assert_eq!(hash(&json!({"b":2,"a":1})), hash(&json!({"a":1,"b":2})));
+        assert_ne!(hash(&json!({"a":1})), hash(&json!({"a":2})));
+    }
+}
