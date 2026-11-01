@@ -25,6 +25,7 @@ For local development you rarely set these by hand. `make setup` seeds `airborne
 | `KEEP_ALIVE` | No | `30` | Actix-web keep-alive timeout, in seconds. |
 | `BACKLOG` | No | `1024` | Listen backlog (max pending connections). |
 | `ACTIX_WORKERS` | No | `4` | Number of Actix worker threads. |
+| `RELEASE_CORS_ALLOWED_ORIGINS` | No | _(empty)_, e.g. `http://localhost:8090` | Comma-separated browser origins (`scheme://host[:port]`) allowed to read the public `/release/*` routes cross-origin, for the web SDK. `*` allows any origin. GET/HEAD only, the only allowed request header is `x-dimension`, and credentials are never allowed. Empty disables CORS, leaving `/release` unchanged. A malformed origin fails startup. |
 | `PUBLIC_ENDPOINT` | **Yes** | `http://localhost:3000` | Externally reachable base URL of the deployment. Used by the dashboard to reach the API and to build browser-facing URLs / redirects. |
 | `RUST_LOG` | No | `debug,info,error,actix_web=info,error` | Standard Rust log filter directive. |
 | `LOG_FORMAT` | No | _(empty)_ | Tracing output format. Empty selects the default human-readable format; set to a JSON-style value for structured logs. |
