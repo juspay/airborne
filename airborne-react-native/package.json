@@ -6,11 +6,20 @@
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
+      "browser": {
+        "source": "./src/index.web.tsx",
+        "types": "./lib/typescript/src/index.web.d.ts",
+        "default": "./lib/module/index.web.js"
+      },
       "source": "./src/index.tsx",
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./web": {
+      "types": "./lib/typescript/src/web/index.d.ts",
+      "default": "./lib/module/web/index.js"
+    }
   },
   "files": [
     "src",
@@ -100,6 +109,10 @@
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/src/__tests__/support/"
     ]
   },
   "commitlint": {
