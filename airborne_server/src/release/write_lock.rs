@@ -32,6 +32,14 @@ pub async fn locked<T>(
 ) -> airborne_types::Result<T> {
     locked_inner(state, org, app, true, operation).await
 }
+pub(super) async fn bounded_read<T>(
+    read: impl std::future::Future<Output = T>,
+) -> airborne_types::Result<T> {
+    tokio::time::timeout(std::time::Duration::from_secs(15), read)
+        .await
+        .map_err(|_| ABError::InternalServerError("Release read deadline".into()))
+}
+
 pub async fn locked_inner<T>(
     state: &web::Data<AppState>,
     org: &str,
@@ -91,8 +99,8 @@ pub async fn locked_inner<T>(
     // Dropping this physical session releases its advisory lock, even on cancellation.
     let conn = Arc::new(conn);
     // Do not race the SDK future with a lock heartbeat or a body timeout. A DB
-    // hiccup must not discard a definite pre-dispatch error. Each SDK call has
-    // its own 5s deadline; check the body budget at mutation boundaries instead.
+    // hiccup must not discard a definite pre-dispatch error. Release mutations have
+    // a 5s deadline; full read listings have a 15s deadline; check the body budget at mutation boundaries instead.
     let result = SESSION
         .scope(conn.clone(), async {
             if reconcile {
@@ -329,16 +337,18 @@ pub async fn history_confirms(
     let Some(workspace) = op.data["workspace"].as_str() else {
         return Ok(false);
     };
-    let logs = state
-        .superposition_client
-        .list_audit_logs()
-        .org_id(&state.env.superposition_org_id)
-        .workspace_id(workspace)
-        .tables("experiments")
-        .all(true)
-        .send()
-        .await
-        .map_err(super::control_center::sp_error)?;
+    let logs = bounded_read(
+        state
+            .superposition_client
+            .list_audit_logs()
+            .org_id(&state.env.superposition_org_id)
+            .workspace_id(workspace)
+            .tables("experiments")
+            .all(true)
+            .send(),
+    )
+    .await?
+    .map_err(super::control_center::sp_error)?;
     Ok(logs
         .data
         .iter()
@@ -431,16 +441,18 @@ pub async fn config_values(
     workspace: &str,
 ) -> airborne_types::Result<Value> {
     let defaults = default_values(state, workspace).await?;
-    let contexts = state
-        .superposition_client
-        .list_contexts()
-        .org_id(&state.env.superposition_org_id)
-        .workspace_id(workspace)
-        .all(true)
-        .send()
-        .await
-        .map_err(super::control_center::sp_error)?
-        .data;
+    let contexts = bounded_read(
+        state
+            .superposition_client
+            .list_contexts()
+            .org_id(&state.env.superposition_org_id)
+            .workspace_id(workspace)
+            .all(true)
+            .send(),
+    )
+    .await?
+    .map_err(super::control_center::sp_error)?
+    .data;
     let contexts = contexts
         .into_iter()
         .map(|c| {
@@ -459,16 +471,18 @@ pub async fn default_values(
     state: &web::Data<AppState>,
     workspace: &str,
 ) -> airborne_types::Result<Value> {
-    let keys = state
-        .superposition_client
-        .list_default_configs()
-        .org_id(&state.env.superposition_org_id)
-        .workspace_id(workspace)
-        .all(true)
-        .send()
-        .await
-        .map_err(super::control_center::sp_error)?
-        .data;
+    let keys = bounded_read(
+        state
+            .superposition_client
+            .list_default_configs()
+            .org_id(&state.env.superposition_org_id)
+            .workspace_id(workspace)
+            .all(true)
+            .send(),
+    )
+    .await?
+    .map_err(super::control_center::sp_error)?
+    .data;
     Ok(Value::Object(
         keys.into_iter()
             .map(|k| {
@@ -514,10 +528,24 @@ fn definitely_rejected<E>(error: &superposition_sdk::error::SdkError<E>) -> bool
     }
 }
 
-pub(super) async fn bounded_read<T>(
-    read: impl std::future::Future<Output = T>,
-) -> airborne_types::Result<T> {
-    tokio::time::timeout(std::time::Duration::from_secs(15), read)
-        .await
-        .map_err(|_| ABError::InternalServerError("Release read deadline".into()))
+// Reader contract deliberately excludes config snapshots and upstream identifiers.
+pub fn reader_details(op: &super::operations::Operation) -> Value {
+    serde_json::json!({"code":"unresolved","operation_id":op.id,
+        "message":"Upstream outcome is not confirmed. Writes are paused for this app."})
+}
+
+#[cfg(test)]
+mod read_deadline_tests {
+    use super::*;
+    #[tokio::test]
+    async fn hung_read_expires_without_waiting_for_writer_body_budget() {
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(16),
+            bounded_read(std::future::pending::<()>()),
+        )
+        .await;
+        assert!(result
+            .expect("read exceeded its independent deadline")
+            .is_err());
+    }
 }

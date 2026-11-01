@@ -39,6 +39,8 @@ use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
 pub mod control_center;
 pub(crate) mod operations;
+pub(crate) mod recovery;
+pub(crate) mod rollback;
 mod types;
 pub mod utils;
 mod write_lock;
