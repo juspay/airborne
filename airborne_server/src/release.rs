@@ -426,7 +426,7 @@ pub(super) async fn create_release_impl(
     let BuildOverrides {
         final_important,
         package_data,
-        is_first_release,
+
         final_lazy,
         final_resources,
         config_version,
@@ -512,48 +512,8 @@ pub(super) async fn create_release_impl(
             .collect()
     });
 
-    if is_first_release {
-        // For first ever release -> Directly conclude the experiment to make it live
-        let transformed_variant_id =
-            format!("{}-{}", experiment_id_for_ramping, experimental_variant_id);
-        info!(
-            "Concluding first release experiment with variant id: {}",
-            transformed_variant_id
-        );
-        ramp_experiment(
-            &state,
-            &workspace_name,
-            &experiment_id_for_ramping,
-            50,
-            &Some("Ramping first release experiment to 50%".to_string()),
-        )
-        .await?;
-        control_center::event(
-            &state,
-            &auth_response,
-            &experiment_id_for_ramping,
-            "ramped",
-            serde_json::json!({"traffic_percentage":50}),
-        )
-        .await;
-        write_lock::check().await?;
-    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id_for_ramping,"status":"CONCLUDED","chosen_variant":transformed_variant_id}),         state
-            .release_superposition_client
-            .conclude_experiment()
-            .org_id(superposition_org_id_from_env.clone())
-            .workspace_id(workspace_name.clone())
-            .id(experiment_id_for_ramping.clone())
-            .chosen_variant(transformed_variant_id.clone())
-            .change_reason(write_lock::user_reason("Concluding first release experiment to make it live")?).send())).await?;
-        control_center::event(
-            &state,
-            &auth_response,
-            &experiment_id_for_ramping,
-            "concluded",
-            serde_json::json!({"chosen_variant":transformed_variant_id}),
-        )
-        .await;
-    }
+    // Initial/default configuration is also seen after a workspace rebuild.
+    // Never infer operator approval from missing upstream release state.
 
     let response_lazy = final_lazy.unwrap_or_default();
 
@@ -657,13 +617,8 @@ pub(super) async fn create_release_impl(
             package_version: pkg_version,
             config_version: config_version.clone(),
             created_at: now.to_string(),
-            traffic_percentage: if is_first_release { 50 } else { 0 },
-            status: if is_first_release {
-                "CONCLUDED"
-            } else {
-                "CREATED"
-            }
-            .to_string(),
+            traffic_percentage: 0,
+            status: "CREATED".to_string(),
         }),
     }))
     }).await
@@ -1707,7 +1662,7 @@ pub(super) async fn update_release_impl(
         let BuildOverrides {
             final_important,
             package_data,
-            is_first_release: _,
+
             final_lazy,
             final_resources,
             config_version,
