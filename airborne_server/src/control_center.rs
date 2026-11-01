@@ -70,6 +70,7 @@ pub fn add_routes() -> Scope {
         .service(crate::release::recovery::list)
         .service(crate::release::recovery::resolve)
         .configure(crate::release::maker_checker::routes)
+        .service(crate::release::control_center::retry_cache)
         .service(overview)
         .service(list_groups)
         .service(create_group)
