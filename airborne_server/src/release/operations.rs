@@ -64,6 +64,29 @@ pub async fn load(
         .await
         .map_err(|_| ABError::InternalServerError("Operation journal deadline".into()))?
 }
+// A replacement retains lineage in the durable rollback journal, even when
+// release-event recording failed. Scope every lookup to the application.
+pub async fn rollback_parent(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    replacement: &str,
+) -> airborne_types::Result<Option<String>> {
+    let pool = state.db_pool.clone();
+    let (org, app, replacement) = (org.to_owned(), app.to_owned(), replacement.to_owned());
+    #[derive(QueryableByName)]
+    struct Parent {
+        #[diesel(sql_type = Text)]
+        source_release_id: String,
+    }
+    run_blocking!({
+        let mut c = pool.get_timeout(std::time::Duration::from_secs(2))?;
+        let rows = diesel::sql_query("SELECT source_release_id FROM hyperotaserver.release_operations WHERE org_id=$1 AND app_id=$2 AND kind='rollback' AND data->>'replacement_release_id'=$3")
+            .bind::<Text,_>(org).bind::<Text,_>(app).bind::<Text,_>(replacement).load::<Parent>(&mut c)?;
+        Ok(rows.into_iter().next().map(|r| r.source_release_id))
+    })
+}
+
 #[derive(QueryableByName)]
 pub struct PendingApp {
     #[diesel(sql_type=Text)]
@@ -81,6 +104,8 @@ pub async fn pending_apps(state: &web::Data<AppState>) -> airborne_types::Result
         Ok(rows)
     })
 }
+// A rejected/pre-dispatch plan owns no upstream transition. Re-plan it, even
+// after a source/registry change; retain the row id for the unique source index.
 // A rejected/pre-dispatch plan owns no upstream transition. Re-plan it, even
 // after a source/registry change; retain the row id for the unique source index.
 pub async fn has_confirmed(
