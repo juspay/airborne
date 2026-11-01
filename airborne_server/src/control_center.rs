@@ -71,6 +71,7 @@ pub fn add_routes() -> Scope {
         .service(crate::release::recovery::resolve)
         .configure(crate::release::maker_checker::routes)
         .service(crate::release::control_center::retry_cache)
+        .configure(crate::release::serving_policy::routes)
         .service(overview)
         .service(list_groups)
         .service(create_group)
@@ -383,6 +384,7 @@ async fn overview(
     for ((index, app), status) in statuses.iter_mut() {
         let org = organisations[*index]["name"].as_str().unwrap();
         crate::release::maker_checker::overview(&state, org, app, status).await?;
+        status["serving_policy"] = crate::release::serving_policy::get(&state, org, app).await?;
         status["unresolved_operations"] = pending
             .iter()
             .find(|p| p.org_id == org && p.app_id == *app)
