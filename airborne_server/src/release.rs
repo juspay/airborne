@@ -479,6 +479,14 @@ async fn create_release(
     })?;
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
+    control_center::event(
+        &state,
+        &auth_response,
+        &experiment_id_for_ramping,
+        "created",
+        serde_json::json!({}),
+    )
+    .await;
 
     let response_important = final_important.unwrap_or_else(|| {
         package_data
@@ -504,7 +512,15 @@ async fn create_release(
         )
         .await
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-        let _ = state
+        control_center::event(
+            &state,
+            &auth_response,
+            &experiment_id_for_ramping,
+            "ramped",
+            serde_json::json!({"traffic_percentage":50}),
+        )
+        .await;
+        let concluded = state
             .release_superposition_client
             .conclude_experiment()
             .org_id(superposition_org_id_from_env.clone())
@@ -518,6 +534,16 @@ async fn create_release(
                 info!("Failed to conclude first release experiment: {:?}", e);
                 error::ErrorInternalServerError("Failed to conclude experiment".to_string())
             });
+        if concluded.is_ok() {
+            control_center::event(
+                &state,
+                &auth_response,
+                &experiment_id_for_ramping,
+                "concluded",
+                serde_json::json!({"chosen_variant":transformed_variant_id}),
+            )
+            .await;
+        }
     }
 
     let response_lazy = final_lazy.unwrap_or_default();
@@ -988,6 +1014,14 @@ async fn ramp_release(
     .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
     info!("Successfully ramped experiment {}", experiment_id);
+    control_center::event(
+        &state,
+        &auth_response,
+        &experiment_id,
+        "ramped",
+        serde_json::json!({"traffic_percentage":req.traffic_percentage}),
+    )
+    .await;
 
     let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
 
@@ -1131,6 +1165,14 @@ async fn conclude_release(
                 "Failed to conclude experiment in Superposition".to_string(),
             )
         })?;
+    control_center::event(
+        &state,
+        &auth_response,
+        &experiment_id,
+        "concluded",
+        serde_json::json!({"chosen_variant":req.chosen_variant}),
+    )
+    .await;
 
     info!(
         "Successfully concluded experiment {} with variant {}",
@@ -1233,6 +1275,14 @@ async fn discard_release(
             )
         })?;
 
+    control_center::event(
+        &state,
+        &auth_response,
+        &experiment_id,
+        "discarded",
+        serde_json::json!({"change_reason":req.change_reason}),
+    )
+    .await;
     info!("Successfully discarded experiment {}", experiment_id);
 
     Ok(Json(DiscardReleaseResponse {

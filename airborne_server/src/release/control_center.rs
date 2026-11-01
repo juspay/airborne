@@ -13,8 +13,11 @@
 // limitations under the License.
 
 use super::*;
+use crate::{run_blocking, utils::db::schema::hyperotaserver::release_events as e};
+use diesel::prelude::*;
 use serde_json::json;
 use superposition_sdk::types::ExperimentResponse;
+use uuid::Uuid;
 type Result<T> = airborne_types::Result<T>;
 
 pub async fn experiments(
@@ -100,6 +103,115 @@ pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Re
         json!({"application":app,"platform":null,"live":live,"active":active,"last_activity_at":exps.iter().max_by_key(|e|e.last_modified).map(|e|utils::dt(&e.last_modified)),"error":null}),
     )
 }
+pub async fn event(
+    state: &web::Data<AppState>,
+    auth: &AuthResponse,
+    release: &str,
+    action: &str,
+    payload: Value,
+) {
+    if required_event(state, auth, release, action, payload)
+        .await
+        .is_err()
+    {
+        log::error!("Failed to append release event");
+    }
+}
+async fn required_event(
+    state: &web::Data<AppState>,
+    auth: &AuthResponse,
+    release: &str,
+    action: &str,
+    payload: Value,
+) -> Result<()> {
+    let Some(org) = auth.organisation.as_ref().map(|a| a.name.clone()) else {
+        return Err(ABError::InternalServerError("Audit scope missing".into()));
+    };
+    let Some(app) = auth.application.as_ref().map(|a| a.name.clone()) else {
+        return Err(ABError::InternalServerError("Audit scope missing".into()));
+    };
+    let pool = state.db_pool.clone();
+    let actor = auth.sub.clone();
+    let release = release.to_string();
+    let action = action.to_string();
+    run_blocking!({
+        let mut c = pool.get()?;
+        diesel::insert_into(e::table)
+            .values((
+                e::id.eq(Uuid::new_v4()),
+                e::org_id.eq(org),
+                e::app_id.eq(app),
+                e::release_id.eq(release),
+                e::action.eq(action),
+                e::actor.eq(actor),
+                e::payload.eq(payload),
+            ))
+            .execute(&mut c)?;
+        Ok(())
+    })
+}
+#[authz(resource="release",action="read",org_roles=["owner","admin","write","read"],app_roles=["admin","write","read"])]
+#[get("/releases/{release_id}/events")]
+pub async fn events(
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+    path: Path<String>,
+) -> Result<Json<Value>> {
+    let (org, app) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
+    let id = path.into_inner();
+    let (_, exps) = experiments(&state, &org, &app).await?;
+    let exp = exps
+        .iter()
+        .find(|e| e.id == id)
+        .ok_or_else(|| ABError::NotFound("Release not found".into()))?;
+    let pool = state.db_pool.clone();
+    let rows = run_blocking!({
+        let mut c = pool.get()?;
+        Ok(e::table
+            .filter(e::org_id.eq(org))
+            .filter(e::app_id.eq(app))
+            .filter(e::release_id.eq(id))
+            .order((e::created_at.asc(), e::id.asc()))
+            .select((e::action, e::actor, e::created_at, e::payload))
+            .load::<(String, String, DateTime<Utc>, Value)>(&mut c)?)
+    })?;
+    let mut events=rows.into_iter().map(|(action,actor,time,payload)|json!({"action":action,"actor":actor,"created_at":time,"payload":payload,"synthetic":false})).collect::<Vec<_>>();
+    if !events.iter().any(|e| e["action"] == "created") {
+        events.push(json!({"action":"created","actor":exp.created_by,"created_at":utils::dt(&exp.created_at),"payload":{},"synthetic":true}));
+    }
+    let terminal = match exp.status {
+        ExperimentStatusType::Concluded => Some("concluded"),
+        ExperimentStatusType::Discarded => Some("discarded"),
+        _ => None,
+    };
+    if let Some(action) = terminal {
+        if !events.iter().any(|e| e["action"] == action) {
+            events.push(json!({"action":action,"actor":exp.last_modified_by,"created_at":utils::dt(&exp.last_modified),"payload":{"chosen_variant":exp.chosen_variant},"synthetic":true}));
+        }
+    }
+    events.sort_by_key(|e| e["created_at"].as_str().unwrap_or_default().to_string());
+    Ok(Json(json!({"events":events,"outcome":outcome(exp, &exps)})))
+}
+pub(super) fn current_live<'a>(
+    exp: &ExperimentResponse,
+    exps: &'a [ExperimentResponse],
+) -> Option<&'a ExperimentResponse> {
+    latest_live(exps)
+        .into_iter()
+        .find(|e| context(e) == context(exp))
+}
+fn outcome(exp: &ExperimentResponse, exps: &[ExperimentResponse]) -> &'static str {
+    match exp.status {
+        ExperimentStatusType::Created | ExperimentStatusType::Inprogress => "active",
+        ExperimentStatusType::Discarded => "discarded",
+        _ if !live(exp) => "concluded_on_control",
+        _ if current_live(exp, exps).is_some_and(|e| e.id == exp.id) => "live",
+        _ => "superseded",
+    }
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -133,6 +245,29 @@ pub(crate) mod tests {
             .unwrap()
     }
     #[test]
+    fn stale_detection_uses_the_latest_live_release_in_the_same_context() {
+        let exps = vec![
+            make("old", 1, "ios"),
+            make("current", 2, "ios"),
+            make("other", 3, "android"),
+        ];
+        assert_eq!(current_live(&exps[0], &exps).unwrap().id, "current");
+        assert_ne!(current_live(&exps[0], &exps).unwrap().id, exps[0].id);
+        assert_eq!(current_live(&exps[1], &exps).unwrap().id, exps[1].id);
+    }
+    #[test]
+    fn outcome_covers_all_five_contract_values() {
+        let mut exps = vec![make("old", 1, "ios"), make("current", 2, "ios")];
+        assert_eq!(outcome(&exps[0], &exps), "superseded");
+        assert_eq!(outcome(&exps[1], &exps), "live");
+        exps[0].chosen_variant = Some("control".into());
+        assert_eq!(outcome(&exps[0], &exps), "concluded_on_control");
+        exps[0].status = ExperimentStatusType::Discarded;
+        assert_eq!(outcome(&exps[0], &exps), "discarded");
+        exps[0].status = ExperimentStatusType::Inprogress;
+        assert_eq!(outcome(&exps[0], &exps), "active");
+    }
+    #[test]
     fn live_selection() {
         let mut exps = vec![
             make("old", 1, "ios"),
@@ -148,5 +283,13 @@ pub(crate) mod tests {
         assert_eq!(ids.len(), 2);
         assert!(ids.contains(&"new"));
         assert!(ids.contains(&"android"));
+        assert_eq!(current_live(&exps[0], &exps).unwrap().id, "new");
+        assert_eq!(outcome(&exps[0], &exps), "superseded");
+        assert_eq!(outcome(&exps[1], &exps), "live");
+        assert_eq!(outcome(&exps[3], &exps), "concluded_on_control");
+        exps[3].status = ExperimentStatusType::Discarded;
+        assert_eq!(outcome(&exps[3], &exps), "discarded");
+        exps[3].status = ExperimentStatusType::Created;
+        assert_eq!(outcome(&exps[3], &exps), "active");
     }
 }
