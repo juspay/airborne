@@ -7,6 +7,8 @@ use aws.protocols#restJson1
 @httpBearerAuth
 service Airborne {
     operations: [
+        IngestTelemetryReports
+        GetTelemetrySummary
         // user
         PostLogin
         GetUser
@@ -29,9 +31,16 @@ service Airborne {
         CreateRelease
         ListReleases
         GetRelease
+        RampRelease
+        ConcludeRelease
+        DiscardRelease
         ServeRelease
         ServeReleaseV2
         // dimension
+        GetServingPolicy
+        PutServingPolicy
+        PreviewServingPolicy
+        CreateCohortRange
         CreateDimension
         ListDimensions
         UpdateDimension
@@ -47,12 +56,14 @@ service Airborne {
         GetControlCenterReleaseEvents
         GetControlCenterRollbackPreview
         RollbackRelease
-    ]
-    errors: [
-        Unauthorized
-        BadRequestError
-        NotFoundError
-        InternalServerError
-        ForbiddenError
+        GetControlCenterApprovalPolicy
+        UpdateControlCenterApprovalPolicy
+        ListControlCenterDeploymentRequests
+        CreateControlCenterDeploymentRequest
+        GetControlCenterDeploymentRequest
+        ApproveControlCenterDeploymentRequest
+        RejectControlCenterDeploymentRequest
+        CancelControlCenterDeploymentRequest
+        AcknowledgeEmergencyRollback
     ]
 }

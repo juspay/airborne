@@ -41,8 +41,5 @@ structure CreateApplicationRequest {
 operation CreateApplication {
     input: CreateApplicationRequest
     output: Application
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
