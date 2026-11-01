@@ -67,12 +67,15 @@ pub struct GroupRequest {
 }
 pub fn add_routes() -> Scope {
     Scope::new("")
+        .service(crate::release::recovery::list)
+        .service(crate::release::recovery::resolve)
         .service(overview)
         .service(list_groups)
         .service(create_group)
         .service(update_group)
         .service(delete_group)
         .service(crate::release::control_center::events)
+        .service(crate::release::rollback::preview)
 }
 async fn load_groups(state: &web::Data<AppState>, org: String) -> Result<Vec<Value>> {
     let pool = state.db_pool.clone();
@@ -144,6 +147,12 @@ async fn save_group(
     run_blocking!({
         let mut c = pool.get()?;
         c.transaction::<_, ABError, _>(|c| {
+            diesel::sql_query(format!(
+                "SELECT pg_advisory_xact_lock_shared({})",
+                crate::organisation::journal_lifecycle::KEY
+            ))
+            .bind::<diesel::sql_types::Text, _>(&org)
+            .execute(c)?;
             for member in &req.members {
                 if !["android", "ios", "web", "other"].contains(&member.platform.as_str()) {
                     return Err(ABError::BadRequest("Invalid platform".into()));
@@ -354,6 +363,9 @@ async fn overview(
         }
     }
     let mut statuses = jobs.iter().map(|(index,_,app)|((*index,app.clone()),json!({"application":app,"platform":null,"live":[],"active":[],"last_activity_at":null,"error":"Release lookup deadline exceeded"}))).collect::<std::collections::BTreeMap<_,_>>();
+    // Pause state is local durable data, independent of upstream lookup deadlines.
+    // Only attach rows for applications already authorized above.
+    let pending = crate::release::operations::pending_apps(&state).await?;
     let work = stream::iter(jobs.into_iter().map(|(index,org,app)| {
         let state=state.clone();
         async move {
@@ -365,6 +377,14 @@ async fn overview(
     tokio::pin!(work);
     while let Ok(Some((key, status))) = tokio::time::timeout_at(deadline, work.next()).await {
         statuses.insert(key, status);
+    }
+    for ((index, app), status) in statuses.iter_mut() {
+        let org = organisations[*index]["name"].as_str().unwrap();
+        status["unresolved_operations"] = pending
+            .iter()
+            .find(|p| p.org_id == org && p.app_id == *app)
+            .map(|p| p.operations.clone())
+            .unwrap_or(json!([]));
     }
     for (index, org) in organisations.iter_mut().enumerate() {
         let mut grouped = std::collections::HashSet::new();

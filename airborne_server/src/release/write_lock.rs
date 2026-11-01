@@ -35,7 +35,11 @@ pub async fn locked<T>(
 pub(super) async fn bounded_read<T>(
     read: impl std::future::Future<Output = T>,
 ) -> airborne_types::Result<T> {
-    tokio::time::timeout(std::time::Duration::from_secs(15), read)
+    let deadline = SESSION
+        .try_with(|s| s.deadline)
+        .unwrap_or_else(|_| tokio::time::Instant::now() + std::time::Duration::from_secs(15));
+    let deadline = deadline.min(tokio::time::Instant::now() + std::time::Duration::from_secs(15));
+    tokio::time::timeout_at(deadline, read)
         .await
         .map_err(|_| ABError::InternalServerError("Release read deadline".into()))
 }
@@ -79,6 +83,10 @@ pub async fn locked_inner<T>(
                     "Another release write is in progress; retry".into(),
                 ));
             }
+            let lifecycle_key = crate::organisation::journal_lifecycle::KEY;
+            diesel::sql_query(format!("SELECT pg_advisory_lock_shared({lifecycle_key})"))
+                .bind::<diesel::sql_types::Text, _>(&org_for_session)
+                .execute(&mut conn)?;
             Ok(LockSession {
                 conn: Mutex::new(conn),
                 state: state_for_session,
@@ -414,7 +422,8 @@ where
             Ok(value)
         }
         Err(error) => {
-            if definitely_rejected(&error) {
+            let rejection = rejected_upstream_response(&error, &[400, 401, 403, 404, 422]);
+            if definitely_rejected(&error) || rejection.is_some() {
                 op.advance("rejected")?;
                 super::operations::save(
                     &session.state,
@@ -425,9 +434,12 @@ where
                     &op,
                 )
                 .await?;
-                return Err(ABError::InternalServerError(
-                    "Superposition request was not dispatched; retry when it is reachable".into(),
-                ));
+                return Err(rejection.unwrap_or_else(|| {
+                    ABError::InternalServerError(
+                        "Superposition request was not dispatched; retry when it is reachable"
+                            .into(),
+                    )
+                }));
             }
             let mut body = details(&op);
             body["own_attempt"] = Value::Bool(true);
@@ -499,6 +511,22 @@ pub async fn default_values(
 
 // Smithy uses the Hyper connector. Only typed connect-phase failures are safe;
 // socket resets, generic IO errors, read/operation timeouts and responses are not.
+fn rejected_upstream_response<E>(
+    error: &superposition_sdk::error::SdkError<E>,
+    definite_statuses: &[u16],
+) -> Option<ABError> {
+    use superposition_sdk::error::SdkError;
+    let SdkError::ServiceError(service_error) = error else {
+        return None;
+    };
+    let status = service_error.raw().status().as_u16();
+    if !definite_statuses.contains(&status) {
+        return None;
+    }
+    let message = format!("Superposition rejected the request (HTTP {status})");
+    Some(ABError::BadRequest(message))
+}
+
 fn definitely_rejected<E>(error: &superposition_sdk::error::SdkError<E>) -> bool {
     use superposition_sdk::error::SdkError;
     match error {
