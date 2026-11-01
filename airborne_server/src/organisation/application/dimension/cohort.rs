@@ -22,6 +22,7 @@ pub fn add_routes() -> Scope {
     Scope::new("")
         .service(list_cohorts_api)
         .service(create_cohort_checkpoint_api)
+        .service(create_range)
         .service(create_cohort_group_api)
         .service(get_cohort_priority_api)
         .service(update_cohort_priority_api)
@@ -160,6 +161,9 @@ async fn create_cohort_checkpoint_api(
                         return (last_in, first);
                     };
 
+                    if is_closed_range(definitions) {
+                        return (last_in, first);
+                    }
                     match definitions.keys().next() {
                         // track the last index where the key is `In`
                         Some(key) if *key == types::JsonLogicKey::In => (Some(idx), first),
@@ -560,4 +564,182 @@ async fn update_cohort_priority_api(
         }))
     })
     .await
+}
+
+// Closed ranges are independent of the checkpoint chain. Their inclusive pair
+// cannot be produced by checkpoints (which use complementary strict bounds).
+fn is_closed_range(definition: &types::DefinitionMap) -> bool {
+    if let Some(types::DefinitionValue::Array(conditions)) =
+        definition.get(&types::JsonLogicKey::And)
+    {
+        return conditions.len()==2 && conditions.iter().any(|v| matches!(v,types::DefinitionValue::Node(m) if m.contains_key(&types::JsonLogicKey::SemVerGe))) && conditions.iter().any(|v| matches!(v,types::DefinitionValue::Node(m) if m.contains_key(&types::JsonLogicKey::SemVerLe)));
+    }
+    false
+}
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct ClosedRange {
+    name: String,
+    lower: String,
+    upper: String,
+    priority: usize,
+}
+fn insert_range(
+    schema: &mut CohortDimensionSchema,
+    depends_on: &str,
+    req: &ClosedRange,
+) -> airborne_types::Result<()> {
+    let lower = semver::Version::parse(&req.lower)
+        .map_err(|_| ABError::BadRequest("lower must be a semantic version".into()))?;
+    let upper = semver::Version::parse(&req.upper)
+        .map_err(|_| ABError::BadRequest("upper must be a semantic version".into()))?;
+    // Superposition jp_ver_* currently does not implement SemVer prerelease
+    // precedence. Refuse unsupported bounds rather than silently mis-targeting.
+    if !lower.pre.is_empty()
+        || !upper.pre.is_empty()
+        || !lower.build.is_empty()
+        || !upper.build.is_empty()
+    {
+        return Err(ABError::BadRequest("Ranges require stable major.minor.patch versions; upstream comparators do not support prerelease/build metadata".into()));
+    }
+    if lower.cmp_precedence(&upper).is_gt() {
+        return Err(ABError::BadRequest("lower must not exceed upper".into()));
+    }
+    if req.name.trim().is_empty() || req.name == "otherwise" || schema.r#enum.contains(&req.name) {
+        return Err(ABError::BadRequest(
+            "Invalid or duplicate cohort name".into(),
+        ));
+    }
+    schema.remove_default();
+    let end = schema
+        .r#enum
+        .iter()
+        .position(|v| v == "otherwise")
+        .unwrap_or(schema.r#enum.len());
+    if req.priority > end {
+        return Err(ABError::BadRequest(format!(
+            "priority must be between 0 and {end}"
+        )));
+    }
+    let conditions = [
+        (types::JsonLogicKey::SemVerGe, &req.lower),
+        (types::JsonLogicKey::SemVerLe, &req.upper),
+    ]
+    .into_iter()
+    .map(|(key, value)| {
+        types::DefinitionValue::Node(HashMap::from([(
+            key,
+            types::DefinitionValue::Leaf(serde_json::json!([{"var":depends_on},value])),
+        )]))
+    })
+    .collect();
+    schema.definitions.insert(
+        req.name.clone(),
+        HashMap::from([(
+            types::JsonLogicKey::And,
+            types::DefinitionValue::Array(conditions),
+        )]),
+    );
+    schema.r#enum.insert(req.priority, req.name.clone());
+    Ok(())
+}
+#[authz(resource="cohort", action="update", org_roles=["owner","admin","write"], app_roles=["admin","write"])]
+#[post("/range")]
+async fn create_range(
+    cohort_dimension: Path<String>,
+    req: Json<ClosedRange>,
+    auth_response: ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<ClosedRange>> {
+    let (o, a) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
+    crate::release::maker_checker::auxiliary_write(&state, &o, &a, async {
+        crate::release::maker_checker::auxiliary(&state, &o, &a).await?;
+        let workspace = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            a.clone(),
+            o.clone(),
+        )
+        .await?;
+        let dimension = state
+            .superposition_client
+            .get_dimension()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace.clone())
+            .dimension(cohort_dimension.as_str())
+            .send()
+            .await
+            .map_err(|e| ABError::InternalServerError(format!("Failed to fetch dimension: {e}")))?;
+        let depends = match dimension.dimension_type {
+            superposition_sdk::types::DimensionType::LocalCohort(d) => d,
+            _ => {
+                return Err(ABError::BadRequest(
+                    "Expected local cohort dimension".into(),
+                ))
+            }
+        };
+        let mut schema: CohortDimensionSchema = dimension.schema.try_into()?;
+        insert_range(&mut schema, &depends, &req)?;
+        state
+            .superposition_client
+            .update_dimension()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace)
+            .dimension(cohort_dimension.as_str())
+            .set_schema(Some(schema.to_kv_str_doc()))
+            .change_reason("Added independent closed semantic version range".to_owned())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to update dimension: {e}"))
+            })?;
+        Ok(Json(req.into_inner()))
+    })
+    .await
+}
+#[cfg(test)]
+mod range_tests {
+    use super::*;
+    #[test]
+    fn closed_range_preserves_previous_definitions_and_priority() {
+        let mut schema = CohortDimensionSchema::default("app_version".into());
+        let req = |name: &str, lower: &str, upper: &str, priority| ClosedRange {
+            name: name.into(),
+            lower: lower.into(),
+            upper: upper.into(),
+            priority,
+        };
+        insert_range(&mut schema, "app_version", &req("old", "1.0.0", "1.9.9", 0)).unwrap();
+        let before = serde_json::to_vec(&schema.definitions["old"]).unwrap();
+        insert_range(&mut schema, "app_version", &req("new", "1.5.0", "2.0.0", 0)).unwrap();
+        assert_eq!(
+            before,
+            serde_json::to_vec(&schema.definitions["old"]).unwrap()
+        );
+        assert_eq!(schema.r#enum, vec!["new", "old", "otherwise"]);
+        assert!(is_closed_range(&schema.definitions["new"]));
+        let definition = schema.definitions["new"].values().next().unwrap().to_json();
+        assert_eq!(
+            definition,
+            serde_json::json!([{"jp_ver_ge":[{"var":"app_version"},"1.5.0"]},{"jp_ver_le":[{"var":"app_version"},"2.0.0"]}])
+        );
+        for (lo, hi) in [
+            ("bad", "2.0.0"),
+            ("1.0.0-alpha", "2.0.0"),
+            ("1.0.0+build", "2.0.0"),
+            ("2.0.0", "1.0.0"),
+            ("1.0", "2.0.0"),
+        ] {
+            assert!(insert_range(&mut schema, "app_version", &req("invalid", lo, hi, 0)).is_err());
+        }
+        insert_range(
+            &mut schema,
+            "app_version",
+            &req("single", "2.0.0", "2.0.0", 0),
+        )
+        .unwrap();
+    }
 }

@@ -42,6 +42,7 @@ pub(crate) mod maker_checker;
 pub(crate) mod operations;
 pub(crate) mod recovery;
 pub(crate) mod rollback;
+pub(crate) mod serving_policy;
 mod types;
 pub mod utils;
 pub(crate) mod write_lock;
@@ -1410,11 +1411,10 @@ async fn serve_release_handler(
 
     log::info!("Final evaluation Context {:?}", evaluation_context);
 
-    let strict = strict_release_application(
-        &std::env::var("STRICT_RELEASE_APPLICATIONS").unwrap_or_default(),
-        &organisation,
-        &application,
-    );
+    let strict = serving_policy::cached(&state, &organisation, &application).await?
+        ["effective_strict"]
+        .as_bool()
+        .unwrap_or(true);
     let of_release_config = if strict {
         // Keep snapshot versions: a concurrent default change must never make an
         // old fallback look like a targeted override. Fail closed on that race.

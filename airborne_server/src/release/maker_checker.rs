@@ -282,7 +282,7 @@ async fn member(state: &web::Data<AppState>, sub: &str, org: &str, app: &str) ->
 fn permission_action(action: &str) -> &str {
     match action {
         "create" => "create",
-        "update" | "set_rollback_sensitive" => "update",
+        "update" | "set_rollback_sensitive" | "set_strict_serving" => "update",
         "ramp" => "ramp",
         "discard" => "discard",
         _ => "conclude",
@@ -436,6 +436,11 @@ async fn snapshot_payload(
     action: &str,
     payload: &Value,
 ) -> Result<Value> {
+    if action == "set_strict_serving" {
+        let _: super::serving_policy::Change = serde_json::from_value(payload["body"].clone())
+            .map_err(|e| ABError::BadRequest(e.to_string()))?;
+        return super::serving_policy::get(state, org, app).await;
+    }
     if action == "create" || action == "update" {
         let req: CreateReleaseRequest = serde_json::from_value(payload["body"].clone())
             .map_err(|e| ABError::BadRequest(e.to_string()))?;
@@ -510,7 +515,7 @@ async fn base_state(state: &web::Data<AppState>, org: &str, app: &str) -> Result
     exps.sort_by_key(|e| e["id"].as_str().unwrap_or("").to_owned());
     // Conservative app-wide freshness includes overlap and in-place rollout/override edits.
     Ok(
-        json!({"releases":exps,"config":write_lock::config_values(state,&workspace).await?,"protections":rows(state,org,app,"protections").await?}),
+        json!({"releases":exps,"config":write_lock::config_values(state,&workspace).await?,"protections":rows(state,org,app,"protections").await?,"serving_policy":super::serving_policy::get(state,org,app).await?}),
     )
 }
 #[authz(resource="release",action="read",org_roles=["owner","admin","write","read"],app_roles=["admin","write","read"])]
@@ -525,17 +530,18 @@ async fn create_request(
         let p=policy(&state,&o,&a).await?;
         if !p.enabled||!p.makers.contains(&auth_response.sub){return Err(ABError::Forbidden("Enabled policy and maker membership required".into()))}
         permission(&state,&auth_response.sub,&o,&a,permission_action(&req.action)).await?;
-        if !["create","ramp","conclude","update","rollback","discard","set_rollback_sensitive"].contains(&req.action.as_str()){return Err(ABError::BadRequest("Unknown deployment action".into()))}
+        if !["create","ramp","conclude","update","rollback","discard","set_rollback_sensitive","set_strict_serving"].contains(&req.action.as_str()){return Err(ABError::BadRequest("Unknown deployment action".into()))}
         if req.reason.trim().is_empty(){return Err(ABError::BadRequest("Request reason required".into()))}
         write_lock::validate_user_reason(&req.reason)?;
         let mut payload=req.payload.clone();
         if !payload.is_object(){return Err(ABError::BadRequest("payload must be an object".into()))}
         let allowed=if req.action=="create"{vec!["body"]}else{vec!["release_id","body"]};
         if payload.as_object().unwrap().keys().any(|k|!allowed.contains(&k.as_str())) {return Err(ABError::BadRequest("Unknown payload field".into()))}
-        if req.action!="create" {
+        if req.action!="create" && req.action!="set_strict_serving" {
             let(_,exps)=control_center::experiments(&state,&o,&a).await?;
             if !exps.iter().any(|e|Some(e.id.as_str())==payload["release_id"].as_str()){return Err(ABError::NotFound("Release not found in this application".into()))}
         }
+        if req.action=="set_strict_serving" && payload.get("release_id").is_some(){return Err(ABError::BadRequest("set_strict_serving has no release_id".into()))}
         if req.action=="set_rollback_sensitive"{validate_marker(&payload["body"]["rollback_sensitive"])?;}
         let id=Uuid::new_v4();payload["config_version"]=json!(id.to_string());
         let resolved=snapshot_payload(&state,&o,&a,&req.action,&payload).await?;payload["snapshot"]=resolved;
@@ -680,6 +686,10 @@ async fn execute(state: &web::Data<AppState>, auth: &AuthResponse, r: &Value) ->
     let body = p["body"].clone();
     let parse = |e: serde_json::Error| ABError::BadRequest(e.to_string());
     let result = match action {
+        "set_strict_serving" => {
+            super::serving_policy::change(state, auth, serde_json::from_value(body).map_err(parse)?)
+                .await?
+        }
         "create" => json!(Box::pin(super::create_release_impl(
             Json(serde_json::from_value(body).map_err(parse)?),
             auth.clone(),
@@ -963,6 +973,18 @@ mod review_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn strict_serving_changes_require_update_permission_and_approval() {
+        assert_eq!(permission_action("set_strict_serving"), "update");
+        assert!(needs_approval("set_strict_serving", "", 0, 0, false));
+        assert!(
+            serde_json::from_value::<super::super::serving_policy::Change>(
+                json!({"strict":true,"extra":false})
+            )
+            .is_err()
+        );
+    }
+
     #[test]
     fn roster_requires_a_distinct_checker_for_every_maker() {
         for makers in [vec![], vec!["a"], vec!["a", "b"]] {
