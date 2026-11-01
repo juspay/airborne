@@ -72,6 +72,7 @@ pub fn add_routes() -> Scope {
         .service(create_group)
         .service(update_group)
         .service(delete_group)
+        .service(crate::release::control_center::events)
 }
 async fn load_groups(state: &web::Data<AppState>, org: String) -> Result<Vec<Value>> {
     let pool = state.db_pool.clone();
