@@ -1,12 +1,19 @@
 import { CreateApplicationCommandInput, CreateApplicationCommandOutput } from "../commands/CreateApplicationCommand";
+import { CreateControlCenterGroupCommandInput, CreateControlCenterGroupCommandOutput } from "../commands/CreateControlCenterGroupCommand";
 import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "../commands/CreateDimensionCommand";
 import { CreateFileCommandInput, CreateFileCommandOutput } from "../commands/CreateFileCommand";
 import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from "../commands/CreateOrganisationCommand";
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "../commands/CreatePackageCommand";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "../commands/CreateReleaseCommand";
+import { DeleteControlCenterGroupCommandInput, DeleteControlCenterGroupCommandOutput } from "../commands/DeleteControlCenterGroupCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "../commands/DeleteDimensionCommand";
+import { GetControlCenterOverviewCommandInput, GetControlCenterOverviewCommandOutput } from "../commands/GetControlCenterOverviewCommand";
+import { GetControlCenterReleaseEventsCommandInput, GetControlCenterReleaseEventsCommandOutput } from "../commands/GetControlCenterReleaseEventsCommand";
+import { GetControlCenterRollbackPreviewCommandInput, GetControlCenterRollbackPreviewCommandOutput } from "../commands/GetControlCenterRollbackPreviewCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "../commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "../commands/GetUserCommand";
+import { ListControlCenterGroupsCommandInput, ListControlCenterGroupsCommandOutput } from "../commands/ListControlCenterGroupsCommand";
+import { ListControlCenterOperationsCommandInput, ListControlCenterOperationsCommandOutput } from "../commands/ListControlCenterOperationsCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "../commands/ListDimensionsCommand";
 import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "../commands/ListFileGroupsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "../commands/ListFilesCommand";
@@ -15,8 +22,11 @@ import { ListPackagesCommandInput, ListPackagesCommandOutput } from "../commands
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "../commands/ListReleasesCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "../commands/PostLoginCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "../commands/RequestOrganisationCommand";
+import { ResolveControlCenterOperationCommandInput, ResolveControlCenterOperationCommandOutput } from "../commands/ResolveControlCenterOperationCommand";
+import { RollbackReleaseCommandInput, RollbackReleaseCommandOutput } from "../commands/RollbackReleaseCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "../commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "../commands/ServeReleaseV2Command";
+import { UpdateControlCenterGroupCommandInput, UpdateControlCenterGroupCommandOutput } from "../commands/UpdateControlCenterGroupCommand";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "../commands/UpdateDimensionCommand";
 import { UpdateFileCommandInput, UpdateFileCommandOutput } from "../commands/UpdateFileCommand";
 import { UploadFileCommandInput, UploadFileCommandOutput } from "../commands/UploadFileCommand";
@@ -26,6 +36,10 @@ import { SerdeContext as __SerdeContext } from "@smithy/types";
  * serializeAws_restJson1CreateApplicationCommand
  */
 export declare const se_CreateApplicationCommand: (input: CreateApplicationCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1CreateControlCenterGroupCommand
+ */
+export declare const se_CreateControlCenterGroupCommand: (input: CreateControlCenterGroupCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1CreateDimensionCommand
  */
@@ -47,9 +61,25 @@ export declare const se_CreatePackageCommand: (input: CreatePackageCommandInput,
  */
 export declare const se_CreateReleaseCommand: (input: CreateReleaseCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1DeleteControlCenterGroupCommand
+ */
+export declare const se_DeleteControlCenterGroupCommand: (input: DeleteControlCenterGroupCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1DeleteDimensionCommand
  */
 export declare const se_DeleteDimensionCommand: (input: DeleteDimensionCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetControlCenterOverviewCommand
+ */
+export declare const se_GetControlCenterOverviewCommand: (input: GetControlCenterOverviewCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetControlCenterReleaseEventsCommand
+ */
+export declare const se_GetControlCenterReleaseEventsCommand: (input: GetControlCenterReleaseEventsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetControlCenterRollbackPreviewCommand
+ */
+export declare const se_GetControlCenterRollbackPreviewCommand: (input: GetControlCenterRollbackPreviewCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1GetReleaseCommand
  */
@@ -58,6 +88,14 @@ export declare const se_GetReleaseCommand: (input: GetReleaseCommandInput, conte
  * serializeAws_restJson1GetUserCommand
  */
 export declare const se_GetUserCommand: (input: GetUserCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1ListControlCenterGroupsCommand
+ */
+export declare const se_ListControlCenterGroupsCommand: (input: ListControlCenterGroupsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1ListControlCenterOperationsCommand
+ */
+export declare const se_ListControlCenterOperationsCommand: (input: ListControlCenterOperationsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1ListDimensionsCommand
  */
@@ -91,6 +129,14 @@ export declare const se_PostLoginCommand: (input: PostLoginCommandInput, context
  */
 export declare const se_RequestOrganisationCommand: (input: RequestOrganisationCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
+ * serializeAws_restJson1ResolveControlCenterOperationCommand
+ */
+export declare const se_ResolveControlCenterOperationCommand: (input: ResolveControlCenterOperationCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1RollbackReleaseCommand
+ */
+export declare const se_RollbackReleaseCommand: (input: RollbackReleaseCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
  * serializeAws_restJson1ServeReleaseCommand
  */
 export declare const se_ServeReleaseCommand: (input: ServeReleaseCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
@@ -98,6 +144,10 @@ export declare const se_ServeReleaseCommand: (input: ServeReleaseCommandInput, c
  * serializeAws_restJson1ServeReleaseV2Command
  */
 export declare const se_ServeReleaseV2Command: (input: ServeReleaseV2CommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1UpdateControlCenterGroupCommand
+ */
+export declare const se_UpdateControlCenterGroupCommand: (input: UpdateControlCenterGroupCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1UpdateDimensionCommand
  */
@@ -114,6 +164,10 @@ export declare const se_UploadFileCommand: (input: UploadFileCommandInput, conte
  * deserializeAws_restJson1CreateApplicationCommand
  */
 export declare const de_CreateApplicationCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateApplicationCommandOutput>;
+/**
+ * deserializeAws_restJson1CreateControlCenterGroupCommand
+ */
+export declare const de_CreateControlCenterGroupCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateControlCenterGroupCommandOutput>;
 /**
  * deserializeAws_restJson1CreateDimensionCommand
  */
@@ -135,9 +189,25 @@ export declare const de_CreatePackageCommand: (output: __HttpResponse, context: 
  */
 export declare const de_CreateReleaseCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<CreateReleaseCommandOutput>;
 /**
+ * deserializeAws_restJson1DeleteControlCenterGroupCommand
+ */
+export declare const de_DeleteControlCenterGroupCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<DeleteControlCenterGroupCommandOutput>;
+/**
  * deserializeAws_restJson1DeleteDimensionCommand
  */
 export declare const de_DeleteDimensionCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<DeleteDimensionCommandOutput>;
+/**
+ * deserializeAws_restJson1GetControlCenterOverviewCommand
+ */
+export declare const de_GetControlCenterOverviewCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetControlCenterOverviewCommandOutput>;
+/**
+ * deserializeAws_restJson1GetControlCenterReleaseEventsCommand
+ */
+export declare const de_GetControlCenterReleaseEventsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetControlCenterReleaseEventsCommandOutput>;
+/**
+ * deserializeAws_restJson1GetControlCenterRollbackPreviewCommand
+ */
+export declare const de_GetControlCenterRollbackPreviewCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetControlCenterRollbackPreviewCommandOutput>;
 /**
  * deserializeAws_restJson1GetReleaseCommand
  */
@@ -146,6 +216,14 @@ export declare const de_GetReleaseCommand: (output: __HttpResponse, context: __S
  * deserializeAws_restJson1GetUserCommand
  */
 export declare const de_GetUserCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetUserCommandOutput>;
+/**
+ * deserializeAws_restJson1ListControlCenterGroupsCommand
+ */
+export declare const de_ListControlCenterGroupsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListControlCenterGroupsCommandOutput>;
+/**
+ * deserializeAws_restJson1ListControlCenterOperationsCommand
+ */
+export declare const de_ListControlCenterOperationsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ListControlCenterOperationsCommandOutput>;
 /**
  * deserializeAws_restJson1ListDimensionsCommand
  */
@@ -179,6 +257,14 @@ export declare const de_PostLoginCommand: (output: __HttpResponse, context: __Se
  */
 export declare const de_RequestOrganisationCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<RequestOrganisationCommandOutput>;
 /**
+ * deserializeAws_restJson1ResolveControlCenterOperationCommand
+ */
+export declare const de_ResolveControlCenterOperationCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ResolveControlCenterOperationCommandOutput>;
+/**
+ * deserializeAws_restJson1RollbackReleaseCommand
+ */
+export declare const de_RollbackReleaseCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<RollbackReleaseCommandOutput>;
+/**
  * deserializeAws_restJson1ServeReleaseCommand
  */
 export declare const de_ServeReleaseCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<ServeReleaseCommandOutput>;
@@ -186,6 +272,10 @@ export declare const de_ServeReleaseCommand: (output: __HttpResponse, context: _
  * deserializeAws_restJson1ServeReleaseV2Command
  */
 export declare const de_ServeReleaseV2Command: (output: __HttpResponse, context: __SerdeContext) => Promise<ServeReleaseV2CommandOutput>;
+/**
+ * deserializeAws_restJson1UpdateControlCenterGroupCommand
+ */
+export declare const de_UpdateControlCenterGroupCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<UpdateControlCenterGroupCommandOutput>;
 /**
  * deserializeAws_restJson1UpdateDimensionCommand
  */

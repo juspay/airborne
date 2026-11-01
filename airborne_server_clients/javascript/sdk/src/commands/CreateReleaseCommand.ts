@@ -35,7 +35,7 @@ export interface CreateReleaseCommandInput extends CreateReleaseRequest {}
 export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __MetadataBearer {}
 
 /**
- * Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.
+ * Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Returns 409 if another release is already ongoing for the same dimensions. Requires a bearer token.
  * @example
  * Use a bare-bones client and the command you need to make an API call.
  * ```javascript
@@ -70,6 +70,9 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  * const command = new CreateReleaseCommand(input);
  * const response = await client.send(command);
  * // { // CreateReleaseResponse
+ * //   warnings: [ // ReleaseWarnings
+ * //     "STRING_VALUE",
+ * //   ],
  * //   id: "STRING_VALUE", // required
  * //   created_at: "STRING_VALUE", // required
  * //   config: { // GetReleaseConfig
@@ -133,6 +136,12 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  *
  * @throws {@link BadRequestError} (client fault)
  *  Bad request error
+ *
+ * @throws {@link ConflictError} (client fault)
+ *  Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.
+ *
+ * @throws {@link UnresolvedOperationError} (client fault)
+ *  A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.
  *
  * @throws {@link NotFoundError} (client fault)
  *  Not found error
