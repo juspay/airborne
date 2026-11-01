@@ -163,6 +163,11 @@ async fn put_properties_schema_api(
                 &existing_config_properties,
                 &properties.keys().cloned().collect::<Vec<String>>(),
             );
+            // No remote write for identical schemas, even when used by releases.
+            let to_be_updated = to_be_updated
+                .into_iter()
+                .filter(|key| properties.get(key) != existing_config_schemas.get(key))
+                .collect::<Vec<_>>();
             let all_configs: Vec<String> = to_be_created
                 .iter()
                 .chain(to_be_updated.iter())
@@ -313,20 +318,12 @@ async fn put_properties_schema_api(
                 Ok(values) => info!("All good: {:?}", values),
                 Err(e) => match e {
                     transaction::TxnError::Operation { source, .. } => return Err(source),
-                    transaction::TxnError::Join { source, .. } => {
-                        log::error!("Task Join Error: {:?}", source);
-                        return Err(ABError::InternalServerError("service error".to_string()));
-                    }
                     transaction::TxnError::Panic { index } => {
                         log::error!(
                             "Task Panic at: {:?}, task_metadata: {:?}",
                             index,
                             task_metadata.get(index)
                         );
-                        return Err(ABError::InternalServerError("service error".to_string()));
-                    }
-                    transaction::TxnError::MissingResult { index } => {
-                        log::error!("Missing result for task: {:?}", index);
                         return Err(ABError::InternalServerError("service error".to_string()));
                     }
                 },

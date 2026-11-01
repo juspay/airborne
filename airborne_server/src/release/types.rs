@@ -60,6 +60,7 @@ pub struct Config {
 
 #[derive(Serialize)]
 pub struct CreateReleaseResponse {
+    pub warnings: Vec<String>,
     pub id: String,
     pub created_at: DateTime<Utc>,
     pub config: Config,
