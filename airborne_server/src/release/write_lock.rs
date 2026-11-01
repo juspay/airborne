@@ -563,6 +563,154 @@ pub fn reader_details(op: &super::operations::Operation) -> Value {
 }
 
 #[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn reserved_markers_and_nested_config_are_not_operation_evidence() {
+        let marker = "Airborne operation 00000000-0000-4000-8000-000000000001";
+        let expected = json!({"change_reason":marker,"status":"INPROGRESS"});
+        for forged in [
+            format!("Investigating [{marker}] then checking"),
+            marker.to_string(),
+            format!("x [{marker}] [{marker}]"),
+            "x [Airborne operation invalid]".into(),
+        ] {
+            assert!(validate_user_reason(&forged).is_err());
+            assert!(!experiment_matches(
+                &json!({"change_reason":forged,"status":"INPROGRESS"}),
+                &expected
+            ));
+        }
+        assert!(combine_reason(&format!("Investigating [{marker}]"), marker).is_err());
+        assert!(experiment_matches(
+            &json!({"change_reason":format!("real reason [{marker}]"),"status":"INPROGRESS"}),
+            &expected
+        ));
+        let config = json!({"settings":{"change_reason":"keep","other":1}});
+        assert!(contains(&config, &config));
+        assert!(!contains(
+            &json!({"settings":{"change_reason":"keep extra","other":1}}),
+            &config
+        ));
+        assert!(!contains(
+            &json!({"settings":{"change_reason":"keep","other":1,"added":2}}),
+            &config
+        ));
+        assert!(!experiment_matches(
+            &json!({"change_reason":format!("reason [{marker}]"),"variants":{"change_reason":"keep extra"}}),
+            &json!({"change_reason":marker,"variants":{"change_reason":"keep"}})
+        ));
+    }
+    #[test]
+    fn writer_capacity_fails_fast_but_one_stalled_app_leaves_headroom() {
+        let stalled = WRITERS.try_acquire().unwrap();
+        let healthy = WRITERS.try_acquire().unwrap();
+        let mut remaining = (0..62)
+            .map(|_| WRITERS.try_acquire().unwrap())
+            .collect::<Vec<_>>();
+        assert!(WRITERS.try_acquire().is_err());
+        drop(remaining.pop());
+        assert!(WRITERS.try_acquire().is_ok());
+        drop(stalled);
+        drop(healthy);
+        drop(remaining);
+        assert_eq!(WRITERS.available_permits(), 64);
+    }
+    #[test]
+    fn reasons_preserve_user_text_with_utf8_byte_limit() {
+        let marker = format!("Airborne operation {}", uuid::Uuid::new_v4());
+        let user = "x".repeat(197);
+        assert_eq!(
+            combine_reason(&user, &marker).unwrap(),
+            format!("{user} [{marker}]")
+        );
+        assert_eq!(combine_reason(&user, &marker).unwrap().len(), 255);
+        assert!(combine_reason(&"x".repeat(198), &marker).is_err());
+        assert!(combine_reason(&"é".repeat(99), &marker).is_err());
+    }
+    #[test]
+    fn construction_is_rejected_but_generic_io_and_read_timeouts_are_unknown() {
+        use superposition_sdk::error::{ConnectorError, SdkError};
+        let construction: SdkError<()> =
+            SdkError::construction_failure(std::io::Error::other("invalid request"));
+        assert!(definitely_rejected(&construction));
+        let reset: SdkError<()> = SdkError::dispatch_failure(ConnectorError::io(Box::new(
+            std::io::Error::new(std::io::ErrorKind::ConnectionReset, "reset"),
+        )));
+        assert!(!definitely_rejected(&reset));
+        let read: SdkError<()> = SdkError::dispatch_failure(ConnectorError::timeout(Box::new(
+            std::io::Error::other("HTTP read timeout occurred after 1s"),
+        )));
+        assert!(!definitely_rejected(&read));
+        let connect: SdkError<()> = SdkError::dispatch_failure(ConnectorError::timeout(Box::new(
+            std::io::Error::other("HTTP connect timeout occurred after 2s"),
+        )));
+        assert!(definitely_rejected(&connect));
+        let operation: SdkError<()> =
+            SdkError::timeout_error(std::io::Error::other("operation timeout"));
+        assert!(!definitely_rejected(&operation));
+    }
+    #[tokio::test]
+    async fn actual_connector_refusal_is_rejected() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let client = superposition_sdk::Client::from_conf(
+            superposition_sdk::Config::builder()
+                .bearer_token("scratch".into())
+                .endpoint_url(format!("http://{addr}"))
+                .retry_config(aws_smithy_types::retry::RetryConfig::disabled())
+                .behavior_version_latest()
+                .build(),
+        );
+        let error = client
+            .ramp_experiment()
+            .org_id("scratch")
+            .workspace_id("scratch")
+            .id("1")
+            .traffic_percentage(10)
+            .change_reason("scratch")
+            .send()
+            .await
+            .unwrap_err();
+        assert!(definitely_rejected(&error), "{error:?}");
+    }
+    #[test]
+    fn upstream_history_requires_generated_suffix_and_transition() {
+        assert!(audit_confirms(
+            json!({"id":123,"status":"INPROGRESS","traffic_percentage":50,"change_reason":"operator reason [Airborne operation 00000000-0000-4000-8000-000000000001]"}),
+            &json!({"id":"123","status":"INPROGRESS","traffic_percentage":50,"change_reason":"Airborne operation 00000000-0000-4000-8000-000000000001"})
+        ));
+        assert!(!audit_confirms(
+            json!({"id":123,"status":"CREATED","change_reason":"Airborne operation 00000000-0000-4000-8000-000000000001"}),
+            &json!({"id":"123","status":"INPROGRESS","change_reason":"Airborne operation 00000000-0000-4000-8000-000000000001"})
+        ));
+    }
+    #[test]
+    fn unresolved_requires_own_marker_and_expected_transition() {
+        let expected = json!({"id":"r","status":"INPROGRESS","traffic_percentage":50,"change_reason":"reason [Airborne operation 00000000-0000-4000-8000-000000000001]"});
+        assert!(experiment_matches(&expected, &expected));
+        let mut actual = expected.clone();
+        actual["traffic_percentage"] = json!(10);
+        assert!(!experiment_matches(&actual, &expected));
+        actual = expected.clone();
+        actual["change_reason"] = json!("human");
+        assert!(!experiment_matches(&actual, &expected));
+        actual = expected.clone();
+        actual["status"] = json!("CREATED");
+        assert!(!experiment_matches(&actual, &expected));
+    }
+    #[test]
+    fn unknown_create_does_not_resolve_from_unchanged_state() {
+        assert!(!contains(
+            &json!({"status":"CREATED","change_reason":"other"}),
+            &json!({"status":"CREATED","change_reason":"own"})
+        ));
+    }
+}
+
+#[cfg(test)]
 mod read_deadline_tests {
     use super::*;
     #[tokio::test]

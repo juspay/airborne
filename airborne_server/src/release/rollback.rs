@@ -782,3 +782,164 @@ async fn verify_effect(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn replacement_fixture() -> (Operation, ExperimentResponse) {
+        let mut r = super::super::control_center::tests::make("replacement", 2, "ios");
+        r.status = ExperimentStatusType::Created;
+        r.traffic_percentage = 0;
+        r.chosen_variant = None;
+        r.change_reason = "test [Airborne operation 00000000-0000-4000-8000-000000000001]".into();
+        let mut op = Operation {
+            id: Uuid::new_v4(),
+            state: "planned".into(),
+            data: json!({"source":{"id":"source"},"preview":{"action":"rereleased","reconciled_keys":{"kept_current":["added"],"dropped":["removed"]}},"replacement_release_id":"replacement"}),
+        };
+        op.data["observed"] = snapshot(&r);
+        (op, r)
+    }
+    #[test]
+    fn a_pristine_plan_does_not_pin_the_source() {
+        let (mut op, mut r) = replacement_fixture();
+        op.data["replacement_release_id"] = Value::Null;
+        op.data["observed"] = Value::Null;
+        r.id = "source".into();
+        op.data["source"] = snapshot(&r);
+        r.traffic_percentage = 10;
+        r.change_reason = "human ramp".into();
+        assert!(!owns_upstream(&op, std::slice::from_ref(&r)));
+        r.change_reason = "test [Airborne operation 00000000-0000-4000-8000-000000000001]".into();
+        op.data["transition_expected"] = snapshot(&r);
+        assert!(owns_upstream(&op, &[r]));
+    }
+    #[test]
+    fn registry_drift_is_only_validated_before_replacement_creation() {
+        let (mut op, r) = replacement_fixture();
+        assert!(!needs_registration(&op, std::slice::from_ref(&r)));
+        op.data["replacement_release_id"] = Value::Null;
+        assert!(needs_registration(&op, &[]));
+        op.state = "completed".into();
+        assert!(!needs_registration(&op, &[]));
+    }
+    #[test]
+    fn recorded_created_resumes() {
+        let (op, r) = replacement_fixture();
+        assert!(validate(&op, &[r]).is_ok());
+    }
+    #[test]
+    fn create_before_record_crash_preserves_expected_contents_and_disclosure() {
+        let (mut op, mut r) = replacement_fixture();
+        r.description = format!("Rollback operation {}", op.id);
+        op.data.as_object_mut().unwrap().remove("observed");
+        op.data
+            .as_object_mut()
+            .unwrap()
+            .remove("replacement_release_id");
+        let mut expected = snapshot(&r);
+        expected.as_object_mut().unwrap().remove("revision");
+        op.data["transition_expected"] = expected;
+        assert!(validate(&op, &[r]).is_ok());
+        assert_eq!(
+            op.data["preview"]["reconciled_keys"]["kept_current"],
+            json!(["added"])
+        );
+    }
+    #[test]
+    fn own_ramp_after_lost_response_resumes() {
+        let (mut op, mut r) = replacement_fixture();
+        r.status = ExperimentStatusType::Inprogress;
+        r.traffic_percentage = 50;
+        r.change_reason = "test [Airborne operation 00000000-0000-4000-8000-000000000001]".into();
+        op.data["transition_expected"] = snapshot(&r);
+        assert!(validate(&op, &[r]).is_ok());
+    }
+    #[test]
+    fn human_ramp_down_after_failure_is_changed() {
+        let (mut op, mut r) = replacement_fixture();
+        r.status = ExperimentStatusType::Inprogress;
+        r.traffic_percentage = 50;
+        op.data["observed"] = snapshot(&r);
+        r.traffic_percentage = 10;
+        r.change_reason = "human".into();
+        assert!(validate(&op, &[r]).is_err());
+    }
+    #[test]
+    fn human_contents_change_is_changed() {
+        let (op, mut r) = replacement_fixture();
+        r.variants[0]
+            .overrides
+            .insert("package.version".into(), Document::Null);
+        assert!(validate(&op, &[r]).is_err());
+    }
+    #[test]
+    fn human_identical_write_revision_is_changed() {
+        let (op, mut r) = replacement_fixture();
+        r.last_modified = aws_smithy_types::DateTime::from_secs(99);
+        assert!(validate(&op, &[r]).is_err());
+    }
+    #[test]
+    fn human_revision_after_confirmed_ramp_is_changed() {
+        let (mut op, mut r) = replacement_fixture();
+        r.status = ExperimentStatusType::Inprogress;
+        r.traffic_percentage = 50;
+        r.change_reason = "test [Airborne operation 00000000-0000-4000-8000-000000000001]".into();
+        op.data["observed"] = snapshot(&r);
+        op.data["transition_expected"] = Value::Null;
+        r.last_modified = aws_smithy_types::DateTime::from_secs(99);
+        assert!(validate(&op, &[r]).is_err());
+    }
+    #[test]
+    fn own_conclude_after_lost_response_resumes() {
+        let (mut op, mut r) = replacement_fixture();
+        r.status = ExperimentStatusType::Concluded;
+        r.chosen_variant = experimental(&r).map(|v| v.id.clone());
+        r.change_reason = "test [Airborne operation 00000000-0000-4000-8000-000000000001]".into();
+        op.data["transition_expected"] = snapshot(&r);
+        assert!(validate(&op, &[r]).is_ok());
+    }
+    #[test]
+    fn discarded_or_control_concluded_replacement_is_changed() {
+        for status in [
+            ExperimentStatusType::Discarded,
+            ExperimentStatusType::Concluded,
+        ] {
+            let (op, mut r) = replacement_fixture();
+            r.status = status;
+            r.chosen_variant = Some("control".into());
+            assert!(validate(&op, &[r]).is_err());
+        }
+    }
+    #[test]
+    fn missing_recorded_replacement_is_changed() {
+        let (op, _) = replacement_fixture();
+        assert!(validate(&op, &[]).is_err());
+    }
+    #[test]
+    fn later_unrelated_release_prevents_resume() {
+        let (op, r) = replacement_fixture();
+        let newer = super::super::control_center::tests::make("later", 99, "ios");
+        assert!(validate(&op, &[r, newer]).is_err());
+    }
+    #[test]
+    fn schemas_fail_closed_before_any_write() {
+        assert!(schema_matches(
+            &json!({"type":"string","pattern":".*"}),
+            &json!("a")
+        ));
+        assert!(!schema_matches(&json!({"type":"integer"}), &json!("a")));
+        assert!(!schema_matches(
+            &json!({"type":"string","pattern":"^a"}),
+            &json!("a")
+        ));
+        assert!(!schema_matches(
+            &json!({"type":"object","required":["id"]}),
+            &json!({})
+        ));
+        assert!(!schema_matches(
+            &json!({"type":"array","items":{"type":"integer"}}),
+            &json!(["a"])
+        ));
+    }
+}

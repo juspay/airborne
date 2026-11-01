@@ -126,3 +126,34 @@ pub async fn save(
         Ok(())
     }).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn every_durable_state_transition_and_terminal_state_is_checked() {
+        let states = [
+            "planned",
+            "unresolved",
+            "confirmed",
+            "rejected",
+            "completed",
+        ];
+        for from in states {
+            for to in states {
+                let mut op = Operation {
+                    id: Uuid::new_v4(),
+                    state: from.into(),
+                    data: Value::Null,
+                };
+                let allowed = from == to
+                    || matches!(
+                        (from, to),
+                        ("planned", "completed") | ("unresolved", "confirmed" | "rejected")
+                    );
+                assert_eq!(op.advance(to).is_ok(), allowed, "{from} -> {to}");
+                assert_eq!(op.state, if allowed { to } else { from });
+            }
+        }
+    }
+}
