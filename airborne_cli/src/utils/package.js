@@ -64,5 +64,6 @@ export async function createPackageFromLocalRelease(
     );
   } catch (err) {
     console.error("Error creating package from local release:", err.message);
+    throw err;
   }
 }

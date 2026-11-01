@@ -179,6 +179,7 @@ export async function createLocalReleaseConfig(
     );
   } catch (err) {
     console.error("❌ Failed to create local release config:", err.message);
+    throw err;
   }
 }
 
@@ -227,10 +228,12 @@ export async function writeReleaseConfig(
         console.log("✅ Ruby script executed successfully");
       } catch (error) {
         console.error("❌ Ruby script execution failed:", error.message);
+    throw error;
       }
     }
   } catch (err) {
     console.error("❌ Failed to write release config:", err.message);
+    throw err;
   }
 }
 
@@ -334,6 +337,7 @@ export async function updateLocalReleaseConfig(
     );
   } catch (err) {
     console.error("❌ Failed to create local release config:", err.message);
+    throw err;
   }
 }
 
