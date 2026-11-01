@@ -81,10 +81,7 @@ structure RequestOrganisationResponse {
 operation CreateOrganisation {
     input: CreateOrganisationRequest
     output: Organisation
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Submit a request to have an organisation provisioned (for onboarding flows that require manual approval), including contact details and store links. Returns a confirmation message. Requires a bearer token.
@@ -94,10 +91,7 @@ operation CreateOrganisation {
 operation RequestOrganisation {
     input: RequestOrganisationRequest
     output: RequestOrganisationResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// List all organisations the authenticated user belongs to, along with their applications and the caller's access level in each. Requires a bearer token.
@@ -107,8 +101,5 @@ operation RequestOrganisation {
 @requiresauth
 operation ListOrganisations {
     output: ListOrganisationsResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }

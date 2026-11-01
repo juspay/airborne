@@ -116,6 +116,13 @@ list ControlCenterActiveReleaseList {
 
 /// Release state for one application, including per-application lookup failures.
 structure ControlCenterAppStatus {
+    /// Local auxiliary data unavailable or deadline exceeded; corresponding fields are null.
+    auxiliary_error: String
+    telemetry: Document
+    cache_invalidation: Document
+    /// Stored policy plus deployment force-on override.
+    serving_policy: ServingPolicy
+
     @required
     application: String
 
@@ -130,7 +137,6 @@ structure ControlCenterAppStatus {
     active: ControlCenterActiveReleaseList
 
     /// Unresolved upstream writes. While any item exists, writes are paused for this application.
-    @required
     unresolved_operations: ControlCenterUnresolvedOperationList
 
     /// RFC 3339 timestamp, or JSON null when the application has no release activity.
@@ -140,6 +146,18 @@ structure ControlCenterAppStatus {
     /// Sanitized lookup failure message, or JSON null when lookup succeeded.
     @required
     error: Document
+
+    /// Whether this application currently requires a separate checker for protected writes.
+    approval_required: Boolean
+
+    /// Number of pending requests. This count is not capped by the queue list limit.
+    pending_requests: Integer
+
+    /// Emergency rollbacks waiting for independent checker acknowledgement.
+    emergency_needs_review: EmergencyReviewList
+
+    /// Local rollback sensitivity markers for releases.
+    release_protections: ReleaseProtectionList
 }
 
 /// An upstream write whose outcome has not been confirmed.
@@ -150,14 +168,8 @@ structure ControlCenterUnresolvedOperation {
     @required
     message: String
 
-    @required
-    expected: Document
 
-    @required
-    before: Document
 
-    @required
-    upstream_workspace: Document
 }
 
 list ControlCenterUnresolvedOperationList {
@@ -279,6 +291,17 @@ enum ControlCenterReleaseEventAction {
     DISCARDED = "discarded"
     ROLLED_BACK = "rolled_back"
     OPERATION_RESOLVED = "operation_resolved"
+    REQUESTED = "requested"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+    STALE = "stale"
+    EXECUTED = "executed"
+    FAILED = "failed"
+    EMERGENCY_ROLLBACK = "emergency_rollback"
+    EMERGENCY_ACKNOWLEDGED = "emergency_acknowledged"
+    POLICY_CHANGED = "policy_changed"
 }
 
 structure ControlCenterReleaseEvent {
@@ -330,6 +353,12 @@ structure RollbackReleaseRequest {
     @required
     @length(min: 1)
     reason: String
+
+    /// Use only for the constrained emergency rollback path.
+    emergency: Boolean
+
+    /// Required when the latest live source is marked rollback-sensitive.
+    confirm_sensitive_risk: Boolean
 }
 
 /// Path, scope headers, and reason for a release rollback request.
@@ -346,10 +375,16 @@ structure RollbackReleaseInput {
     @httpHeader("x-application")
     application: String
 
-    /// The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+    /// The reason must not contain the reserved, case-sensitive text "Airborne operation": Airborne appends a generated suffix made of "[Airborne operation ", a canonical UUID and "]" to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
     @required
     @length(min: 1)
     reason: String
+
+    /// Use only for the constrained emergency rollback path.
+    emergency: Boolean
+
+    /// Required when the latest live source is marked rollback-sensitive.
+    confirm_sensitive_risk: Boolean
 }
 
 enum RollbackReleaseAction {
@@ -436,6 +471,7 @@ structure RollbackPreviewBlocked {
 
 /// Side-effect-free rollback decision. Action, resulting package, reconciliation details and blocked are nullable when unavailable.
 structure RollbackPreviewResponse {
+    blocked_package_versions: StringList
     @required
     action: Document
 
@@ -459,7 +495,7 @@ structure ListControlCenterGroupsInput {
     organisation: String
 }
 
-/// List unresolved write operations for one application. `status` is currently `unresolved`.
+/// List unresolved write operations for one application. "status" is currently "unresolved".
 structure ListControlCenterOperationsInput {
     @required
     @httpHeader("x-organisation")
@@ -483,17 +519,9 @@ structure ControlCenterUnresolvedOperationDetails {
     @required
     message: String
 
-    @required
-    expected: Document
 
-    @required
-    before: Document
 
-    @required
-    upstream_workspace: Document
 
-    @required
-    upstream_org: Document
 }
 
 list ControlCenterUnresolvedOperationDetailsList {
@@ -526,7 +554,7 @@ structure ResolveControlCenterOperationInput {
     @required
     finding: OperationRecoveryFinding
 
-    /// Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400.
+    /// Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text "Airborne operation"; such a reason returns 400.
     @required
     @length(min: 1)
     reason: String
@@ -561,7 +589,7 @@ structure GetControlCenterOverviewInput {}
 operation CreateControlCenterGroup {
     input: CreateControlCenterGroupInput
     output: ControlCenterGroup
-    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError]
+    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError NotFoundError]
 }
 
 /// Delete a group by UUID. Requires Bearer authentication and x-organisation. Only organisation admins/owners can delete groups.
@@ -582,7 +610,7 @@ operation DeleteControlCenterGroup {
 operation GetControlCenterOverview {
     input: GetControlCenterOverviewInput
     output: GetControlCenterOverviewResponse
-    errors: [Unauthorized InternalServerError]
+    errors: [Unauthorized InternalServerError BadRequestError NotFoundError ForbiddenError]
 }
 
 /// List groups for the organisation in x-organisation. Member applications are filtered to those the caller can read. Requires Bearer authentication.
@@ -593,7 +621,7 @@ operation GetControlCenterOverview {
 operation ListControlCenterGroups {
     input: ListControlCenterGroupsInput
     output: ListControlCenterGroupsResponse
-    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError]
+    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError NotFoundError]
 }
 
 /// List unresolved upstream write outcomes for an application. Requires Bearer authentication, scope headers, and release read access.
@@ -604,10 +632,10 @@ operation ListControlCenterGroups {
 operation ListControlCenterOperations {
     input: ListControlCenterOperationsInput
     output: ListControlCenterOperationsResponse
-    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError]
+    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError NotFoundError]
 }
 
-/// Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text `Airborne operation`. Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.
+/// Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text "Airborne operation". Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.
 @tags(["Control Center"])
 @http(method: "POST", uri: "/api/control-center/operations/{id}/resolve")
 @requiresauth
@@ -656,5 +684,5 @@ operation GetControlCenterRollbackPreview {
 operation RollbackRelease {
     input: RollbackReleaseInput
     output: RollbackReleaseResponse
-    errors: [Unauthorized ForbiddenError BadRequestError NotFoundError ConflictError ReleaseSupersededError UnresolvedOperationError RollbackReplacementChangedError RollbackUnprocessableError InternalServerError RollbackPartialFailureError]
+    errors: [Unauthorized ForbiddenError BadRequestError NotFoundError ConflictError ReleaseSupersededError UnresolvedOperationError RollbackReplacementChangedError RollbackUnprocessableError InternalServerError RollbackPartialFailureError ApprovalRequiredError]
 }
