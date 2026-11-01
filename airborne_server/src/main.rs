@@ -19,6 +19,7 @@ use airborne_authz_macros as _;
 mod authz;
 mod build;
 mod config;
+mod control_center;
 mod dashboard;
 mod file;
 mod middleware;
@@ -388,6 +389,21 @@ async fn main() -> std::io::Result<()> {
         )
     };
 
+    let release_superposition_client = superposition_sdk::Client::from_conf(
+        superposition_client
+            .config()
+            .to_builder()
+            .retry_config(aws_smithy_types::retry::RetryConfig::disabled())
+            .timeout_config(
+                aws_smithy_types::timeout::TimeoutConfig::builder()
+                    .connect_timeout(Duration::from_secs(2))
+                    .operation_timeout(Duration::from_secs(5))
+                    .operation_attempt_timeout(Duration::from_secs(5))
+                    .build(),
+            )
+            .build(),
+    );
+
     let authz_provider = build_authz_provider(
         authz_provider_kind,
         authz_bootstrap_super_admins.clone(),
@@ -445,6 +461,7 @@ async fn main() -> std::io::Result<()> {
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
         superposition_client,
+        release_superposition_client,
         sheets_hub: hub,
         provider_registry,
     });
@@ -525,6 +542,11 @@ async fn main() -> std::io::Result<()> {
                         web::scope("/packages")
                             .wrap(Auth)
                             .service(package::add_routes()),
+                    )
+                    .service(
+                        web::scope("/control-center")
+                            .wrap(Auth)
+                            .service(control_center::add_routes()),
                     )
                     .service(release::add_routes("releases")),
             )

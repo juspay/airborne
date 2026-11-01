@@ -1,6 +1,8 @@
 // @generated automatically by Diesel CLI.
 
 pub mod hyperotaserver {
+    diesel::table! { hyperotaserver.app_groups (id) { id -> Uuid, org_id -> Text, name -> Text, created_at -> Timestamptz, updated_at -> Timestamptz, } }
+    diesel::table! { hyperotaserver.app_group_members (group_id, app_id) { group_id -> Uuid, org_id -> Text, app_id -> Text, platform -> Text, } }
     pub mod sql_types {
         #[derive(diesel::query_builder::QueryId, Clone, diesel::sql_types::SqlType)]
         #[diesel(postgres_type(name = "invite_role", schema = "hyperotaserver"))]

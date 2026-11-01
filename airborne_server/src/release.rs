@@ -37,6 +37,7 @@ use superposition_provider::{AllFeatureProvider, SuperpositionAPIProvider};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
+pub mod control_center;
 mod types;
 pub mod utils;
 
@@ -129,7 +130,7 @@ async fn get_release(
     .map_err(|_| ABError::InternalServerError("Failed to get workspace name".to_string()))?;
 
     let exp_details = state
-        .superposition_client
+        .release_superposition_client
         .get_experiment()
         .org_id(superposition_org_id_from_env)
         .workspace_id(workspace_name)
@@ -446,7 +447,7 @@ async fn create_release(
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
     let created_experiment_response = state
-        .superposition_client
+        .release_superposition_client
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
@@ -504,7 +505,7 @@ async fn create_release(
         .await
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
         let _ = state
-            .superposition_client
+            .release_superposition_client
             .conclude_experiment()
             .org_id(superposition_org_id_from_env.clone())
             .workspace_id(workspace_name.clone())
@@ -1019,7 +1020,7 @@ async fn ramp_experiment(
     change_reason: &Option<String>,
 ) -> airborne_types::Result<()> {
     state
-        .superposition_client
+        .release_superposition_client
         .ramp_experiment()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name)
@@ -1073,7 +1074,7 @@ async fn conclude_release(
     .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
     let experiment_details = state
-        .superposition_client
+        .release_superposition_client
         .get_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
@@ -1110,7 +1111,7 @@ async fn conclude_release(
     );
 
     state
-        .superposition_client
+        .release_superposition_client
         .conclude_experiment()
         .org_id(superposition_org_id_from_env)
         .workspace_id(workspace_name)
@@ -1192,7 +1193,7 @@ async fn discard_release(
     .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
 
     let experiment_details = state
-        .superposition_client
+        .release_superposition_client
         .get_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
@@ -1213,7 +1214,7 @@ async fn discard_release(
     }
 
     state
-        .superposition_client
+        .release_superposition_client
         .discard_experiment()
         .workspace_id(workspace_name)
         .org_id(superposition_org_id_from_env)
@@ -1552,7 +1553,7 @@ async fn update_release(
     .await?;
 
     let experiment_details = state
-        .superposition_client
+        .release_superposition_client
         .get_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
@@ -1595,7 +1596,7 @@ async fn update_release(
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
     let updated_experiment_response = state
-        .superposition_client
+        .release_superposition_client
         .update_overrides_experiment()
         .id(release_id.clone())
         .org_id(superposition_org_id_from_env.clone())
