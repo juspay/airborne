@@ -9,6 +9,11 @@ import path from "path";
 import { promptWithType } from "./prompt.js";
 import { execSync } from "child_process";
 import { compileHermesBundle } from "./hermes.js";
+import {
+  buildBundleCommand,
+  resolveBundleLayout,
+  shouldCompileHermes,
+} from "./bundle-command.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -100,33 +105,30 @@ export async function createLocalReleaseConfig(
   platform
 ) {
   try {
-    const entry_file = airborneConfig.js_entry_file || "index.js";
-    const index_file_path =
-      airborneConfig[platform].index_file_path || `index.${platform}.bundle`;
-    const build_folder = path.join(platform, "build", "generated", "airborne");
+    const layout = resolveBundleLayout(airborneConfig, platform);
+    const { index_file_path, build_folder } = layout;
 
     const fullBuildFolderPath = path.join(options.directory_path, build_folder);
     if (!fs.existsSync(fullBuildFolderPath)) {
       fs.mkdirSync(fullBuildFolderPath, { recursive: true });
     }
 
-    const isExpo = airborneConfig.expo || false;
-    let command;
-    if (isExpo) {
-      command = `cd '${options.directory_path}' && npx expo export:embed --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
-    } else {
-      command = `cd '${options.directory_path}' && npx react-native bundle --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
-    }
+    const command = buildBundleCommand(
+      airborneConfig,
+      platform,
+      options.directory_path,
+      layout
+    );
 
     const bundleResult = await executeReactNativeBundleCommand(command);
 
     if (!bundleResult.success) {
       throw new Error(
-        `React Native bundle command failed: ${bundleResult.error}`
+        `Bundle command failed: ${bundleResult.error}`
       );
     }
     
-    if (airborneConfig.hermes_enabled) {
+    if (shouldCompileHermes(airborneConfig, platform)) {
       await compileHermesBundle(options.directory_path, `${build_folder}/${index_file_path}`);
     }
 
@@ -150,13 +152,13 @@ export async function createLocalReleaseConfig(
         version: "",
         prooerties: {},
         index: {
-          file_path: airborneConfig[platform].index_file_path,
+          file_path: index_file_path,
           url: "",
           checksum: "",
         },
         important: remotebundleContents
           .filter(
-            (item) => item.path !== airborneConfig[platform].index_file_path
+            (item) => item.path !== index_file_path
           )
           .map((item) => {
             return {
@@ -238,10 +240,8 @@ export async function updateLocalReleaseConfig(
   platform
 ) {
   try {
-    const entry_file = airborneConfig.js_entry_file || "index.js";
-    const index_file_path =
-      airborneConfig[platform].index_file_path || `index.${platform}.bundle`;
-    const build_folder = path.join(platform, "build", "generated", "airborne");
+    const layout = resolveBundleLayout(airborneConfig, platform);
+    const { index_file_path, build_folder } = layout;
 
     const fullBuildFolderPath = path.join(options.directory_path, build_folder);
     if (!fs.existsSync(fullBuildFolderPath)) {
@@ -258,23 +258,22 @@ export async function updateLocalReleaseConfig(
       }
     });
 
-    const isExpo = airborneConfig.expo || false;
-    let command;
-    if (isExpo) {
-      command = `cd '${options.directory_path}' && npx expo export:embed --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
-    } else {
-      command = `cd '${options.directory_path}' && npx react-native bundle --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
-    }
+    const command = buildBundleCommand(
+      airborneConfig,
+      platform,
+      options.directory_path,
+      layout
+    );
 
     const bundleResult = await executeReactNativeBundleCommand(command);
 
     if (!bundleResult.success) {
       throw new Error(
-        `React Native bundle command failed: ${bundleResult.error}`
+        `Bundle command failed: ${bundleResult.error}`
       );
     }
     
-    if (airborneConfig.hermes_enabled) {
+    if (shouldCompileHermes(airborneConfig, platform)) {
       await compileHermesBundle(options.directory_path, `${build_folder}/${index_file_path}`);
     }
 
@@ -306,14 +305,13 @@ export async function updateLocalReleaseConfig(
         version: existingReleaseConfig?.package?.version || "",
         properties: existingReleaseConfig?.package?.properties || {},
         index: {
-          file_path: airborneConfig[options.platform].index_file_path,
+          file_path: index_file_path,
           url: "",
           checksum: "",
         },
         important: remotebundleContents
           .filter(
-            (item) =>
-              item.path !== airborneConfig[options.platform].index_file_path
+            (item) => item.path !== index_file_path
           )
           .map((item) => ({
             file_path: item.path,

@@ -60,7 +60,7 @@ export async function executeReactNativeBundleCommand(command) {
       command: command,
     };
   } catch (error) {
-    console.error("❌ React Native bundle command failed:", error.message);
+    console.error("❌ Bundle command failed:", error.message);
 
     return {
       success: false,

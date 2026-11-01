@@ -114,7 +114,7 @@ Create platform-specific release configuration files.
 
 **Options:**
 
-- `-p, --platform <platform>` - Target platform (android | ios)
+- `-p, --platform <platform>` - Target platform (android | ios | web)
 - `-b, --boot-timeout <timeout>` - Boot timeout in milliseconds
 - `-r, --release-config-timeout <timeout>` - Release config timeout in milliseconds
 
@@ -137,7 +137,7 @@ Update existing release configuration files.
 
 **Options:**
 
-- `-p, --platform <platform>` - Target platform (android | ios)
+- `-p, --platform <platform>` - Target platform (android | ios | web)
 - `-b, --boot-timeout <timeout>` - New boot timeout in milliseconds
 - `-r, --release-config-timeout <timeout>` - New release config timeout in milliseconds
 
@@ -158,7 +158,7 @@ Process local files and create remote file records.
 
 **Options:**
 
-- `-p, --platform <platform>` - Target platform (android | ios) (required)
+- `-p, --platform <platform>` - Target platform (android | ios | web) (required)
 - `-t, --tag <tag>` - Tag for file identification
 - `-u, --upload` - Upload files directly to Airborne server
 
@@ -181,7 +181,7 @@ Create a deployable package from local release configuration.
 
 **Options:**
 
-- `-p, --platform <platform>` - Target platform (android | ios) (required)
+- `-p, --platform <platform>` - Target platform (android | ios | web) (required)
 - `-t, --tag <tag>` - Package tag for identification
 
 **Examples:**
@@ -231,6 +231,10 @@ node airborne_cli/src/index.js create-remote-package -p android -t "v1.0.0"
 node airborne_cli/src/index.js create-remote-files -p ios --upload -t "v1.0.0"
 node airborne_cli/src/index.js create-remote-package -p ios -t "v1.0.0"
 ```
+
+### Web bundles
+
+`--platform web` publishes a browser OTA bundle for the `airborne-react-native` web loader. Add a `web` section to `airborne-config.json` (`organisation`, `namespace`, optional `index_file_path` defaulting to `index.web.bundle`, optional `build_command` defaulting to `npm run build:web`). Instead of `react-native bundle`, the CLI runs `build_command` with `AIRBORNE_OUTPUT_DIR` and `AIRBORNE_INDEX_FILE` set; the build must write one script to `$AIRBORNE_OUTPUT_DIR/$AIRBORNE_INDEX_FILE`. Hermes is never applied to web bundles.
 
 ## 📁 File Structure
 

@@ -12,6 +12,7 @@ import {
   loadToken,
 } from "./utils/common.js";
 import { promptWithType } from "./utils/prompt.js";
+import { PLATFORMS, parsePlatform } from "./utils/platform.js";
 import {
   createLocalReleaseConfig,
   readReleaseConfig,
@@ -199,7 +200,7 @@ program
 
   Parameters:
       [directoryPath] (optional) : Directory where config will be created (defaults to current directory)
-      -p, --platform <string> (optional) : Target platform (android | ios)
+      -p, --platform <string> (optional) : Target platform (android | ios | web)
       -b, --boot-timeout <number> (optional) : Boot timeout in milliseconds (positive number)
       -r, --release-config-timeout <number> (optional) : Release config timeout in milliseconds (positive number)
 
@@ -207,16 +208,8 @@ program
   )
   .option(
     "-p, --platform <platform>",
-    "Target platform: android | ios",
-    (value) => {
-      const lower = value.toLowerCase();
-      if (!["android", "ios"].includes(lower)) {
-        throw new InvalidOptionArgumentError(
-          `Invalid platform: "${value}". Allowed values: android | ios`
-        );
-      }
-      return lower;
-    }
+    "Target platform: android | ios | web",
+    parsePlatform
   )
   .option(
     "-b, --boot-timeout <timeout>",
@@ -294,8 +287,8 @@ Notes:
       options.directoryPath = directoryPath;
       if (!options.platform) {
         options.platform = await promptWithType(
-          "\n Please enter the target platform (android/ios): ",
-          ["android", "ios"]
+          "\n Please enter the target platform (android/ios/web): ",
+          PLATFORMS
         );
       }
       const normalizedOptions = normalizeOptions(options);
@@ -354,23 +347,15 @@ program
 
   Parameters:
       [directoryPath] (optional) : Directory containing the config to update (defaults to current directory)
-      -p, --platform <string> (optional) : Target platform (android | ios)
+      -p, --platform <string> (optional) : Target platform (android | ios | web)
       -b, --boot-timeout <number> (optional) : New boot timeout in milliseconds (positive number)
       -r, --release-config-timeout <number> (optional) : New release config timeout in milliseconds (positive number)
 `
   )
   .option(
     "-p, --platform <platform>",
-    "Target platform: android | ios",
-    (value) => {
-      const lower = value.toLowerCase();
-      if (!["android", "ios"].includes(lower)) {
-        throw new InvalidOptionArgumentError(
-          `Invalid platform: "${value}". Allowed values: android | ios`
-        );
-      }
-      return lower;
-    }
+    "Target platform: android | ios | web",
+    parsePlatform
   )
   .option(
     "-b, --boot-timeout <timeout>",
@@ -448,8 +433,8 @@ Notes:
       options.directoryPath = directoryPath;
       if (!options.platform) {
         options.platform = await promptWithType(
-          "\n Please enter the target platform (android/ios): ",
-          ["android", "ios"]
+          "\n Please enter the target platform (android/ios/web): ",
+          PLATFORMS
         );
       }
       const normalizedOptions = normalizeOptions(options);
@@ -494,7 +479,7 @@ program
 
   Parameters:
       [directoryPath] (optional) : Directory containing the release config (defaults to current directory)
-      -p, --platform <string> (required) : Target platform (android | ios)
+      -p, --platform <string> (required) : Target platform (android | ios | web)
       -t, --tag <string> (optional) : Tag to apply to the files for identification
       -u, --upload (optional) : Upload files directly to Airborne server instead of using external URLs
 
@@ -502,16 +487,8 @@ program
   )
   .option(
     "-p, --platform <platform>",
-    "Target platform: android | ios",
-    (value) => {
-      const lower = value.toLowerCase();
-      if (!["android", "ios"].includes(lower)) {
-        throw new InvalidOptionArgumentError(
-          `Invalid platform: "${value}". Allowed values: android | ios`
-        );
-      }
-      return lower;
-    }
+    "Target platform: android | ios | web",
+    parsePlatform
   )
   .option("-t, --tag <tag>", "Tag to apply to the files", (tag) => {
     if (tag === "__default__") {
@@ -561,8 +538,8 @@ Notes:
       options.directoryPath = directoryPath;
       if (!options.platform) {
         options.platform = await promptWithType(
-          "\n Please enter the target platform (android/ios): ",
-          ["android", "ios"]
+          "\n Please enter the target platform (android/ios/web): ",
+          PLATFORMS
         );
       }
       const normalizedOptions = normalizeOptions(options);
@@ -682,23 +659,15 @@ program
 
   Parameters:
       [directoryPath] (optional) : Directory containing the release config (defaults to current directory)
-      -p, --platform <string> (required) : Target platform (android | ios)
+      -p, --platform <string> (required) : Target platform (android | ios | web)
       -t, --tag <string> (optional) : Tag to apply to the package for identification and versioning
 
 `
   )
   .option(
     "-p, --platform <platform>",
-    "Target platform: android | ios",
-    (value) => {
-      const lower = value.toLowerCase();
-      if (!["android", "ios"].includes(lower)) {
-        throw new InvalidOptionArgumentError(
-          `Invalid platform: "${value}". Allowed values: android | ios`
-        );
-      }
-      return lower;
-    }
+    "Target platform: android | ios | web",
+    parsePlatform
   )
   .option("-t, --tag <tag>", "Tag to apply to the files", (tag) => {
     if (tag === "__default__") {
@@ -755,8 +724,8 @@ Notes:
       options.directoryPath = directoryPath;
       if (!options.platform) {
         options.platform = await promptWithType(
-          "\n Please enter the target platform (android/ios): ",
-          ["android", "ios"]
+          "\n Please enter the target platform (android/ios/web): ",
+          PLATFORMS
         );
       }
       const normalizedOptions = normalizeOptions(options);
