@@ -68,7 +68,7 @@ This runs three things concurrently:
 Before starting the server, `make run` executes the init scripts, which finalize configuration **in `.env`**:
 
 - `init-superposition.sh` — creates the default Superposition org and writes `SUPERPOSITION_ORG_ID`.
-- `init-localstack.sh` — creates the local KMS key (`alias/my-local-key`) and the S3 bucket, and (in encrypted mode) KMS-encrypts the master key and the sensitive variables into `.env`.
+- `init-localstack.sh` — creates the local KMS key (`alias/my-local-key`) and the S3 bucket (with a `GET`/`HEAD` CORS rule so browser clients can fetch OTA files), and (in encrypted mode) KMS-encrypts the master key and the sensitive variables into `.env`.
 - `init-keycloak.sh` — reads the realm's client secrets from Keycloak and writes `OIDC_CLIENT_SECRET` / `AUTH_ADMIN_CLIENT_SECRET` (encrypted or plaintext per mode), along with the resolved issuer/token URLs.
 
 The encryption mode used at run time is taken from `USE_ENCRYPTED_SECRETS` in `.env` (falling back to the `make` variable). To run without encryption:
