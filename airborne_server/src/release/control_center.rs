@@ -122,6 +122,9 @@ pub async fn event(
     payload: Value,
 ) {
     let mut payload = payload;
+    if let Some(approval) = super::maker_checker::audit_context() {
+        payload["approval"] = approval;
+    }
     if payload.get("reason").is_none() {
         if let Some(reason) = super::write_lock::last_reason() {
             payload["reason"] = json!(reason);
@@ -215,6 +218,10 @@ pub async fn events(
 #[derive(Deserialize)]
 pub struct RollbackRequest {
     reason: String,
+    #[serde(default)]
+    emergency: bool,
+    #[serde(default)]
+    confirm_sensitive_risk: bool,
 }
 #[derive(Debug, PartialEq)]
 pub(super) enum RollbackDecision {
@@ -250,6 +257,16 @@ pub async fn rollback(
     )?;
     let id = path.into_inner();
     let result = super::write_lock::locked(&state, &org, &app, async {
+        if req.emergency {
+            return super::maker_checker::emergency(
+                &state,
+                &auth_response,
+                &id,
+                &req.reason,
+                req.confirm_sensitive_risk,
+            )
+            .await;
+        }
         Box::pin(super::rollback::run(
             &state,
             &auth_response,
