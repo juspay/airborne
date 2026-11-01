@@ -42,6 +42,9 @@ declare const GetControlCenterRollbackPreviewCommand_base: {
  * const command = new GetControlCenterRollbackPreviewCommand(input);
  * const response = await client.send(command);
  * // { // RollbackPreviewResponse
+ * //   blocked_package_versions: [ // StringList
+ * //     "STRING_VALUE",
+ * //   ],
  * //   action: "DOCUMENT_VALUE", // required
  * //   current_package_version: "DOCUMENT_VALUE", // required
  * //   resulting_package_version: "DOCUMENT_VALUE", // required

@@ -6,6 +6,831 @@
         "description": "Service for managing OTA updates and configurations"
     },
     "paths": {
+        "/api/control-center/approval-policy": {
+            "get": {
+                "description": "Return the application's current approval policy. An absent row returns disabled, empty rosters, a 24-hour TTL and emergency rollback enabled.",
+                "operationId": "GetControlCenterApprovalPolicy",
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetControlCenterApprovalPolicy 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetControlCenterApprovalPolicyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            },
+            "put": {
+                "description": "Replace the application's approval policy. Only actual organisation owners/admins may edit it. Roster identities must be enabled Keycloak users with app access and ordinary release permissions. Enabling requires at least two distinct subjects and a different eligible checker for each maker. Returns 409 until the operator deployment readiness fence is attested after all old instances and writes are drained.",
+                "operationId": "UpdateControlCenterApprovalPolicy",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateControlCenterApprovalPolicyRequestContent"
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UpdateControlCenterApprovalPolicy 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateControlCenterApprovalPolicyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/deployment-requests": {
+            "get": {
+                "description": "List the newest deployment requests. Status filtering precedes the 1,000-row cap. Omit x-application to list across the organisation, with per-application read filtering.",
+                "operationId": "ListControlCenterDeploymentRequests",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "$ref": "#/components/schemas/DeploymentRequestStatus"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Optional: omit x-application to list readable requests across the organisation. Filter is applied before the 1,000 newest-row cap.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Optional: omit x-application to list readable requests across the organisation. Filter is applied before the 1,000 newest-row cap."
+                        }
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListControlCenterDeploymentRequests 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListControlCenterDeploymentRequestsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            },
+            "post": {
+                "description": "Raise an immutable deployment request. The server resolves and freezes the snapshot, hashes it and records the authenticated subject as requester.",
+                "operationId": "CreateControlCenterDeploymentRequest",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateControlCenterDeploymentRequestRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateControlCenterDeploymentRequest 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateControlCenterDeploymentRequestResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/deployment-requests/{id}": {
+            "get": {
+                "description": "Fetch one request by UUID independently of queue pagination. Both scope headers are required.",
+                "operationId": "GetControlCenterDeploymentRequest",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetControlCenterDeploymentRequest 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetControlCenterDeploymentRequestResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/deployment-requests/{id}/approve": {
+            "post": {
+                "description": "Approve and immediately execute a pending request. The checker must be currently eligible and different from the immutable requester.",
+                "operationId": "ApproveControlCenterDeploymentRequest",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApproveControlCenterDeploymentRequestRequestContent"
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ApproveControlCenterDeploymentRequest 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApproveControlCenterDeploymentRequestResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "UnresolvedOperationError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnresolvedOperationErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "RollbackUnprocessableError 422 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RollbackUnprocessableErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "RollbackPartialFailureError 502 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RollbackPartialFailureErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/deployment-requests/{id}/cancel": {
+            "post": {
+                "description": "Cancel a request. Only its requester may cancel it.",
+                "operationId": "CancelControlCenterDeploymentRequest",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CancelControlCenterDeploymentRequestRequestContent"
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CancelControlCenterDeploymentRequest 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CancelControlCenterDeploymentRequestResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/deployment-requests/{id}/reject": {
+            "post": {
+                "description": "Reject a request. A checker may reject their own request; a reason is required.",
+                "operationId": "RejectControlCenterDeploymentRequest",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RejectControlCenterDeploymentRequestRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "RejectControlCenterDeploymentRequest 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RejectControlCenterDeploymentRequestResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
         "/api/control-center/groups": {
             "get": {
                 "description": "List groups for the organisation in x-organisation. Member applications are filtered to those the caller can read. Requires Bearer authentication.",
@@ -460,7 +1285,7 @@
         },
         "/api/control-center/operations/{id}/resolve": {
             "post": {
-                "description": "Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text `Airborne operation`. Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.",
+                "description": "Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text \"Airborne operation\". Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.",
                 "operationId": "ResolveControlCenterOperation",
                 "requestBody": {
                     "content": {
@@ -838,6 +1663,396 @@
                 "tags": [
                     "Control Center"
                 ]
+            }
+        },
+        "/api/control-center/serving-policy": {
+            "get": {
+                "description": "Read stored and effective strict serving policy.",
+                "operationId": "GetServingPolicy",
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetServingPolicy 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetServingPolicyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ApprovalRequiredError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            },
+            "put": {
+                "description": "Change strict serving. Requires release update permission. Both directions require set_strict_serving approval when maker-checker is enabled. Payload body is {strict: boolean}, without release_id.",
+                "operationId": "PutServingPolicy",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PutServingPolicyRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PutServingPolicy 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PutServingPolicyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ApprovalRequiredError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/serving-policy/preview": {
+            "post": {
+                "description": "Read-only evaluation of one context and toss. Returns whether enabling strict serving removes default fallback; this is not a population-wide impact count.",
+                "operationId": "PreviewServingPolicy",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PreviewServingPolicyRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PreviewServingPolicy 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PreviewServingPolicyResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ApprovalRequiredError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/telemetry": {
+            "get": {
+                "operationId": "GetTelemetrySummary",
+                "parameters": [
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetTelemetrySummary 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetTelemetrySummaryResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/file": {
@@ -2031,6 +3246,113 @@
                 ]
             }
         },
+        "/api/organisations/applications/dimension/{dimension}/cohort/range": {
+            "post": {
+                "description": "Add an independent inclusive stable major.minor.patch semantic version interval. Prerelease and build metadata bounds return 400 because upstream comparators do not support their precedence. Earlier definitions are unchanged. Enum index zero wins overlaps. Does not alter checkpoint semantics. Requires cohort update permission; unavailable while maker-checker is enabled, like other targeting edits.",
+                "operationId": "CreateCohortRange",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateCohortRangeRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "dimension",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateCohortRange 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateCohortRangeResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Dimensions"
+                ]
+            }
+        },
         "/api/organisations/create": {
             "post": {
                 "description": "Create a new organisation owned by the authenticated user. Returns the created organisation with its (initially empty) application list and the caller's access levels. Requires a bearer token.",
@@ -2493,11 +3815,11 @@
                         }
                     },
                     "403": {
-                        "description": "ForbiddenError 403 response",
+                        "description": "ApprovalRequiredError 403 response",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
                                 }
                             }
                         }
@@ -2779,6 +4101,491 @@
                 ]
             }
         },
+        "/api/releases/{release_id}/acknowledge-emergency": {
+            "post": {
+                "description": "Independently acknowledge the emergency rollback for its source release. Only a different current checker may acknowledge it.",
+                "operationId": "AcknowledgeEmergencyRollback",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcknowledgeEmergencyRollbackRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "AcknowledgeEmergencyRollback 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AcknowledgeEmergencyRollbackResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/releases/{release_id}/conclude": {
+            "post": {
+                "description": "Make one variant of a ramped release permanent. Concluding on an experimental variant promotes the release; concluding on the control variant ends it and leaves the previous release live. Read the variant ids from experiment.experiment_variants on GetRelease. The release must have been ramped first. Unknown release ids return 404. Pass the organisation and application in the x-organisation and x-application headers. Returns 409 when the release is still only created (ramp it first) or has already concluded or been discarded, 409 with \"code: unresolved\" when an upstream outcome is unknown, and 400 when the chosen variant does not exist. When the application requires approvals, every conclude is refused with 403 \"approval_required\"; raise a deployment request instead. Requires a bearer token and release conclude permission.",
+                "operationId": "ConcludeRelease",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConcludeReleaseRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "description": "ID of the release (the experiment id returned by CreateRelease).",
+                        "schema": {
+                            "type": "string",
+                            "description": "ID of the release (the experiment id returned by CreateRelease)."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ConcludeRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConcludeReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ApprovalRequiredError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "UnresolvedOperationError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnresolvedOperationErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/releases/{release_id}/discard": {
+            "post": {
+                "description": "Discard a release that has not been ramped, so it never serves traffic. Only a release in the created state can be discarded; a ramped release must be concluded on \"control\" or rolled back instead, and a release that is already concluded or discarded returns 409. Unknown release ids return 404. Discarding never needs approval. Pass the organisation and application in the x-organisation and x-application headers. Returns 409 with \"code: unresolved\" when an upstream outcome is unknown. Requires a bearer token and release discard permission.",
+                "operationId": "DiscardRelease",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DiscardReleaseRequestContent"
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "description": "ID of the release (the experiment id returned by CreateRelease).",
+                        "schema": {
+                            "type": "string",
+                            "description": "ID of the release (the experiment id returned by CreateRelease)."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "DiscardRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DiscardReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "UnresolvedOperationError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnresolvedOperationErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/releases/{release_id}/ramp": {
+            "post": {
+                "description": "Set the share of traffic that receives a release. A release starts at 0% and is not served until it is ramped; the first ramp moves it from created to in progress, and later ramps raise or lower the share. Pass the organisation and application in the x-organisation and x-application headers. Unknown release ids return 404. Values outside 0–50 return 400 before any write is attempted. Explicit upstream 400 and 422 validation rejections for ramps are recorded as not applied and do not pause writes for the application; other uncertain outcomes return 409 with code \"unresolved\" and own_attempt true, so inspect the real state before retrying and never repeat a committed ramp merely to clear a cache failure. Returns 409 when the release has already concluded or been discarded, and 409 with code \"unresolved\" when an earlier upstream write for the application still needs recovery; an organisation admin can resolve that operation with ResolveControlCenterOperation. When the application requires approvals, raising traffic (or any ramp of a rollback-sensitive release) is refused with 403 \"approval_required\"; raise a deployment request instead. Requires a bearer token and release ramp permission.",
+                "operationId": "RampRelease",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RampReleaseRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "description": "ID of the release (the experiment id returned by CreateRelease).",
+                        "schema": {
+                            "type": "string",
+                            "description": "ID of the release (the experiment id returned by CreateRelease)."
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "description": "Name of the application",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the application"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "description": "Name of the organisation",
+                        "schema": {
+                            "type": "string",
+                            "description": "Name of the organisation"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "RampRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RampReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ApprovalRequiredError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "UnresolvedOperationError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnresolvedOperationErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
         "/api/releases/{release_id}/rollback": {
             "post": {
                 "description": "Roll back a release according to its lifecycle state. Writes are durable and retries of a completed operation return its recorded success, including later unrelated live-release diagnostics. Unknown upstream outcomes return 409 unresolved and require real-state/operator review; changed replacements return 409 replacement_changed and must not be resumed automatically. Re-release only works while the source is the latest live release for its dimensions. Requires Bearer authentication plus x-organisation and x-application; callers need release write/conclude permission.",
@@ -2851,11 +4658,11 @@
                         }
                     },
                     "403": {
-                        "description": "ForbiddenError 403 response",
+                        "description": "ApprovalRequiredError 403 response",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                    "$ref": "#/components/schemas/ApprovalRequiredErrorResponseContent"
                                 }
                             }
                         }
@@ -2914,6 +4721,75 @@
                 "tags": [
                     "Releases"
                 ]
+            }
+        },
+        "/api/telemetry/reports": {
+            "post": {
+                "description": "Optional unverified device reports. 400 drops invalid/expired receipts; 429 retries later; 503 means disabled/unavailable.",
+                "operationId": "IngestTelemetryReports",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/IngestTelemetryReportsRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "202": {
+                        "description": "IngestTelemetryReports 202 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IngestTelemetryReportsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "TooManyRequestsError 429 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TooManyRequestsErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "ServiceUnavailableError 503 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServiceUnavailableErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
             }
         },
         "/api/token/issue": {
@@ -3093,6 +4969,20 @@
                             "description": "Name of the application."
                         },
                         "required": true
+                    },
+                    {
+                        "name": "telemetry_platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "native_version",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -3186,6 +5076,20 @@
                             "description": "Name of the application."
                         },
                         "required": true
+                    },
+                    {
+                        "name": "telemetry_platform",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "native_version",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -3258,6 +5162,30 @@
     },
     "components": {
         "schemas": {
+            "AcknowledgeEmergencyRollbackRequestContent": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Independent review explanation; must be nonblank."
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "AcknowledgeEmergencyRollbackResponseContent": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "success"
+                ]
+            },
             "Application": {
                 "type": "object",
                 "description": "Application information",
@@ -3284,10 +5212,122 @@
                     "organisation"
                 ]
             },
+            "ApprovalRequiredErrorResponseContent": {
+                "type": "object",
+                "description": "A direct release write was refused because this application requires an approved deployment request.",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "application",
+                    "code",
+                    "message"
+                ]
+            },
+            "ApproveControlCenterDeploymentRequestRequestContent": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string"
+                    }
+                }
+            },
+            "ApproveControlCenterDeploymentRequestResponseContent": {
+                "type": "object",
+                "description": "Immutable deployment request and its latest decision/result.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID."
+                    },
+                    "org": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestPayload"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "description": "Lowercase hexadecimal SHA-256 digest of the immutable approved content."
+                    },
+                    "base_state": {
+                        "description": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body."
+                    },
+                    "requester": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DeploymentRequestStatus"
+                    },
+                    "expires_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "decided_by": {
+                        "description": "Subject of the latest decision, or JSON null."
+                    },
+                    "decision_reason": {
+                        "description": "Decision explanation, or JSON null."
+                    },
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "updated_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "result": {
+                        "description": "Existing action execution result or JSON null."
+                    }
+                },
+                "required": [
+                    "action",
+                    "application",
+                    "base_state",
+                    "created_at",
+                    "decided_by",
+                    "decision_reason",
+                    "expires_at",
+                    "id",
+                    "org",
+                    "payload",
+                    "payload_hash",
+                    "reason",
+                    "requester",
+                    "result",
+                    "status",
+                    "updated_at"
+                ]
+            },
             "BadRequestErrorResponseContent": {
                 "type": "object",
                 "description": "Bad request error",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Airborne error code (AB_005)."
@@ -3299,6 +5339,136 @@
                 "required": [
                     "code",
                     "message"
+                ]
+            },
+            "CancelControlCenterDeploymentRequestRequestContent": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string"
+                    }
+                }
+            },
+            "CancelControlCenterDeploymentRequestResponseContent": {
+                "type": "object",
+                "description": "Immutable deployment request and its latest decision/result.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID."
+                    },
+                    "org": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestPayload"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "description": "Lowercase hexadecimal SHA-256 digest of the immutable approved content."
+                    },
+                    "base_state": {
+                        "description": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body."
+                    },
+                    "requester": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DeploymentRequestStatus"
+                    },
+                    "expires_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "decided_by": {
+                        "description": "Subject of the latest decision, or JSON null."
+                    },
+                    "decision_reason": {
+                        "description": "Decision explanation, or JSON null."
+                    },
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "updated_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "result": {
+                        "description": "Existing action execution result or JSON null."
+                    }
+                },
+                "required": [
+                    "action",
+                    "application",
+                    "base_state",
+                    "created_at",
+                    "decided_by",
+                    "decision_reason",
+                    "expires_at",
+                    "id",
+                    "org",
+                    "payload",
+                    "payload_hash",
+                    "reason",
+                    "requester",
+                    "result",
+                    "status",
+                    "updated_at"
+                ]
+            },
+            "ConcludeReleaseRequestContent": {
+                "type": "object",
+                "description": "Request to conclude a release.",
+                "properties": {
+                    "chosen_variant": {
+                        "type": "string",
+                        "description": "Variant to make permanent: the control variant keeps the previous release live, an experimental variant promotes this release. Take the id from experiment.experiment_variants on GetRelease; the experiment service generates the ids, so they cannot be guessed. An unknown variant returns 400 and names the available ones."
+                    },
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Optional reason recorded upstream. It must not contain the reserved, case-sensitive text \"Airborne operation\", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                },
+                "required": [
+                    "chosen_variant"
+                ]
+            },
+            "ConcludeReleaseResponseContent": {
+                "type": "object",
+                "description": "Result of concluding a release.",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "Always true; failures are returned as errors."
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable summary."
+                    },
+                    "experiment_id": {
+                        "type": "string",
+                        "description": "ID of the concluded release."
+                    },
+                    "chosen_variant": {
+                        "type": "string",
+                        "description": "Variant that was made permanent."
+                    }
+                },
+                "required": [
+                    "chosen_variant",
+                    "experiment_id",
+                    "message",
+                    "success"
                 ]
             },
             "ConfigProperties": {
@@ -3317,6 +5487,13 @@
                 "type": "object",
                 "description": "Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Airborne error code (AB_007)."
@@ -3374,6 +5551,15 @@
                 "type": "object",
                 "description": "Release state for one application, including per-application lookup failures.",
                 "properties": {
+                    "auxiliary_error": {
+                        "type": "string",
+                        "description": "Local auxiliary data unavailable or deadline exceeded; corresponding fields are null."
+                    },
+                    "telemetry": {},
+                    "cache_invalidation": {},
+                    "serving_policy": {
+                        "$ref": "#/components/schemas/ServingPolicy"
+                    },
                     "application": {
                         "type": "string"
                     },
@@ -3404,6 +5590,28 @@
                     },
                     "error": {
                         "description": "Sanitized lookup failure message, or JSON null when lookup succeeded."
+                    },
+                    "approval_required": {
+                        "type": "boolean",
+                        "description": "Whether this application currently requires a separate checker for protected writes."
+                    },
+                    "pending_requests": {
+                        "type": "number",
+                        "description": "Number of pending requests. This count is not capped by the queue list limit."
+                    },
+                    "emergency_needs_review": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EmergencyReview"
+                        },
+                        "description": "Emergency rollbacks waiting for independent checker acknowledgement."
+                    },
+                    "release_protections": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReleaseProtection"
+                        },
+                        "description": "Local rollback sensitivity markers for releases."
                     }
                 },
                 "required": [
@@ -3412,8 +5620,84 @@
                     "error",
                     "last_activity_at",
                     "live",
-                    "platform",
-                    "unresolved_operations"
+                    "platform"
+                ]
+            },
+            "ControlCenterDeploymentRequest": {
+                "type": "object",
+                "description": "Immutable deployment request and its latest decision/result.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID."
+                    },
+                    "org": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestPayload"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "description": "Lowercase hexadecimal SHA-256 digest of the immutable approved content."
+                    },
+                    "base_state": {
+                        "description": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body."
+                    },
+                    "requester": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DeploymentRequestStatus"
+                    },
+                    "expires_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "decided_by": {
+                        "description": "Subject of the latest decision, or JSON null."
+                    },
+                    "decision_reason": {
+                        "description": "Decision explanation, or JSON null."
+                    },
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "updated_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "result": {
+                        "description": "Existing action execution result or JSON null."
+                    }
+                },
+                "required": [
+                    "action",
+                    "application",
+                    "base_state",
+                    "created_at",
+                    "decided_by",
+                    "decision_reason",
+                    "expires_at",
+                    "id",
+                    "org",
+                    "payload",
+                    "payload_hash",
+                    "reason",
+                    "requester",
+                    "result",
+                    "status",
+                    "updated_at"
                 ]
             },
             "ControlCenterGroup": {
@@ -3577,7 +5861,18 @@
                     "concluded",
                     "discarded",
                     "rolled_back",
-                    "operation_resolved"
+                    "operation_resolved",
+                    "requested",
+                    "approved",
+                    "rejected",
+                    "cancelled",
+                    "expired",
+                    "stale",
+                    "executed",
+                    "failed",
+                    "emergency_rollback",
+                    "emergency_acknowledged",
+                    "policy_changed"
                 ]
             },
             "ControlCenterReleaseOutcome": {
@@ -3600,17 +5895,11 @@
                     },
                     "message": {
                         "type": "string"
-                    },
-                    "expected": {},
-                    "before": {},
-                    "upstream_workspace": {}
+                    }
                 },
                 "required": [
-                    "before",
-                    "expected",
                     "message",
-                    "operation_id",
-                    "upstream_workspace"
+                    "operation_id"
                 ]
             },
             "ControlCenterUnresolvedOperationDetails": {
@@ -3624,20 +5913,12 @@
                     },
                     "message": {
                         "type": "string"
-                    },
-                    "expected": {},
-                    "before": {},
-                    "upstream_workspace": {},
-                    "upstream_org": {}
+                    }
                 },
                 "required": [
-                    "before",
                     "code",
-                    "expected",
                     "message",
-                    "operation_id",
-                    "upstream_org",
-                    "upstream_workspace"
+                    "operation_id"
                 ]
             },
             "CreateApplicationRequestContent": {
@@ -3677,6 +5958,152 @@
                     "access",
                     "application",
                     "organisation"
+                ]
+            },
+            "CreateCohortRangeRequestContent": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "lower": {
+                        "type": "string"
+                    },
+                    "upper": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "type": "number",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "lower",
+                    "name",
+                    "priority",
+                    "upper"
+                ]
+            },
+            "CreateCohortRangeResponseContent": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "lower": {
+                        "type": "string"
+                    },
+                    "upper": {
+                        "type": "string"
+                    },
+                    "priority": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "lower",
+                    "name",
+                    "priority",
+                    "upper"
+                ]
+            },
+            "CreateControlCenterDeploymentRequestRequestContent": {
+                "type": "object",
+                "description": "Create a deployment request. The client may send only action, payload and reason; the server resolves requester, snapshot and base state.",
+                "properties": {
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestInputPayload"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Nonblank maker explanation. Reserved \"Airborne operation\" text is refused."
+                    }
+                },
+                "required": [
+                    "action",
+                    "payload",
+                    "reason"
+                ]
+            },
+            "CreateControlCenterDeploymentRequestResponseContent": {
+                "type": "object",
+                "description": "Immutable deployment request and its latest decision/result.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID."
+                    },
+                    "org": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestPayload"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "description": "Lowercase hexadecimal SHA-256 digest of the immutable approved content."
+                    },
+                    "base_state": {
+                        "description": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body."
+                    },
+                    "requester": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DeploymentRequestStatus"
+                    },
+                    "expires_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "decided_by": {
+                        "description": "Subject of the latest decision, or JSON null."
+                    },
+                    "decision_reason": {
+                        "description": "Decision explanation, or JSON null."
+                    },
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "updated_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "result": {
+                        "description": "Existing action execution result or JSON null."
+                    }
+                },
+                "required": [
+                    "action",
+                    "application",
+                    "base_state",
+                    "created_at",
+                    "decided_by",
+                    "decision_reason",
+                    "expires_at",
+                    "id",
+                    "org",
+                    "payload",
+                    "payload_hash",
+                    "reason",
+                    "requester",
+                    "result",
+                    "status",
+                    "updated_at"
                 ]
             },
             "CreateControlCenterGroupRequestContent": {
@@ -4058,6 +6485,9 @@
                             "type": "string"
                         },
                         "description": "Resources for the release"
+                    },
+                    "rollback_sensitive": {
+                        "$ref": "#/components/schemas/RollbackSensitiveReason"
                     }
                 },
                 "required": [
@@ -4137,6 +6567,54 @@
                     "success"
                 ]
             },
+            "DeploymentRequestAction": {
+                "type": "string",
+                "description": "Supported approved release mutation.",
+                "enum": [
+                    "create",
+                    "update",
+                    "ramp",
+                    "conclude",
+                    "discard",
+                    "rollback",
+                    "set_strict_serving",
+                    "set_rollback_sensitive"
+                ]
+            },
+            "DeploymentRequestInputPayload": {
+                "type": "object",
+                "description": "Request payload accepted from the maker. The body is action-specific and is frozen by the server.",
+                "properties": {
+                    "body": {},
+                    "release_id": {
+                        "type": "string"
+                    }
+                }
+            },
+            "DeploymentRequestPayload": {
+                "type": "object",
+                "description": "Frozen action payload returned by the server, including its resolved immutable snapshot.",
+                "properties": {
+                    "body": {},
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "snapshot": {}
+                }
+            },
+            "DeploymentRequestStatus": {
+                "type": "string",
+                "enum": [
+                    "pending",
+                    "executing",
+                    "executed",
+                    "failed",
+                    "rejected",
+                    "cancelled",
+                    "expired",
+                    "stale"
+                ]
+            },
             "DimensionResponse": {
                 "type": "object",
                 "description": "A targeting dimension.",
@@ -4185,6 +6663,100 @@
                     "description": "Dimension value"
                 },
                 "description": "Map of dimension name to value."
+            },
+            "DiscardReleaseRequestContent": {
+                "type": "object",
+                "description": "Request to discard a release.",
+                "properties": {
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Optional reason recorded upstream. It must not contain the reserved, case-sensitive text \"Airborne operation\", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                }
+            },
+            "DiscardReleaseResponseContent": {
+                "type": "object",
+                "description": "Result of discarding a release.",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "Always true; failures are returned as errors."
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable summary."
+                    },
+                    "experiment_id": {
+                        "type": "string",
+                        "description": "ID of the discarded release."
+                    }
+                },
+                "required": [
+                    "experiment_id",
+                    "message",
+                    "success"
+                ]
+            },
+            "EmergencyReview": {
+                "type": "object",
+                "description": "A pending emergency rollback awaiting an independent review.",
+                "properties": {
+                    "rollback_finished": {
+                        "type": "boolean",
+                        "description": "Present for new successful emergencies; absent on legacy rows."
+                    },
+                    "rolled_back_to_package_version": {},
+                    "rollback_result": {},
+                    "new_release_id": {},
+                    "id": {
+                        "type": "string"
+                    },
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "actor": {
+                        "type": "string"
+                    },
+                    "acknowledged_by": {},
+                    "reason": {
+                        "type": "string"
+                    },
+                    "confirm_sensitive_risk": {
+                        "type": "boolean"
+                    },
+                    "plan": {},
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    }
+                },
+                "required": [
+                    "acknowledged_by",
+                    "actor",
+                    "confirm_sensitive_risk",
+                    "created_at",
+                    "id",
+                    "plan",
+                    "reason",
+                    "release_id"
+                ]
+            },
+            "ExperimentVariants": {
+                "type": "object",
+                "description": "Variant ids of the experiment backing a release. Pass one of these as chosen_variant when concluding.",
+                "properties": {
+                    "control": {
+                        "type": "string",
+                        "description": "Id of the control variant, which keeps the previous release live. The experiment service prefixes it with the release id, for example \"7522252134449025024-control\"."
+                    },
+                    "experimentals": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Ids of the experimental variants, which promote this release, for example \"7522252134449025024-experimental_1\". A release created by Airborne has exactly one."
+                    }
+                }
             },
             "FileGroup": {
                 "type": "object",
@@ -4269,6 +6841,13 @@
             "ForbiddenErrorResponseContent": {
                 "type": "object",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Airborne error code (AB_006)."
@@ -4280,6 +6859,122 @@
                 "required": [
                     "code",
                     "message"
+                ]
+            },
+            "GetControlCenterApprovalPolicyResponseContent": {
+                "type": "object",
+                "description": "Complete application approval policy. PUT replaces the policy; omitted fields use server defaults.",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "makers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Sorted unique canonical identity subjects."
+                    },
+                    "checkers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Sorted unique canonical identity subjects."
+                    },
+                    "request_ttl_hours": {
+                        "type": "number",
+                        "maximum": 720,
+                        "minimum": 1,
+                        "description": "Request lifetime in hours, from 1 through 720."
+                    },
+                    "emergency_rollback": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "checkers",
+                    "emergency_rollback",
+                    "enabled",
+                    "makers",
+                    "request_ttl_hours"
+                ]
+            },
+            "GetControlCenterDeploymentRequestResponseContent": {
+                "type": "object",
+                "description": "Immutable deployment request and its latest decision/result.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID."
+                    },
+                    "org": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestPayload"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "description": "Lowercase hexadecimal SHA-256 digest of the immutable approved content."
+                    },
+                    "base_state": {
+                        "description": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body."
+                    },
+                    "requester": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DeploymentRequestStatus"
+                    },
+                    "expires_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "decided_by": {
+                        "description": "Subject of the latest decision, or JSON null."
+                    },
+                    "decision_reason": {
+                        "description": "Decision explanation, or JSON null."
+                    },
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "updated_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "result": {
+                        "description": "Existing action execution result or JSON null."
+                    }
+                },
+                "required": [
+                    "action",
+                    "application",
+                    "base_state",
+                    "created_at",
+                    "decided_by",
+                    "decision_reason",
+                    "expires_at",
+                    "id",
+                    "org",
+                    "payload",
+                    "payload_hash",
+                    "reason",
+                    "requester",
+                    "result",
+                    "status",
+                    "updated_at"
                 ]
             },
             "GetControlCenterOverviewResponseContent": {
@@ -4323,6 +7018,13 @@
                 "type": "object",
                 "description": "Side-effect-free rollback decision. Action, resulting package, reconciliation details and blocked are nullable when unavailable.",
                 "properties": {
+                    "blocked_package_versions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of strings"
+                    },
                     "action": {},
                     "current_package_version": {},
                     "resulting_package_version": {},
@@ -4347,11 +7049,11 @@
                     },
                     "release_config_timeout": {
                         "type": "number",
-                        "description": "Time allowed for fetching the release config, in seconds."
+                        "description": "Time allowed for fetching the release config, in milliseconds."
                     },
                     "boot_timeout": {
                         "type": "number",
-                        "description": "Time allowed for the app to boot, in seconds."
+                        "description": "Time allowed for the app to boot, in milliseconds."
                     },
                     "properties": {
                         "$ref": "#/components/schemas/ConfigProperties"
@@ -4430,6 +7132,46 @@
                     }
                 }
             },
+            "GetServingPolicyResponseContent": {
+                "type": "object",
+                "properties": {
+                    "strict": {
+                        "type": "boolean"
+                    },
+                    "deployment_override": {
+                        "type": "boolean"
+                    },
+                    "effective_strict": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "deployment_override",
+                    "effective_strict",
+                    "strict"
+                ]
+            },
+            "GetTelemetrySummaryResponseContent": {
+                "type": "object",
+                "description": "Advisory only; reports never change releases. Native versions and rows are bounded.",
+                "properties": {
+                    "window_days": {
+                        "type": "number"
+                    },
+                    "verification": {
+                        "type": "string"
+                    },
+                    "automatic_action": {
+                        "type": "string"
+                    },
+                    "adoption_definition": {
+                        "type": "string"
+                    },
+                    "releases": {},
+                    "release_totals": {},
+                    "blocked_package_versions": {}
+                }
+            },
             "GetUserResponseContent": {
                 "type": "object",
                 "description": "Information about the authenticated user.",
@@ -4454,10 +7196,57 @@
                     "user_id"
                 ]
             },
+            "IngestTelemetryReportsRequestContent": {
+                "type": "object",
+                "properties": {
+                    "receipt": {
+                        "type": "string",
+                        "maxLength": 4096
+                    },
+                    "install_id": {
+                        "type": "string"
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TelemetryEvent"
+                        },
+                        "maxItems": 32,
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "events",
+                    "install_id",
+                    "receipt"
+                ]
+            },
+            "IngestTelemetryReportsResponseContent": {
+                "type": "object",
+                "properties": {
+                    "accepted": {
+                        "type": "boolean"
+                    },
+                    "verification": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "accepted",
+                    "verification"
+                ]
+            },
             "InternalServerErrorResponseContent": {
                 "type": "object",
                 "description": "Internal server error",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Airborne error code (AB_003)."
@@ -4469,6 +7258,20 @@
                 "required": [
                     "code",
                     "message"
+                ]
+            },
+            "ListControlCenterDeploymentRequestsResponseContent": {
+                "type": "object",
+                "properties": {
+                    "requests": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterDeploymentRequest"
+                        }
+                    }
+                },
+                "required": [
+                    "requests"
                 ]
             },
             "ListControlCenterGroupsResponseContent": {
@@ -4669,6 +7472,13 @@
                 "type": "object",
                 "description": "Not found error",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Airborne error code (AB_001)."
@@ -4799,6 +7609,137 @@
                     "token_type"
                 ]
             },
+            "PreviewServingPolicyRequestContent": {
+                "type": "object",
+                "properties": {
+                    "context": {
+                        "$ref": "#/components/schemas/ServingPreviewContext"
+                    },
+                    "toss": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "context",
+                    "toss"
+                ]
+            },
+            "PreviewServingPolicyResponseContent": {
+                "type": "object",
+                "properties": {
+                    "serving_policy": {
+                        "$ref": "#/components/schemas/ServingPolicy"
+                    },
+                    "context": {
+                        "$ref": "#/components/schemas/ServingPreviewContext"
+                    },
+                    "toss": {
+                        "type": "string"
+                    },
+                    "config_version": {
+                        "type": "string"
+                    },
+                    "package_version": {},
+                    "targeted": {
+                        "type": "boolean"
+                    },
+                    "would_stop_serving": {
+                        "type": "boolean"
+                    },
+                    "strict_status": {
+                        "type": "number"
+                    },
+                    "scope": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "context",
+                    "scope",
+                    "serving_policy",
+                    "strict_status",
+                    "targeted",
+                    "toss",
+                    "would_stop_serving"
+                ]
+            },
+            "PutServingPolicyRequestContent": {
+                "type": "object",
+                "properties": {
+                    "strict": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "strict"
+                ]
+            },
+            "PutServingPolicyResponseContent": {
+                "type": "object",
+                "properties": {
+                    "strict": {
+                        "type": "boolean"
+                    },
+                    "deployment_override": {
+                        "type": "boolean"
+                    },
+                    "effective_strict": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "deployment_override",
+                    "effective_strict",
+                    "strict"
+                ]
+            },
+            "RampReleaseRequestContent": {
+                "type": "object",
+                "description": "Request to ramp a release's traffic.",
+                "properties": {
+                    "traffic_percentage": {
+                        "type": "number",
+                        "maximum": 50,
+                        "minimum": 0,
+                        "description": "Percentage of traffic to route to the release, from 0 to 50. Values outside this range return 400 before any write is attempted. Setting it to 0 pauses the release without discarding it. Lowering it needs no approval, raising it does when approvals are enabled."
+                    },
+                    "change_reason": {
+                        "type": "string",
+                        "description": "Optional reason recorded upstream. It must not contain the reserved, case-sensitive text \"Airborne operation\", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                },
+                "required": [
+                    "traffic_percentage"
+                ]
+            },
+            "RampReleaseResponseContent": {
+                "type": "object",
+                "description": "Result of ramping a release.",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "description": "Always true; failures are returned as errors."
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Human-readable summary."
+                    },
+                    "experiment_id": {
+                        "type": "string",
+                        "description": "ID of the ramped release."
+                    },
+                    "traffic_percentage": {
+                        "type": "number",
+                        "description": "Traffic percentage now routed to the release."
+                    }
+                },
+                "required": [
+                    "experiment_id",
+                    "message",
+                    "success",
+                    "traffic_percentage"
+                ]
+            },
             "ReconciledKeys": {
                 "type": "object",
                 "description": "How the configuration of a re-released rollback was reconciled with the currently registered keys.",
@@ -4823,6 +7764,95 @@
                     "kept_current"
                 ]
             },
+            "RejectControlCenterDeploymentRequestRequestContent": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "RejectControlCenterDeploymentRequestResponseContent": {
+                "type": "object",
+                "description": "Immutable deployment request and its latest decision/result.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID."
+                    },
+                    "org": {
+                        "type": "string"
+                    },
+                    "application": {
+                        "type": "string"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/DeploymentRequestAction"
+                    },
+                    "payload": {
+                        "$ref": "#/components/schemas/DeploymentRequestPayload"
+                    },
+                    "payload_hash": {
+                        "type": "string",
+                        "description": "Lowercase hexadecimal SHA-256 digest of the immutable approved content."
+                    },
+                    "base_state": {
+                        "description": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body."
+                    },
+                    "requester": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/DeploymentRequestStatus"
+                    },
+                    "expires_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "decided_by": {
+                        "description": "Subject of the latest decision, or JSON null."
+                    },
+                    "decision_reason": {
+                        "description": "Decision explanation, or JSON null."
+                    },
+                    "created_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "updated_at": {
+                        "type": "number",
+                        "format": "double"
+                    },
+                    "result": {
+                        "description": "Existing action execution result or JSON null."
+                    }
+                },
+                "required": [
+                    "action",
+                    "application",
+                    "base_state",
+                    "created_at",
+                    "decided_by",
+                    "decision_reason",
+                    "expires_at",
+                    "id",
+                    "org",
+                    "payload",
+                    "payload_hash",
+                    "reason",
+                    "requester",
+                    "result",
+                    "status",
+                    "updated_at"
+                ]
+            },
             "ReleaseExperiment": {
                 "type": "object",
                 "description": "Details of the experiment backing a release, used to ramp it out gradually.",
@@ -4830,6 +7860,9 @@
                     "experiment_id": {
                         "type": "string",
                         "description": "Identifier of the experiment."
+                    },
+                    "experiment_variants": {
+                        "$ref": "#/components/schemas/ExperimentVariants"
                     },
                     "package_version": {
                         "type": "number",
@@ -4852,6 +7885,21 @@
                         "description": "Current status of the experiment."
                     }
                 }
+            },
+            "ReleaseProtection": {
+                "type": "object",
+                "properties": {
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "rollback_sensitive": {
+                        "description": "Explicitly cleared markers are represented as JSON null."
+                    }
+                },
+                "required": [
+                    "release_id",
+                    "rollback_sensitive"
+                ]
             },
             "RequestOrganisationRequestContent": {
                 "type": "object",
@@ -4918,7 +7966,7 @@
                     "reason": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400."
+                        "description": "Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text \"Airborne operation\"; such a reason returns 400."
                     },
                     "request_terminated": {
                         "type": "boolean",
@@ -4969,6 +8017,13 @@
                 "type": "object",
                 "description": "Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Airborne error code (AB_003)."
@@ -5010,7 +8065,15 @@
                     "reason": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                        "description": "The reason must not contain the reserved, case-sensitive text \"Airborne operation\": Airborne appends a generated suffix made of \"[Airborne operation \", a canonical UUID and \"]\" to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    },
+                    "emergency": {
+                        "type": "boolean",
+                        "description": "Use only for the constrained emergency rollback path."
+                    },
+                    "confirm_sensitive_risk": {
+                        "type": "boolean",
+                        "description": "Required when the latest live source is marked rollback-sensitive."
                     }
                 },
                 "required": [
@@ -5063,9 +8126,7 @@
                     "operation_id": {
                         "type": "string"
                     },
-                    "replacement_release_id": {
-                        "type": "string"
-                    }
+                    "replacement_release_id": {}
                 },
                 "required": [
                     "code",
@@ -5074,10 +8135,25 @@
                     "replacement_release_id"
                 ]
             },
+            "RollbackSensitiveReason": {
+                "type": "string",
+                "description": "A declared reason a release must retain additional rollback protection.",
+                "enum": [
+                    "security",
+                    "one_way_migration"
+                ]
+            },
             "RollbackUnprocessableErrorResponseContent": {
                 "type": "object",
                 "description": "Returned by rollback when no earlier live release exists or the historical package and config cannot be reconciled. Nothing is created.",
                 "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
                     "code": {
                         "type": "string",
                         "description": "Rollback block code: `no_predecessor` or `incompatible`."
@@ -5156,6 +8232,14 @@
                 "type": "object",
                 "description": "Release configuration",
                 "properties": {
+                    "blocked_package_versions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of strings"
+                    },
+                    "telemetry": {},
                     "config": {
                         "$ref": "#/components/schemas/GetReleaseConfig"
                     },
@@ -5176,6 +8260,14 @@
                 "type": "object",
                 "description": "Release configuration",
                 "properties": {
+                    "blocked_package_versions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of strings"
+                    },
+                    "telemetry": {},
                     "config": {
                         "$ref": "#/components/schemas/GetReleaseConfig"
                     },
@@ -5190,6 +8282,83 @@
                     "config",
                     "package",
                     "resources"
+                ]
+            },
+            "ServiceUnavailableErrorResponseContent": {
+                "type": "object",
+                "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": "Present when an approved action failed and its failed status was saved."
+                    },
+                    "request_status": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
+                ]
+            },
+            "ServingPolicy": {
+                "type": "object",
+                "properties": {
+                    "strict": {
+                        "type": "boolean"
+                    },
+                    "deployment_override": {
+                        "type": "boolean"
+                    },
+                    "effective_strict": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "deployment_override",
+                    "effective_strict",
+                    "strict"
+                ]
+            },
+            "ServingPreviewContext": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "string"
+                }
+            },
+            "TelemetryEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind"
+                ]
+            },
+            "TooManyRequestsErrorResponseContent": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
                 ]
             },
             "UnauthorizedResponseContent": {
@@ -5243,6 +8412,75 @@
                     "operation_id",
                     "upstream_org",
                     "upstream_workspace"
+                ]
+            },
+            "UpdateControlCenterApprovalPolicyRequestContent": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "makers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of strings"
+                    },
+                    "checkers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "List of strings"
+                    },
+                    "request_ttl_hours": {
+                        "type": "number",
+                        "maximum": 720,
+                        "minimum": 1
+                    },
+                    "emergency_rollback": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "UpdateControlCenterApprovalPolicyResponseContent": {
+                "type": "object",
+                "description": "Complete application approval policy. PUT replaces the policy; omitted fields use server defaults.",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "makers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Sorted unique canonical identity subjects."
+                    },
+                    "checkers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Sorted unique canonical identity subjects."
+                    },
+                    "request_ttl_hours": {
+                        "type": "number",
+                        "maximum": 720,
+                        "minimum": 1,
+                        "description": "Request lifetime in hours, from 1 through 720."
+                    },
+                    "emergency_rollback": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "checkers",
+                    "emergency_rollback",
+                    "enabled",
+                    "makers",
+                    "request_ttl_hours"
                 ]
             },
             "UpdateControlCenterGroupRequestContent": {

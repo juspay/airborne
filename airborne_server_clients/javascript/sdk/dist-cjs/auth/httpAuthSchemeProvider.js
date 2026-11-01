@@ -24,6 +24,12 @@ function createSmithyApiNoAuthHttpAuthOption(authParameters) {
 const defaultAirborneHttpAuthSchemeProvider = (authParameters) => {
     const options = [];
     switch (authParameters.operation) {
+        case "IngestTelemetryReports":
+            {
+                options.push(createSmithyApiNoAuthHttpAuthOption(authParameters));
+                break;
+            }
+            ;
         case "PostLogin":
             {
                 options.push(createSmithyApiNoAuthHttpAuthOption(authParameters));
