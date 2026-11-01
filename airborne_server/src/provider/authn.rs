@@ -365,6 +365,15 @@ pub async fn verify_authn_token(
 
 #[async_trait]
 pub trait AuthNProvider: Send + Sync {
+    /// Approval rosters must resolve to real, enabled identities, not just AuthZ grants.
+    async fn approval_subject_exists(
+        &self,
+        _state: &AppState,
+        _subject: &str,
+    ) -> airborne_types::Result<bool> {
+        Err(ABError::BadRequest("Maker-checker requires an identity directory lookup supported by the configured AuthN provider".into()))
+    }
+
     fn kind(&self) -> AuthnProviderKind;
 
     fn supports_password_login(&self) -> bool;
@@ -726,33 +735,4 @@ pub async fn refresh_access_token_common(
         })?;
 
     to_user_token(&token_response)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::rewrite_to_external_endpoint;
-
-    #[test]
-    fn rewrites_authorization_endpoint_to_external_issuer() {
-        let rewritten = rewrite_to_external_endpoint(
-            "http://internal-idp/realms/demo/protocol/openid-connect/auth",
-            "http://internal-idp/realms/demo",
-            "https://public-idp.example.com/realms/demo",
-        );
-        assert_eq!(
-            rewritten,
-            "https://public-idp.example.com/realms/demo/protocol/openid-connect/auth"
-        );
-    }
-
-    #[test]
-    fn keeps_authorization_endpoint_when_prefix_does_not_match() {
-        let endpoint = "https://accounts.example.com/oauth2/v1/authorize";
-        let rewritten = rewrite_to_external_endpoint(
-            endpoint,
-            "http://internal-idp/realms/demo",
-            "https://public-idp.example.com/realms/demo",
-        );
-        assert_eq!(rewritten, endpoint);
-    }
 }

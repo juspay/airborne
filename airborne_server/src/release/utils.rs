@@ -535,7 +535,7 @@ pub async fn build_overrides(
 ) -> airborne_types::Result<BuildOverrides> {
     let resolved_config_builder = dims.iter().fold(
         state
-            .superposition_client
+            .release_superposition_client
             .get_resolved_config()
             .workspace_id(workspace.clone())
             .org_id(superposition_org_id.clone())
@@ -793,7 +793,8 @@ pub async fn build_overrides(
         ));
     }
 
-    let config_version = uuid::Uuid::new_v4().to_string();
+    let config_version =
+        super::maker_checker::config_version().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
     let mut control_overrides = std::collections::HashMap::new();
     control_overrides.insert(
