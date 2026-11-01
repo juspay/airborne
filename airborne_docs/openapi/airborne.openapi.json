@@ -6,6 +6,840 @@
         "description": "Service for managing OTA updates and configurations"
     },
     "paths": {
+        "/api/control-center/groups": {
+            "get": {
+                "description": "List groups for the organisation in x-organisation. Member applications are filtered to those the caller can read. Requires Bearer authentication.",
+                "operationId": "ListControlCenterGroups",
+                "parameters": [
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListControlCenterGroups 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListControlCenterGroupsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            },
+            "post": {
+                "description": "Create a group with a name and full member list. Requires Bearer authentication and an x-organisation header. Only organisation admins/owners can create groups.",
+                "operationId": "CreateControlCenterGroup",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateControlCenterGroupRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CreateControlCenterGroup 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateControlCenterGroupResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/groups/{id}": {
+            "delete": {
+                "description": "Delete a group by UUID. Requires Bearer authentication and x-organisation. Only organisation admins/owners can delete groups.",
+                "operationId": "DeleteControlCenterGroup",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "DeleteControlCenterGroup 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeleteControlCenterGroupResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            },
+            "put": {
+                "description": "Replace a group's name and complete member list. Requires Bearer authentication and x-organisation. Only organisation admins/owners can update groups.",
+                "operationId": "UpdateControlCenterGroup",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateControlCenterGroupRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "UpdateControlCenterGroup 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateControlCenterGroupResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/operations": {
+            "get": {
+                "description": "List unresolved upstream write outcomes for an application. Requires Bearer authentication, scope headers, and release read access.",
+                "operationId": "ListControlCenterOperations",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ListControlCenterOperations 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListControlCenterOperationsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/operations/{id}/resolve": {
+            "post": {
+                "description": "Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text `Airborne operation`. Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.",
+                "operationId": "ResolveControlCenterOperation",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResolveControlCenterOperationRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ResolveControlCenterOperation 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ResolveControlCenterOperationResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "ConflictError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConflictErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/overview": {
+            "get": {
+                "description": "Return the authenticated user's release overview across accessible organisations and applications. No x-organisation or x-application header is required.",
+                "operationId": "GetControlCenterOverview",
+                "responses": {
+                    "200": {
+                        "description": "GetControlCenterOverview 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetControlCenterOverviewResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/releases/{release_id}/events": {
+            "get": {
+                "description": "Return the ordered audit timeline for a release. Requires Bearer authentication plus x-organisation and x-application headers.",
+                "operationId": "GetControlCenterReleaseEvents",
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetControlCenterReleaseEvents 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetControlCenterReleaseEventsResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "/api/control-center/releases/{release_id}/rollback-preview": {
+            "get": {
+                "description": "Compute the rollback decision and package/config reconciliation without persisting an operation or changing upstream, audit, journal, or cache state. Requires release read permission and organisation/application scope headers.",
+                "operationId": "GetControlCenterRollbackPreview",
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "GetControlCenterRollbackPreview 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GetControlCenterRollbackPreviewResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Control Center"
+                ]
+            }
+        },
         "/api/file": {
             "post": {
                 "description": "Register a file by URL, recording its metadata and assigning it a version. Pass the organisation and application in the x-organisation and x-application headers. Use this when the file is already hosted somewhere the server can reach; to upload the bytes directly, use UploadFile instead. Requires a bearer token.",
@@ -1593,7 +2427,7 @@
         },
         "/api/releases": {
             "post": {
-                "description": "Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.",
+                "description": "Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Returns 409 if another release is already ongoing for the same dimensions. Requires a bearer token.",
                 "operationId": "CreateRelease",
                 "requestBody": {
                     "content": {
@@ -1674,6 +2508,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "UnresolvedOperationError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnresolvedOperationErrorResponseContent"
                                 }
                             }
                         }
@@ -1925,6 +2769,143 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "/api/releases/{release_id}/rollback": {
+            "post": {
+                "description": "Roll back a release according to its lifecycle state. Writes are durable and retries of a completed operation return its recorded success, including later unrelated live-release diagnostics. Unknown upstream outcomes return 409 unresolved and require real-state/operator review; changed replacements return 409 replacement_changed and must not be resumed automatically. Re-release only works while the source is the latest live release for its dimensions. Requires Bearer authentication plus x-organisation and x-application; callers need release write/conclude permission.",
+                "operationId": "RollbackRelease",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RollbackReleaseRequestContent"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "parameters": [
+                    {
+                        "name": "release_id",
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-application",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "x-organisation",
+                        "in": "header",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "RollbackRelease 200 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RollbackReleaseResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "BadRequestError 400 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BadRequestErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized 401 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnauthorizedResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ForbiddenError 403 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ForbiddenErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "NotFoundError 404 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NotFoundErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "RollbackReplacementChangedError 409 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RollbackReplacementChangedErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "RollbackUnprocessableError 422 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RollbackUnprocessableErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "InternalServerError 500 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InternalServerErrorResponseContent"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "RollbackPartialFailureError 502 response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RollbackPartialFailureErrorResponseContent"
                                 }
                             }
                         }
@@ -2307,11 +3288,16 @@
                 "type": "object",
                 "description": "Bad request error",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (AB_005)."
+                    },
                     "message": {
                         "type": "string"
                     }
                 },
                 "required": [
+                    "code",
                     "message"
                 ]
             },
@@ -2325,6 +3311,333 @@
                 },
                 "required": [
                     "tenant_info"
+                ]
+            },
+            "ConflictErrorResponseContent": {
+                "type": "object",
+                "description": "Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (AB_007)."
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message"
+                ]
+            },
+            "ControlCenterActiveRelease": {
+                "type": "object",
+                "description": "A release that is created or currently in progress.",
+                "properties": {
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "package_version": {
+                        "type": "number"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "traffic_percentage": {
+                        "type": "number"
+                    },
+                    "experimental_variant": {
+                        "type": "string",
+                        "description": "Exact variant identifier of the experimental variant; conclude requires this value."
+                    },
+                    "dimensions": {},
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "created_by": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "created_by",
+                    "dimensions",
+                    "experimental_variant",
+                    "package_version",
+                    "release_id",
+                    "status",
+                    "traffic_percentage"
+                ]
+            },
+            "ControlCenterAppStatus": {
+                "type": "object",
+                "description": "Release state for one application, including per-application lookup failures.",
+                "properties": {
+                    "application": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "description": "Platform label from the containing group; JSON null for an ungrouped application."
+                    },
+                    "live": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterLiveRelease"
+                        }
+                    },
+                    "active": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterActiveRelease"
+                        }
+                    },
+                    "unresolved_operations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterUnresolvedOperation"
+                        },
+                        "description": "Unresolved upstream writes. While any item exists, writes are paused for this application."
+                    },
+                    "last_activity_at": {
+                        "description": "RFC 3339 timestamp, or JSON null when the application has no release activity."
+                    },
+                    "error": {
+                        "description": "Sanitized lookup failure message, or JSON null when lookup succeeded."
+                    }
+                },
+                "required": [
+                    "active",
+                    "application",
+                    "error",
+                    "last_activity_at",
+                    "live",
+                    "platform",
+                    "unresolved_operations"
+                ]
+            },
+            "ControlCenterGroup": {
+                "type": "object",
+                "description": "A configured application group.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID identifying the group."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterGroupMember"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "members",
+                    "name"
+                ]
+            },
+            "ControlCenterGroupMember": {
+                "type": "object",
+                "description": "A group member identifies an application and the platform label shown in Control Center.",
+                "properties": {
+                    "application": {
+                        "type": "string"
+                    },
+                    "platform": {
+                        "$ref": "#/components/schemas/ControlCenterPlatform"
+                    }
+                },
+                "required": [
+                    "application",
+                    "platform"
+                ]
+            },
+            "ControlCenterLiveRelease": {
+                "type": "object",
+                "description": "A release that is currently live for one dimensions context.",
+                "properties": {
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "package_version": {
+                        "type": "number"
+                    },
+                    "config_version": {
+                        "type": "string"
+                    },
+                    "dimensions": {},
+                    "concluded_at": {
+                        "type": "string",
+                        "description": "RFC 3339 timestamp for the concluded live release.",
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "concluded_at",
+                    "config_version",
+                    "dimensions",
+                    "package_version",
+                    "release_id"
+                ]
+            },
+            "ControlCenterOrganisationOverview": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "groups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterOverviewGroup"
+                        }
+                    },
+                    "ungrouped": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterAppStatus"
+                        }
+                    }
+                },
+                "required": [
+                    "groups",
+                    "name",
+                    "ungrouped"
+                ]
+            },
+            "ControlCenterOverviewGroup": {
+                "type": "object",
+                "description": "A group and its release status entries in the overview response.",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterAppStatus"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "members",
+                    "name"
+                ]
+            },
+            "ControlCenterPlatform": {
+                "type": "string",
+                "description": "Supported application platforms for a Control Center group member.",
+                "enum": [
+                    "android",
+                    "ios",
+                    "web",
+                    "other"
+                ]
+            },
+            "ControlCenterReleaseEvent": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "$ref": "#/components/schemas/ControlCenterReleaseEventAction"
+                    },
+                    "actor": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "payload": {},
+                    "synthetic": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "action",
+                    "actor",
+                    "created_at",
+                    "payload",
+                    "synthetic"
+                ]
+            },
+            "ControlCenterReleaseEventAction": {
+                "type": "string",
+                "description": "Recorded timeline action. The timeline can also include synthetic created/concluded/discarded entries.",
+                "enum": [
+                    "created",
+                    "ramped",
+                    "concluded",
+                    "discarded",
+                    "rolled_back",
+                    "operation_resolved"
+                ]
+            },
+            "ControlCenterReleaseOutcome": {
+                "type": "string",
+                "description": "Server-computed outcome of a release. Clients must use this value rather than infer it from the events.",
+                "enum": [
+                    "active",
+                    "live",
+                    "superseded",
+                    "concluded_on_control",
+                    "discarded"
+                ]
+            },
+            "ControlCenterUnresolvedOperation": {
+                "type": "object",
+                "description": "An upstream write whose outcome has not been confirmed.",
+                "properties": {
+                    "operation_id": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "expected": {},
+                    "before": {},
+                    "upstream_workspace": {}
+                },
+                "required": [
+                    "before",
+                    "expected",
+                    "message",
+                    "operation_id",
+                    "upstream_workspace"
+                ]
+            },
+            "ControlCenterUnresolvedOperationDetails": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "expected": {},
+                    "before": {},
+                    "upstream_workspace": {},
+                    "upstream_org": {}
+                },
+                "required": [
+                    "before",
+                    "code",
+                    "expected",
+                    "message",
+                    "operation_id",
+                    "upstream_org",
+                    "upstream_workspace"
                 ]
             },
             "CreateApplicationRequestContent": {
@@ -2364,6 +3677,50 @@
                     "access",
                     "application",
                     "organisation"
+                ]
+            },
+            "CreateControlCenterGroupRequestContent": {
+                "type": "object",
+                "description": "Input for creating a group.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterGroupMember"
+                        }
+                    }
+                },
+                "required": [
+                    "members",
+                    "name"
+                ]
+            },
+            "CreateControlCenterGroupResponseContent": {
+                "type": "object",
+                "description": "A configured application group.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID identifying the group."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterGroupMember"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "members",
+                    "name"
                 ]
             },
             "CreateDimensionRequestContent": {
@@ -2732,8 +4089,14 @@
             },
             "CreateReleaseResponseContent": {
                 "type": "object",
-                "description": "A created release.",
                 "properties": {
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Advisory targeting warnings emitted by create, update and list."
+                    },
                     "id": {
                         "type": "string",
                         "description": "ID of the release"
@@ -2761,6 +4124,17 @@
                     "dimensions",
                     "id",
                     "package"
+                ]
+            },
+            "DeleteControlCenterGroupResponseContent": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "success"
                 ]
             },
             "DimensionResponse": {
@@ -2895,12 +4269,72 @@
             "ForbiddenErrorResponseContent": {
                 "type": "object",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (AB_006)."
+                    },
                     "message": {
                         "type": "string"
                     }
                 },
                 "required": [
+                    "code",
                     "message"
+                ]
+            },
+            "GetControlCenterOverviewResponseContent": {
+                "type": "object",
+                "properties": {
+                    "generated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "organisations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterOrganisationOverview"
+                        }
+                    }
+                },
+                "required": [
+                    "generated_at",
+                    "organisations"
+                ]
+            },
+            "GetControlCenterReleaseEventsResponseContent": {
+                "type": "object",
+                "properties": {
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterReleaseEvent"
+                        }
+                    },
+                    "outcome": {
+                        "$ref": "#/components/schemas/ControlCenterReleaseOutcome"
+                    }
+                },
+                "required": [
+                    "events",
+                    "outcome"
+                ]
+            },
+            "GetControlCenterRollbackPreviewResponseContent": {
+                "type": "object",
+                "description": "Side-effect-free rollback decision. Action, resulting package, reconciliation details and blocked are nullable when unavailable.",
+                "properties": {
+                    "action": {},
+                    "current_package_version": {},
+                    "resulting_package_version": {},
+                    "reconciled_keys": {},
+                    "blocked": {}
+                },
+                "required": [
+                    "action",
+                    "blocked",
+                    "current_package_version",
+                    "reconciled_keys",
+                    "resulting_package_version"
                 ]
             },
             "GetReleaseConfig": {
@@ -3024,12 +4458,45 @@
                 "type": "object",
                 "description": "Internal server error",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (AB_003)."
+                    },
                     "message": {
                         "type": "string"
                     }
                 },
                 "required": [
+                    "code",
                     "message"
+                ]
+            },
+            "ListControlCenterGroupsResponseContent": {
+                "type": "object",
+                "properties": {
+                    "groups": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterGroup"
+                        }
+                    }
+                },
+                "required": [
+                    "groups"
+                ]
+            },
+            "ListControlCenterOperationsResponseContent": {
+                "type": "object",
+                "properties": {
+                    "operations": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterUnresolvedOperationDetails"
+                        }
+                    }
+                },
+                "required": [
+                    "operations"
                 ]
             },
             "ListDimensionsResponseContent": {
@@ -3202,12 +4669,24 @@
                 "type": "object",
                 "description": "Not found error",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (AB_001)."
+                    },
                     "message": {
                         "type": "string"
                     }
                 },
                 "required": [
+                    "code",
                     "message"
+                ]
+            },
+            "OperationRecoveryFinding": {
+                "type": "string",
+                "enum": [
+                    "did_not_apply",
+                    "applied"
                 ]
             },
             "Organisation": {
@@ -3320,6 +4799,30 @@
                     "token_type"
                 ]
             },
+            "ReconciledKeys": {
+                "type": "object",
+                "description": "How the configuration of a re-released rollback was reconciled with the currently registered keys.",
+                "properties": {
+                    "kept_current": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keys registered after the historical release; they keep their current value."
+                    },
+                    "dropped": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Keys in the historical release that are no longer registered; they are dropped."
+                    }
+                },
+                "required": [
+                    "dropped",
+                    "kept_current"
+                ]
+            },
             "ReleaseExperiment": {
                 "type": "object",
                 "description": "Details of the experiment backing a release, used to ramp it out gradually.",
@@ -3406,6 +4909,193 @@
                     "organisation_name"
                 ]
             },
+            "ResolveControlCenterOperationRequestContent": {
+                "type": "object",
+                "properties": {
+                    "finding": {
+                        "$ref": "#/components/schemas/OperationRecoveryFinding"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400."
+                    },
+                    "request_terminated": {
+                        "type": "boolean",
+                        "description": "Must be true for did_not_apply. The operator confirms the original request cannot execute later."
+                    }
+                },
+                "required": [
+                    "finding",
+                    "reason"
+                ]
+            },
+            "ResolveControlCenterOperationResponseContent": {
+                "type": "object",
+                "properties": {
+                    "operation_id": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "$ref": "#/components/schemas/ResolvedOperationState"
+                    },
+                    "finding": {
+                        "$ref": "#/components/schemas/OperationRecoveryFinding"
+                    }
+                },
+                "required": [
+                    "finding",
+                    "operation_id",
+                    "state"
+                ]
+            },
+            "ResolvedOperationState": {
+                "type": "string",
+                "enum": [
+                    "confirmed",
+                    "rejected"
+                ]
+            },
+            "RollbackFailureStage": {
+                "type": "string",
+                "description": "Stage of a rollback re-release at which a failure occurred after the replacement release was created.",
+                "enum": [
+                    "create",
+                    "ramp",
+                    "conclude"
+                ]
+            },
+            "RollbackPartialFailureErrorResponseContent": {
+                "type": "object",
+                "description": "Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (AB_003)."
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "replacement_release_id": {
+                        "description": "Identifier of the replacement release, or JSON null when no replacement was created."
+                    },
+                    "rollback_operation_id": {
+                        "type": "string",
+                        "description": "Durable rollback operation identifier."
+                    },
+                    "stage": {
+                        "$ref": "#/components/schemas/RollbackFailureStage"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message",
+                    "replacement_release_id",
+                    "rollback_operation_id",
+                    "stage"
+                ]
+            },
+            "RollbackReleaseAction": {
+                "type": "string",
+                "enum": [
+                    "discarded",
+                    "concluded_control",
+                    "rereleased"
+                ]
+            },
+            "RollbackReleaseRequestContent": {
+                "type": "object",
+                "description": "Path, scope headers, and reason for a release rollback request.",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                },
+                "required": [
+                    "reason"
+                ]
+            },
+            "RollbackReleaseResponseContent": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "$ref": "#/components/schemas/RollbackReleaseAction"
+                    },
+                    "release_id": {
+                        "type": "string"
+                    },
+                    "rolled_back_to_package_version": {
+                        "description": "Control package version, historical package version, or JSON null if unavailable."
+                    },
+                    "new_release_id": {
+                        "description": "Replacement release identifier, or JSON null when rollback does not create one."
+                    },
+                    "reconciled_keys": {
+                        "$ref": "#/components/schemas/ReconciledKeys"
+                    },
+                    "current_live_release_id": {
+                        "description": "Current live release in the same dimensions context, or JSON null."
+                    },
+                    "later_release_id": {
+                        "description": "A later unrelated live release, or JSON null. Completed retries still report the recorded rollback as successful."
+                    }
+                },
+                "required": [
+                    "action",
+                    "new_release_id",
+                    "reconciled_keys",
+                    "release_id",
+                    "rolled_back_to_package_version"
+                ]
+            },
+            "RollbackReplacementChangedErrorResponseContent": {
+                "type": "object",
+                "description": "The rollback replacement was changed outside the durable rollback operation. Human inspection is required; do not resume automatically.",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "type": "string"
+                    },
+                    "replacement_release_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "message",
+                    "operation_id",
+                    "replacement_release_id"
+                ]
+            },
+            "RollbackUnprocessableErrorResponseContent": {
+                "type": "object",
+                "description": "Returned by rollback when no earlier live release exists or the historical package and config cannot be reconciled. Nothing is created.",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Rollback block code: `no_predecessor` or `incompatible`."
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Actionable explanation of why the rollback cannot proceed."
+                    },
+                    "current_live_release_id": {
+                        "description": "The live release for this dimensions context, or JSON null."
+                    }
+                },
+                "required": [
+                    "code",
+                    "current_live_release_id",
+                    "message"
+                ]
+            },
             "ServeFile": {
                 "type": "object",
                 "description": "A file as served to the SDK, with the location and checksum needed to download and verify it.",
@@ -3421,6 +5111,10 @@
                     "checksum": {
                         "type": "string",
                         "description": "Checksum used to verify the downloaded file."
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
                     }
                 }
             },
@@ -3502,12 +5196,97 @@
                 "type": "object",
                 "description": "Unauthorized error",
                 "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Airborne error code (for example, AB_004)."
+                    },
                     "message": {
                         "type": "string"
                     }
                 },
                 "required": [
+                    "code",
                     "message"
+                ]
+            },
+            "UnresolvedOperationErrorResponseContent": {
+                "type": "object",
+                "description": "A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "operation_id": {
+                        "type": "string"
+                    },
+                    "expected": {
+                        "description": "The exact state expected after the upstream write."
+                    },
+                    "before": {
+                        "description": "The state observed before dispatch."
+                    },
+                    "upstream_workspace": {},
+                    "upstream_org": {},
+                    "own_attempt": {
+                        "type": "boolean",
+                        "description": "True when this request itself may have changed upstream state; absent when an earlier write is blocking this request."
+                    }
+                },
+                "required": [
+                    "before",
+                    "code",
+                    "expected",
+                    "message",
+                    "operation_id",
+                    "upstream_org",
+                    "upstream_workspace"
+                ]
+            },
+            "UpdateControlCenterGroupRequestContent": {
+                "type": "object",
+                "description": "Input for replacing a group's name and members.",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterGroupMember"
+                        }
+                    }
+                },
+                "required": [
+                    "members",
+                    "name"
+                ]
+            },
+            "UpdateControlCenterGroupResponseContent": {
+                "type": "object",
+                "description": "A configured application group.",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "UUID identifying the group."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ControlCenterGroupMember"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "members",
+                    "name"
                 ]
             },
             "UpdateDimensionRequestContent": {

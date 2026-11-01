@@ -42,6 +42,9 @@ declare const GetReleaseCommand_base: {
  * const command = new GetReleaseCommand(input);
  * const response = await client.send(command);
  * // { // GetReleaseResponse
+ * //   warnings: [ // ReleaseWarnings
+ * //     "STRING_VALUE",
+ * //   ],
  * //   id: "STRING_VALUE",
  * //   created_at: "STRING_VALUE",
  * //   config: { // GetReleaseConfig
