@@ -171,11 +171,7 @@ async fn main() -> std::io::Result<()> {
         tokio::spawn(push_metrics_task(metrics_url));
     }
 
-    let force_path_style = app_config
-        .aws_endpoint_url
-        .as_ref()
-        .map(|url| url.contains("localstack"))
-        .unwrap_or(false);
+    let force_path_style = force_path_style(app_config.aws_endpoint_url.as_deref());
 
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
@@ -532,4 +528,47 @@ async fn main() -> std::io::Result<()> {
     .bind(("0.0.0.0", port))?
     .run()
     .await
+}
+
+/// LocalStack and other local S3 endpoints cannot resolve virtual-hosted bucket
+/// names, so path-style addressing is forced for them.
+fn force_path_style(endpoint: Option<&str>) -> bool {
+    let Some(url) = endpoint.and_then(|endpoint| url::Url::parse(endpoint).ok()) else {
+        return false;
+    };
+    match url.host() {
+        Some(url::Host::Domain(host)) => host.contains("localstack") || host == "localhost",
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod force_path_style_tests {
+    use super::force_path_style;
+
+    #[test]
+    fn local_endpoints_use_path_style() {
+        for endpoint in [
+            "http://localstack:4566",
+            "http://localhost:4566",
+            "http://127.0.0.1:4566",
+            "http://[::1]:9000",
+        ] {
+            assert!(force_path_style(Some(endpoint)), "{endpoint}");
+        }
+    }
+
+    #[test]
+    fn remote_or_missing_endpoints_keep_virtual_hosted_style() {
+        for endpoint in [
+            Some("https://s3.amazonaws.com"),
+            Some("https://s3.ap-south-1.amazonaws.com"),
+            Some("not a url"),
+            None,
+        ] {
+            assert!(!force_path_style(endpoint), "{endpoint:?}");
+        }
+    }
 }

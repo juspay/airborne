@@ -140,7 +140,7 @@ The server talks to S3 (object storage) and KMS (secret decryption). AWS credent
 | --- | --- | --- | --- |
 | `AWS_BUCKET` | **Yes** | `hyper-ota-bucket` | S3 bucket for files, packages, and resources. |
 | `AWS_REGION` | **Yes** (SDK) | `us-east-1` | AWS region. Read by the AWS SDK credential/region chain. |
-| `AWS_ENDPOINT_URL` | No | `http://localhost:4566` | Custom S3/KMS endpoint. When set, the S3 client switches to **path-style** addressing (needed for LocalStack). Leave unset in production to use real AWS. |
+| `AWS_ENDPOINT_URL` | No | `http://localhost:4566` | Custom S3/KMS endpoint. The S3 client switches to **path-style** addressing (needed for LocalStack) when the endpoint's host contains `localstack`, is `localhost`, or is a loopback IPv4/IPv6 address; other endpoints use virtual-hosted addressing. Leave unset in production to use real AWS. |
 | `AWS_ACCESS_KEY_ID` | Conditional (SDK) | `test` | AWS access key. Read by the SDK. In production, prefer an IAM role over static keys. |
 | `AWS_SECRET_ACCESS_KEY` | Conditional (SDK) | `test` | AWS secret key. Read by the SDK. Prefer IAM roles in production. |
 | `AWS_SESSION_TOKEN` | No (SDK) | `test` | Optional session token for temporary credentials. |
