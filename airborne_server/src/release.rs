@@ -38,8 +38,10 @@ use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBui
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
 pub mod control_center;
+pub(crate) mod operations;
 mod types;
 pub mod utils;
+mod write_lock;
 
 fn encode_url_path(raw_url: &str) -> String {
     match url::Url::parse(raw_url) {

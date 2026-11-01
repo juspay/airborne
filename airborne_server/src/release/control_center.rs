@@ -213,6 +213,54 @@ fn outcome(exp: &ExperimentResponse, exps: &[ExperimentResponse]) -> &'static st
     }
 }
 
+pub async fn invalidate(state: &web::Data<AppState>, org: &str, app: &str) {
+    for path in [
+        format!("/release/{org}/{app}*"),
+        format!("/release/v2/{org}/{app}*"),
+    ] {
+        log::info!("Invalidating release config cache: {path}");
+        if tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            utils::invalidate_cf(
+                &state.cf_client,
+                path,
+                &state.env.cloudfront_distribution_id,
+            ),
+        )
+        .await
+        .is_err()
+        {
+            log::warn!("Release cache invalidation failed");
+        }
+    }
+}
+pub(super) fn sp_error(e: impl std::fmt::Display) -> ABError {
+    log::error!("Release operation failed: {e}");
+    ABError::InternalServerError("Release operation failed".into())
+}
+/// Reconcile both variant coverages against the authoritative registered keys.
+/// Superposition's atomic create validates values/schemas before persisting anything.
+pub(super) fn snapshot(exp: &ExperimentResponse) -> Value {
+    let variants = exp
+        .variants
+        .iter()
+        .map(|v| {
+            (
+                v.variant_type.as_str().to_string(),
+                json!(v
+                    .overrides
+                    .iter()
+                    .map(|(k, v)| (
+                        k.clone(),
+                        utils::document_to_value(v).unwrap_or(Value::Null)
+                    ))
+                    .collect::<serde_json::Map<_, _>>()),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
+    json!({"id":exp.id,"status":exp.status.as_str(),"context":context(exp),"variants":variants,"traffic_percentage":exp.traffic_percentage,"chosen_variant":exp.chosen_variant,"description":exp.description,"change_reason":exp.change_reason,"revision":format!("{}:{}",exp.last_modified.secs(),exp.last_modified.subsec_nanos())})
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;

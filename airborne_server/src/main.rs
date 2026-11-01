@@ -414,6 +414,7 @@ async fn main() -> std::io::Result<()> {
     .expect("Failed to initialize AuthZ provider");
 
     // Initialize Redis client
+    let release_write_db_url = utils::db::get_database_url(&app_config, false).await;
     let redis_cache = if let Some(redis_url) = app_config.redis_url {
         info!("Initializing Redis cache");
 
@@ -457,6 +458,7 @@ async fn main() -> std::io::Result<()> {
         authn_provider: build_authn_provider(authn_provider_kind),
         authz_provider,
         db_pool: pool,
+        release_write_db_url,
         redis_cache,
         s3_client: aws_s3_client,
         cf_client: aws_cloudfront_client,
