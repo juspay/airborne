@@ -917,7 +917,6 @@ pub async fn build_overrides(
     Ok(BuildOverrides {
         final_important,
         package_data,
-        is_first_release,
         final_lazy,
         final_resources,
         config_version,
