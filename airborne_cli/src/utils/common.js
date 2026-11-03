@@ -81,11 +81,21 @@ const cliToConfigMap = {
   directoryPath: "directory_path",
   bootTimeout: "boot_timeout",
   releaseConfigTimeout: "release_config_timeout",
+  releaseTimeout: "release_config_timeout",
   expo: "expo",
   hermesEnabled: "hermes_enabled",
 };
 
 export function normalizeOptions(options = {}) {
+  if (
+    options.releaseTimeout !== undefined &&
+    options.releaseConfigTimeout !== undefined &&
+    options.releaseTimeout !== options.releaseConfigTimeout
+  ) {
+    throw new Error(
+      "Conflicting timeout options: use --release-config-timeout only."
+    );
+  }
   const normalized = {};
 
   for (const [key, value] of Object.entries(options)) {

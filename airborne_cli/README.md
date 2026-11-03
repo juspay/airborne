@@ -116,7 +116,7 @@ Create platform-specific release configuration files.
 
 - `-p, --platform <platform>` - Target platform (android | ios)
 - `-b, --boot-timeout <timeout>` - Boot timeout in milliseconds
-- `-r, --release-timeout <timeout>` - Release timeout in milliseconds
+- `-r, --release-config-timeout <timeout>` - Release config timeout in milliseconds
 
 **Examples:**
 
@@ -139,7 +139,7 @@ Update existing release configuration files.
 
 - `-p, --platform <platform>` - Target platform (android | ios)
 - `-b, --boot-timeout <timeout>` - New boot timeout in milliseconds
-- `-r, --release-timeout <timeout>` - New release timeout in milliseconds
+- `-r, --release-config-timeout <timeout>` - New release config timeout in milliseconds
 
 ### Remote Operations
 
@@ -287,3 +287,5 @@ node  airborne_cli/src/index.js  --help
 - Node.js 18+
 - React Native CLI
 - Valid Airborne server credentials
+
+For both local release config commands, `--release-timeout` is a deprecated alias for `--release-config-timeout` and emits a warning. Existing scripts remain supported. Supplying both names with different values is rejected. `-r` remains supported. The setting writes `config.release_config_timeout`, which controls the SDK wait for fetching the release configuration.
