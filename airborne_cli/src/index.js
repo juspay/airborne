@@ -195,13 +195,13 @@ program
     $ airborne-devkit create-local-release-config [directoryPath] \\
       -p <platform> \\
       -b <boot-timeout> \\
-      -r <release-timeout>
+      -r <release-config-timeout>
 
   Parameters:
       [directoryPath] (optional) : Directory where config will be created (defaults to current directory)
       -p, --platform <string> (optional) : Target platform (android | ios)
       -b, --boot-timeout <number> (optional) : Boot timeout in milliseconds (positive number)
-      -r, --release-timeout <number> (optional) : Release timeout in milliseconds (positive number)
+      -r, --release-config-timeout <number> (optional) : Release config timeout in milliseconds (positive number)
 
 `
   )
@@ -232,8 +232,24 @@ program
     }
   )
   .option(
+    "--release-timeout <timeout>",
+    "Deprecated alias for --release-config-timeout",
+    (value) => {
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num <= 0) {
+        throw new InvalidOptionArgumentError(
+          `Invalid release config timeout: "${value}". Must be a positive number.`
+        );
+      }
+      console.warn(
+        "Warning: --release-timeout is deprecated; use --release-config-timeout instead."
+      );
+      return num;
+    }
+  )
+  .option(
     "-r, --release-config-timeout <timeout>",
-    "Release timeout in milliseconds (positive number)",
+    "Release config timeout in milliseconds (positive number)",
     (value) => {
       const num = parseInt(value, 10);
       if (isNaN(num) || num <= 0) {
@@ -340,7 +356,7 @@ program
       [directoryPath] (optional) : Directory containing the config to update (defaults to current directory)
       -p, --platform <string> (optional) : Target platform (android | ios)
       -b, --boot-timeout <number> (optional) : New boot timeout in milliseconds (positive number)
-      -r, --release-timeout <number> (optional) : New release timeout in milliseconds (positive number)
+      -r, --release-config-timeout <number> (optional) : New release config timeout in milliseconds (positive number)
 `
   )
   .option(
@@ -370,8 +386,24 @@ program
     }
   )
   .option(
-    "-r, --release-timeout <timeout>",
-    "Release timeout in milliseconds (positive number)",
+    "--release-timeout <timeout>",
+    "Deprecated alias for --release-config-timeout",
+    (value) => {
+      const num = parseInt(value, 10);
+      if (isNaN(num) || num <= 0) {
+        throw new InvalidOptionArgumentError(
+          `Invalid release config timeout: "${value}". Must be a positive number.`
+        );
+      }
+      console.warn(
+        "Warning: --release-timeout is deprecated; use --release-config-timeout instead."
+      );
+      return num;
+    }
+  )
+  .option(
+    "-r, --release-config-timeout <timeout>",
+    "Release config timeout in milliseconds (positive number)",
     (value) => {
       const num = parseInt(value, 10);
       if (isNaN(num) || num <= 0) {
