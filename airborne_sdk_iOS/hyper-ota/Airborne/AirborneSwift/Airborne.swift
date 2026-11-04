@@ -202,7 +202,8 @@ import AirborneSwiftModel
         self.startApplicationManager()
     }
     
-    public func getBaseBundle() -> Bundle {
+    /// Bundle holding the bundled release config and index; also the application manager's base bundle.
+    @objc public func getBaseBundle() -> Bundle {
         return bundlePath
     }
     
@@ -281,50 +282,13 @@ extension AirborneServices {
      *
      * @note The path is guaranteed to be valid, falling back to bundled assets if needed.
      * @note Call this method after `startApp` for the most up-to-date bundle.
+     * @note Resolved by `AJPApplicationManager.getIndexBundleURL()`.
      */
     @objc public func getIndexBundlePath() -> URL {
-        let indexBundleName = delegate?.indexBundleName?() ?? "main.jsbundle"
-        
-        guard
-            let indexFilePath = (self.applicationManager?.getCurrentApplicationManifest() as? AJPApplicationManifest)?.package.index.filePath,
-            !indexFilePath.isEmpty
-        else {
-            let components = indexBundleName.split(separator: ".", maxSplits: 1)
-            let name = components.first.map(String.init) ?? indexBundleName
-            let ext = components.dropFirst().first.map(String.init) ?? ""
-            return bundlePath.url(forResource: name, withExtension: ext) ?? bundlePath.bundleURL.appendingPathComponent(indexBundleName)
+        guard let applicationManager = self.applicationManager else {
+            return AJPApplicationManager.hostIndexBundleURL(indexBundleName: indexBundleName(), in: bundlePath)
         }
-            
-        guard
-            let filePath = self.applicationManager?.getPathForPackageFile(indexFilePath),
-            FileManager.default.fileExists(atPath: filePath)
-        else {
-            let filePath = filePathInBundleForFileName(indexFilePath)
-            if let filePath = filePath {
-                return URL(fileURLWithPath: filePath)
-            } else {
-                return bundlePath.bundleURL.appendingPathComponent(indexFilePath)
-            }
-        }
-        
-        return URL(fileURLWithPath: filePath)
-    }
-    
-    private func filePathInBundleForFileName(_ fileName: String) -> String? {
-        let fileNameComponents = fileName.components(separatedBy: ".")
-        
-        guard fileNameComponents.count > 1 else {
-            return nil
-        }
-
-        let fileNameString = fileNameComponents.dropLast().joined(separator: ".")
-        let fileExtension = fileNameComponents.last!
-
-        if let filePathInBundle = self.bundlePath.path(forResource: fileNameString, ofType: fileExtension) {
-            return filePathInBundle
-        }
-
-        return nil
+        return applicationManager.getIndexBundleURL()
     }
     
     /**
@@ -334,18 +298,7 @@ extension AirborneServices {
      *         Returns an empty string if manifest cannot be serialized.
      */
     @objc public func getReleaseConfig() -> String {
-        guard
-            let manifest = self.applicationManager?.getCurrentApplicationManifest() as? AJPApplicationManifest,
-            let manifestDict = manifest.toDictionary() as? [String: Any] else {
-            return ""
-        }
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: manifestDict, options: .prettyPrinted)
-            return String(data: jsonData, encoding: .utf8) ?? ""
-        } catch {
-            debugPrint("Error converting manifest to JSON: \(error)")
-            return ""
-        }
+        return applicationManager?.currentReleaseConfigJSON(prettyPrinted: true) ?? ""
     }
     
     /**
@@ -378,6 +331,13 @@ extension AirborneServices: AJPApplicationManagerDelegate {
      */
     public func getReleaseConfigHeaders() -> [String : String] {
         self.dimensions
+    }
+
+    /**
+     * Forwards the host-shipped index name used when the release config has no index.
+     */
+    public func indexBundleName() -> String {
+        delegate?.indexBundleName?() ?? AJPApplicationManager.defaultIndexBundleName
     }
 
     /**
