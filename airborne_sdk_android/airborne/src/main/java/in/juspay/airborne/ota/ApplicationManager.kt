@@ -676,9 +676,13 @@ class ApplicationManager(
     }
 
     private fun getIndexFilePath(fileName: String): String {
+        // An empty index path would resolve to the package directory itself.
+        if (fileName.isEmpty()) {
+            return ""
+        }
         val file =
             otaServices.fileProviderService.getFileFromInternalStorage("app/$PACKAGE_DIR_NAME/$fileName")
-        if (file.exists()) {
+        if (file.isFile) {
             return file.absolutePath
         }
         return ""
