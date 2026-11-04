@@ -63,6 +63,14 @@ import AirborneSwiftCore
      *       throughout the lifetime of the delegate object.
      */
     @objc optional func getBaseBundle() -> Bundle
+
+    /**
+     * Returns the name of the host-shipped index file in the base bundle (for example
+     * "main.jsbundle"), used when the release config names no index.
+     *
+     * @note Read once when the application manager is created. Defaults to "main.jsbundle".
+     */
+    @objc optional func indexBundleName() -> String
     
     /**
      * Determines whether the application should use only local assets without network requests.

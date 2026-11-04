@@ -322,6 +322,59 @@ final class AJPApplicationManagerTests: XCTestCase {
         XCTAssertTrue(AJPApplicationManager.isPackageRelativePath("a/..\u{0338}/x"))
     }
 
+    // MARK: - existingInstance(withWorkspace:)
+
+    func testExistingInstance_returnsManagerCreatedForWorkspace() {
+        XCTAssertTrue(AJPApplicationManager.existingInstance(withWorkspace: workspace) === manager)
+    }
+
+    func testExistingInstance_unknownWorkspace_returnsNil() {
+        XCTAssertNil(AJPApplicationManager.existingInstance(withWorkspace: "never_created_\(UUID().uuidString)"))
+    }
+
+    // MARK: - currentReleaseConfigJSON
+
+    func testCurrentReleaseConfigJSON_compactIsValidJSONWithSeededPackage() throws {
+        let json = try XCTUnwrap(manager.currentReleaseConfigJSON(prettyPrinted: false))
+        XCTAssertFalse(json.contains("\n"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
+        let package = try XCTUnwrap(object["package"] as? [String: Any])
+        XCTAssertEqual(package["name"] as? String, "parity-app")
+        XCTAssertEqual(package["version"] as? String, "2.0.0")
+    }
+
+    func testCurrentReleaseConfigJSON_prettyPrintedHasNewlinesAndSameContent() throws {
+        let compact = try XCTUnwrap(manager.currentReleaseConfigJSON(prettyPrinted: false))
+        let pretty = try XCTUnwrap(manager.currentReleaseConfigJSON(prettyPrinted: true))
+        XCTAssertTrue(pretty.contains("\n"))
+        let a = try JSONSerialization.jsonObject(with: Data(compact.utf8)) as? NSDictionary
+        let b = try JSONSerialization.jsonObject(with: Data(pretty.utf8)) as? NSDictionary
+        XCTAssertEqual(a, b)
+    }
+
+    // MARK: - getIndexBundleURL
+
+    func testGetIndexBundleURL_prefersIndexFileOnDisk() throws {
+        try writePackageFile("index.jsa", content: "/* index */")
+        let expected = manager.getPathForPackageFile("index.jsa")
+        XCTAssertEqual(manager.getIndexBundleURL().path, URL(fileURLWithPath: expected).path)
+    }
+
+    func testGetIndexBundleURL_missingIndexFallsBackToBaseBundleLocation() {
+        let url = manager.getIndexBundleURL()
+        XCTAssertEqual(url.lastPathComponent, "index.jsa")
+        XCTAssertEqual(url.deletingLastPathComponent().standardizedFileURL.path,
+                       Bundle(for: Self.self).bundleURL.standardizedFileURL.path)
+    }
+
+    func testHostIndexBundleURL_defaultsToMainJsbundleUnderBundle() {
+        let bundle = Bundle(for: Self.self)
+        let url = AJPApplicationManager.hostIndexBundleURL(
+            indexBundleName: AJPApplicationManager.defaultIndexBundleName, in: bundle)
+        XCTAssertEqual(AJPApplicationManager.defaultIndexBundleName, "main.jsbundle")
+        XCTAssertEqual(url.lastPathComponent, "main.jsbundle")
+    }
+
     // MARK: - waitForPackagesAndResources
 
     func testWaitForPackagesAndResources_resultIsOK() {

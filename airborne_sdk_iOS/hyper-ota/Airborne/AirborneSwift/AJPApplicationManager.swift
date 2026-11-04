@@ -119,6 +119,8 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     private var baseBundle: Bundle
     private var isLocalAssets: Bool
     private var forceUpdate: Bool
+    /// Host-shipped index used when the release config has no index; read from the delegate once at init.
+    private let indexBundleName: String
     
     private weak var delegate: AJPApplicationManagerDelegate?
     
@@ -182,6 +184,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     
     // MARK: - Initialization Engine
     
+    @objc public class func existingInstance(withWorkspace workspace: String) -> AJPApplicationManager? {
+        classLock.lock(); defer { classLock.unlock() }
+        return managers[workspace]
+    }
     @objc public class func getSharedInstance(withWorkspace workspace: String, delegate: AJPApplicationManagerDelegate, logger: Any?) -> AJPApplicationManager {
         classLock.lock()
         defer { classLock.unlock() }
@@ -221,6 +227,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.isLocalAssets = delegate?.shouldUseLocalAssets?() ?? false
         self.forceUpdate = delegate?.shouldDoForceUpdate?() ?? true
+        self.indexBundleName = delegate?.indexBundleName?() ?? AJPApplicationManager.defaultIndexBundleName
         
         self.startTime = Date().timeIntervalSince1970 * 1000
         self.managerId = UUID().uuidString.lowercased()
@@ -609,7 +616,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             return nil
         }
     }
-    
+
     /// Whether `path` is relative and has no ".." component, so it cannot leave the package directory.
     static func isPackageRelativePath(_ path: String) -> Bool {
         // Split on code points, not Characters: a combining mark after "/" would merge with it
@@ -619,6 +626,32 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             return false
         }
         return !scalars.split(separator: "/").contains { $0.elementsEqual("..".unicodeScalars) }
+    }
+
+    /**
+     * Serializes the current release config (config, package, resources) as JSON.
+     *
+     * Shared by `AirborneServices.getReleaseConfig()` and the React Native bridge.
+     * Returns nil (and logs) when the manifest cannot be serialized.
+     */
+    @objc(currentReleaseConfigJSONPrettyPrinted:)
+    public func currentReleaseConfigJSON(prettyPrinted: Bool) -> String? {
+        guard let manifest = getCurrentApplicationManifest() as? AJPApplicationManifest else {
+            return nil
+        }
+        let dictionary = manifest.toDictionary()
+        // JSONSerialization raises an Objective-C exception (not a Swift error) for invalid objects.
+        guard JSONSerialization.isValidJSONObject(dictionary) else {
+            tracker.trackError("release_config_serialization_failed", value: NSMutableDictionary(dictionary: ["error": "release config is not valid JSON"]))
+            return nil
+        }
+        do {
+            let data = try JSONSerialization.data(withJSONObject: dictionary, options: prettyPrinted ? .prettyPrinted : [])
+            return String(data: data, encoding: .utf8)
+        } catch {
+            tracker.trackError("release_config_serialization_failed", value: NSMutableDictionary(dictionary: ["error": error.localizedDescription]))
+            return nil
+        }
     }
 
     @objc public func readResourceFile(_ resourceFileName: String) -> String? {
@@ -667,6 +700,55 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         return utils.isDownloadCompleted(self.resourceDownloadStatus)
     }
     
+    /**
+     * Returns the URL of the JS index to hand to the JS runtime.
+     *
+     * Resolution order: the current package's index file on disk, then a file of the same name in
+     * the base bundle, then the host's `indexBundleName` when the release config has no index.
+     * `AirborneServices.getIndexBundlePath()` and the React Native bridge both resolve through here.
+     */
+    @objc public func getIndexBundleURL() -> URL {
+        let indexFilePath = package.index.filePath
+        if indexFilePath.isEmpty {
+            return hostIndexBundleURL()
+        }
+
+        let path = getPathForPackageFile(indexFilePath)
+        if !path.isEmpty && FileManager.default.fileExists(atPath: path) {
+            return URL(fileURLWithPath: path)
+        }
+
+        if let bundledPath = pathInBaseBundle(forFileName: indexFilePath) {
+            return URL(fileURLWithPath: bundledPath)
+        }
+        return baseBundle.bundleURL.appendingPathComponent(indexFilePath)
+    }
+
+    /// Default host index name when neither the release config nor the delegate names one.
+    static let defaultIndexBundleName = "main.jsbundle"
+
+    private func hostIndexBundleURL() -> URL {
+        return AJPApplicationManager.hostIndexBundleURL(indexBundleName: indexBundleName, in: baseBundle)
+    }
+
+    /// The host-shipped index in `bundle`: a resource named `indexBundleName`, or that name under the bundle URL.
+    static func hostIndexBundleURL(indexBundleName: String, in bundle: Bundle) -> URL {
+        let components = indexBundleName.split(separator: ".", maxSplits: 1)
+        let name = components.first.map(String.init) ?? indexBundleName
+        let fileExtension = components.dropFirst().first.map(String.init) ?? ""
+        return bundle.url(forResource: name, withExtension: fileExtension)
+            ?? bundle.bundleURL.appendingPathComponent(indexBundleName)
+    }
+
+    private func pathInBaseBundle(forFileName fileName: String) -> String? {
+        let components = fileName.components(separatedBy: ".")
+        guard components.count > 1, let fileExtension = components.last else {
+            return nil
+        }
+        let name = components.dropLast().joined(separator: ".")
+        return baseBundle.path(forResource: name, ofType: fileExtension)
+    }
+
     @objc public func getPathForPackageFile(_ fileName: String) -> String {
         let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
         return fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
