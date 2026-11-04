@@ -101,7 +101,7 @@ public class NetUtils {
     }
 
     private int readTimeout;
-    public static OkHttpClient DEFAULT_HTTP_CLIENT = null;
+    public static volatile OkHttpClient DEFAULT_HTTP_CLIENT = null;
 
     private int connectionTimeout;
     private boolean trackMetrics = false;
@@ -116,22 +116,18 @@ public class NetUtils {
                     boolean sslPinningRequired, Context ctx) throws NoSuchAlgorithmException, KeyManagementException {
         this.connectionTimeout = connectionTimeout;
         this.readTimeout = readTimeout;
-        if (DEFAULT_HTTP_CLIENT == null) {
-            DEFAULT_HTTP_CLIENT = buildHttpClient(ctx);
-        }
-        /*
-         * Using new builder here will not use a new connection pool etc,
-         * instead it will use the base client's. So connection pool/cache etc will be shared across.
-         * See: https://square.github.io/okhttp/5.x/okhttp/okhttp3/-ok-http-client/index.html
-         */
-        DEFAULT_HTTP_CLIENT.newBuilder()
-                .readTimeout(readTimeout, TimeUnit.MILLISECONDS)
-                .connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
-                .build();
+        initDefaultHttpClient(ctx);
         this.sslSocketFactory = new JuspaySSLSocketFactory();
     }
 
-    private OkHttpClient buildHttpClient(Context ctx) {
+    // One shared client (and one Cache on HTTP_CACHE_NAME). OkHttp does not support two Cache objects on one directory.
+    private static synchronized void initDefaultHttpClient(Context ctx) {
+        if (DEFAULT_HTTP_CLIENT == null) {
+            DEFAULT_HTTP_CLIENT = buildHttpClient(ctx);
+        }
+    }
+
+    private static OkHttpClient buildHttpClient(Context ctx) {
         File cacheDir = ctx.getDir(HTTP_CACHE_NAME, Context.MODE_PRIVATE);
         long ONE_MB = 1024L * 1024L;
         Cache httpCache = new Cache(cacheDir, 10 * ONE_MB);

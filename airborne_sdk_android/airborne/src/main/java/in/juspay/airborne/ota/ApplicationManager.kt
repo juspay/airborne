@@ -168,16 +168,8 @@ class ApplicationManager(
         val startTime = System.currentTimeMillis()
         val url =
             if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
-        if (!::netUtils.isInitialized) {
-            netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
-        }
+        initNetUtils(clientId)
         netUtils.setTrackMetrics(metricsEndPoint != null)
-
-        // Apply pending SSL config if set
-        pendingSslConfig?.let { (sslSocketFactory, trustManager) ->
-            netUtils.setSslConfig(sslSocketFactory, trustManager)
-            pendingSslConfig = null
-        }
         val newTask =
             UpdateTask(
                 url ?: releaseConfigTemplateUrl,
@@ -266,9 +258,7 @@ class ApplicationManager(
         val clientId =
             sanitizeClientId(otaServices.clientId?.takeIf { it.isNotBlank() } ?: "default")
         val contextRef = CONTEXT_MAP[clientId] ?: WeakReference(ctx)
-        if (!::netUtils.isInitialized) {
-            netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
-        }
+        initNetUtils(clientId)
         val newTask = UpdateTask(
             url,
             otaServices.fileProviderService,
@@ -315,6 +305,18 @@ class ApplicationManager(
         }
     }
 
+    @Synchronized
+    private fun initNetUtils(clientId: String) {
+        if (!::netUtils.isInitialized) {
+            netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
+        }
+        // Apply pending SSL config if set
+        pendingSslConfig?.let { (sslSocketFactory, trustManager) ->
+            netUtils.setSslConfig(sslSocketFactory, trustManager)
+            pendingSslConfig = null
+        }
+    }
+
     /**
      * Set custom SSL configuration for mTLS support.
      * Call this before loadApplication() to enable client certificate authentication.
@@ -322,6 +324,7 @@ class ApplicationManager(
      * @param sslSocketFactory SSL socket factory configured with client certificate
      * @param trustManager Trust manager for server certificate validation
      */
+    @Synchronized
     fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
         if (::netUtils.isInitialized) {
             netUtils.setSslConfig(sslSocketFactory, trustManager)
@@ -397,7 +400,12 @@ class ApplicationManager(
         Log.d(TAG, "requiredFiles for $dir $requiredFiles")
         val current =
             otaServices.fileProviderService.listFilesRecursive(dir)?.toList() ?: emptyList()
-        val required = requiredFiles.map { otaServices.fileProviderService.hyperFileUtil.encodeFileName(it) }
+        // listFilesRecursive gives encoded names only when !fromAirborne, so encode to match it.
+        val required = if (fromAirborne) {
+            requiredFiles
+        } else {
+            requiredFiles.map { otaServices.fileProviderService.hyperFileUtil.encodeFileName(it) }
+        }
         val redundant = setDifference(current, required)
         if (redundant.isEmpty()) {
             Log.d(TAG, "No clean-up required for dir: $dir")
@@ -572,9 +580,11 @@ class ApplicationManager(
 
     fun readSplitAsFile(fileName: String): File {
         val stream = readSplitAsStream(fileName)
-        val dotIndex = fileName.lastIndexOf('.')
-        val prefix = if (dotIndex > 0) fileName.substring(0, dotIndex) else fileName
-        val suffix = if (dotIndex > 0) fileName.substring(dotIndex) else ".tmp"
+        // createTempFile needs a prefix of 3+ chars with no path separator.
+        val baseName = fileName.substringAfterLast('/')
+        val dotIndex = baseName.lastIndexOf('.')
+        val prefix = (if (dotIndex > 0) baseName.substring(0, dotIndex) else baseName).padEnd(3, '_')
+        val suffix = if (dotIndex > 0) baseName.substring(dotIndex) else ".tmp"
 
         val tempFile = File.createTempFile(prefix, suffix, this.ctx.cacheDir)
 

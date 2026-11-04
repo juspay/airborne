@@ -355,15 +355,23 @@ jobs:
         id: android_version
         shell: bash
         run: |
-          version=$(grep '^airborneVersion=' airborne_sdk_android/version.properties | cut -d= -f2)
+          set -euo pipefail
+          version=$(grep '^airborneVersion=' airborne_sdk_android/version.properties | cut -d= -f2 | tr -d '\r[:space:]')
           echo "version=$version" >> $GITHUB_OUTPUT
-          status=$(curl -s -o /dev/null -w '%{http_code}' "https://repo1.maven.org/maven2/io/juspay/airborne/$version/airborne-$version.pom")
-          if [ "$status" = "200" ]; then
-            echo "publish=false" >> $GITHUB_OUTPUT
-            echo "io.juspay:airborne:$version is already published, skipping."
-          else
-            echo "publish=true" >> $GITHUB_OUTPUT
-          fi
+          status=$(curl -sS --retry 3 --max-time 30 -o /dev/null -w '%{http_code}' "https://repo1.maven.org/maven2/io/juspay/airborne/$version/airborne-$version.pom" || true)
+          case "$status" in
+            200)
+              echo "publish=false" >> $GITHUB_OUTPUT
+              echo "io.juspay:airborne:$version is already published, skipping."
+              ;;
+            404)
+              echo "publish=true" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "::error::Could not check Maven Central for io.juspay:airborne:$version (HTTP $status)."
+              exit 1
+              ;;
+          esac
 
       - name: Set up Temurin JDK 17
         if: steps.android_version.outputs.publish == 'true'
