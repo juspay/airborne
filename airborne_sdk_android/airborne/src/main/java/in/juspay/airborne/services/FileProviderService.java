@@ -26,6 +26,8 @@ import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -48,10 +50,10 @@ import in.juspay.airborne.TrackerCallback;
 import in.juspay.airborne.utils.OTAUtils;
 import in.juspay.hyperutil.FileUtilCallback;
 import in.juspay.hyperutil.HyperFileUtil;
-import in.juspay.airborne.constants.Labels;
-import in.juspay.airborne.constants.LogCategory;
-import in.juspay.airborne.constants.LogLevel;
-import in.juspay.airborne.constants.LogSubCategory;
+import in.juspay.hyperutil.constants.Labels;
+import in.juspay.hyperutil.constants.LogCategory;
+import in.juspay.hyperutil.constants.LogLevel;
+import in.juspay.hyperutil.constants.LogSubCategory;
 
 /**
  * A class that contains helper methods for files.
@@ -158,21 +160,48 @@ public class FileProviderService {
         return readFromFile(fileName, true);
     }
 
+    @NonNull
+    public BufferedInputStream readFromFileAsStream(@NonNull String fileName) {
+        BufferedInputStream data = null;
+
+        if (!otaServices.getFromAirborne()) {
+            data = hyperFileUtil.readFileForHyperSDKAsStream(fileName);
+        } else {
+            if (shouldCheckInternalAssets) {
+                data = readFromInternalStorageAsStream(fileName);
+            }
+
+            if (data == null) {
+                data = readFromAssetsAsStream(fileName);
+            }
+        }
+
+        return data != null
+                ? data
+                : new BufferedInputStream(new ByteArrayInputStream(new byte[0]));
+    }
+
     public String readFromFile(String fileName, boolean useCache) {
         String data = null;
         if (useCache) {
             data = readFromCache(fileName);
         }
 
-        if (data == null && !otaServices.getFromAirborne()) {
-            data = hyperFileUtil.readFileForHyperSDK(fileName);
-        } else if (data == null) {
-            if (shouldCheckInternalAssets) {
-                data = readFromInternalStorage(fileName);
-            }
-
-            if (data == null) {
-                data = readFromAssets(fileName);
+        if (data == null) {
+            try (BufferedInputStream stream = readFromFileAsStream(fileName)) {
+                if (stream == null) {
+                    data = null;
+                } else {
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    byte[] chunk = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = stream.read(chunk)) != -1) {
+                        buffer.write(chunk, 0, bytesRead);
+                    }
+                    data = buffer.toString("UTF-8");
+                }
+            } catch (Exception e) {
+                data = null;
             }
         }
 
@@ -197,27 +226,63 @@ public class FileProviderService {
     }
 
     public String readFromInternalStorage(String fileName) {
+        try (BufferedInputStream stream = readFromInternalStorageAsStream(fileName)) {
+            if (stream == null) return null;
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = stream.read(chunk)) != -1) {
+                buffer.write(chunk, 0, bytesRead);
+            }
+            return buffer.toString("UTF-8");
+
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public BufferedInputStream readFromInternalStorageAsStream(String fileName) {
 
         if (otaServices.getUseBundledAssets()) {
             return null;
         }
 
         if (!otaServices.getFromAirborne()) {
-            String result = hyperFileUtil.readFileFromInternalStorage(fileName);
-            return result != null ? result : "";
+            return hyperFileUtil.readFileFromInternalStorageAsStream(fileName);
         }
         try {
-            String content = new String(getInternalStorageFileAsByte(fileName));
-            otaServices.getTrackerCallback().track(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, LogLevel.DEBUG, Labels.System.FILE_PROVIDER_SERVICE, "readFromInternalStorage", new JSONObject().put("Returning the file content for file ", fileName));
+            File file = getFileFromInternalStorageInternal(fileName);
+            if (!file.exists()) {
+                return null;
+            }
+
+            otaServices.getTrackerCallback().track(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, LogLevel.DEBUG, Labels.System.FILE_PROVIDER_SERVICE, "readFromInternalStorageAsStream", new JSONObject().put("Returning the file stream for file ", fileName));
             if (fileName.endsWith(".json")) {
+                byte[] content;
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    byte[] chunk = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fis.read(chunk)) != -1) {
+                        buffer.write(chunk, 0, bytesRead);
+                    }
+                    content = buffer.toByteArray();
+                } catch (Exception e) {
+                    return null;
+                }
+
                 try {
-                    new JSONObject(content);
+                    new JSONObject(new String(content));
                 } catch (JSONException e) {
                     deleteAndRemoveMetadata(fileName);
                     return null;
                 }
+
+                return new BufferedInputStream(new ByteArrayInputStream(content));
             }
-            return content;
+
+            return new BufferedInputStream(new FileInputStream(file));
         } catch (Exception e) {
             otaServices.getTrackerCallback().trackException(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.FILE_PROVIDER_SERVICE, "read from internal storage failed", e);
         }
@@ -226,11 +291,26 @@ public class FileProviderService {
     }
 
     public String readFromAssets(String fileName) {
+        try (BufferedInputStream stream = readFromAssetsAsStream(fileName)) {
+            if (stream == null) return null;
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = stream.read(chunk)) != -1) {
+                buffer.write(chunk, 0, bytesRead);
+            }
+            return buffer.toString("UTF-8");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public BufferedInputStream readFromAssetsAsStream(String fileName) {
         final TrackerCallback tracker = otaServices.getTrackerCallback();
 
         try {
-            byte[] encrypted = getAssetFileAsByte(fileName);
-            return new String(encrypted);
+            return getAssetFileAsStream(fileName);
         } catch (Exception e) {
             tracker.trackException(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.FILE_PROVIDER_SERVICE, "Exception trying to read file from assets: " + fileName, e);
             return null;
@@ -249,10 +329,6 @@ public class FileProviderService {
     @SuppressWarnings("UnusedReturnValue")
     public boolean updateFile(@NonNull Context context, String fileName, byte[] content) {
         return writeToFile(context, fileName, content, false);
-    }
-
-    public boolean updateFile(String fileName, byte[] content) {
-        return writeToFile(Workspace.getCtx(), fileName, content, false);
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -410,15 +486,32 @@ public class FileProviderService {
     }
 
     public byte[] getAssetFileAsByte(String fileName) {
+
+        try (BufferedInputStream stream = getAssetFileAsStream(fileName)) {
+            if (stream == null) {
+                return new byte[]{};
+            }
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = stream.read(chunk)) != -1) {
+                buffer.write(chunk, 0, bytesRead);
+            }
+            return buffer.toByteArray();
+        } catch (RuntimeException re) {
+            if (re.getCause() instanceof IOException) {
+                throw re;
+            }
+        } catch (Exception e) {
+        }
+        return new byte[]{};
+    }
+
+    public BufferedInputStream getAssetFileAsStream(String fileName) {
         final TrackerCallback tracker = otaServices.getTrackerCallback();
 
         try {
-            try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-                try (InputStream is = openAsset(fileName)) {
-                    readFromInputStream(bos, is);
-                }
-                return bos.toByteArray();
-            }
+            return new BufferedInputStream(openAsset(fileName));
         } catch (IOException e) {
             tracker.trackException(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.FILE_PROVIDER_SERVICE, "Could not read " + fileName, e);
             throw new RuntimeException(e);
@@ -426,7 +519,7 @@ public class FileProviderService {
             tracker.trackException(LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.FILE_PROVIDER_SERVICE, "Exception: Could not read " + fileName, e);
         }
 
-        return new byte[]{};
+        return null;
     }
 
     private void readFromInputStream(ByteArrayOutputStream bos, InputStream is) throws IOException {

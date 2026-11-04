@@ -18,7 +18,6 @@
  */
 package `in`.juspay.airborne.services
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.AssetManager
@@ -26,6 +25,7 @@ import android.util.Log
 import androidx.annotation.Keep
 import `in`.juspay.airborne.utils.OTAUtils
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 
@@ -41,7 +41,6 @@ open class Workspace {
     constructor(ctx: Context, workspacePath: String, fromAirborne: Boolean = false) {
         this.path = trimFileSeparator(workspacePath)
         this.fromAirborne = fromAirborne
-        Workspace.ctx = ctx
         root = mkRoot(ctx, this.path)
         cacheRoot = mkCacheRoot(ctx, this.path)
         val sharedPrefsName = this.path.replace('/', '_')
@@ -79,6 +78,7 @@ open class Workspace {
         if (root.exists()) {
             OTAUtils.deleteRecursive(root)
             mkRoot(ctx, path)
+            setup(ctx)
         }
     }
 
@@ -146,13 +146,43 @@ open class Workspace {
         return keysSet
     }
 
+    fun copyAssetsRecursively(context: Context, assetPath: String, destRoot: File) {
+        val assetManager = context.assets
+        val fileList = assetManager.list(assetPath) ?: return
+
+        if (fileList.isEmpty()) {
+            // It's a file, copy it
+            copyAssetFile(context, assetPath, destRoot)
+        } else {
+            // It's a folder
+            val destDir = File(destRoot, assetPath.substringAfterLast('/'))
+            if (!destDir.exists()) destDir.mkdirs()
+
+            for (name in fileList) {
+                val subPath = if (assetPath.isEmpty()) name else "$assetPath/$name"
+                copyAssetsRecursively(context, subPath, destDir)
+            }
+        }
+    }
+
+    private fun copyAssetFile(context: Context, assetPath: String, destDir: File) {
+        val fileName = assetPath.substringAfterLast('/')
+        val outFile = File(destDir, fileName)
+        context.assets.open(assetPath).use { input ->
+            FileOutputStream(outFile).use { output ->
+                input.copyTo(output)
+            }
+        }
+    }
+
+    fun setup(context: Context) {
+        copyAssetsRecursively(context, path, root)
+    }
+
     companion object {
         private const val TAG = "Workspace"
         private const val FALLBACK_WORKSPACE = "juspay"
 
-        @SuppressLint("StaticFieldLeak")
-        @JvmStatic
-        var ctx: Context? = null
         private var fallbackSharedPreferencesJuspay: SharedPreferences? = null
         private var fallbackSharedPreferencesGodel: SharedPreferences? = null
 

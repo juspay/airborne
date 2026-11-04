@@ -330,8 +330,6 @@ jobs:
       id-token: write
     if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
-    env:
-      VERSION: ${{ needs.tag-release.outputs.version }}
 
     steps:
       - name: Checkout
@@ -351,7 +349,24 @@ jobs:
             hyper_eta_react:
               - 'airborne_sdk_android/hyper-eta-react/**'
 
+      # The Android SDK has its own version (airborne_sdk_android/version.properties),
+      # separate from the monorepo version. Publish only when that version is not on Maven Central yet.
+      - name: Check if Android SDK version is already published
+        id: android_version
+        shell: bash
+        run: |
+          version=$(grep '^airborneVersion=' airborne_sdk_android/version.properties | cut -d= -f2)
+          echo "version=$version" >> $GITHUB_OUTPUT
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://repo1.maven.org/maven2/io/juspay/airborne/$version/airborne-$version.pom")
+          if [ "$status" = "200" ]; then
+            echo "publish=false" >> $GITHUB_OUTPUT
+            echo "io.juspay:airborne:$version is already published, skipping."
+          else
+            echo "publish=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Temurin JDK 17
+        if: steps.android_version.outputs.publish == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
@@ -359,12 +374,13 @@ jobs:
           cache: "gradle"
 
       - name: Grant execute for Gradle wrapper
+        if: steps.android_version.outputs.publish == 'true'
         run: chmod +x gradlew
         working-directory: airborne_sdk_android
 
       - name: Import GPG
+        if: steps.android_version.outputs.publish == 'true'
         run: |
-          echo "VERSION=${{ env.VERSION }}" >> $GITHUB_ENV
           echo "${SIGNING_KEY}" | base64 -d > /tmp/key.asc
           gpg --batch --import /tmp/key.asc
           # Export the decoded key for Gradle
@@ -376,6 +392,7 @@ jobs:
 
       # Publish aggregation (both modules). nmcp builds a single ZIP and uploads to Portal API
       - name: Publish to Maven Central (Central Portal)
+        if: steps.android_version.outputs.publish == 'true'
         working-directory: airborne_sdk_android
         run: ./gradlew --no-daemon publishAggregationToCentralPortal
         env:

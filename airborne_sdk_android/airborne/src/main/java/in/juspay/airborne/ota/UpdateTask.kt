@@ -14,6 +14,7 @@
 
 package `in`.juspay.airborne.ota
 
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import `in`.juspay.airborne.BuildConfig
@@ -34,11 +35,10 @@ import `in`.juspay.airborne.ota.Constants.RESOURCES_DIR_NAME
 import `in`.juspay.airborne.ota.Constants.RESOURCES_FILE_NAME
 import `in`.juspay.airborne.services.FileProviderService
 import `in`.juspay.airborne.services.TempWriter
-import `in`.juspay.airborne.services.Workspace
 import `in`.juspay.airborne.utils.OTAUtils
-import `in`.juspay.airborne.constants.LogCategory
-import `in`.juspay.airborne.constants.LogLevel
-import `in`.juspay.airborne.constants.LogSubCategory
+import `in`.juspay.hyperutil.constants.LogCategory
+import `in`.juspay.hyperutil.constants.LogLevel
+import `in`.juspay.hyperutil.constants.LogSubCategory
 import okhttp3.Response
 import okhttp3.ResponseBody
 import org.json.JSONException
@@ -76,7 +76,9 @@ internal class UpdateTask(
     private val netUtils: NetUtils,
     rcHeaders: Map<String, String>? = null,
     private val lazyDownloadCallback: LazyDownloadCallback?,
-    private val fromAirborne: Boolean = true
+    private val fromAirborne: Boolean = true,
+    private val ctx: Context,
+    private val onPackageDownloaded: ((oldVersion: String, newVersion: String) -> Unit)? = null
 ) {
     val updateUUID = UUID.randomUUID().toString()
 
@@ -95,6 +97,8 @@ internal class UpdateTask(
     private var resourceUpdate: ResourceUpdateTask? = null
     private var resourceDownloadStatus = ResourceUpdateStatus.RESOURCES_DOWNLOADING
 
+    private val HEX_ARRAY = "0123456789abcdef".toCharArray()
+
     @Volatile
     private var packageTimeout =
         (localReleaseConfig?.config ?: DEFAULT_CONFIG).bootTimeout
@@ -106,7 +110,7 @@ internal class UpdateTask(
 
     private var defaultHeaders = mutableMapOf(
         "x-os-version" to Build.VERSION.RELEASE,
-        "x-airborne-version" to SDK_VERSION,
+        "x-airborne-version" to getSDKVersion(ctx),
         "x-release-config-version" to localReleaseConfig?.version.toString(),
         "x-package-version" to localReleaseConfig?.pkg?.version,
         "x-config-version" to localReleaseConfig?.config?.version
@@ -114,8 +118,6 @@ internal class UpdateTask(
 
     // TODO Move to storing in main app dir & remove this var.
     private var resourceSaveFuture: Future<Unit>? = null
-
-    private val HEX_ARRAY = "0123456789abcdef".toCharArray()
 
     init {
         trackers.add(tracker)
@@ -375,7 +377,7 @@ internal class UpdateTask(
         }
     }
 
-    private fun fetchReleaseConfig(): ReleaseConfig? {
+    internal fun fetchReleaseConfig(): ReleaseConfig? {
         val startTime = System.currentTimeMillis()
         return when (val fr = fetch(releaseConfigUrl, noCache = true)) {
             is Result.Ok -> {
@@ -406,10 +408,10 @@ internal class UpdateTask(
         readPersistentState(StateKey.SAVED_PACKAGE_UPDATE)?.let {
             Log.d(TAG, "Found saved pkg $it.")
             try {
-                val tw = fileProviderService.reOpenTempWriter(it.getString("dir"))
                 val pkg = ReleaseConfig.packageFromJSON(
                     it.getJSONObject("package_manifest")
                 )
+                val tw = fileProviderService.reOpenTempWriter(it.getString("dir"))
                 val result = movePackageUpdate(tw, pkg, System.currentTimeMillis())
                 if (result) {
                     removeFromPersistentState(StateKey.SAVED_PACKAGE_UPDATE)
@@ -417,15 +419,26 @@ internal class UpdateTask(
                 }
                 return null
             } catch (e: Exception) {
-                removeFromPersistentState(StateKey.SAVED_RESOURCE_UPDATE)
+                // Also covers the temp dir being deleted outright, where reOpenTempWriter throws.
+                removeFromPersistentState(StateKey.SAVED_PACKAGE_UPDATE)
                 trackException(
-                    "saved_resources_corrupted",
+                    "saved_package_corrupted",
                     e
                 )
                 return null
             }
         }
         return null
+    }
+
+    private fun notifyPackageDownloaded(newVersion: String) {
+        val oldVersion = localReleaseConfig?.pkg?.version ?: ""
+        Log.d(TAG, "Package downloaded: old=$oldVersion new=$newVersion")
+        try {
+            onPackageDownloaded?.invoke(oldVersion, newVersion)
+        } catch (e: Exception) {
+            trackException("package_downloaded_callback_failed", e)
+        }
     }
 
     private fun installPackageUpdate(
@@ -511,6 +524,16 @@ internal class UpdateTask(
                 )
                 Log.d(TAG, "Saved resources $pkg")
                 setInPersistentState(StateKey.SAVED_PACKAGE_UPDATE, json)
+
+                // The package is on disk but was not installed this boot. It will be promoted on
+                // the next process start, so integrators can prompt for a restart on this event.
+                trackInfo(
+                    LogKey.DOWNLOADS_COMPLETED_AFTER_TIMEOUT,
+                    JSONObject()
+                        .put("package_version", pkg.version)
+                        .put("current_package_version", localReleaseConfig?.pkg?.version ?: "")
+                )
+                notifyPackageDownloaded(pkg.version)
             }
 
             else -> {}
@@ -774,7 +797,7 @@ internal class UpdateTask(
         Log.d(TAG, "writing manifest $fileName")
         val startTime = System.currentTimeMillis()
         val result = synchronized(fileLock) {
-            fileProviderService.updateFile("app/$fileName", text.toByteArray())
+            fileProviderService.updateFile(ctx, "app/$fileName", text.toByteArray())
         }
         logTimeTaken(startTime, "writeManifest $fileName")
         return result
@@ -795,7 +818,7 @@ internal class UpdateTask(
 
     private fun savePersistentState(state: JSONObject) {
         try {
-            fileProviderService.updateFile("$APP_DIR/state.json", state.toString().toByteArray())
+            fileProviderService.updateFile(ctx, "$APP_DIR/state.json", state.toString().toByteArray())
         } catch (e: Exception) {
             trackException(
                 "persistent_state_save_failed",
@@ -864,7 +887,6 @@ internal class UpdateTask(
 
                     if (checksum.isNotEmpty()) {
                         val calculatedChecksum = sha256Hex(extracted)
-
                         if (!calculatedChecksum.equals(checksum, ignoreCase = true)) {
                             Log.e(TAG, "Checksum mismatch for $filePathToSaveIn")
                             return Result.Error()
@@ -1056,7 +1078,7 @@ internal class UpdateTask(
         trackers.forEach {
             it.track(
                 LogCategory.LIFECYCLE,
-                LogSubCategory.LifeCycle.AIRBORNE,
+                LogSubCategory.LifeCycle.HYPER_OTA,
                 level,
                 LABEL,
                 key,
@@ -1076,7 +1098,8 @@ internal class UpdateTask(
             }
         }
     }
-    private fun sha256Hex(bytes: ByteArray): String {
+
+    fun sha256Hex(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
 
         val hexChars = CharArray(digest.size * 2)
@@ -1328,13 +1351,25 @@ internal class UpdateTask(
 
     private object LogKey {
         const val PACKAGE_UPDATE_RESULT = "package_update_result"
+
+        /**
+         * A package finished downloading after the boot timeout elapsed, so it was staged and
+         * will be installed on the next process start. Carries `package_version` (the staged
+         * one) and `current_package_version` (the one currently running).
+         *
+         * Name matches the iOS SDK's event so integrators can share one handler.
+         */
+        const val DOWNLOADS_COMPLETED_AFTER_TIMEOUT = "downloads_completed_after_timeout"
     }
 
     companion object {
         const val TAG = "UpdateTask"
         const val LABEL = "ota_update"
         const val RETRY_LIMIT = 1
-        val SDK_VERSION: String = Workspace.ctx?.getString(R.string.airborne_version) ?: "undefined"
+
+        private fun getSDKVersion(ctx: Context): String {
+            return ctx.getString(R.string.airborne_version) ?: "undefined"
+        }
 
         private fun <V> doAsync(callable: Callable<V>): Future<V> =
             OTAUtils.doAsync(callable)

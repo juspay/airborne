@@ -14,6 +14,9 @@
 
 package in.juspay.airborne.network;
 
+import android.os.Build;
+import android.util.Log;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -26,6 +29,8 @@ import javax.net.ssl.SSLSocketFactory;
 
 public class JuspaySSLSocketFactory extends SSLSocketFactory {
 
+    private static final String TAG = "JuspaySSLSocketFactory";
+    private static volatile boolean tlsv13Failed = false;
     private final SSLSocketFactory delegate;
 
     public JuspaySSLSocketFactory() throws KeyManagementException, NoSuchAlgorithmException {
@@ -75,8 +80,19 @@ public class JuspaySSLSocketFactory extends SSLSocketFactory {
     }
 
     private Socket enableTLSOnSocket(Socket socket) {
-        if((socket instanceof SSLSocket)) {
-            ((SSLSocket)socket).setEnabledProtocols(new String[] {"TLSv1.2"});
+        if (socket instanceof SSLSocket) {
+            SSLSocket sslSocket = (SSLSocket) socket;
+            try {
+                if (!tlsv13Failed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    sslSocket.setEnabledProtocols(new String[]{"TLSv1.2", "TLSv1.3"});
+                } else {
+                    sslSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
+                }
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "setEnabledProtocols failed for [TLSv1.2, TLSv1.3], retrying with [TLSv1.2] only. Error: " + e.getMessage());
+                tlsv13Failed = true;
+                sslSocket.setEnabledProtocols(new String[]{"TLSv1.2"});
+            }
         }
         return socket;
     }

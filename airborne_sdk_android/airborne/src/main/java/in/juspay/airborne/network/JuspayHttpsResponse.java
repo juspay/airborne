@@ -22,6 +22,8 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -37,15 +39,28 @@ import okhttp3.Response;
  * @author Sriduth
  */
 public class JuspayHttpsResponse {
+    public static class RedirectHop {
+        public final String url;
+        public final int statusCode;
+        public RedirectHop(String url, int statusCode) {
+            this.url = url;
+            this.statusCode = statusCode;
+        }
+    }
+
     public final int responseCode;
     public final Map<String, List<String>> headers;
     public final byte[] responsePayload;
+    public final String finalUrl;
+    public final List<RedirectHop> redirectChain;
 
     public JuspayHttpsResponse(int responseCode, @NonNull byte[] responsePayload,
                                Map<String, List<String>> headers) {
         this.responseCode = responseCode;
         this.responsePayload = responsePayload;
         this.headers = headers;
+        this.finalUrl = null;
+        this.redirectChain = null;
     }
 
     private static byte[] decodeGZip(InputStream in) throws IOException {
@@ -68,6 +83,8 @@ public class JuspayHttpsResponse {
     public JuspayHttpsResponse(HttpsURLConnection connection) throws IOException {
         this.responseCode = connection.getResponseCode();
         this.headers = connection.getHeaderFields();
+        this.finalUrl = null;
+        this.redirectChain = null;
 
         InputStream is;
         if ((responseCode >= 200 && responseCode < 300) || responseCode == 302) {
@@ -97,6 +114,18 @@ public class JuspayHttpsResponse {
     public JuspayHttpsResponse(Response response) throws IOException {
         responseCode = response.code();
         headers = response.headers().toMultimap();
+        finalUrl = response.request().url().toString();
+
+        // Walk the priorResponse() chain to collect each redirect hop in order
+        List<RedirectHop> hops = new ArrayList<>();
+        Response prior = response.priorResponse();
+        while (prior != null) {
+            hops.add(new RedirectHop(prior.request().url().toString(), prior.code()));
+            prior = prior.priorResponse();
+        }
+        Collections.reverse(hops); // order: first hop → last hop
+        redirectChain = hops.isEmpty() ? null : hops;
+
         if (response.body() != null) {
             String contentEncoding = response.header("content-encoding");
             if (contentEncoding != null && contentEncoding.equalsIgnoreCase("gzip")) {

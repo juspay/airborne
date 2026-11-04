@@ -22,11 +22,11 @@ plugins {
 
 android {
     namespace = "in.juspay.airborne"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 21
-        targetSdk = 35
+        targetSdk = 36
 
         consumerProguardFiles "consumer-rules.pro"
 
@@ -70,12 +70,6 @@ android {
     }
 }
 
-def resolveVersion() {
-    def tag = System.getenv("GITHUB_REF_NAME")
-    if (tag != null && tag.startsWith("v")) return tag.substring(1)
-    return "SNAPSHOT"
-}
-
 afterEvaluate {
     publishing {
         publications {
@@ -84,7 +78,7 @@ afterEvaluate {
 
                 groupId = 'io.juspay'
                 artifactId = 'airborne'
-                version = System.getenv("VERSION") ?: resolveVersion()
+                version = rootProject.ext.airborneVersion
 
                 pom {
                     name = 'Airborne'
@@ -131,11 +125,9 @@ nmcp {
 dependencies {
 
     implementation('androidx.appcompat:appcompat:1.1.0')
-    implementation('com.google.android.material:material:1.12.0')
-    implementation('androidx.core:core-ktx:1.1.0')
     implementation('com.squareup.okhttp3:okhttp:3.3.0')
 
-    api ('in.juspay:hyperutil:2.2.5-xota.05')
+    api ('in.juspay:hyperutil:2.2.9-rc.18')
 
     testImplementation('junit:junit:4.13.2')
     androidTestImplementation('androidx.test.ext:junit:1.2.1')
