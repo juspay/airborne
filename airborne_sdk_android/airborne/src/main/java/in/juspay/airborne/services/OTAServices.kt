@@ -16,11 +16,11 @@ package `in`.juspay.airborne.services
 
 import android.content.Context
 import `in`.juspay.airborne.TrackerCallback
-import `in`.juspay.airborne.constants.Labels
-import `in`.juspay.airborne.constants.LogCategory
-import `in`.juspay.airborne.constants.LogLevel
-import `in`.juspay.airborne.constants.LogSubCategory
-import `in`.juspay.airborne.constants.OTAConstants
+import `in`.juspay.hyperutil.constants.Labels
+import `in`.juspay.hyperutil.constants.LogCategory
+import `in`.juspay.hyperutil.constants.LogLevel
+import `in`.juspay.hyperutil.constants.LogSubCategory
+import `in`.juspay.hyperutil.constants.OTAConstants
 import org.json.JSONObject
 
 class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanUpValue: String, val useBundledAssets: Boolean, val trackerCallback: TrackerCallback, val fromAirborne: Boolean = true) {
@@ -38,9 +38,9 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
         if (prevBuildId != cleanUpValue) {
             trackerCallback.track(
                 LogCategory.LIFECYCLE,
-                LogSubCategory.LifeCycle.AIRBORNE,
+                LogSubCategory.LifeCycle.HYPER_OTA,
                 LogLevel.INFO,
-                Labels.Airborne.FIRST_TIME_SETUP,
+                Labels.HyperOTA.FIRST_TIME_SETUP,
                 "started",
                 JSONObject().put("status", "started")
             )
@@ -50,9 +50,9 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
                 ctx.let { workspace.clean(it) }
                 trackerCallback.track(
                     LogCategory.LIFECYCLE,
-                    LogSubCategory.LifeCycle.AIRBORNE,
+                    LogSubCategory.LifeCycle.HYPER_OTA,
                     LogLevel.INFO,
-                    Labels.Airborne.FIRST_TIME_SETUP,
+                    Labels.HyperOTA.FIRST_TIME_SETUP,
                     "completed",
                     JSONObject().put("status", "completed")
                 )
@@ -61,8 +61,8 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
                 trackerCallback.trackAndLogException(
                     TAG,
                     LogCategory.LIFECYCLE,
-                    LogSubCategory.LifeCycle.AIRBORNE,
-                    Labels.Airborne.FIRST_TIME_SETUP,
+                    LogSubCategory.LifeCycle.HYPER_OTA,
+                    Labels.HyperOTA.FIRST_TIME_SETUP,
                     "Exception in firstTimeCleanUp",
                     e
                 )

@@ -14,10 +14,10 @@
 
 package in.juspay.airborne.services;
 
-import static in.juspay.airborne.constants.OTAConstants.ATTR_HASH_IN_DISK;
 import static in.juspay.airborne.services.ServiceConstants.ASSET_METADATA_FILE_NAME;
 import static in.juspay.airborne.services.ServiceConstants.ATTR_LAST_CHECKED;
 import static in.juspay.airborne.services.ServiceConstants.ATTR_ZIPHASH_IN_DISK;
+import static in.juspay.hyperutil.constants.OTAConstants.ATTR_HASH_IN_DISK;
 
 import android.content.Context;
 import android.os.AsyncTask;
@@ -41,10 +41,10 @@ import java.util.zip.ZipInputStream;
 import in.juspay.airborne.TrackerCallback;
 import in.juspay.airborne.network.OTANetUtils;
 import in.juspay.airborne.utils.OTAUtils;
-import in.juspay.airborne.constants.Labels;
-import in.juspay.airborne.constants.LogCategory;
-import in.juspay.airborne.constants.LogLevel;
-import in.juspay.airborne.constants.LogSubCategory;
+import in.juspay.hyperutil.constants.Labels;
+import in.juspay.hyperutil.constants.LogCategory;
+import in.juspay.hyperutil.constants.LogLevel;
+import in.juspay.hyperutil.constants.LogSubCategory;
 
 /**
  * Utility functions that deal with downloading of hot-pushed assets.
@@ -78,7 +78,7 @@ public class RemoteAssetService {
         return getContent(context, location, getAssetTtl());
     }
 
-    private byte[] download(String sourceHash, String location) {
+    private byte[] download(String sourceHash, String location, @NonNull Context context) {
         //HTTP GET to download latest Copy
         HashMap<String, String> queryParam = new HashMap<>();
 
@@ -96,7 +96,7 @@ public class RemoteAssetService {
             if (clientId == null) {
                 clientId = "";
             }
-            OTANetUtils netUtils = new OTANetUtils(Workspace.getCtx(), clientId, otaServices.getCleanUpValue());
+            OTANetUtils netUtils = new OTANetUtils(context, clientId, otaServices.getCleanUpValue());
             newText = netUtils.fetchIfModified(location, queryParam);
         } catch (Exception e) {
             otaServices.getTrackerCallback().trackAndLogException(LOG_TAG, LogCategory.ACTION, LogSubCategory.Action.SYSTEM, Labels.System.REMOTE_ASSET_SERVICE, "Error While Downloading File", e);
@@ -177,11 +177,9 @@ public class RemoteAssetService {
         if (null != assetMetadata.getString(ATTR_LAST_CHECKED)) {
             sourceHash = assetMetadata.getString(ATTR_HASH_IN_DISK);
             zipHash = assetMetadata.getString(ATTR_ZIPHASH_IN_DISK);
-        } else {
-            sourceHash = fileProviderService.readFromFile(fileName + ".hash");
         }
 
-        byte[] newText = download(zipHash, location);
+        byte[] newText = download(zipHash, location, context);
         if (newText != null) {
             zipHash = OTAUtils.md5(newText);
         }
@@ -195,7 +193,6 @@ public class RemoteAssetService {
 
         String newHash = decideAndUpdateInternalStorage(context, newText, sourceHash, fileName);
         if (newHash != null) {
-            fileProviderService.writeFileToDisk(context, newHash, fileName + ".hash");
             assetMetadata.put(ATTR_LAST_CHECKED, System.currentTimeMillis());
             assetMetadata.put(ATTR_HASH_IN_DISK, newHash);
             assetMetadata.put(ATTR_ZIPHASH_IN_DISK, zipHash);
@@ -234,7 +231,7 @@ public class RemoteAssetService {
             zipHash = assetMetadata.getString(ATTR_ZIPHASH_IN_DISK);
         }
 
-        byte[] certificates = download(zipHash, location);
+        byte[] certificates = download(zipHash, location, context);
         if (certificates != null) {
             fileModified = true;
             zipHash = OTAUtils.md5(certificates);

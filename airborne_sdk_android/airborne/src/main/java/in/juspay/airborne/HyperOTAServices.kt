@@ -21,12 +21,31 @@ import `in`.juspay.airborne.services.OTAServices
 import `in`.juspay.airborne.services.Workspace
 
 @Keep
-class HyperOTAServices(private val context: Context, workSpacePath: String, appVersion: String, private val releaseConfigTemplateUrl: String, trackerCallback: TrackerCallback, private val onBootComplete: ((String) -> Unit)? = null, useBundledAssets: Boolean = false, private val fromAirborne: Boolean = true) {
+class HyperOTAServices @JvmOverloads constructor(
+    private val context: Context,
+    workSpacePath: String,
+    appVersion: String,
+    private val releaseConfigTemplateUrl: String,
+    trackerCallback: TrackerCallback,
+    private val onBootComplete: ((String) -> Unit)? = null,
+    useBundledAssets: Boolean = false,
+    private val fromAirborne: Boolean = true,
+    private val onPackageDownloaded: ((oldVersion: String, newVersion: String) -> Unit)? = null
+) {
     val workspace: Workspace = Workspace(context, workSpacePath, fromAirborne)
     val otaServices: OTAServices = OTAServices(context, workspace, appVersion, useBundledAssets, trackerCallback, fromAirborne)
 
     @Keep
     fun createApplicationManager(dimensions: Map<String, String>? = null, metricsEndpoint: String? = null): ApplicationManager {
-        return ApplicationManager(context, releaseConfigTemplateUrl, otaServices, metricsEndpoint, dimensions, onBootComplete, fromAirborne)
+        return ApplicationManager(
+            context,
+            releaseConfigTemplateUrl,
+            otaServices,
+            metricsEndpoint,
+            dimensions,
+            onBootComplete,
+            fromAirborne,
+            onPackageDownloaded
+        )
     }
 }

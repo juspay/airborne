@@ -27,27 +27,34 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.X509TrustManager;
 
 import in.juspay.airborne.TrackerCallback;
 import in.juspay.airborne.security.HyperSSLSocketFactory;
-import in.juspay.airborne.services.Workspace;
-import in.juspay.airborne.constants.Labels;
-import in.juspay.airborne.constants.LogCategory;
-import in.juspay.airborne.constants.LogLevel;
-import in.juspay.airborne.constants.LogSubCategory;
+import in.juspay.hyperutil.constants.Labels;
+import in.juspay.hyperutil.constants.LogCategory;
+import in.juspay.hyperutil.constants.LogLevel;
+import in.juspay.hyperutil.constants.LogSubCategory;
 
 import okhttp3.Cache;
 import okhttp3.Call;
+import okhttp3.Dns;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -66,42 +73,66 @@ public class NetUtils {
     private static final MediaType MEDIA_TYPE_TEXT = MediaType.parse("text/plain");
     private static final String TAG = "NetUtils";
 
+    public enum DnsPolicy { IPV4_ONLY, IPV6_ONLY, ALL }
+
+    public static class DnsPolicyFilter implements Dns {
+        private final DnsPolicy policy;
+
+        public DnsPolicyFilter(DnsPolicy policy) {
+            this.policy = policy;
+        }
+
+        @Override
+        public List<InetAddress> lookup(String hostname) throws UnknownHostException {
+            List<InetAddress> addresses = Dns.SYSTEM.lookup(hostname);
+            List<InetAddress> result = new ArrayList<>();
+            for (InetAddress addr : addresses) {
+                if ((policy == DnsPolicy.IPV6_ONLY && addr instanceof Inet6Address)
+                        || (policy == DnsPolicy.IPV4_ONLY && addr instanceof Inet4Address)
+                        || policy == DnsPolicy.ALL) {
+                    result.add(addr);
+                }
+            }
+            if (result.isEmpty()) {
+                throw new UnknownHostException("No " + policy.name() + " addresses resolved for " + hostname);
+            }
+            return result;
+        }
+    }
+
     private int readTimeout;
-    public static final OkHttpClient DEFAULT_HTTP_CLIENT = buildHttpClient();
+    public static OkHttpClient DEFAULT_HTTP_CLIENT = null;
 
     private int connectionTimeout;
     private boolean trackMetrics = false;
     private final NetworkSummarizer networkSummarizer = new NetworkSummarizer();
     private SSLSocketFactory sslSocketFactory;
+    private X509TrustManager customTrustManager;
     private String sessionId;
 
     @SuppressWarnings("SameParameterValue")
     public NetUtils(@IntRange(from = 0, to = Integer.MAX_VALUE) int connectionTimeout,
-                    @IntRange(from = 0, to = Integer.MAX_VALUE) int readTimeout) throws NoSuchAlgorithmException, KeyManagementException {
-        this(connectionTimeout, readTimeout, false);
-    }
-
-    @SuppressWarnings("SameParameterValue")
-    public NetUtils(@IntRange(from = 0, to = Integer.MAX_VALUE) int connectionTimeout,
                     @IntRange(from = 0, to = Integer.MAX_VALUE) int readTimeout,
-                    boolean sslPinningRequired) throws NoSuchAlgorithmException, KeyManagementException {
+                    boolean sslPinningRequired, Context ctx) throws NoSuchAlgorithmException, KeyManagementException {
         this.connectionTimeout = connectionTimeout;
         this.readTimeout = readTimeout;
+        if (DEFAULT_HTTP_CLIENT == null) {
+            DEFAULT_HTTP_CLIENT = buildHttpClient(ctx);
+        }
         /*
          * Using new builder here will not use a new connection pool etc,
          * instead it will use the base client's. So connection pool/cache etc will be shared across.
          * See: https://square.github.io/okhttp/5.x/okhttp/okhttp3/-ok-http-client/index.html
          */
-        OkHttpClient httpClient = DEFAULT_HTTP_CLIENT.newBuilder()
+        DEFAULT_HTTP_CLIENT.newBuilder()
                 .readTimeout(readTimeout, TimeUnit.MILLISECONDS)
                 .connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS)
                 .build();
         this.sslSocketFactory = new JuspaySSLSocketFactory();
     }
 
-    private static OkHttpClient buildHttpClient() {
-        File cacheDir = Workspace.getCtx()
-                .getDir(HTTP_CACHE_NAME, Context.MODE_PRIVATE);
+    private OkHttpClient buildHttpClient(Context ctx) {
+        File cacheDir = ctx.getDir(HTTP_CACHE_NAME, Context.MODE_PRIVATE);
         long ONE_MB = 1024L * 1024L;
         Cache httpCache = new Cache(cacheDir, 10 * ONE_MB);
         return new OkHttpClient.Builder()
@@ -114,7 +145,7 @@ public class NetUtils {
                 .build();
     }
 
-    private static void setHeaders(
+    private void setHeaders(
             @NonNull Request.Builder requestBuilder,
             @Nullable Map<String, String> headers
     ) {
@@ -192,7 +223,7 @@ public class NetUtils {
         return sb.toString();
     }
 
-    public Response doPut(@NonNull final Context context, URL url, byte[] data, @Nullable Map<String, String> headers, NetUtils netUtils, JSONObject options, @Nullable String tag) throws Exception {
+    public Response doPut(URL url, byte[] data, @Nullable Map<String, String> headers, JSONObject options, @Nullable String tag) throws Exception {
         return doMethod("PUT", url.toString(), null, headers, data, null, options, tag);
     }
 
@@ -371,11 +402,13 @@ public class NetUtils {
         if (options != null) {
             setOptions(clientBuilder, options);
         }
-        if (sslSocketFactory != null && HyperSSLSocketFactory.DEFAULT_TRUST_MANAGER != null) {
-            clientBuilder.sslSocketFactory(
-                    sslSocketFactory,
-                    HyperSSLSocketFactory.DEFAULT_TRUST_MANAGER
-            );
+        // Use custom trust manager if set, otherwise fall back to default
+        X509TrustManager trustManager = (customTrustManager != null)
+                ? customTrustManager
+                : HyperSSLSocketFactory.DEFAULT_TRUST_MANAGER;
+
+        if (sslSocketFactory != null && trustManager != null) {
+            clientBuilder.sslSocketFactory(sslSocketFactory, trustManager);
         }
         long startTime = System.currentTimeMillis();
         Response response = clientBuilder.build().newCall(requestBuilder.build()).execute();
@@ -440,7 +473,20 @@ public class NetUtils {
         this.sslSocketFactory = sslSocketFactory;
     }
 
-    public static void cancelAPICall(String tag, @NonNull TrackerCallback trackerCallback) {
+    /**
+     * Set custom SSL configuration for mTLS support.
+     * This allows configuring a custom SSLSocketFactory and X509TrustManager
+     * for client certificate authentication.
+     *
+     * @param sslSocketFactory SSL socket factory configured with client certificate
+     * @param trustManager Trust manager for server certificate validation
+     */
+    public void setSslConfig(SSLSocketFactory sslSocketFactory, X509TrustManager trustManager) {
+        this.sslSocketFactory = sslSocketFactory;
+        this.customTrustManager = trustManager;
+    }
+
+    public void cancelAPICall(String tag, @NonNull TrackerCallback trackerCallback) {
         try {
             for (Call call : DEFAULT_HTTP_CLIENT.dispatcher().runningCalls()) {
                 if (tag.equals(call.request().tag())) {
@@ -485,6 +531,10 @@ public class NetUtils {
                 "retryOnConnectionFailure",
                 true
         );
+        boolean followSslRedirects = options.optBoolean(
+                "followSslRedirects",
+                false
+        );
         if (connectionTimeout != -1) {
             clientBuilder.connectTimeout(connectionTimeout, TimeUnit.MILLISECONDS);
         }
@@ -495,6 +545,16 @@ public class NetUtils {
             clientBuilder.writeTimeout(writeTimeout, TimeUnit.MILLISECONDS);
         }
         clientBuilder.retryOnConnectionFailure(retryOnConnectionFailure);
+        clientBuilder.followSslRedirects(followSslRedirects);
+
+        final String dnsPolicy = options.optString("dnsPolicy", "");
+        if (!dnsPolicy.isEmpty()) {
+            try {
+                clientBuilder.dns(new DnsPolicyFilter(DnsPolicy.valueOf(dnsPolicy)));
+            } catch (IllegalArgumentException ignored) {
+                // unknown dnsPolicy value — fall back to system DNS
+            }
+        }
     }
 
     public void setTrackMetrics(boolean bool) {

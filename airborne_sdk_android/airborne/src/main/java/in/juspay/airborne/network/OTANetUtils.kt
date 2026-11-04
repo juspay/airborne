@@ -16,9 +16,8 @@ package `in`.juspay.airborne.network
 
 import android.content.Context
 import `in`.juspay.airborne.R
-import `in`.juspay.airborne.services.Workspace
 
-class OTANetUtils(val ctx: Context, val clientId: String, private val appVersion: String, connectionTimeout: Int, readTimeout: Int, sslPinningRequired: Boolean = false) : NetUtils(connectionTimeout, readTimeout, sslPinningRequired) {
+class OTANetUtils(val ctx: Context, val clientId: String, private val appVersion: String, connectionTimeout: Int, readTimeout: Int, sslPinningRequired: Boolean = false) : NetUtils(connectionTimeout, readTimeout, sslPinningRequired, ctx) {
 
     constructor(ctx: Context, clientId: String, appVersion: String) : this(ctx, clientId, appVersion, 0, 0, false)
 
@@ -31,7 +30,7 @@ class OTANetUtils(val ctx: Context, val clientId: String, private val appVersion
         defaultHeaders["X-App-Name"] = "Airborne"
         defaultHeaders["Referer"] = ctx.packageName
         defaultHeaders["x-client-id"] = clientId
-        defaultHeaders["x-airborne-version"] = Workspace.ctx?.getString(R.string.airborne_version) ?: "undefined"
+        defaultHeaders["x-airborne-version"] = ctx.getString(R.string.airborne_version) ?: "undefined"
 
         return defaultHeaders
     }

@@ -30,16 +30,20 @@ import `in`.juspay.airborne.ota.Constants.RESOURCES_DIR_NAME
 import `in`.juspay.airborne.ota.Constants.RESOURCES_FILE_NAME
 import `in`.juspay.airborne.services.OTAServices
 import `in`.juspay.airborne.utils.OTAUtils
-import `in`.juspay.airborne.constants.LogCategory
-import `in`.juspay.airborne.constants.LogLevel
-import `in`.juspay.airborne.constants.LogSubCategory
+import `in`.juspay.hyperutil.constants.LogCategory
+import `in`.juspay.hyperutil.constants.LogLevel
+import `in`.juspay.hyperutil.constants.LogSubCategory
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedInputStream
+import java.io.File
 import java.lang.ref.WeakReference
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Future
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
 
 class ApplicationManager(
     private val ctx: Context,
@@ -48,7 +52,8 @@ class ApplicationManager(
     private val metricsEndPoint: String? = null,
     private val rcHeaders: Map<String, String>? = null,
     private val onBootComplete: ((String) -> Unit)? = null,
-    private val fromAirborne: Boolean = true
+    private val fromAirborne: Boolean = true,
+    private val onPackageDownloaded: ((oldVersion: String, newVersion: String) -> Unit)? = null
 ) {
     var shouldUpdate = true
     private lateinit var netUtils: NetUtils
@@ -61,6 +66,7 @@ class ApplicationManager(
     private var indexFolderPath = ""
     private var sessionId: String? = null
     private var rcCallback: ReleaseConfigCallback? = null
+    private var pendingSslConfig: Pair<SSLSocketFactory, X509TrustManager>? = null
 
     fun loadApplication(
         unSanitizedClientId: String,
@@ -103,6 +109,9 @@ class ApplicationManager(
                 val headerJs = """
                 window.document.title="${rc.pkg.name}";
                 window.RELEASE_CONFIG=${rc.serialize()};
+                window.AIRBORNE_USE_LOCAL_ASSETS=${otaServices.useBundledAssets};
+                window.AIRBORNE_OTA_BASE_PATH="${workspace.root.path + "/app/package"}";
+                window.AIRBORNE_OTA_LOCAL_BASE_PATH="${workspace.path + "/app/package"}";
                 """.trimIndent()
                 applicationContent = headerJs + js
                 loadWaitTask.complete()
@@ -116,7 +125,7 @@ class ApplicationManager(
             } finally {
                 indexPathWaitTask.complete()
                 loadWaitTask.complete()
-                onBootComplete?.let { it(indexFolderPath) } // TODO: this has to be changed
+                onBootComplete?.let { it(indexFolderPath) }
                 logTimeTaken(startTime, "loadApplication")
             }
         }
@@ -125,6 +134,10 @@ class ApplicationManager(
     fun getApplicationContent(): String {
         loadWaitTask.get()
         return applicationContent
+    }
+
+    fun clearApplicationContent() {
+        applicationContent = ""
     }
 
     fun getIndexBundlePath(): String {
@@ -153,9 +166,18 @@ class ApplicationManager(
         lazyDownloadCallback: LazyDownloadCallback? = null
     ): ReleaseConfig? {
         val startTime = System.currentTimeMillis()
-        val url = if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
-        netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
+        val url =
+            if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
+        if (!::netUtils.isInitialized) {
+            netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
+        }
         netUtils.setTrackMetrics(metricsEndPoint != null)
+
+        // Apply pending SSL config if set
+        pendingSslConfig?.let { (sslSocketFactory, trustManager) ->
+            netUtils.setSslConfig(sslSocketFactory, trustManager)
+            pendingSslConfig = null
+        }
         val newTask =
             UpdateTask(
                 url ?: releaseConfigTemplateUrl,
@@ -166,7 +188,9 @@ class ApplicationManager(
                 netUtils,
                 rcHeaders,
                 lazyDownloadCallback,
-                fromAirborne
+                fromAirborne,
+                ctx,
+                onPackageDownloaded
             )
         val runningTask = RUNNING_UPDATE_TASKS.putIfAbsent(clientId, newTask) ?: newTask
         if (runningTask == newTask) {
@@ -208,7 +232,8 @@ class ApplicationManager(
                         "Failed to fetch release config, re-trying in release mode."
                     )
                     runningTask.awaitOnFinish()
-                    releaseConfigTemplateUrl = rcCallback?.getReleaseConfig(true) ?: releaseConfigTemplateUrl
+                    releaseConfigTemplateUrl =
+                        rcCallback?.getReleaseConfig(true) ?: releaseConfigTemplateUrl
                     tryUpdate(clientId, true, fileLock, lazyDownloadCallback)
                 } else {
                     releaseConfig
@@ -222,6 +247,89 @@ class ApplicationManager(
 
     fun setSessionId(sessionId: String?) {
         this.sessionId = sessionId
+    }
+
+    fun checkForUpdate(): String {
+        val url = if (rcCallback != null) {
+            rcCallback?.getReleaseConfig(false) ?: releaseConfigTemplateUrl
+        } else {
+            releaseConfigTemplateUrl
+        }
+
+        if (url.isEmpty()) {
+            return JSONObject()
+                .put("updateAvailable", false)
+                .put("error", "No release config URL")
+                .toString()
+        }
+
+        val clientId =
+            sanitizeClientId(otaServices.clientId?.takeIf { it.isNotBlank() } ?: "default")
+        val contextRef = CONTEXT_MAP[clientId] ?: WeakReference(ctx)
+        if (!::netUtils.isInitialized) {
+            netUtils = OTANetUtils(ctx, clientId, otaServices.cleanUpValue)
+        }
+        val newTask = UpdateTask(
+            url,
+            otaServices.fileProviderService,
+            releaseConfig,
+            contextRef,
+            tracker,
+            netUtils,
+            rcHeaders,
+            null,
+            fromAirborne,
+            ctx
+        )
+
+        val remoteRC = newTask.fetchReleaseConfig()
+        if (remoteRC == null) {
+            Log.e(TAG, "checkForUpdate failed")
+            return JSONObject()
+                .put("updateAvailable", false)
+                .put("error", "ReleaseConfig deSerializing failed or HTTP error")
+                .toString()
+        }
+
+        return try {
+            val localRc = releaseConfig
+
+            val localVersion = localRc?.config?.version ?: ""
+            val localPkgVersion = localRc?.pkg?.version ?: ""
+            val remoteVersion = remoteRC.config.version
+            val remotePkgVersion = remoteRC.pkg.version
+
+            JSONObject()
+                .put("updateAvailable", ((remoteVersion != localVersion) || (remotePkgVersion != localPkgVersion)))
+                .put("currentVersion", localVersion)
+                .put("remoteVersion", remoteVersion)
+                .put("currentPackageVersion", localPkgVersion)
+                .put("remotePackageVersion", remotePkgVersion)
+                .toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "checkForUpdate failed", e)
+            JSONObject()
+                .put("updateAvailable", false)
+                .put("error", e.message ?: "Unknown error")
+                .toString()
+        }
+    }
+
+    /**
+     * Set custom SSL configuration for mTLS support.
+     * Call this before loadApplication() to enable client certificate authentication.
+     *
+     * @param sslSocketFactory SSL socket factory configured with client certificate
+     * @param trustManager Trust manager for server certificate validation
+     */
+    fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager) {
+        if (::netUtils.isInitialized) {
+            netUtils.setSslConfig(sslSocketFactory, trustManager)
+        } else {
+            // Store for later when netUtils is initialized
+            // This handles the case where setSslConfig is called before loadApplication
+            pendingSslConfig = Pair(sslSocketFactory, trustManager)
+        }
     }
 
     private fun postMetrics(updateUUID: String, didUpdatePkg: Boolean) = metricsEndPoint?.let {
@@ -287,8 +395,10 @@ class ApplicationManager(
 
     private fun cleanUpDir(dir: String, requiredFiles: List<String>) {
         Log.d(TAG, "requiredFiles for $dir $requiredFiles")
-        val current = otaServices.fileProviderService.listFilesRecursive(dir)?.toList() ?: emptyList()
-        val redundant = setDifference(current, requiredFiles)
+        val current =
+            otaServices.fileProviderService.listFilesRecursive(dir)?.toList() ?: emptyList()
+        val required = requiredFiles.map { otaServices.fileProviderService.hyperFileUtil.encodeFileName(it) }
+        val redundant = setDifference(current, required)
         if (redundant.isEmpty()) {
             Log.d(TAG, "No clean-up required for dir: $dir")
             return
@@ -349,21 +459,50 @@ class ApplicationManager(
         synchronized(lock) {
             try {
                 var rcVersion = readFromInternalStorage(RC_VERSION_FILE_NAME)
-                val (configString, pkgString, resString) = listOf(CONFIG_FILE_NAME, PACKAGE_MANIFEST_FILE_NAME, RESOURCES_FILE_NAME)
+                val (configString, pkgString, resString) = listOf(
+                    CONFIG_FILE_NAME,
+                    PACKAGE_MANIFEST_FILE_NAME,
+                    RESOURCES_FILE_NAME
+                )
                     .map { readFromInternalStorage(it) }
 
-                val bundledRC = if (listOf(configString, pkgString, resString).any { it.isEmpty() }) {
-                    ReleaseConfig.deSerialize(otaServices.fileProviderService.readFromAssets("release_config.json")).getOrNull()
-                } else {
-                    null
-                }
+                val bundledRC =
+                    if (listOf(configString, pkgString, resString).any { it.isEmpty() }) {
+                        val bundledRCString = if (fromAirborne) otaServices.fileProviderService.readFromAssets("release_config.json") else readFromAssets("release_config.json")
+
+                        if (bundledRCString == null) {
+                            null
+                        } else {
+                            ReleaseConfig.deSerialize(bundledRCString).getOrNull()
+                        }
+                    } else {
+                        null
+                    }
 
                 if (rcVersion.isEmpty() && bundledRC != null) {
                     rcVersion = bundledRC.version
                 }
-                val config = loadConfigComponent(configString, CONFIG_FILE_NAME, bundledRC?.config, DEFAULT_CONFIG, ReleaseConfig::deSerializeConfig)
-                val pkg = loadConfigComponent(pkgString, PACKAGE_MANIFEST_FILE_NAME, bundledRC?.pkg, DEFAULT_PKG, ReleaseConfig::deSerializePackage)
-                val resources = loadConfigComponent(resString, RESOURCES_FILE_NAME, bundledRC?.resources, DEFAULT_RESOURCES, ReleaseConfig::deSerializeResources)
+                val config = loadConfigComponent(
+                    configString,
+                    CONFIG_FILE_NAME,
+                    bundledRC?.config,
+                    DEFAULT_CONFIG,
+                    ReleaseConfig::deSerializeConfig
+                )
+                val pkg = loadConfigComponent(
+                    pkgString,
+                    PACKAGE_MANIFEST_FILE_NAME,
+                    bundledRC?.pkg,
+                    DEFAULT_PKG,
+                    ReleaseConfig::deSerializePackage
+                )
+                val resources = loadConfigComponent(
+                    resString,
+                    RESOURCES_FILE_NAME,
+                    bundledRC?.resources,
+                    DEFAULT_RESOURCES,
+                    ReleaseConfig::deSerializeResources
+                )
 
                 Log.d(TAG, "Local release config loaded.")
                 return ReleaseConfig(rcVersion, config, pkg, resources)
@@ -412,11 +551,40 @@ class ApplicationManager(
         readFile(filePath)
     }
 
-    private fun readFile(filePath: String): String =
-        otaServices.fileProviderService.readFromFile("app/$filePath")
+    private fun readFile(filePath: String): String {
+        readFileAsStream(filePath).use { stream ->
+            return stream.readBytes().toString(Charsets.UTF_8)
+        }
+    }
+
+    private fun readFileAsStream(filePath: String): BufferedInputStream =
+        otaServices.fileProviderService.readFromFileAsStream("app/$filePath")
 
     fun readSplit(fileName: String): String {
-        return readFile("$PACKAGE_DIR_NAME/$fileName")
+        return readSplitAsStream(fileName).use { stream ->
+            String(stream.readBytes(), Charsets.UTF_8)
+        }
+    }
+
+    fun readSplitAsStream(fileName: String): BufferedInputStream {
+        return readFileAsStream("$PACKAGE_DIR_NAME/$fileName")
+    }
+
+    fun readSplitAsFile(fileName: String): File {
+        val stream = readSplitAsStream(fileName)
+        val dotIndex = fileName.lastIndexOf('.')
+        val prefix = if (dotIndex > 0) fileName.substring(0, dotIndex) else fileName
+        val suffix = if (dotIndex > 0) fileName.substring(dotIndex) else ".tmp"
+
+        val tempFile = File.createTempFile(prefix, suffix, this.ctx.cacheDir)
+
+        stream.use { input ->
+            tempFile.outputStream().buffered().use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        return tempFile
     }
 
     fun readReleaseConfig(): String {
@@ -469,7 +637,7 @@ class ApplicationManager(
     private fun trackGeneric(label: String, value: JSONObject, level: String) {
         tracker.track(
             LogCategory.LIFECYCLE,
-            LogSubCategory.LifeCycle.AIRBORNE,
+            LogSubCategory.LifeCycle.HYPER_OTA,
             level,
             TAG,
             label,

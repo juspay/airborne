@@ -167,7 +167,7 @@ internal data class ReleaseConfig(
         }
 
         override fun hashCode(): Int {
-            return 31 * url.hashCode() + filePath.hashCode()
+            return 31 * url.toURI().hashCode() + filePath.hashCode()
         }
 
         fun toJSON(): JSONObject {
