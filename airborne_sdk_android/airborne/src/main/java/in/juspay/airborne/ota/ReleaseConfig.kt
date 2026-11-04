@@ -149,7 +149,7 @@ internal data class ReleaseConfig(
             if (this === other) return true
             if (other !is Split) return false
 
-            if (url != other.url) return false
+            if (url.toExternalForm() != other.url.toExternalForm()) return false
             if (filePath != other.filePath) return false
 
             // Only compare checksum if both are non-null and non-empty
@@ -167,7 +167,7 @@ internal data class ReleaseConfig(
         }
 
         override fun hashCode(): Int {
-            return 31 * url.toURI().hashCode() + filePath.hashCode()
+            return 31 * url.toExternalForm().hashCode() + filePath.hashCode()
         }
 
         fun toJSON(): JSONObject {
