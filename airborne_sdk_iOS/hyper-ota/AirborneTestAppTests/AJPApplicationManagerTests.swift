@@ -272,6 +272,56 @@ final class AJPApplicationManagerTests: XCTestCase {
         XCTAssertEqual(manager.readResourceFile(name), "/* resource */")
     }
 
+    func testReadPackageFile_pathLeavingPackage_returnsNil() throws {
+        // A real file one level above the package's main directory; readable if ".." were followed.
+        let secret = "secret_\(UUID().uuidString).txt"
+        try writePackageFile("../\(secret)", content: "outside")
+        XCTAssertNil(manager.readPackageFile("../\(secret)"))
+        XCTAssertNil(manager.readPackageFile("a/../../\(secret)"))
+    }
+
+    func testReadPackageFile_absolutePath_returnsNil() {
+        XCTAssertNil(manager.readPackageFile("/etc/hosts"))
+    }
+
+    func testReadPackageFile_nestedRelativePath_returnsContent() throws {
+        let name = "dir_\(UUID().uuidString)/nested.js"
+        try writePackageFile(name, content: "/* nested */")
+        XCTAssertEqual(manager.readPackageFile(name), "/* nested */")
+    }
+
+    // MARK: - isPackageRelativePath
+
+    func testIsPackageRelativePath_acceptsRelativePaths() {
+        for path in ["", "index.jsa", "a/b/c.js", "./index.jsa", "a/./b", "a//b", "a/",
+                     "..a", "a..", "a..b", "a/..b/c", "a/b../c", "...", ".hidden", "a b/c d.js",
+                     "%2e%2e/x", "~/x", "a\\b", "caf\u{E9}/index.js"] {
+            XCTAssertTrue(AJPApplicationManager.isPackageRelativePath(path), "expected relative: \(path)")
+        }
+    }
+
+    func testIsPackageRelativePath_rejectsAbsolutePaths() {
+        for path in ["/", "/etc/hosts", "//x", "/index.jsa", "/../x"] {
+            XCTAssertFalse(AJPApplicationManager.isPackageRelativePath(path), "expected absolute: \(path)")
+        }
+    }
+
+    func testIsPackageRelativePath_rejectsParentComponents() {
+        for path in ["..", "../x", "a/..", "a/../b", "a/b/../../c", "./..", "../..", "a//..//b", "x/../"] {
+            XCTAssertFalse(AJPApplicationManager.isPackageRelativePath(path), "expected escape: \(path)")
+        }
+    }
+
+    func testIsPackageRelativePath_combiningMarkCannotHideSeparator() {
+        // "/" + U+0338 is a single Character, but at the file-system level it is still a separator.
+        XCTAssertFalse(AJPApplicationManager.isPackageRelativePath("../\u{0338}x"))
+        XCTAssertFalse(AJPApplicationManager.isPackageRelativePath("a/../\u{0338}x"))
+        XCTAssertFalse(AJPApplicationManager.isPackageRelativePath("/\u{0338}x"))
+        // A combining mark glued to ".." makes it an ordinary file name, not a parent reference.
+        XCTAssertTrue(AJPApplicationManager.isPackageRelativePath("a/\u{0338}../x"))
+        XCTAssertTrue(AJPApplicationManager.isPackageRelativePath("a/..\u{0338}/x"))
+    }
+
     // MARK: - waitForPackagesAndResources
 
     func testWaitForPackagesAndResources_resultIsOK() {

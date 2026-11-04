@@ -583,7 +583,20 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         handler?(getCurrentResult())
     }
     
+    /**
+     * Reads a file of the current package as UTF-8.
+     *
+     * `fileName` is relative to the package directory (as in the release config). Absolute paths
+     * and paths with a ".." component are rejected (logged, nil), since this is reachable from JS.
+     */
     @objc public func readPackageFile(_ fileName: String) -> String? {
+        if !AJPApplicationManager.isPackageRelativePath(fileName) {
+            let map = NSMutableDictionary()
+            map["fileName"] = fileName
+            map["error"] = "path is absolute or leaves the package directory"
+            tracker.trackError("read_package_file", value: map)
+            return nil
+        }
         let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
         do {
             let fileContent = try fileUtil.loadFile(filePath, folder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, withLocalAssets: self.isLocalAssets)
@@ -597,6 +610,17 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
     }
     
+    /// Whether `path` is relative and has no ".." component, so it cannot leave the package directory.
+    static func isPackageRelativePath(_ path: String) -> Bool {
+        // Split on code points, not Characters: a combining mark after "/" would merge with it
+        // into one Character and hide the separator from a Character-based split.
+        let scalars = path.unicodeScalars
+        if scalars.first == "/" {
+            return false
+        }
+        return !scalars.split(separator: "/").contains { $0.elementsEqual("..".unicodeScalars) }
+    }
+
     @objc public func readResourceFile(_ resourceFileName: String) -> String? {
         let mainResourcePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(resourceFileName)
         do {
