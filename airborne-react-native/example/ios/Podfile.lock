@@ -1,7 +1,7 @@
 PODS:
-  - Airborne (0.3.2)
-  - AirborneReact (0.3.0):
-    - Airborne (= 0.3.2)
+  - Airborne (0.45.0)
+  - AirborneReact (0.45.0):
+    - Airborne (= 0.45.0)
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1909,8 +1909,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  Airborne: 46578e56070672d064940d803c149007d747a6f8
-  AirborneReact: cf25bdffe669629d0fe2b1b5cb3df68b318409d0
+  Airborne: 40b992ce83d340be465bc8299d2b51120a7fb991
+  AirborneReact: 21e4cb3d4957a17a372bbfcc36020639ffe5372f
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
