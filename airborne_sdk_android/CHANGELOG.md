@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_android-v0.3.0 - 2026-11-05
+#### Bug Fixes
+- **(android)** publish io.juspay:airborne with the release version - (144b53f) - Yaswanth
+- **(android)** review fixes for the Bitbucket sync - (7ef1c78) - Shiva Nandan V
+#### Features
+- **(android)** sync airborne SDK with Bitbucket in.juspay:airborne 2.2.9-rc.18 - (f8aa693) - Shiva Nandan V
+
+- - -
+
 ## airborne_sdk_android-v0.2.0 - 2026-04-17
 #### Features
 - **(android)** handle checksum in release config - (1458257) - yash.rajput.001
