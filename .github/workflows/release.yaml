@@ -12,6 +12,7 @@ concurrency:
 jobs:
   tag-release:
     runs-on: ubuntu-latest
+    environment: production
     permissions:
       contents: write
       id-token: write
@@ -20,11 +21,18 @@ jobs:
       version: ${{ steps.git_tag.outputs.version }}
       is_new_version: ${{ steps.git_tag.outputs.is_new_version }}
     steps:
+      - name: Generate GitHub app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.HYPER_SDK_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HYPER_SDK_APP_PRIVATE_KEY }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
@@ -44,22 +52,6 @@ jobs:
         with:
           crate: cocogitto
           version: "6.3.0"
-
-      - name: Install SSH key
-        env:
-          DEPLOY_KEY: ${{ secrets.AIRBORNE_DEPLOY_KEY }}
-        run: |
-          # create .ssh
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          # write private key
-          echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-
-          # ensure github host key is known (avoid StrictHostKeyChecking prompt)
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
 
       - name: Get current version
         id: current_version
@@ -121,7 +113,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -154,7 +145,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -196,7 +186,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -229,7 +218,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -271,7 +259,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -304,7 +291,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -337,7 +323,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Filter paths
         id: changes
@@ -427,7 +412,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - uses: actions/setup-node@v4
         with:
@@ -481,7 +465,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          ssh-key: ${{ secrets.AIRBORNE_DEPLOY_KEY}}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
