@@ -1,8 +1,8 @@
 name: Create an airborne release
 
 on:
-  pull_request:
-    types: [closed]
+  # Not pull_request: production only allows main, and PR runs are checked as refs/pull/N/merge.
+  push:
     branches: [main]
 
 concurrency:
@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     outputs:
       version: ${{ steps.git_tag.outputs.version }}
       is_new_version: ${{ steps.git_tag.outputs.is_new_version }}
@@ -95,7 +95,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -137,7 +137,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -168,7 +168,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -210,7 +210,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -241,7 +241,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     strategy:
       max-parallel: 5
       matrix:
@@ -283,7 +283,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -314,7 +314,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -398,7 +398,7 @@ jobs:
 
   publish-to-npm:
     needs: [tag-release]
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     permissions:
       contents: read
       id-token: write
@@ -457,7 +457,7 @@ jobs:
         publish-to-npm,
       ]
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true && github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
+    if: github.ref == 'refs/heads/main' && needs.tag-release.outputs.is_new_version == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
