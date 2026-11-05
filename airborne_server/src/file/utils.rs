@@ -4,6 +4,38 @@ use sha2::{Digest, Sha256 as checksum_algorithm};
 
 use crate::types as airborne_types;
 use crate::types::ABError;
+use crate::utils::db::models::FileEntry;
+
+/// Whether a file row has been fully materialised and is safe to publish.
+pub fn is_file_ready(file: &FileEntry) -> bool {
+    file.size > 0 && !file.checksum.trim().is_empty()
+}
+
+/// Identifies the files in `files` that are not yet safe to publish
+pub fn not_ready_file_keys(files: &[FileEntry]) -> Vec<String> {
+    files
+        .iter()
+        .filter(|file| !is_file_ready(file))
+        .map(|file| format!("{}@version:{}", file.file_path, file.version))
+        .collect()
+}
+
+/// Rejects the request unless every file is ready to publish.
+pub fn ensure_files_ready(files: &[FileEntry]) -> airborne_types::Result<()> {
+    let pending = not_ready_file_keys(files);
+
+    if pending.is_empty() {
+        return Ok(());
+    }
+
+    Err(ABError::BadRequest(format!(
+        "These files are not ready to be published: {}. A file becomes ready \
+         once its size and checksum have been computed; a file stuck at size 0 \
+         with an empty checksum means its download failed and it must be \
+         re-created before use.",
+        pending.join(", ")
+    )))
+}
 
 pub async fn download_and_checksum(file_url: &str) -> airborne_types::Result<(u64, String)> {
     let bytes = download_and_calculate_filesize(file_url, &None).await?;
