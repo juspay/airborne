@@ -175,8 +175,22 @@ import Foundation
     /// - Throws: An `NSError` if the file cannot be read or if decoding fails.
     /// - Returns: The fully decoded object. You will typically cast it to your expected type after receiving it.
     @objc public func getDecodedInstanceForClass(_ className: AnyClass, withContentOfFileName fileName: String, inFolder folderName: String) throws -> Any {
+        return try getDecodedInstanceForClasses([className], withContentOfFileName: fileName, inFolder: folderName)
+    }
+
+    /// Reads and decodes an archived object whose class graph spans more than one type.
+    /// - Parameters:
+    ///   - classes: Every class permitted anywhere in the decoded object graph. Secure decoding
+    ///              validates contained objects too, so a collection needs the classes of its
+    ///              elements listed alongside its own — an untyped JSON payload, for instance,
+    ///              needs `NSDictionary`, `NSArray`, `NSString`, `NSNumber` and `NSNull`.
+    ///   - fileName: The name of the file containing the archived data.
+    ///   - folderName: The folder where the file is located within the workspace.
+    /// - Throws: An `NSError` if the file cannot be read or if decoding fails.
+    /// - Returns: The fully decoded object. You will typically cast it to your expected type after receiving it.
+    @objc public func getDecodedInstanceForClasses(_ classes: [AnyClass], withContentOfFileName fileName: String, inFolder folderName: String) throws -> Any {
         let fileData = try getFileDataFromInternalStorage(fileName, inFolder: folderName)
-        guard let decoded = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [className], from: fileData) else {
+        guard let decoded = try NSKeyedUnarchiver.unarchivedObject(ofClasses: classes, from: fileData) else {
             throw NSError(domain: "in.juspay.Airborne", code: 1003, userInfo: [NSLocalizedDescriptionKey: "Failed to decode object or object was nil"])
         }
         return decoded
