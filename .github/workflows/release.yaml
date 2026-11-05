@@ -334,8 +334,7 @@ jobs:
             hyper_eta_react:
               - 'airborne_sdk_android/hyper-eta-react/**'
 
-      # The Android SDK has its own version (airborne_sdk_android/version.properties),
-      # separate from the monorepo version. Publish only when that version is not on Maven Central yet.
+      # cog writes the release version into version.properties; skip if Maven Central already has it.
       - name: Check if Android SDK version is already published
         id: android_version
         shell: bash
