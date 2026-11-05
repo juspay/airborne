@@ -141,6 +141,15 @@ async fn create_dimension_api(
                         e
                     ))
                 })?;
+
+            crate::release::utils::refresh_unresolved_properties(
+                &state,
+                &organisation,
+                &application,
+                &workspace_name,
+            )
+            .await;
+
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
                 position: dimension.position,
@@ -165,6 +174,15 @@ async fn create_dimension_api(
                 .map_err(|e| {
                     ABError::InternalServerError(format!("Failed to create dimension: {}", e))
                 })?;
+
+            crate::release::utils::refresh_unresolved_properties(
+                &state,
+                &organisation,
+                &application,
+                &workspace_name,
+            )
+            .await;
+
             Ok(Json(CreateDimensionResponse {
                 dimension: dimension.dimension,
                 position: dimension.position,
@@ -311,6 +329,14 @@ async fn update_dimension_api(
             ABError::InternalServerError(format!("Failed to trigger weight recompute: {}", e))
         })?;
 
+    crate::release::utils::refresh_unresolved_properties(
+        &state,
+        &organisation,
+        &application,
+        &workspace_name,
+    )
+    .await;
+
     Ok(Json(Dimension {
         dimension: update_dimension.dimension,
         position: update_dimension.position,
@@ -366,6 +392,14 @@ async fn delete_dimension_api(
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;
+
+    crate::release::utils::refresh_unresolved_properties(
+        &state,
+        &organisation,
+        &application,
+        &workspace_name,
+    )
+    .await;
 
     Ok(Json(()))
 }

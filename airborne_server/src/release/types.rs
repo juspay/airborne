@@ -163,11 +163,50 @@ pub struct ServeReleaseResponse {
     pub config: Config,
     pub package: ServePackage,
     pub resources: Vec<ServeFile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unresolved_properties: Option<UnresolvedProperties>,
+}
+
+/// The unresolved Superposition bundle for an application's workspace, narrowed to
+/// the `config.properties` key space, attached to the serve-release response when
+/// `?extended=true`.
+///
+/// This is the same data the server just resolved against, handed over unresolved
+/// so a caller can resolve properties itself. `config` maps onto
+/// `ProviderCache::init_config` and the two experiment lists onto
+/// `ProviderCache::init_experiments` in `superposition_core`.
+///
+/// `Deserialize` is required because this is cached in Redis per (org, app); see
+/// `release::utils::get_unresolved_properties`.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UnresolvedProperties {
+    /// `contexts`, `overrides`, `default_configs` and `dimensions`, serialised
+    /// exactly as `superposition_types::Config` does, with every config key other
+    /// than `config.properties*` filtered out. `dimensions` is *not* filtered, so
+    /// cohort dimensions still carry their JsonLogic `definitions` and cohort
+    /// membership is derivable from this payload alone.
+    pub config: Value,
+    pub config_version: String,
+    pub config_last_modified: DateTime<Utc>,
+    pub experiments: Value,
+    pub experiment_groups: Value,
+    pub experiments_last_modified: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]
 pub struct ServeReleaseQueryParams {
     pub toss: Option<String>,
+    /// Held as a string rather than a `bool` so that a junk value degrades to
+    /// "not requested" instead of 400-ing the boot path on a query-parse error.
+    pub extended: Option<String>,
+}
+
+impl ServeReleaseQueryParams {
+    pub fn wants_extended(&self) -> bool {
+        self.extended
+            .as_deref()
+            .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "true" | "1"))
+    }
 }
 
 pub struct BuildOverrides {
