@@ -88,7 +88,64 @@ Fired on release config download completion.
     release_config_url: "<url>",
     status: 200,
     time_taken: "<time_taken>",
-    app_update_id: "<UUID>"
+    app_update_id: "<UUID>",
+    // Signature fields — present only when public keys are configured (iOS):
+    signature_present: true,        // whether the response carried a signature header
+    signature_verified: true,       // whether it verified against a trusted key
+    signature_key_id: "<key id>"    // the key that verified it
+  }
+}
+```
+
+When verification is configured but fails, `signature_verified` is `false` and `signature_error` carries a stable reason code (`signature_mismatch`, `untrusted_key_id`, `malformed_signature`, `unsupported_alg`, `malformed_header`, `invalid_signing_config`). The config is discarded and the app keeps its installed bundle.
+
+A release config is only accepted from a **2xx** response. A 4xx or 5xx is treated as a failed fetch — `is_success` is `false` and `message` is `"Unexpected HTTP status <code>"` — and its body is never parsed, verified, or staged, even if it happens to look like a config. The app falls back to the currently installed bundle. (Signature verification runs only on 2xx responses, since non-2xx responses are rejected before it.)
+
+### release_config_signature_missing
+
+Fired (iOS) when a public key is configured but the response carried no signature header. This is not an error — the server omits the signature when an application has no signing key — so the config is still applied. Use it to confirm signing is switched on before you rely on it.
+
+```typescript
+{
+  level: "warning",
+  key: "release_config_signature_missing",
+  value: {
+    reason: "missing_header",
+    trusted_key_id: "<the pinned key id>"
+  }
+}
+```
+
+### release_config_signature_verification_failed
+
+Fired (iOS) when a response carried a signature that could not be verified against the pinned key. The config is rejected.
+
+```typescript
+{
+  level: "error",
+  key: "release_config_signature_verification_failed",
+  value: {
+    reason: "signature_mismatch",        // stable reason code
+    response_key_id: "<key id from header>",
+    alg: "es256",
+    trusted_key_id: "<the pinned key id>",
+    status: 200,
+    body_size: "<bytes>"
+  }
+}
+```
+
+### release_config_signing_key_invalid
+
+Fired once at initialization (iOS) when verification was configured but cannot run — a malformed public-key PEM, or only one of the key id / public key supplied. The signing config is unusable, so any signed config will be rejected until it is fixed in a new app build.
+
+```typescript
+{
+  level: "error",
+  key: "release_config_signing_key_invalid",
+  value: {
+    key_id: "<the configured key id>",
+    has_public_key: false               // whether a usable PEM was parsed
   }
 }
 ```
