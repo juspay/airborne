@@ -166,4 +166,184 @@ impl AuthNProvider for KeycloakAuthNProvider {
 
         self.login_with_password(state, credentials).await
     }
+
+    fn supports_service_accounts(&self) -> bool {
+        true
+    }
+
+    async fn create_service_account_user(
+        &self,
+        state: &AppState,
+        username: &str,
+        email: &str,
+        password: &str,
+    ) -> airborne_types::Result<UserToken> {
+        if state.env.keycloak_url.trim().is_empty() {
+            return Err(ABError::InternalServerError(
+                "AUTH_ADMIN_ISSUER must be configured for service account creation".to_string(),
+            ));
+        }
+        if state.env.realm.trim().is_empty() {
+            return Err(ABError::InternalServerError(
+                "Unable to derive Keycloak realm from AUTH_ADMIN_ISSUER".to_string(),
+            ));
+        }
+
+        let admin_token = get_token(state.env.clone(), Client::new())
+            .await
+            .map_err(|_| ABError::InternalServerError("Failed to get admin token".to_string()))?;
+        let admin = KeycloakAdmin::new(&state.env.keycloak_url, admin_token, Client::new());
+
+        if find_user_by_username(&admin, &state.env.realm, username)
+            .await?
+            .is_some()
+        {
+            return Err(ABError::BadRequest(
+                "Service account user already exists".to_string(),
+            ));
+        }
+
+        let user = UserRepresentation {
+            username: Some(username.to_string()),
+            first_name: Some("Service".to_string()),
+            last_name: Some("Account".to_string()),
+            email: Some(email.to_string()),
+            email_verified: Some(true),
+            credentials: Some(vec![CredentialRepresentation {
+                value: Some(password.to_string()),
+                temporary: Some(false),
+                type_: Some("password".to_string()),
+                ..Default::default()
+            }]),
+            enabled: Some(true),
+            ..Default::default()
+        };
+        admin.realm_users_post(&state.env.realm, user).await?;
+
+        // Login with offline_access to get a long-lived refresh token
+        let credentials = UserCredentials {
+            name: username.to_string(),
+            password: password.to_string(),
+            first_name: None,
+            last_name: None,
+            email: None,
+        };
+        match password_login_common(state, &credentials, Some("offline_access")).await {
+            Ok(token) => Ok(token),
+            Err(e) => {
+                // Roll back the just-created Keycloak user so a retry is not blocked
+                // by an orphaned identity failing the duplicate-username check above.
+                if let Err(cleanup_err) = self.delete_user(state, username).await {
+                    log::error!(
+                        "Failed to roll back orphaned service account user '{}': {}",
+                        username,
+                        cleanup_err
+                    );
+                }
+                Err(e)
+            }
+        }
+    }
+
+    async fn rotate_service_account_user(
+        &self,
+        state: &AppState,
+        username: &str,
+        password: &str,
+    ) -> airborne_types::Result<UserToken> {
+        if state.env.keycloak_url.trim().is_empty() || state.env.realm.trim().is_empty() {
+            return Err(ABError::InternalServerError(
+                "Keycloak admin configuration required for service account rotation".to_string(),
+            ));
+        }
+
+        let admin_token = get_token(state.env.clone(), Client::new())
+            .await
+            .map_err(|_| ABError::InternalServerError("Failed to get admin token".to_string()))?;
+        let admin = KeycloakAdmin::new(&state.env.keycloak_url, admin_token, Client::new());
+
+        let user = find_user_by_username(&admin, &state.env.realm, username)
+            .await?
+            .ok_or_else(|| {
+                ABError::NotFound("Service account user not found in identity provider".to_string())
+            })?;
+        let user_id = user.id.ok_or_else(|| {
+            ABError::InternalServerError("User has no ID in identity provider".to_string())
+        })?;
+
+        // 1. Set a fresh password (admin reset does not require the old one).
+        admin
+            .realm_users_with_user_id_reset_password_put(
+                &state.env.realm,
+                &user_id,
+                CredentialRepresentation {
+                    value: Some(password.to_string()),
+                    temporary: Some(false),
+                    type_: Some("password".to_string()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to reset service account password: {}",
+                    e
+                ))
+            })?;
+
+        // 2. Revoke existing sessions so the previously issued offline token
+        //    (the old client_secret) can no longer be refreshed.
+        admin
+            .realm_users_with_user_id_logout_post(&state.env.realm, &user_id)
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to revoke service account sessions: {}",
+                    e
+                ))
+            })?;
+
+        // 3. Log in with offline_access to mint a fresh long-lived refresh token.
+        let credentials = UserCredentials {
+            name: username.to_string(),
+            password: password.to_string(),
+            first_name: None,
+            last_name: None,
+            email: None,
+        };
+        password_login_common(state, &credentials, Some("offline_access")).await
+    }
+
+    async fn delete_user(&self, state: &AppState, username: &str) -> airborne_types::Result<()> {
+        if state.env.keycloak_url.trim().is_empty() || state.env.realm.trim().is_empty() {
+            return Err(ABError::InternalServerError(
+                "Keycloak admin configuration required for user deletion".to_string(),
+            ));
+        }
+
+        let admin_token = get_token(state.env.clone(), Client::new())
+            .await
+            .map_err(|_| ABError::InternalServerError("Failed to get admin token".to_string()))?;
+        let admin = KeycloakAdmin::new(&state.env.keycloak_url, admin_token, Client::new());
+
+        let user = find_user_by_username(&admin, &state.env.realm, username)
+            .await?
+            .ok_or_else(|| ABError::NotFound("User not found in identity provider".to_string()))?;
+
+        let user_id = user.id.ok_or_else(|| {
+            ABError::InternalServerError("User has no ID in identity provider".to_string())
+        })?;
+
+        admin
+            .realm_users_with_user_id_delete(&state.env.realm, &user_id)
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!(
+                    "Failed to delete user from identity provider: {}",
+                    e
+                ))
+            })?;
+
+        Ok(())
+    }
 }
