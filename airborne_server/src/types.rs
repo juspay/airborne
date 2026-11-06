@@ -495,6 +495,17 @@ where
         .transpose()
 }
 
+/// Like `de_u32_from_str`: query values arrive as strings, including when
+/// `PaginatedQuery` is `#[serde(flatten)]`-ed into another query struct.
+fn de_bool_from_str<'de, D>(d: D) -> std::result::Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(d)?;
+    opt.map(|s| s.parse().map_err(serde::de::Error::custom))
+        .transpose()
+}
+
 impl<'de> Deserialize<'de> for PaginatedQuery {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -506,7 +517,7 @@ impl<'de> Deserialize<'de> for PaginatedQuery {
             count: Option<u32>,
             #[serde(default, deserialize_with = "de_u32_from_str")]
             page: Option<u32>,
-            #[serde(default)]
+            #[serde(default, deserialize_with = "de_bool_from_str")]
             all: Option<bool>,
         }
 
@@ -530,5 +541,43 @@ impl<'de> Deserialize<'de> for PaginatedQuery {
 
             Ok(Self::Paginated { page, count })
         }
+    }
+}
+
+#[cfg(test)]
+mod paginated_query_tests {
+    use super::PaginatedQuery;
+    use actix_web::web::Query;
+
+    #[derive(serde::Deserialize)]
+    struct Flattened {
+        #[serde(flatten)]
+        pagination: PaginatedQuery,
+    }
+
+    #[test]
+    fn all_parses_when_used_directly() {
+        let q = Query::<PaginatedQuery>::from_query("all=true").unwrap();
+        assert!(matches!(q.into_inner(), PaginatedQuery::All));
+    }
+
+    #[test]
+    fn all_parses_when_flattened() {
+        let q = Query::<Flattened>::from_query("all=true").unwrap();
+        assert!(matches!(q.into_inner().pagination, PaginatedQuery::All));
+    }
+
+    #[test]
+    fn all_false_falls_back_to_default_page() {
+        let q = Query::<Flattened>::from_query("all=false").unwrap();
+        assert!(matches!(
+            q.into_inner().pagination,
+            PaginatedQuery::Paginated { page: 1, count: 10 }
+        ));
+    }
+
+    #[test]
+    fn all_rejects_non_boolean() {
+        assert!(Query::<Flattened>::from_query("all=yes").is_err());
     }
 }
