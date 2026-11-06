@@ -25,6 +25,7 @@ For local development you rarely set these by hand. `make setup` seeds `airborne
 | `KEEP_ALIVE` | No | `30` | Actix-web keep-alive timeout, in seconds. |
 | `BACKLOG` | No | `1024` | Listen backlog (max pending connections). |
 | `ACTIX_WORKERS` | No | `4` | Number of Actix worker threads. |
+| `RELEASE_CORS_ALLOWED_ORIGINS` | No | _(empty)_, e.g. `http://localhost:8090` | Comma-separated browser origins (`scheme://host[:port]`) allowed to read the public `/release/*` routes cross-origin, for the web SDK. `*` allows any origin. GET/HEAD only, the only allowed request header is `x-dimension`, and credentials are never allowed. Empty disables CORS, leaving `/release` unchanged. A malformed origin fails startup. |
 | `PUBLIC_ENDPOINT` | **Yes** | `http://localhost:3000` | Externally reachable base URL of the deployment. Used by the dashboard to reach the API and to build browser-facing URLs / redirects. |
 | `RUST_LOG` | No | `debug,info,error,actix_web=info,error` | Standard Rust log filter directive. |
 | `LOG_FORMAT` | No | _(empty)_ | Tracing output format. Empty selects the default human-readable format; set to a JSON-style value for structured logs. |
@@ -140,7 +141,7 @@ The server talks to S3 (object storage) and KMS (secret decryption). AWS credent
 | --- | --- | --- | --- |
 | `AWS_BUCKET` | **Yes** | `hyper-ota-bucket` | S3 bucket for files, packages, and resources. |
 | `AWS_REGION` | **Yes** (SDK) | `us-east-1` | AWS region. Read by the AWS SDK credential/region chain. |
-| `AWS_ENDPOINT_URL` | No | `http://localhost:4566` | Custom S3/KMS endpoint. When set, the S3 client switches to **path-style** addressing (needed for LocalStack). Leave unset in production to use real AWS. |
+| `AWS_ENDPOINT_URL` | No | `http://localhost:4566` | Custom S3/KMS endpoint. The S3 client switches to **path-style** addressing (needed for LocalStack) when the endpoint's host contains `localstack`, is `localhost`, or is a loopback IPv4/IPv6 address; other endpoints use virtual-hosted addressing. Leave unset in production to use real AWS. |
 | `AWS_ACCESS_KEY_ID` | Conditional (SDK) | `test` | AWS access key. Read by the SDK. In production, prefer an IAM role over static keys. |
 | `AWS_SECRET_ACCESS_KEY` | Conditional (SDK) | `test` | AWS secret key. Read by the SDK. Prefer IAM roles in production. |
 | `AWS_SESSION_TOKEN` | No (SDK) | `test` | Optional session token for temporary credentials. |

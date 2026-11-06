@@ -159,6 +159,9 @@ echo "${GREEN}✅ KMS alias configured: $KMS_KEY_ID${NC}"
 
 echo "${YELLOW}🪣 Creating S3 bucket...${NC}"
 aws --endpoint-url=${AWS_ENDPOINT_URL} s3 mb s3://$AWS_BUCKET >/dev/null 2>&1 || true
+aws --endpoint-url=${AWS_ENDPOINT_URL} s3api put-bucket-cors --bucket "$AWS_BUCKET" \
+  --cors-configuration '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"]}]}' >/dev/null 2>&1 ||
+  echo "${YELLOW}⚠️  Could not set bucket CORS (browser OTA downloads from this bucket may be blocked); continuing${NC}"
 echo "${GREEN}✅ S3 bucket ready: $AWS_BUCKET${NC}"
 
 # Variables that need encryption/processing

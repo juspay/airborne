@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![deny(unused_crate_dependencies)]
+use actix_cors::Cors;
 use airborne_authz_macros as _;
 
 mod authz;
@@ -31,11 +32,12 @@ mod user;
 mod utils;
 
 use actix_web::{
+    middleware::Condition,
     web::{self, PathConfig, QueryConfig},
     App, HttpResponse, HttpServer,
 };
 use aws_sdk_s3::config::Builder;
-use config::AppConfig;
+use config::{AppConfig, ReleaseCorsOrigins};
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
 use google_sheets4::{
@@ -171,11 +173,7 @@ async fn main() -> std::io::Result<()> {
         tokio::spawn(push_metrics_task(metrics_url));
     }
 
-    let force_path_style = app_config
-        .aws_endpoint_url
-        .as_ref()
-        .map(|url| url.contains("localstack"))
-        .unwrap_or(false);
+    let force_path_style = force_path_style(app_config.aws_endpoint_url.as_deref());
 
     let aws_cloudfront_client = aws_sdk_cloudfront::Client::new(&shared_config);
 
@@ -479,6 +477,7 @@ async fn main() -> std::io::Result<()> {
     let keep_alive = app_config.keep_alive;
     let backlog = app_config.backlog;
     let port = app_config.port;
+    let release_cors_origins = app_config.release_cors_origins.clone();
 
     HttpServer::new(move || {
         App::new()
@@ -490,7 +489,11 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::JsonConfig::default().error_handler(middleware::json_error_handler))
             .wrap(actix_web::middleware::Compress::default())
             .wrap(actix_web::middleware::Logger::default())
-            .service(web::scope("/release").service(release::add_public_routes()))
+            .service(
+                web::scope("/release")
+                    .wrap(release_cors(&release_cors_origins))
+                    .service(release::add_public_routes()),
+            )
             .service(web::scope("/build").service(build::add_routes()))
             .service(
                 web::scope(&server_path_prefix)
@@ -532,4 +535,163 @@ async fn main() -> std::io::Result<()> {
     .bind(("0.0.0.0", port))?
     .run()
     .await
+}
+
+/// LocalStack and other local S3 endpoints cannot resolve virtual-hosted bucket
+/// names, so path-style addressing is forced for them.
+fn force_path_style(endpoint: Option<&str>) -> bool {
+    let Some(url) = endpoint.and_then(|endpoint| url::Url::parse(endpoint).ok()) else {
+        return false;
+    };
+    match url.host() {
+        Some(url::Host::Domain(host)) => host.contains("localstack") || host == "localhost",
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod force_path_style_tests {
+    use super::force_path_style;
+
+    #[test]
+    fn local_endpoints_use_path_style() {
+        for endpoint in [
+            "http://localstack:4566",
+            "http://localhost:4566",
+            "http://127.0.0.1:4566",
+            "http://[::1]:9000",
+        ] {
+            assert!(force_path_style(Some(endpoint)), "{endpoint}");
+        }
+    }
+
+    #[test]
+    fn remote_or_missing_endpoints_keep_virtual_hosted_style() {
+        for endpoint in [
+            Some("https://s3.amazonaws.com"),
+            Some("https://s3.ap-south-1.amazonaws.com"),
+            Some("not a url"),
+            None,
+        ] {
+            assert!(!force_path_style(endpoint), "{endpoint:?}");
+        }
+    }
+}
+
+/// Web clients fetch the release config cross-origin and send `x-dimension`,
+/// which triggers a preflight. Without configured origins the middleware is
+/// skipped entirely, so `/release` behaves exactly as before.
+fn release_cors(origins: &ReleaseCorsOrigins) -> Condition<Cors> {
+    let base = Cors::default()
+        .allowed_methods(vec!["GET", "HEAD"])
+        .allowed_headers(vec!["x-dimension"])
+        .max_age(3600);
+    match origins {
+        ReleaseCorsOrigins::Disabled => Condition::new(false, base),
+        ReleaseCorsOrigins::Any => Condition::new(true, base.allow_any_origin()),
+        ReleaseCorsOrigins::List(list) => Condition::new(
+            true,
+            list.iter()
+                .fold(base, |cors, origin| cors.allowed_origin(origin)),
+        ),
+    }
+}
+
+#[cfg(test)]
+mod release_cors_tests {
+    use super::{release_cors, ReleaseCorsOrigins};
+    use actix_web::{
+        http::{header, Method, StatusCode},
+        test, web, App, HttpResponse,
+    };
+
+    async fn call(
+        origins: ReleaseCorsOrigins,
+        req: test::TestRequest,
+    ) -> actix_web::dev::ServiceResponse {
+        let app = test::init_service(
+            App::new().service(
+                web::scope("/release")
+                    .wrap(release_cors(&origins))
+                    .route("/org/app", web::get().to(HttpResponse::Ok)),
+            ),
+        )
+        .await;
+        test::call_service(&app, req.uri("/release/org/app").to_request()).await
+    }
+
+    fn allow_origin(res: &actix_web::dev::ServiceResponse) -> Option<String> {
+        res.headers()
+            .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .map(|v| v.to_str().unwrap().to_string())
+    }
+
+    fn preflight(origin: &str) -> test::TestRequest {
+        test::TestRequest::default()
+            .method(Method::OPTIONS)
+            .insert_header((header::ORIGIN, origin))
+            .insert_header((header::ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+            .insert_header((header::ACCESS_CONTROL_REQUEST_HEADERS, "x-dimension"))
+    }
+
+    #[actix_web::test]
+    async fn listed_origin_passes_preflight_and_get() {
+        let origins = ReleaseCorsOrigins::List(vec!["http://localhost:8090".into()]);
+        let res = call(origins.clone(), preflight("http://localhost:8090")).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(allow_origin(&res).as_deref(), Some("http://localhost:8090"));
+
+        let get = test::TestRequest::get().insert_header((header::ORIGIN, "http://localhost:8090"));
+        let res = call(origins, get).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(allow_origin(&res).as_deref(), Some("http://localhost:8090"));
+    }
+
+    #[actix_web::test]
+    async fn unlisted_origin_gets_no_allow_header_but_is_not_blocked() {
+        let origins = ReleaseCorsOrigins::List(vec!["http://localhost:8090".into()]);
+        let get = test::TestRequest::get().insert_header((header::ORIGIN, "https://evil.example"));
+        let res = call(origins, get).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(allow_origin(&res), None);
+    }
+
+    #[actix_web::test]
+    async fn preflight_rejects_unlisted_origins_headers_and_methods() {
+        let origins = ReleaseCorsOrigins::List(vec!["http://localhost:8090".into()]);
+
+        let res = call(origins.clone(), preflight("https://evil.example")).await;
+        assert!(!res.status().is_success());
+        assert_eq!(allow_origin(&res), None);
+
+        let other_header = preflight("http://localhost:8090")
+            .insert_header((header::ACCESS_CONTROL_REQUEST_HEADERS, "authorization"));
+        let res = call(origins.clone(), other_header).await;
+        assert!(!res.status().is_success());
+
+        let post = preflight("http://localhost:8090")
+            .insert_header((header::ACCESS_CONTROL_REQUEST_METHOD, "POST"));
+        let res = call(origins, post).await;
+        assert!(!res.status().is_success());
+    }
+
+    #[actix_web::test]
+    async fn any_origin_is_echoed() {
+        let get = test::TestRequest::get().insert_header((header::ORIGIN, "https://web.example"));
+        let res = call(ReleaseCorsOrigins::Any, get).await;
+        assert_eq!(allow_origin(&res).as_deref(), Some("https://web.example"));
+    }
+
+    #[actix_web::test]
+    async fn disabled_leaves_requests_untouched() {
+        let get = test::TestRequest::get().insert_header((header::ORIGIN, "https://web.example"));
+        let res = call(ReleaseCorsOrigins::Disabled, get).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(allow_origin(&res), None);
+
+        let res = call(ReleaseCorsOrigins::Disabled, test::TestRequest::get()).await;
+        assert_eq!(res.status(), StatusCode::OK);
+    }
 }

@@ -71,6 +71,30 @@ The resulting `airborne-config.json` looks like this:
 The command fails if an `airborne-config.json` already exists in the target directory. Edit the existing file directly, or remove it and re-run.
 :::
 
+### Web projects
+
+`create-local-airborne-config` scaffolds only `android` and `ios`. For a web OTA bundle, add a `web` section by hand. The first command run with `--platform web` prompts for its `organisation` and `namespace` and saves them:
+
+```json
+{
+  "web": {
+    "organisation": "MyCompany",
+    "namespace": "MyApp",
+    "index_file_path": "index.web.bundle",
+    "build_command": "npm run build:web"
+  }
+}
+```
+
+There is no `react-native bundle` step for web, and Hermes is never applied. Instead, `create-local-release-config` and `update-local-release-config` run `build_command` (default `npm run build:web`) from the project directory with two environment variables set:
+
+| Variable | Value |
+| --- | --- |
+| `AIRBORNE_OUTPUT_DIR` | `web/build/generated/airborne` (relative to the project directory) |
+| `AIRBORNE_INDEX_FILE` | `index_file_path` (default `index.web.bundle`) |
+
+Your build must write a single script to `$AIRBORNE_OUTPUT_DIR/$AIRBORNE_INDEX_FILE`. Any other files it writes to that directory are listed as `important` files. The release config is written to `web/release_config.json`.
+
 ## create-local-release-config
 
 Bundles your JavaScript for a platform and writes a `release_config.json` describing the package. The command runs the React Native bundler (`react-native bundle`) — or the Expo bundler (`expo export:embed`) when the project is marked as Expo — and, when Hermes is enabled, compiles the Hermes bytecode bundle. It then records the generated index file and every other generated asset.
@@ -94,7 +118,7 @@ npx airborne-devkit create-local-release-config [directoryPath] \
 | Parameter                       | Type               | Required | Description                                                            |
 | ------------------------------- | ------------------ | -------- | ---------------------------------------------------------------------- |
 | `[directoryPath]`               | string             | No       | Directory where the config is created (defaults to the current directory). |
-| `-p, --platform`                | `android` or `ios` | No       | Target platform. Prompted for if omitted.                             |
+| `-p, --platform`                | `android`, `ios` or `web` | No       | Target platform. Prompted for if omitted.                             |
 | `-b, --boot-timeout`            | number             | No       | Boot timeout in milliseconds (must be a positive number). Defaults to `4000`. |
 | `-r, --release-config-timeout`  | number             | No       | Release config timeout in milliseconds (must be a positive number). Defaults to `4000`. |
 
@@ -155,7 +179,7 @@ npx airborne-devkit update-local-release-config -p ios -b 45000 -r 90000
 | Parameter               | Type               | Required | Description                                                     |
 | ----------------------- | ------------------ | -------- | --------------------------------------------------------------- |
 | `[directoryPath]`       | string             | No       | Directory containing the config (defaults to the current directory). |
-| `-p, --platform`        | `android` or `ios` | No       | Target platform. Prompted for if omitted.                       |
+| `-p, --platform`        | `android`, `ios` or `web` | No       | Target platform. Prompted for if omitted.                       |
 | `-b, --boot-timeout`    | number             | No       | New boot timeout in milliseconds (must be a positive number).   |
 | `-r, --release-timeout` | number             | No       | New release config timeout in milliseconds (must be a positive number). |
 

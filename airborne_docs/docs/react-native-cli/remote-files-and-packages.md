@@ -29,7 +29,7 @@ npx airborne-devkit create-remote-files -p android -t "v1.2.0" --upload
 
 | Parameter         | Type               | Required | Description                                                             |
 | ----------------- | ------------------ | -------- | ----------------------------------------------------------------------- |
-| `-p, --platform`  | `android` or `ios` | Yes      | Target platform. Prompted for if omitted.                               |
+| `-p, --platform`  | `android`, `ios` or `web` | Yes      | Target platform. Prompted for if omitted.                               |
 | `-t, --tag`       | string             | No       | Tag applied to the files for identification and versioning. The reserved value `__default__` is not allowed. |
 | `-u, --upload`    | flag               | No       | Upload files directly to Airborne instead of registering external URLs. |
 | `[directoryPath]` | string             | No       | Directory containing the release config (defaults to the current directory). |
@@ -66,7 +66,7 @@ npx airborne-devkit create-remote-package -p ios -t "production-v1.2.0"
 
 | Parameter         | Type               | Required | Description                                                             |
 | ----------------- | ------------------ | -------- | ----------------------------------------------------------------------- |
-| `-p, --platform`  | `android` or `ios` | Yes      | Target platform. Prompted for if omitted.                               |
+| `-p, --platform`  | `android`, `ios` or `web` | Yes      | Target platform. Prompted for if omitted.                               |
 | `-t, --tag`       | string             | No       | Tag applied to the package for identification and versioning. The reserved value `__default__` is not allowed. |
 | `[directoryPath]` | string             | No       | Directory containing the release config (defaults to the current directory). |
 

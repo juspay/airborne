@@ -27,7 +27,7 @@ function persistToConfig(configPath, platform, fields, label) {
 export async function readAndResolveAirborneConfig(directoryPath, platform) {
   const airborneConfig = await readAirborneConfig(directoryPath);
   const configPath = path.join(directoryPath, "airborne-config.json");
-  const label = platform === "android" ? "Android" : "iOS";
+  const label = { android: "Android", ios: "iOS", web: "Web" }[platform];
 
   if (!airborneConfig[platform]) {
     airborneConfig[platform] = {};

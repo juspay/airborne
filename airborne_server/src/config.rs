@@ -26,6 +26,7 @@ pub struct AppConfig {
     pub backlog: u32,
     pub num_workers: usize,
     pub server_path_prefix: String,
+    pub release_cors_origins: ReleaseCorsOrigins,
 
     // Database settings
     pub db_user: String,
@@ -171,6 +172,9 @@ impl AppConfig {
             backlog: parse_env("BACKLOG", 1024),
             num_workers: parse_env("ACTIX_WORKERS", 4),
             server_path_prefix: get_env("SERVER_PATH_PREFIX", Some("api"))?,
+            release_cors_origins: parse_release_cors_origins(
+                &get_optional("RELEASE_CORS_ALLOWED_ORIGINS").unwrap_or_default(),
+            )?,
 
             // Database settings
             db_user: get_env("DB_USER", None)?,
@@ -268,4 +272,104 @@ fn parse_csv_env_list(raw: &str) -> Vec<String> {
         .map(|value| value.to_ascii_lowercase())
         .filter(|value| seen.insert(value.clone()))
         .collect()
+}
+
+/// Browser origins allowed to read the public `/release` routes cross-origin.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReleaseCorsOrigins {
+    /// No CORS headers are added (the default).
+    Disabled,
+    /// `*`: any origin may read release configs (no credentials are allowed).
+    Any,
+    /// Exact origins, normalised to `scheme://host[:port]`.
+    List(Vec<String>),
+}
+
+/// Parses `RELEASE_CORS_ALLOWED_ORIGINS`. A `*` anywhere allows every origin;
+/// any other entry must be a bare http(s) origin, so a typo fails at startup
+/// instead of silently never matching the browser's `Origin` header.
+pub fn parse_release_cors_origins(raw: &str) -> Result<ReleaseCorsOrigins, String> {
+    let entries = parse_csv_env_list(raw);
+    if entries.is_empty() {
+        return Ok(ReleaseCorsOrigins::Disabled);
+    }
+    if entries.iter().any(|entry| entry == "*") {
+        return Ok(ReleaseCorsOrigins::Any);
+    }
+    let mut origins = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let invalid = |reason: &str| {
+            format!("RELEASE_CORS_ALLOWED_ORIGINS: '{entry}' is not a valid origin ({reason})")
+        };
+        let url = url::Url::parse(&entry).map_err(|e| invalid(&e.to_string()))?;
+        if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+            return Err(invalid("expected http(s)://host[:port]"));
+        }
+        if url.path() != "/"
+            || url.query().is_some()
+            || url.fragment().is_some()
+            || !url.username().is_empty()
+            || url.password().is_some()
+        {
+            return Err(invalid(
+                "an origin has no path, query, fragment or credentials",
+            ));
+        }
+        let origin = url.origin().ascii_serialization();
+        if !origins.contains(&origin) {
+            origins.push(origin);
+        }
+    }
+    Ok(ReleaseCorsOrigins::List(origins))
+}
+
+#[cfg(test)]
+mod release_cors_origin_tests {
+    use super::{parse_release_cors_origins, ReleaseCorsOrigins};
+
+    #[test]
+    fn empty_value_disables_cors() {
+        assert_eq!(
+            parse_release_cors_origins(" , "),
+            Ok(ReleaseCorsOrigins::Disabled)
+        );
+    }
+
+    #[test]
+    fn wildcard_wins_in_any_position() {
+        for raw in ["*", "*,https://a.example", "https://a.example,*"] {
+            assert_eq!(
+                parse_release_cors_origins(raw),
+                Ok(ReleaseCorsOrigins::Any),
+                "{raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn origins_are_normalised_and_deduplicated() {
+        assert_eq!(
+            parse_release_cors_origins(
+                "HTTP://LocalHost:8090/, https://app.example:443,http://localhost:8090"
+            ),
+            Ok(ReleaseCorsOrigins::List(vec![
+                "http://localhost:8090".to_string(),
+                "https://app.example".to_string(),
+            ]))
+        );
+    }
+
+    #[test]
+    fn malformed_origins_are_rejected() {
+        for raw in [
+            "localhost:8090",
+            "ftp://files.example",
+            "https://app.example/path",
+            "https://app.example?x=1",
+            "https://user@app.example",
+            "not a url",
+        ] {
+            assert!(parse_release_cors_origins(raw).is_err(), "{raw}");
+        }
+    }
 }
