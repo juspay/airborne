@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.47.0 - 1970-01-01
+### Package updates
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.9.0
+### Global changes
+
+- - -
+
 ## v0.46.0 - 2026-11-05
 ### Package updates
 - airborne_sdk_android bumped to airborne_sdk_android-v0.3.0

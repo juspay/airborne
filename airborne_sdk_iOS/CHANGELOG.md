@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.9.0 - 2026-11-06
+#### Bug Fixes
+- **(ios)** reject package-escaping file paths in readPackageFile - (fa97813) - Shiva Nandan
+#### Features
+- **(ios)** expose existing-instance and release-config accessors for the RN bridge - (372a401) - Shiva Nandan
+
+- - -
+
+## v0.46.0 - 2026-11-06
+#### Miscellaneous Chores
+- **(version)** v0.46.0 [skip ci] - (0fe8f4c) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.8.0 - 2026-10-23
 #### Features
 - support request headers and options in api request - (3705e2b) - Yash Raput
