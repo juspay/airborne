@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_server-v0.25.0 - 2026-11-09
+#### Bug Fixes
+- **(local)** configure LocalStack bucket CORS and loopback path-style S3 - (cb04eed) - Shiva Nandan
+#### Features
+- **(web)** add cached OTA loader and CORS for release requests - (748a58f) - Shiva Nandan
+
+- - -
+
 ## airborne_server-v0.24.0 - 2026-10-12
 #### Features
 - use juspay diesel - (8871692) - yuvrajjsingh0

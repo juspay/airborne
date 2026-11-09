@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.49.0 - 2026-11-09
+### Package updates
+- airborne_react_native bumped to airborne_react_native-v0.5.0
+- airborne_server bumped to airborne_server-v0.25.0
+- airborne_cli bumped to airborne_cli-v0.5.0
+### Global changes
+#### Bug Fixes
+- **(local)** configure LocalStack bucket CORS and loopback path-style S3 - (cb04eed) - Shiva Nandan
+#### Features
+- **(cli)** publish web OTA bundles - (98fee4c) - Shiva Nandan
+- **(web)** add cached OTA loader and CORS for release requests - (748a58f) - Shiva Nandan
+
+- - -
+
 ## v0.48.1 - 2026-11-09
 ### Package updates
 - airborne_cli bumped to airborne_cli-v0.4.1

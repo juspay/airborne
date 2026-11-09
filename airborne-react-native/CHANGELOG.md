@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.5.0 - 2026-11-09
+#### Features
+- **(web)** add cached OTA loader and CORS for release requests - (748a58f) - Shiva Nandan
+
+- - -
+
+## v0.48.1 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.48.1 [skip ci] - (78f348d) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.4.0 - 2026-11-09
 #### Features
 - **(react-native)** depend on io.juspay:airborne 0.46.0 - (49d27b5) - Shiva Nandan V

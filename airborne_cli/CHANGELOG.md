@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.5.0 - 2026-11-09
+#### Features
+- **(cli)** publish web OTA bundles - (98fee4c) - Shiva Nandan
+
+- - -
+
 ## airborne_cli-v0.4.1 - 2026-11-09
 #### Bug Fixes
 - **(cli)** accept --release-config-timeout on update and deprecate --release-timeout - (bfe40d0) - Shiva Nandan
