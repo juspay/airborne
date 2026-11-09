@@ -2,6 +2,49 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_react_native-v0.4.0 - 2026-11-09
+#### Features
+- **(react-native)** depend on io.juspay:airborne 0.46.0 - (49d27b5) - Shiva Nandan V
+
+- - -
+
+## v0.47.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.47.0 [skip ci] - (2e01695) - Airborne Bot
+
+- - -
+
+## v0.46.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(react-native)** depend on Airborne iOS SDK 0.45.0 - (df88ec7) - Shiva Nandan
+- **(version)** v0.46.0 [skip ci] - (0fe8f4c) - Airborne Bot
+
+- - -
+
+## v0.45.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.45.0 [skip ci] - (2d71bbf) - Airborne Bot
+
+- - -
+
+## v0.44.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.44.0 [skip ci] - (3a67232) - Airborne Bot
+
+- - -
+
+## v0.43.4 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.4 [skip ci] - (9ef8b95) - Airborne Bot
+
+- - -
+
+## v0.43.3 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.3 [skip ci] - (2ec99de) - Airborne Bot
+
+- - -
+
 ## airborne_react_native-v0.3.10 - 2026-09-07
 #### Bug Fixes
 - disable dev support for release builds in react host - (858212f) - Yash Rajput
