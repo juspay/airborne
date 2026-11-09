@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.48.1 - 2026-11-09
+### Package updates
+- airborne_cli bumped to airborne_cli-v0.4.1
+### Global changes
+#### Documentation
+- **(cli)** show --release-config-timeout for update-local-release-config - (fae2f45) - Yaswanth
+
+- - -
+
 ## v0.48.0 - 1970-01-01
 ### Package updates
 - airborne_react_native bumped to airborne_react_native-v0.4.0

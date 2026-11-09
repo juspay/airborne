@@ -2,6 +2,174 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_cli-v0.4.1 - 2026-11-09
+#### Bug Fixes
+- **(cli)** accept --release-config-timeout on update and deprecate --release-timeout - (bfe40d0) - Shiva Nandan
+
+- - -
+
+## v0.48.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.48.0 [skip ci] - (530f1ac) - Airborne Bot
+
+- - -
+
+## v0.47.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.47.0 [skip ci] - (2e01695) - Airborne Bot
+
+- - -
+
+## v0.46.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.46.0 [skip ci] - (0fe8f4c) - Airborne Bot
+
+- - -
+
+## v0.45.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.45.0 [skip ci] - (2d71bbf) - Airborne Bot
+
+- - -
+
+## v0.44.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.44.0 [skip ci] - (3a67232) - Airborne Bot
+
+- - -
+
+## v0.43.4 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.4 [skip ci] - (9ef8b95) - Airborne Bot
+
+- - -
+
+## v0.43.3 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.3 [skip ci] - (2ec99de) - Airborne Bot
+
+- - -
+
+## v0.43.2 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.2 [skip ci] - (4f5c8aa) - Airborne Bot
+
+- - -
+
+## v0.43.1 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.1 [skip ci] - (12393de) - Airborne Bot
+
+- - -
+
+## v0.43.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.43.0 [skip ci] - (a9214fc) - Airborne Bot
+
+- - -
+
+## v0.42.1 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.42.1 [skip ci] - (8862e15) - Airborne Bot
+
+- - -
+
+## v0.42.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.42.0 [skip ci] - (a706e7f) - Airborne Bot
+
+- - -
+
+## v0.41.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.41.0 [skip ci] - (99073d5) - Airborne Bot
+
+- - -
+
+## v0.40.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.40.0 [skip ci] - (dc82a08) - Airborne Bot
+
+- - -
+
+## v0.39.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.39.0 [skip ci] - (34d7ecc) - Airborne Bot
+
+- - -
+
+## v0.38.2 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.38.2 [skip ci] - (85d265a) - Airborne Bot
+
+- - -
+
+## v0.38.1 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.38.1 [skip ci] - (e1da6be) - Airborne Bot
+
+- - -
+
+## v0.38.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.38.0 [skip ci] - (72c7726) - Airborne Bot
+
+- - -
+
+## v0.37.2 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.37.2 [skip ci] - (4ca949f) - Airborne Bot
+
+- - -
+
+## v0.37.1 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.37.1 [skip ci] - (8d2dd58) - Airborne Bot
+
+- - -
+
+## v0.37.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.37.0 [skip ci] - (c2ab543) - Airborne Bot
+
+- - -
+
+## v0.36.5 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.36.5 [skip ci] - (bcfe497) - Airborne Bot
+
+- - -
+
+## v0.36.4 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.36.4 [skip ci] - (f721fe4) - Airborne Bot
+
+- - -
+
+## v0.36.3 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.36.3 [skip ci] - (36389a6) - Airborne Bot
+
+- - -
+
+## v0.36.2 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.36.2 [skip ci] - (8dbcdfc) - Airborne Bot
+
+- - -
+
+## v0.36.1 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.36.1 [skip ci] - (e6a48ac) - Airborne Bot
+
+- - -
+
+## v0.36.0 - 2026-11-09
+#### Miscellaneous Chores
+- **(version)** v0.36.0 [skip ci] - (487e711) - Airborne Bot
+
+- - -
+
 ## airborne_cli-v0.4.0 - 2026-05-11
 #### Features
 - add hermes build capability - (1131f49) - Yash Rajput
