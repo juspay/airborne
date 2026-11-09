@@ -21,7 +21,7 @@ use airborne_authz_macros::authz;
 use actix_web::{post, web};
 use aws_smithy_types::Document;
 use diesel::RunQueryDsl;
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use superposition_sdk::operation::create_default_config::CreateDefaultConfigOutput;
 use superposition_sdk::types::WorkspaceStatus;
@@ -219,6 +219,26 @@ async fn add_application(
     )
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace migration error: {}", e)))?;
+
+    // Give the new application a default signing key so its release configs are
+    // signed from the first serve. A failure here must not fail app creation —
+    // this handler is not transactional, so returning an error would leave a
+    // half-created app behind. The app simply serves unsigned configs until the
+    // boot backfill or the Integrity tab provisions a key.
+    if let Err(e) = crate::signing::utils::provision_default_key(
+        state.db_pool.clone(),
+        state.master_encryption_key.as_deref(),
+        organisation.clone(),
+        application.clone(),
+    )
+    .await
+    {
+        error!(
+            "Failed to provision default signing key for {}/{}: {}. \
+             The application will serve unsigned release configs until a key is created.",
+            organisation, application, e
+        );
+    }
 
     Ok(Json(Application {
         application,
