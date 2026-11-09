@@ -157,7 +157,7 @@ npx airborne-devkit update-local-release-config -p ios -b 45000 -r 90000
 | `[directoryPath]`       | string             | No       | Directory containing the config (defaults to the current directory). |
 | `-p, --platform`        | `android` or `ios` | No       | Target platform. Prompted for if omitted.                       |
 | `-b, --boot-timeout`    | number             | No       | New boot timeout in milliseconds (must be a positive number).   |
-| `-r, --release-timeout` | number             | No       | New release config timeout in milliseconds (must be a positive number). |
+| `-r, --release-config-timeout` | number             | No       | New release config timeout in milliseconds (must be a positive number). |
 
 Only the timeout values you supply are changed; any others remain as they were. The command requires both an existing `airborne-config.json` and an existing `release_config.json` for the platform, and fails if the release config is missing — use `create-local-release-config` for that.
 
