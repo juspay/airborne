@@ -2,6 +2,78 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_dashboard-v0.15.2 - 2026-11-10
+#### Bug Fixes
+- bump dashboard npm dependencies to fix audit vulnerabilities - (da01acc) - yuvrajjsingh0
+
+- - -
+
+## v0.49.0 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.49.0 [skip ci] - (4bdc1e9) - Airborne Bot
+
+- - -
+
+## v0.48.1 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.48.1 [skip ci] - (78f348d) - Airborne Bot
+
+- - -
+
+## v0.48.0 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.48.0 [skip ci] - (530f1ac) - Airborne Bot
+
+- - -
+
+## v0.47.0 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.47.0 [skip ci] - (2e01695) - Airborne Bot
+
+- - -
+
+## v0.46.0 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.46.0 [skip ci] - (0fe8f4c) - Airborne Bot
+
+- - -
+
+## v0.45.0 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.45.0 [skip ci] - (2d71bbf) - Airborne Bot
+
+- - -
+
+## v0.44.0 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.44.0 [skip ci] - (3a67232) - Airborne Bot
+
+- - -
+
+## v0.43.4 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.43.4 [skip ci] - (9ef8b95) - Airborne Bot
+
+- - -
+
+## v0.43.3 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.43.3 [skip ci] - (2ec99de) - Airborne Bot
+
+- - -
+
+## v0.43.2 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.43.2 [skip ci] - (4f5c8aa) - Airborne Bot
+
+- - -
+
+## v0.43.1 - 2026-11-10
+#### Miscellaneous Chores
+- **(version)** v0.43.1 [skip ci] - (12393de) - Airborne Bot
+
+- - -
+
 ## airborne_dashboard-v0.15.1 - 2026-08-18
 #### Bug Fixes
 - docs nav - (8bdbc71) - yuvrajjsingh0
