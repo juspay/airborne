@@ -79,17 +79,35 @@ export function EmergencyReviewCard({
     >
       <Siren className="mt-0.5 h-4 w-4 shrink-0 text-orange-700 dark:text-orange-300" aria-hidden />
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="font-medium text-orange-900 dark:text-orange-200">
-          Emergency rollback needs review
-          {restored !== null ? (
-            <>
-              {" "}
-              · {confirmed ? "restored" : "planned to restore"} <Pkg version={restored} />
-            </>
-          ) : finished ? (
-            " · rollback finished"
-          ) : null}
-        </p>
+        <p className="font-medium text-orange-900 dark:text-orange-200">Emergency rollback needs review</p>
+        <dl className="grid grid-cols-[7.5rem_1fr] gap-x-3 gap-y-0.5">
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Server change</dt>
+          <dd>
+            {restored !== null ? (
+              <>
+                {confirmed ? "Now serves" : "Planned to serve"} <Pkg version={restored} />
+                {confirmed ? "" : ", not confirmed"}
+              </>
+            ) : finished ? (
+              "Rollback finished"
+            ) : (
+              "Not recorded"
+            )}
+          </dd>
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Customer recovery</dt>
+          <dd>
+            <span className="font-medium">Not confirmed.</span>{" "}
+            <span className="text-muted-foreground">
+              Airborne does not know that devices booted it.{" "}
+              <Link
+                href={`${releasePath(org, app, replacement ?? review.release_id)}#device-reports`}
+                className="underline"
+              >
+                Check device reports
+              </Link>
+            </span>
+          </dd>
+        </dl>
         <p className="text-muted-foreground">
           <span className="font-mono text-xs">{review.actor}</span> ran an emergency rollback of{" "}
           <Link
@@ -97,7 +115,7 @@ export function EmergencyReviewCard({
             className="font-mono text-xs underline"
             title={`release ${review.release_id}`}
           >
-            {rolledBack !== null ? `v${rolledBack}` : review.release_id}
+            {rolledBack !== null ? `v${rolledBack}` : "the release"}
           </Link>{" "}
           without approval
           {at ? (
@@ -116,13 +134,12 @@ export function EmergencyReviewCard({
         </p>
         {replacement && (
           <p className="text-xs text-muted-foreground">
-            Replacement release:{" "}
             <Link
               href={releasePath(org, app, replacement)}
-              className="font-mono underline"
-              title="Open the replacement"
+              className="underline"
+              title={`Replacement release ${replacement}`}
             >
-              {replacement}
+              Open the replacement release
             </Link>
             {restored !== null && confirmed && (
               <>

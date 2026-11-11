@@ -184,8 +184,8 @@ export function RollbackProblem({
             return (
               <Notice title="This release can no longer be rolled back">
                 <p className="text-muted-foreground">
-                  It was discarded, or concluded on the control variant, since this page loaded, so there is nothing to
-                  roll back. Nothing was changed. Close this and reload the release to see its current state.
+                  It was discarded or rolled back since this page loaded, so there is nothing to roll back. Nothing was
+                  changed. Close this and reload the release to see its current state.
                 </p>
                 <ServerSaid message={failure.message} />
               </Notice>
@@ -467,11 +467,15 @@ export function ReconciledNotice({
           <KeyList keys={keys.kept_current} />
           <span className="block text-muted-foreground">Registered since {v}, so they keep today&apos;s value.</span>
         </dd>
-        <dt className="uppercase tracking-wide text-muted-foreground">Dropped</dt>
-        <dd>
-          <KeyList keys={keys.dropped} />
-          <span className="block text-muted-foreground">No longer registered, so they are not restored.</span>
-        </dd>
+        {keys.dropped.length > 0 && (
+          <>
+            <dt className="uppercase tracking-wide text-muted-foreground">Dropped</dt>
+            <dd>
+              <KeyList keys={keys.dropped} />
+              <span className="block text-muted-foreground">No longer registered, so they are not restored.</span>
+            </dd>
+          </>
+        )}
       </dl>
     </div>
   );

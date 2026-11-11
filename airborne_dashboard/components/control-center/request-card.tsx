@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCircle2, Flag, ShieldCheck, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { toastError, toastSuccess } from "@/hooks/use-toast";
+import { toast, toastError, toastSuccess } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   actionLabel,
@@ -25,6 +25,7 @@ import {
   isExpired,
   isMine,
   isOpenRequest,
+  raisesExposure,
   reconcileDecision,
   requestDimensions,
   requestPackageVersion,
@@ -32,8 +33,9 @@ import {
   summariseRequest,
   type ApprovalFailure,
 } from "@/lib/control-center/approval";
-import { absoluteTime, describeContext, liveForContext, platformApp } from "@/lib/control-center/format";
+import { absoluteTime, describeContext, liveForContext, platformApp, statusLabel } from "@/lib/control-center/format";
 import { useApprovalActions, useAsyncAction, useNow } from "@/lib/control-center/hooks";
+import { flagForRelease, formatRate, type ReleaseEvidence } from "@/lib/control-center/telemetry";
 import type {
   AppStatus,
   ApprovalPolicy,
@@ -55,6 +57,7 @@ import { ServingChip, servingExplanation } from "./serving-policy";
 import { servingState } from "@/lib/control-center/format";
 import type { ServingPolicy } from "@/lib/control-center/types";
 import { Timeline } from "./timeline";
+import { EvidenceBlock, FlagAcknowledge } from "./telemetry";
 import { releasePath, requestPath } from "./paths";
 
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
@@ -96,6 +99,7 @@ export function RequestRow({
   me,
   className,
   dense,
+  app,
 }: {
   org: string;
   request: DeploymentRequest;
@@ -104,9 +108,12 @@ export function RequestRow({
   className?: string;
   /** A narrow column: stack the parts and drop the application, which the column already names. */
   dense?: boolean;
+  /** The application's state now. With it, a request that widens a flagged release shows the failure rate. */
+  app?: AppStatus;
 }) {
   const mine = isMine(request, me);
   const open = isOpenRequest(request.status);
+  const flag = open && raisesExposure(request) ? flagForRelease(app, request.payload.release_id ?? "") : undefined;
   return (
     <li className={cn("relative", className)}>
       <Link
@@ -127,6 +134,19 @@ export function RequestRow({
             <span className="font-medium">{actionLabel(request.action)}</span>
             <span className="text-xs text-muted-foreground">{summariseRequest(request)}</span>
           </div>
+          {flag && (
+            <p className="mt-1">
+              <StateChip
+                tone={flag.status === "seems_bad" ? "danger" : "waiting"}
+                icon={Flag}
+                variant="inline"
+                title="From unverified device reports. Approving widens this release; Airborne has changed nothing."
+              >
+                {flag.status === "seems_bad" ? "Deployment seems bad" : "Suspicious reports"}:{" "}
+                {formatRate(flag.failureRate)} reported failing on v{flag.row.package_version}
+              </StateChip>
+            </p>
+          )}
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             <span className="font-mono">{request.requester}</span>
             {mine && <span className="rounded border px-1 py-px text-[10px] uppercase tracking-wide">you</span>}
@@ -236,14 +256,18 @@ export function RequestChange({
   org,
   request,
   app,
+  unreadable,
   className,
 }: {
   org: string;
   request: DeploymentRequest;
   /** The application now, from the overview. Undefined when the overview has not loaded. */
   app: AppStatus | undefined;
+  /** The overview failed rather than loading: "now" is unknown, not on its way. */
+  unreadable?: boolean;
   className?: string;
 }) {
+  const notLoaded = unreadable ? <span className="text-muted-foreground">unknown</span> : "…";
   const body = request.payload.body ?? {};
   const base = baseRelease(request);
   const snapshot = obj(request.payload.snapshot);
@@ -276,30 +300,12 @@ export function RequestChange({
     case "ramp": {
       const target = num(body.traffic_percentage);
       change = (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Cell label="Target when raised">
-            <span className="font-mono text-2xl font-semibold tabular-nums">{pct(baseTarget)}</span>
-            {base?.status && <p className="text-xs text-muted-foreground">{String(base.status)}</p>}
-          </Cell>
-          <Cell label="Target now">
-            <span className="font-mono text-2xl font-semibold tabular-nums">{app ? pct(nowTarget) : "…"}</span>
-            {driftedTarget && (open || request.status === "stale") && (
-              <p className="text-xs text-amber-700 dark:text-amber-300">changed since raised</p>
-            )}
-          </Cell>
-          <Cell label="Requested target" tone="accent">
-            <span className="font-mono text-2xl font-semibold tabular-nums text-violet-700 dark:text-violet-300">
-              {pct(target)}
+        <div className="space-y-2">
+          <Cell label="Target change">
+            <span className="font-mono text-2xl font-semibold tabular-nums">
+              {app ? pct(nowTarget) : notLoaded} → {pct(target)}
             </span>
-            <p className="text-xs text-muted-foreground">
-              {target === null || baseTarget === null
-                ? "base target unknown"
-                : target === baseTarget
-                  ? "exposure unchanged"
-                  : target > baseTarget
-                    ? "adds exposure"
-                    : "reduces exposure"}
-            </p>
+            {driftedTarget && <p className="text-xs text-muted-foreground">When raised: {pct(baseTarget)}</p>}
           </Cell>
         </div>
       );
@@ -325,7 +331,7 @@ export function RequestChange({
                 <span className="text-muted-foreground">nothing live</span>
               )
             ) : (
-              "…"
+              notLoaded
             )}
           </Cell>
           <Cell label="After approval" tone="accent">
@@ -346,7 +352,9 @@ export function RequestChange({
           <div className="grid gap-3 sm:grid-cols-3">
             <Cell label="When raised">
               {pkg !== null && <Pkg version={pkg} size="lg" />}
-              <p className="text-xs text-muted-foreground">{base?.status ? String(base.status) : "live"}</p>
+              <p className="text-xs text-muted-foreground">
+                {base?.status ? statusLabel(String(base.status)) : "live"}
+              </p>
             </Cell>
             <Cell label="Live now for this reach">
               {app ? (
@@ -356,7 +364,7 @@ export function RequestChange({
                   <span className="text-muted-foreground">nothing live</span>
                 )
               ) : (
-                "…"
+                notLoaded
               )}
             </Cell>
             <Cell label="After approval" tone="accent">
@@ -417,7 +425,7 @@ export function RequestChange({
                   <span className="text-muted-foreground">not reported</span>
                 )
               ) : (
-                "…"
+                notLoaded
               )}
             </Cell>
             <Cell label="After approval" tone="accent">
@@ -472,7 +480,7 @@ export function RequestChange({
                   <span className="text-muted-foreground">nothing live</span>
                 )
               ) : (
-                "…"
+                notLoaded
               )}
             </Cell>
             <Cell label={request.action === "discard" ? "After approval" : "Proposed"} tone="accent">
@@ -499,7 +507,12 @@ export function RequestChange({
               )}
             </Cell>
           </div>
-          {overrides && <Json value={overrides} label={`Resolved overrides (${Object.keys(overrides).length} keys)`} />}
+          {overrides && (
+            <Json
+              value={overrides}
+              label={`Resolved overrides (${Object.keys(overrides).length} key${Object.keys(overrides).length === 1 ? "" : "s"})`}
+            />
+          )}
         </div>
       );
     }
@@ -511,7 +524,9 @@ export function RequestChange({
         <p className="text-sm">
           <span className="text-muted-foreground">Release </span>
           {releaseLink}
-          {base?.status && <span className="text-xs text-muted-foreground"> · {String(base.status)} when raised</span>}
+          {base?.status && (
+            <span className="text-xs text-muted-foreground"> · {statusLabel(String(base.status))} when raised</span>
+          )}
         </p>
       )}
       {change}
@@ -539,6 +554,8 @@ export function RequestDecision({
   me,
   /** The signed-in user holds the release permission the action needs, as far as the client knows. */
   permitted,
+  evidence,
+  evidenceLoading,
   onChanged,
   className,
 }: {
@@ -547,6 +564,10 @@ export function RequestDecision({
   policy: ApprovalPolicy | undefined;
   me: string | null;
   permitted: boolean;
+  /** What device reports say about this request's release now, read from the overview. */
+  evidence: ReleaseEvidence;
+  /** The overview that carries those reports has not answered yet. */
+  evidenceLoading?: boolean;
   onChanged?: () => void;
   className?: string;
 }) {
@@ -555,17 +576,34 @@ export function RequestDecision({
   const [dialog, setDialog] = useState<RequestDecision | null>(null);
   return (
     <>
-      <DecisionPanel {...{ org, request, policy, me, permitted, className }} onOpen={setDialog} />
+      <DecisionPanel
+        {...{ org, request, policy, me, permitted, evidence, evidenceLoading, className }}
+        onOpen={setDialog}
+      />
       <DecisionDialog
         open={dialog !== null}
         decision={dialog ?? "approve"}
         onOpenChange={(o) => !o && setDialog(null)}
         org={org}
         request={request}
+        evidence={evidence}
+        evidenceLoading={evidenceLoading}
         onChanged={onChanged}
       />
     </>
   );
+}
+
+/** What approving does, one line under the failure rate. */
+function widenNote(request: DeploymentRequest): string | null {
+  if (request.action === "conclude") return "Approving makes this release live for everyone in reach.";
+  if (request.action !== "ramp") return null;
+  const target = num(request.payload.body?.traffic_percentage);
+  const base = num(baseRelease(request)?.traffic_percentage);
+  if (target === null) return "Approving changes the rollout target.";
+  return base === null
+    ? `Approving sets the rollout target to ${target}%.`
+    : `Approving raises the rollout target from ${base}% to ${target}%.`;
 }
 
 function DecisionPanel({
@@ -574,6 +612,8 @@ function DecisionPanel({
   policy,
   me,
   permitted,
+  evidence,
+  evidenceLoading,
   onOpen,
   className,
 }: {
@@ -582,6 +622,8 @@ function DecisionPanel({
   policy: ApprovalPolicy | undefined;
   me: string | null;
   permitted: boolean;
+  evidence: ReleaseEvidence;
+  evidenceLoading?: boolean;
   onOpen: (decision: RequestDecision) => void;
   className?: string;
 }) {
@@ -591,6 +633,13 @@ function DecisionPanel({
   const checker = isChecker(policy, me);
   const expired = isExpired(request, now);
   const status = request.status;
+
+  // The reports matter wherever approving would widen a release, and wherever a release is flagged at all.
+  const raises = raisesExposure(request);
+  const flagged = evidence.kind === "flagged";
+  const showEvidence = Boolean(request.payload.release_id) && (raises || flagged);
+  // Widening a flagged release: the safe answer leads. Approve is still there, and still the person's call.
+  const rejectLeads = raises && flagged && !mine;
 
   const noPermissionTitle = `You do not have the permission to ${actionLabel(request.action).toLowerCase()} in ${app}, which the server also asks of anyone who rejects or cancels.`;
   const approveTitle = mine
@@ -609,6 +658,9 @@ function DecisionPanel({
     return (
       <div className={cn("space-y-3", className)}>
         <Outcome request={request} org={org} />
+        {showEvidence && (
+          <EvidenceBlock org={org} app={app} evidence={evidence} loading={evidenceLoading} note={widenNote(request)} />
+        )}
         {mine ? (
           <ApprovalNotice title="You raised this, so a different checker must retry it.">
             <p className="text-muted-foreground">Nobody can approve their own request, including a retry.</p>
@@ -681,11 +733,24 @@ function DecisionPanel({
           <p className="text-muted-foreground">Checkers: {policy.checkers.join(", ") || "none listed"}.</p>
         </ApprovalNotice>
       )}
+      {showEvidence && (
+        <EvidenceBlock org={org} app={app} evidence={evidence} loading={evidenceLoading} note={widenNote(request)} />
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => onOpen("approve")} disabled={Boolean(approveTitle)} title={approveTitle}>
+        {rejectLeads && (
+          <Button onClick={() => onOpen("reject")} disabled={Boolean(rejectTitle)} title={rejectTitle}>
+            <XCircle /> Reject
+          </Button>
+        )}
+        <Button
+          variant={rejectLeads ? "outline" : "default"}
+          onClick={() => onOpen("approve")}
+          disabled={Boolean(approveTitle)}
+          title={approveTitle}
+        >
           <ShieldCheck /> Approve and execute
         </Button>
-        {!mine && (
+        {!mine && !rejectLeads && (
           <Button
             variant="outline"
             onClick={() => onOpen("reject")}
@@ -719,6 +784,8 @@ function DecisionDialog({
   onOpenChange,
   org,
   request,
+  evidence,
+  evidenceLoading,
   onChanged,
 }: {
   open: boolean;
@@ -726,15 +793,19 @@ function DecisionDialog({
   onOpenChange: (o: boolean) => void;
   org: string;
   request: DeploymentRequest;
+  evidence: ReleaseEvidence;
+  evidenceLoading?: boolean;
   onChanged?: () => void;
 }) {
   const actions = useApprovalActions();
   const { pending, error, rawError, run, clearError } = useAsyncAction();
   const [reason, setReason] = useState("");
+  const [acceptFlag, setAcceptFlag] = useState(false);
   const [done, setDone] = useState<DeploymentRequest | null>(null);
   useEffect(() => {
     if (open) {
       setReason("");
+      setAcceptFlag(false);
       setDone(null);
       clearError();
     }
@@ -778,7 +849,9 @@ function DecisionDialog({
     });
     if (res) {
       setDone(res);
-      toastSuccess(
+      (decision === "approve" && evidence.kind === "flagged"
+        ? (title: string, detail: string) => toast({ title, description: detail })
+        : toastSuccess)(
         decision === "approve"
           ? res.status === "executed"
             ? "Approved and executed"
@@ -792,6 +865,11 @@ function DecisionDialog({
   };
 
   const retry = request.status === "failed";
+  // A flag never blocks approval. Widening a flagged release makes the approver read the failure rate and tick it.
+  const raises = raisesExposure(request);
+  const flag = evidence.kind === "flagged" ? evidence.flag : undefined;
+  const needsFlagAck = decision === "approve" && raises && flag !== undefined && !acceptFlag;
+  const showEvidence = decision !== "cancel" && Boolean(request.payload.release_id) && (raises || flag !== undefined);
   const title =
     decision === "approve"
       ? `${retry ? "Approve again" : "Approve and execute"}: ${actionLabel(request.action).toLowerCase()}`
@@ -826,10 +904,25 @@ function DecisionDialog({
           <dd>{request.reason}</dd>
         </dl>
 
+        {showEvidence && !flag && !done && (
+          <EvidenceBlock org={org} app={app} evidence={evidence} loading={evidenceLoading} compact />
+        )}
+
         {done ? (
           <Outcome request={done} org={org} />
         ) : (
           <>
+            {decision === "approve" && raises && flag && (
+              <FlagAcknowledge
+                flag={flag}
+                packageVersion={requestPackageVersion(request) ?? Number(flag.row.package_version)}
+                consequence={widenNote(request) ?? "Approving widens this release."}
+                checked={acceptFlag}
+                onCheckedChange={setAcceptFlag}
+                disabled={pending || terminal}
+                ariaLabel="Approve despite the failure rate"
+              />
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="cc-decision-reason">
                 {decision === "reject" ? "Reason (required, shown to the requester)" : "Note (optional, recorded)"}
@@ -870,9 +963,9 @@ function DecisionDialog({
           </Button>
           {!done && !terminal && (
             <Button
-              variant={decision === "approve" ? "default" : "destructive"}
+              variant={decision === "approve" ? (flag && raises ? "outline" : "default") : "destructive"}
               onClick={submit}
-              disabled={pending || (decision === "reject" && reason.trim().length === 0)}
+              disabled={pending || needsFlagAck || (decision === "reject" && reason.trim().length === 0)}
             >
               {pending
                 ? decision === "approve"
@@ -1085,7 +1178,7 @@ export function RequestTimeline({
     }
     return [...own, ...synth];
   }, [events, request]);
-  return <Timeline events={list} isLoading={isLoading && !events} error={error} onRetry={onRetry} />;
+  return <Timeline events={list} isLoading={isLoading && !events} error={error} onRetry={onRetry} byRequest={false} />;
 }
 
 export function ReachForRequest({ request }: { request: DeploymentRequest }) {

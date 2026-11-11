@@ -20,7 +20,10 @@ import { UngroupedSection } from "@/components/control-center/ungrouped-table";
 import { EmptyState, ErrorState, OverviewSkeleton } from "@/components/control-center/states";
 import { GroupEditorDialog, type GroupEditorMode } from "@/components/control-center/group-editor-dialog";
 import { DeleteGroupDialog } from "@/components/control-center/delete-group-dialog";
-import { APPROVALS_PATH, createAppPath } from "@/components/control-center/paths";
+import { APPROVALS_PATH } from "@/components/control-center/paths";
+import { DeploymentFlags } from "@/components/control-center/telemetry";
+import { FirstRunChecklist, useFirstRunMemory } from "@/components/control-center/first-run";
+import { firstRunProgress, firstRunView } from "@/lib/control-center/first-run";
 
 const PAGE_AUTHZ = definePagePermissions({
   manage_groups: permission("app_group", "create", "org"),
@@ -197,28 +200,10 @@ export default function ControlCenterOverviewPage() {
                 onRetry={refresh}
               />
             )}
-            {allApps(overview).every((app) => !app.error && app.live.length === 0 && app.active.length === 0) && (
-              <div className="rounded-lg border p-5 space-y-2" aria-label="First release checklist">
-                <h2 className="font-semibold">Your first OTA release</h2>
-                <ol className="list-decimal pl-5 space-y-2 text-sm">
-                  <li>
-                    <Link className="underline" href={createAppPath(overview.organisations[0].name)}>
-                      Create an app
-                    </Link>{" "}
-                    in your organisation, separately for each platform.
-                  </li>
-                  <li>
-                    <a className="underline" href="https://airborne.juspay.in/docs/guides/integrate-react-native/">
-                      Wire the SDK
-                    </a>
-                    , configure a compatible app version, and rebuild the native app.
-                  </li>
-                  <li>
-                    Upload a package and create a targeted release from the app&apos;s Releases page. Ramp, then
-                    conclude explicitly to make it live.
-                  </li>
-                </ol>
-              </div>
+            {overview.organisations.flatMap((org) =>
+              [...org.groups.flatMap((g) => g.members), ...org.ungrouped].map((app) => (
+                <DeploymentFlags key={`${org.name}:${app.application}`} org={org.name} app={app} dense note={false} />
+              ))
             )}
             <AttentionStrip summary={summary} focus={focus} onFocus={setFocus} totals={totals} />
 
@@ -284,6 +269,9 @@ function OrgSection({
   const totalApps = org.groups.reduce((n, g) => n + g.members.length, 0) + org.ungrouped.length;
   const noGroups = org.groups.length === 0 && totalApps > 0;
   const noApps = totalApps === 0;
+  const progress = firstRunProgress(org);
+  const [memory, remember] = useFirstRunMemory(org.name);
+  const firstRun = firstRunView(progress, memory);
 
   return (
     <section aria-labelledby={`org-${org.name}`} className="space-y-3">
@@ -306,7 +294,12 @@ function OrgSection({
         </div>
       </div>
 
-      {noApps && (
+      {!filtering && (
+        <FirstRunChecklist org={org.name} progress={progress} view={firstRun} memory={memory} remember={remember} />
+      )}
+
+      {/* The checklist already says to create an app; the empty list does not say it a second time. */}
+      {noApps && firstRun !== "checklist" && (
         <EmptyState
           title={canManage ? `${org.name} has no applications yet` : `No applications you can read in ${org.name}`}
           message={
@@ -322,7 +315,7 @@ function OrgSection({
         />
       )}
 
-      {noGroups && !filtering && (
+      {noGroups && !filtering && firstRun !== "checklist" && (
         <div className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center">
           <FolderPlus className="h-5 w-5 shrink-0 text-primary" aria-hidden />
           <div className="flex-1 text-sm">

@@ -121,7 +121,8 @@ export default function GroupPage() {
           actions={
             <>
               <LastUpdated at={lastUpdatedAt} pollMs={pollMs} isValidating={isValidating} onRefresh={refresh} />
-              {group && canSetPolicy && (
+              {/* Approval vocabulary appears once a policy is on; until then it is one quiet line at the foot. */}
+              {group && canSetPolicy && approvalOn > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -201,6 +202,14 @@ export default function GroupPage() {
                 <PlatformColumn key={m.application} org={orgId} app={m} onChanged={refresh} />
               ))}
             </div>
+            {canSetPolicy && approvalOn === 0 && members.every((m) => typeof m.approval_required === "boolean") && (
+              <p className="border-t pt-3 text-xs text-muted-foreground">
+                Want a second person to approve releases?{" "}
+                <button type="button" className="underline hover:text-foreground" onClick={() => setPolicyDialog(true)}>
+                  Set up approvals for this group
+                </button>
+              </p>
+            )}
           </>
         )}
       </div>
@@ -402,7 +411,7 @@ function PlatformColumn({ org, app, onChanged }: { org: string; app: AppStatus; 
               ) : (
                 <ul className="-mx-4 divide-y border-y">
                   {pending.map((r) => (
-                    <RequestRow key={r.id} org={org} request={r} platform={app.platform} me={me} dense />
+                    <RequestRow key={r.id} org={org} request={r} platform={app.platform} me={me} app={app} dense />
                   ))}
                 </ul>
               )}

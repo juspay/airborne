@@ -21,9 +21,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toastSuccess } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { MAX_RAMP_TARGET, platformApp, platformLabel } from "@/lib/control-center/format";
-import { formatRate, isExcluded, type ReleaseFlag } from "@/lib/control-center/telemetry";
+import { MAX_RAMP_TARGET, platformApp } from "@/lib/control-center/format";
+import { isExcluded, type ReleaseFlag } from "@/lib/control-center/telemetry";
 import { useApprovalActions, useAsyncAction, useReleaseActions, useRollbackPreview } from "@/lib/control-center/hooks";
+import {
+  DEVICE_BOOT_UNCONFIRMED,
+  reasonFromFlag,
+  reasonPlaceholder,
+  rollbackActionLabel,
+  rollbackDirectBody,
+  rollbackHeadline,
+  rollbackRequestBody,
+  serverNowServes,
+} from "@/lib/control-center/rollback-copy";
 import {
   classifyCacheError,
   classifyRollbackError,
@@ -69,7 +79,7 @@ import {
 } from "./approval-notices";
 import { CacheFailureAfterWrite } from "./cache-notice";
 import { LocaleExceptionsNotice } from "./locale-notice";
-import { ExcludedPackageNotice, ExclusionsUnknownNotice } from "./telemetry";
+import { ExcludedPackageNotice, ExclusionsUnknownNotice, FlagAcknowledge } from "./telemetry";
 import { APPROVALS_PATH, appPath, classicNewReleasePath, releasePath } from "./paths";
 import { RollbackSensitiveChip } from "./status-badge";
 import { RollbackMarkerSelect } from "./marker-select";
@@ -297,7 +307,7 @@ export function ReleaseActionBar({
           : release.outcome === "superseded"
             ? "Superseded by a newer release. Nothing to ramp or roll back here; act on the live release."
             : release.outcome === "concluded_on_control"
-              ? "Concluded on the control variant. Nothing to ramp or roll back."
+              ? "Stopped before it went live: devices stayed on the previous release. Nothing to ramp or roll back."
               : "State unknown: the server did not report this release's outcome, so no actions are offered."}
       </p>
     );
@@ -408,7 +418,8 @@ export function ReleaseActionBar({
           </Button>
         )}
         {!incident && rollbackButton}
-        {status === "INPROGRESS" && (
+        {/* In an incident a locked Make live is a dead button in a fire: it is left out rather than shown disabled. */}
+        {status === "INPROGRESS" && !(incident && conclude.disabled) && (
           <Button
             size={size}
             onClick={() => setDialog("conclude")}
@@ -434,7 +445,7 @@ export function ReleaseActionBar({
             Emergency rollback
           </Button>
         )}
-        {policyOn && (isOngoing || isLive) && (
+        {policyOn && (isOngoing || isLive) && !(incident && (notMaker || !permissions.update)) && (
           <Button
             size={size}
             variant="ghost"
@@ -485,6 +496,7 @@ export function ReleaseActionBar({
         onOpenChange={(o) => !o && setDialog(null)}
         mode={rollbackNeedsRequest ? "request" : "direct"}
         {...dialogProps}
+        flag={flag}
         otherOngoing={otherOngoing}
         onSetTargetZero={canZero ? setTargetToZero : undefined}
       />
@@ -494,6 +506,7 @@ export function ReleaseActionBar({
         onOpenChange={(o) => !o && setDialog(null)}
         mode="emergency"
         {...dialogProps}
+        flag={flag}
         otherOngoing={otherOngoing}
         onSetTargetZero={canZero ? setTargetToZero : undefined}
       />
@@ -990,25 +1003,15 @@ function ConcludeDialog({
           ]}
         />
         {flag && flagged && (
-          <label className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/5 p-2.5 text-sm">
-            <Checkbox
-              checked={acceptFlag}
-              onCheckedChange={(v) => setAcceptFlag(v === true)}
-              disabled={pending}
-              aria-label="Make this release live despite the flag"
-              className="mt-0.5"
-            />
-            <span>
-              <strong className="font-medium text-red-800 dark:text-red-200">
-                {flag.status === "seems_bad"
-                  ? `v${release.packageVersion} is failing on ${formatRate(flag.failureRate)} of ${platformLabel(flag.row.platform)} devices`
-                  : `Failures are up on v${release.packageVersion}: ${formatRate(flag.failureRate)} of ${platformLabel(flag.row.platform)} devices`}
-                {flag.baseline ? ` (v${flag.baseline.package_version}: ${formatRate(flag.baselineFailureRate)})` : ""}.
-              </strong>{" "}
-              From unverified device reports; Airborne has changed nothing. Making it live sends it to everyone in
-              reach. I have read this and want to go ahead.
-            </span>
-          </label>
+          <FlagAcknowledge
+            flag={flag}
+            packageVersion={release.packageVersion}
+            consequence="Making it live sends it to everyone in reach."
+            checked={acceptFlag}
+            onCheckedChange={setAcceptFlag}
+            disabled={pending}
+            ariaLabel="Make this release live despite the flag"
+          />
         )}
         <p className="text-xs text-muted-foreground">
           Devices pick up v{release.packageVersion} on their next update check. How many did is on the release page,
@@ -1300,6 +1303,47 @@ function BlockedExits({
   }
 }
 
+/**
+ * What a finished rollback did, kept in three separate facts: what the server serves now, whether any device has
+ * confirmed it, and (for an emergency rollback) that it still needs a second person. Server change is not recovery.
+ */
+function RollbackOutcome({
+  served,
+  emergency,
+  reportsHref,
+  onNavigate,
+}: {
+  served: number | null;
+  emergency: boolean;
+  /** The release page that carries the device reports, or null for this page. */
+  reportsHref: string | null;
+  onNavigate: () => void;
+}) {
+  return (
+    <div role="status" className="space-y-2 rounded-md border p-3 text-sm">
+      <p className="font-medium">{serverNowServes(served)}</p>
+      <p>
+        <span className="font-medium">{DEVICE_BOOT_UNCONFIRMED}</span>{" "}
+        <span className="text-muted-foreground">
+          Airborne has not seen a device confirm it yet; devices pick it up on their next update check.
+        </span>{" "}
+        <Link href={reportsHref ?? "#device-reports"} className="underline" onClick={onNavigate}>
+          See device reports
+        </Link>
+      </p>
+      {emergency && (
+        <p className="border-t pt-2">
+          <span className="font-medium text-orange-800 dark:text-orange-200">Needs review.</span>{" "}
+          <span className="text-muted-foreground">
+            This rollback skipped approval. A checker other than you must acknowledge it from the release page or the
+            approval queue; until then it stays flagged there.
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RollbackDialog({
   open,
   onOpenChange,
@@ -1315,7 +1359,8 @@ function RollbackDialog({
   sensitive = null,
   marker = null,
   onSetTargetZero,
-}: DialogProps & { mode: SubmitMode; onSetTargetZero?: () => void }) {
+  flag,
+}: DialogProps & { mode: SubmitMode; onSetTargetZero?: () => void; flag?: ReleaseFlag }) {
   const actions = useReleaseActions();
   const { approvals, raised, setRaised, forceRequest, setForceRequest, reset } = useRequestOrDirect();
   const { pending, rawError, run, clearError } = useAsyncAction();
@@ -1326,7 +1371,8 @@ function RollbackDialog({
 
   useEffect(() => {
     if (open) {
-      setReason("");
+      // A flagged release already says why: start from that, and let the person change it.
+      setReason(flag ? reasonFromFlag(flag) : "");
       setConfirmRisk(false);
       setResult(null);
       reset();
@@ -1408,21 +1454,8 @@ function RollbackDialog({
       }
     });
     if (res) {
+      // No toast: the dialog stays open and carries the result, and on a narrow screen a toast covers its title.
       setResult(res);
-      toastSuccess(
-        res.current_live_release_id !== undefined
-          ? "Rollback had already completed"
-          : emergency
-            ? `Emergency rollback done${res.rolled_back_to_package_version === null ? "" : `: v${res.rolled_back_to_package_version} restored`}. Needs review.`
-            : res.action === "discarded"
-              ? "Release discarded"
-              : res.rolled_back_to_package_version === null
-                ? "Rolled back"
-                : res.rolled_back_to_package_version === 0
-                  ? "Rolled back to bundled code"
-                  : `Rolled back to v${res.rolled_back_to_package_version}`,
-        platformApp(platform, app)
-      );
       onChanged?.();
     }
   };
@@ -1457,7 +1490,9 @@ function RollbackDialog({
   const title = result
     ? recorded
       ? `Already rolled back v${release.packageVersion}`
-      : `${emergency ? "Emergency rollback of" : result.action === "discarded" ? "Discarded" : "Rolled back"} v${release.packageVersion}`
+      : result.action === "discarded"
+        ? `Discarded v${release.packageVersion}`
+        : `Server now serves v${result.rolled_back_to_package_version ?? "unknown"}`
     : postFailure?.kind === "partial"
       ? `Rollback of v${release.packageVersion} did not finish`
       : asRequest
@@ -1466,33 +1501,33 @@ function RollbackDialog({
           ? `Emergency rollback of v${release.packageVersion}`
           : `${verb} v${release.packageVersion}`;
 
+  // Who ends up on what: the preview names the package; before it loads the live release is the best guess.
+  const returnsTo = resulting ?? stays ?? null;
+  const restoredVersion = result?.rolled_back_to_package_version ?? null;
+
   const description = result
     ? recorded
       ? "This rollback had already completed. The server returned its recorded result; nothing was run again."
-      : emergency
-        ? "The change is applied without approval. It is marked Needs review until a different checker acknowledges it."
-        : "The change is applied. Timeline and overview are refreshed."
+      : result.action === "discarded"
+        ? "The release was discarded before it started. Nothing changed for devices."
+        : emergency
+          ? "Applied without approval. It stays flagged until a different checker acknowledges it."
+          : "Applied and recorded in the timeline."
     : postFailure?.kind === "partial"
       ? "The rollback stopped part-way. It is not complete."
       : previewState.status === "loading"
         ? "Asking the server exactly what this rollback will do…"
         : previewFailure
           ? "This rollback is blocked. Inspect the details below before continuing."
-          : asRequest
-            ? action === "rereleased"
-              ? `Nothing changes now. Once a different checker approves, Airborne creates and concludes a new release of the previous live package and config for the same reach.`
-              : action === "concluded_control"
-                ? "Nothing changes now. Once a different checker approves, the release concludes on the control variant and all traffic returns to the live package."
-                : "Nothing changes now. The rollback runs when a different checker approves."
-            : action === "discarded"
-              ? "The release is discarded before it starts. Nothing changes for devices."
-              : action === "concluded_control"
-                ? "The release concludes on the control variant, so all traffic returns to the live package. It cannot be resumed; create a new release to try again."
-                : action === "rereleased"
-                  ? `v${release.packageVersion} is live. Airborne creates and concludes a new release of the previous live package and config for the same reach, then checks that it took full effect.`
-                  : previewState.status === "error"
-                    ? "The preview is what tells you the resulting package, so nothing can be confirmed without it."
-                    : "This rollback is blocked. Inspect the details below before continuing.";
+          : previewState.status === "error"
+            ? "The preview is what tells you the resulting package, so nothing can be confirmed without it."
+            : asRequest
+              ? rollbackRequestBody(action, returnsTo)
+              : action === null
+                ? "This rollback is blocked. Inspect the details below before continuing."
+                : emergency
+                  ? `Restore ${returnsTo === null ? "the previous package" : `v${returnsTo}`}. Devices receive it on their next update check; boot remains unconfirmed.`
+                  : `${rollbackHeadline(action, returnsTo)} ${rollbackDirectBody(action, release.packageVersion, returnsTo)}`.trim();
 
   const resultRow =
     previewState.status === "loading" ? (
@@ -1556,12 +1591,14 @@ function RollbackDialog({
     <Dialog open={open} onOpenChange={(o) => (o || !pending) && onOpenChange(o)}>
       <DialogContent
         className={cn(
-          "max-h-[92vh] overflow-y-auto sm:max-w-lg",
-          emergency && "border-orange-500/60 ring-4 ring-orange-500/15"
+          "w-[calc(100%-2rem)] max-h-[92vh] overflow-y-auto sm:w-full sm:max-w-lg [&_[data-slot=dialog-footer]]:sticky [&_[data-slot=dialog-footer]]:bottom-[-1.5rem] [&_[data-slot=dialog-footer]]:bg-background [&_[data-slot=dialog-footer]]:py-3",
+          emergency && !result && "border-orange-500/60 ring-4 ring-orange-500/15"
         )}
       >
         <DialogHeader>
-          <DialogTitle className={cn("flex items-center gap-2", emergency && "text-orange-800 dark:text-orange-200")}>
+          <DialogTitle
+            className={cn("flex items-center gap-2", emergency && !result && "text-orange-800 dark:text-orange-200")}
+          >
             {emergency && <Siren className="h-5 w-5" aria-hidden />}
             {title}
           </DialogTitle>
@@ -1572,15 +1609,22 @@ function RollbackDialog({
 
         {result ? (
           <div className="space-y-3">
-            {emergency && (
-              <p className="rounded-md border border-orange-500/50 bg-orange-500/10 p-2 text-sm">
-                <strong>Needs review.</strong> This rollback skipped approval. A checker other than you must acknowledge
-                it from the release page or the approval queue; until then it stays flagged there.
-              </p>
+            {result.action !== "discarded" && !recorded && (
+              <RollbackOutcome
+                served={restoredVersion}
+                emergency={emergency}
+                reportsHref={
+                  result.new_release_id ? `${releasePath(org, app, result.new_release_id)}#device-reports` : null
+                }
+                onNavigate={() => onOpenChange(false)}
+              />
             )}
             <Facts
               rows={[
-                { label: "Outcome", value: <span className="text-xs">{result.action}</span> },
+                {
+                  label: "What happened",
+                  value: <span className="text-sm">{rollbackActionLabel(result.action)}</span>,
+                },
                 {
                   label: result.later_release_id ? "Restored to" : "Live now",
                   value: <PkgLine version={result.rolled_back_to_package_version ?? undefined} />,
@@ -1783,15 +1827,16 @@ function RollbackDialog({
                   id="cc-rollback-reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder={
-                    emergency
-                      ? "e.g. payments failing for everyone on v8 since 02:10, see INC-4821; no second checker awake"
-                      : "e.g. crash on launch for Android 14 reported in #incidents"
-                  }
+                  placeholder={reasonPlaceholder(platform, emergency)}
                   rows={3}
                   autoFocus
                   disabled={pending}
                 />
+                {flag && (
+                  <p className="text-xs text-muted-foreground">
+                    Started from the flag on this release. Edit it, or say more.
+                  </p>
+                )}
               </div>
             )}
 

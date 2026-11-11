@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
       collapsible: true,
       collapsed: false,
       items: [
+        "guides/first-ota",
         "guides/integrate-react-native",
         "guides/integrate-react-native-expo",
         "guides/create-and-target-a-release",
@@ -114,6 +115,7 @@ const sidebars: SidebarsConfig = {
           items: [
             "server/overview",
             "server/control-center",
+            "server/recovery-checklist",
             "server/configuration",
             "server/running-locally",
             "server/superposition-backup",

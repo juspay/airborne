@@ -56,7 +56,7 @@ function accentFor(app: AppStatus): string {
   if (app.emergency_needs_review?.some((r) => !r.acknowledged_by)) return "border-l-orange-500";
   const a = primaryActive(app);
   if (a?.status === "INPROGRESS") return "border-l-sky-500";
-  if (a?.status === "CREATED") return "border-l-amber-500";
+  if (a?.status === "CREATED") return "border-l-border";
   return "border-l-transparent";
 }
 
@@ -86,6 +86,7 @@ export function AppStatusRow({
   // Only locale- or otherwise targeted releases are live: the cell must not read as what ordinary devices get.
   const onlyTargeted = !generalLive && Boolean(defaultLive);
   const extraLive = app.live.length - (defaultLive ? 1 : 0);
+  const flagged = flaggedRows(app).length > 0;
 
   return (
     <div
@@ -111,20 +112,27 @@ export function AppStatusRow({
           >
             {app.application}
           </Link>
+          {showChips && flagged && (
+            // The one thing on the row that asks to be read first: the flag, with its percentage, alone on its line.
+            <div className="mt-1.5">
+              <AppFlagChip org={org} app={app} variant="badge" className="text-xs" />
+            </div>
+          )}
           {showChips &&
             (app.serving_policy ||
-              flaggedRows(app).length > 0 ||
               app.approval_required ||
               app.cache_invalidation?.status === "failed" ||
               (app.emergency_needs_review?.some((r) => !r.acknowledged_by) ?? false)) && (
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <AppFlagChip org={org} app={app} className="text-[11px]" />
-                <ServingChip
-                  policy={app.serving_policy}
-                  variant="inline"
-                  className="text-[11px]"
-                  href={appPath(org, app.application)}
-                />
+                {/* Routine facts step aside while a flag is up. */}
+                {!flagged && (
+                  <ServingChip
+                    policy={app.serving_policy}
+                    variant="inline"
+                    className="text-[11px]"
+                    href={appPath(org, app.application)}
+                  />
+                )}
                 {app.cache_invalidation?.status === "failed" && (
                   <StateChip
                     tone="waiting"
@@ -136,7 +144,7 @@ export function AppStatusRow({
                     CDN cache stale
                   </StateChip>
                 )}
-                {app.approval_required && (
+                {app.approval_required && (!flagged || (app.pending_requests ?? 0) > 0) && (
                   <Link href={approvalPolicyPath(org, app.application)} className="hover:underline">
                     <ApprovalRequiredChip variant="inline" pending={app.pending_requests} className="text-[11px]" />
                   </Link>
@@ -175,11 +183,12 @@ export function AppStatusRow({
               <Pkg version={defaultLive.package_version} title={`config ${defaultLive.config_version}`} />
             </Link>
             {onlyTargeted && (
+              // A fact about reach, not a warning: neutral, and allowed to wrap under the version.
               <StateChip
-                tone="waiting"
+                tone="muted"
                 icon={Layers}
                 variant="inline"
-                className="text-[11px]"
+                className="flex items-start whitespace-normal text-[11px] leading-snug"
                 title={`No release is live for all users. This one is live only for ${describeContext(defaultLive.dimensions)}.`}
               >
                 Only {describeContext(defaultLive.dimensions)}

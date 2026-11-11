@@ -23,6 +23,8 @@ export function TargetingStep() {
     mode,
     hasExistingReleases,
     targetingRequired,
+    compatibilityException,
+    setCompatibilityException,
     targetingRules,
     addTargetingRule,
     removeTargetingRule,
@@ -153,6 +155,21 @@ export function TargetingStep() {
             Review the version range before creating. Ramp accepts up to 50% because Superposition retains a control
             variant; conclude with the experimental variant to serve all matching devices.
           </p>
+          {!isEditMode && (
+            <div className="space-y-2">
+              <Label htmlFor="compatibility-exception">Compatibility exception reason (custom targeting only)</Label>
+              <Input
+                id="compatibility-exception"
+                value={compatibilityException}
+                onChange={(e) => setCompatibilityException(e.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Strict creation requires an explicit app_version or version_cohort target. For other nonempty targeting,
+                explain compatibility in at least 20 characters. The server audits this reason. Compatibility is an
+                operator declaration, not native binary verification.
+              </p>
+            </div>
+          )}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -174,8 +191,8 @@ export function TargetingStep() {
                 ) : targetingRequired ? (
                   <>
                     <p className="text-sm font-medium text-foreground">
-                      Add a targeting rule to continue. This application serves strictly, so a release needs one,
-                      including the first.
+                      Add an app_version or version_cohort target, or explain a custom targeting exception. This applies
+                      to every release, including the first.
                     </p>
                     <p className="mt-1 text-xs">
                       Select a compatible version cohort. Creation starts at zero traffic; ramp, then conclude

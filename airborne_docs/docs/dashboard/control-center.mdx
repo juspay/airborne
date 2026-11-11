@@ -158,7 +158,7 @@ Buttons below are the direct ones. With approval on, several become requests; se
 | State | Buttons | What they do |
 | --- | --- | --- |
 | Not started | **Start rollout**, **Discard** | **Start rollout** sets the first target. **Discard** abandons the release before it starts. |
-| Rolling out | **Change target**, **Make live**, **Roll back** | **Change target** sets a new target. **Make live** concludes the release at 100%. **Roll back** concludes it on the control variant. |
+| Rolling out | **Change target**, **Make live**, **Roll back** | **Change target** sets a new target. **Make live** concludes the release at 100%. **Roll back** returns everyone in reach to the live package. |
 | Live | **Roll back** | Returns this reach to the release that was live before it. See [Roll back](#roll-back). |
 | Anything else | None | The page says so, for example **Discarded. No action is possible.** |
 
@@ -179,10 +179,12 @@ Roll back does one of three things, depending on the release's state. The dialog
 | Release state | Button | What happens | Outcome |
 | --- | --- | --- | --- |
 | Not started | **Discard** | The release is discarded before it starts. Nothing changes for devices. | `discarded` |
-| Rolling out | **Roll back** | The release concludes on the control variant, so all traffic returns to the live package. It cannot be resumed; create a new release to try again. | `concluded_control` |
+| Rolling out | **Roll back** | Everyone in reach returns to the live package and the release stops being offered. It cannot be resumed; create a new release to try again. | `concluded_control` |
 | Live | **Roll back** | Airborne finds the release that was live before this one for the same reach, then creates and concludes a new release of that package and config. | `rereleased` |
 
-Every roll back needs a reason. The field is labelled **Reason (required, recorded in the timeline)**, and the button stays disabled until you enter one. The reason appears in the release's timeline.
+Every roll back needs a reason. The field is labelled **Reason (required, recorded in the timeline)**, and the button stays disabled until you enter one. The reason appears in the release's timeline. On a flagged release the box starts with the flag ("48% of 25 Web devices failed a boot on v2 (unverified reports)."); edit it or add the incident. The example text follows the platform, so a web app is not offered an Android one.
+
+The dialog opens with who ends up on what ("Everyone in reach returns to v1") and when devices notice: they get the package on their next update check, and a device already running the bad release switches after that check and may need an app restart. When it has run, the dialog says **Server now serves v1. Device boot unconfirmed.**, with a **See device reports** link. A roll back changes what the server serves; it does not show that any device booted the old package, and the dialog does not say it does. The config warning below is kept in the result.
 
 Airborne preserves the full reason and appends an operation marker for upstream reconciliation. Superposition limits the combined value to 255 bytes; the marker leaves at most **197 bytes** for your reason. Longer values are rejected before dispatch. The text `Airborne operation` is reserved for those markers, so a reason that contains it exactly as written (the match is case-sensitive) is rejected with a **400** before anything is sent. Rephrase the reason without it.
 
@@ -218,7 +220,7 @@ A blocked roll back changes nothing. The dialog says why, and the button stays d
 | **The earlier package cannot be restored automatically** | Airborne cannot reconcile the earlier config with the registered keys, so it does not guess. Nothing is created. Someone has to review the keys or publish a new release. |
 | **Files of the earlier package are missing or unreachable** | Before restoring, Airborne checks every file the earlier package needs against the file records and the file host. At least one is missing, incomplete or unreachable, so restoring would ship a broken bundle. Restore the files or publish a reviewed replacement. |
 | **This release is itself a rollback** | It was created by rolling back an earlier release (linked in the dialog). Rolling it back again would restore the rejected release, so Airborne refuses. Create a new release with a reviewed package instead. |
-| **This release can no longer be rolled back** | It was discarded, or concluded on the control variant, after the page loaded. Reload the release. |
+| **This release can no longer be rolled back** | It was discarded or rolled back after the page loaded. Reload the release. |
 
 Any other refusal shows as **Rollback refused** with the server's message. For example, a write already running for the same app. Wait, refresh, and try again.
 
@@ -267,7 +269,7 @@ When apps send the SDK's opt-in anonymous telemetry, Control Center shows what d
 - They are a **sample** of the devices that reported, never a population estimate and never the installed base.
 - **Airborne changes nothing because of them.** A flag only changes emphasis and wording. Rolling back, ramping down or pausing is always a person's decision.
 
-A release is flagged **Deployment seems bad** or **Suspicious reports** by a fixed rule on the server (a minimum number of devices, and failures that rose against the previous release; the thresholds are in the server reference). The release page leads with the flag and puts **Roll back** first, and Make live asks you to confirm that you have read the failure rate. With no earlier release to compare with, the headline says "Failures reported", not "up". If a refresh of the reports fails, the panel says so and the numbers shown are from an earlier read. The server side is in [Anonymous device telemetry](/docs/server/control-center#anonymous-device-telemetry).
+A release is flagged **Deployment seems bad** or **Suspicious reports** by a fixed rule on the server (a minimum number of devices, and failures that rose against the previous release; the thresholds are in the server reference). The release page leads with the failure rate ("48% reported failing", then "v2 · 12 of 25 devices on Web 2.8.0 · v1: 0%") and puts **Roll back** first, and Make live asks you to confirm that you have read the failure rate. A flagged release leads with how many devices failed, not how many booted. On the overview the flag is its own badge with the percentage, and routine chips such as strict serving step aside while it is up. With no earlier release to compare with, the headline says "Failures reported", not "up". If a refresh of the reports fails, the panel says so and the numbers shown are from an earlier read. The server side is in [Anonymous device telemetry](/docs/server/control-center#anonymous-device-telemetry).
 
 ## With approval on
 
@@ -283,13 +285,15 @@ When an organisation owner or admin turns on a [maker-checker policy](/docs/guid
 | Create a release | The wizard raises a request. On a strict application it requires a targeting rule first, because the server refuses an untargeted release when the request is approved. |
 | **Discard** | Direct. |
 
-A **Needs review** card, **Awaiting approval** requests and a link to the **Approvals** screen (the queue across your organisations) appear on the app, group and release pages. A request page shows what is being changed now against when it was raised, who may decide it, and its result. **Approve**, **Reject** and **Cancel** are enabled only when you hold the release permission the action needs (the same one the server checks): create for a release, ramp for a target, update for an override edit, the marker or strict serving, discard for a discard, and conclude for everything else.
+A **Needs review** card, **Awaiting approval** requests and a link to the **Approvals** screen (the queue across your organisations) appear on the app, group and release pages. A request page shows what is being changed now against when it was raised, who may decide it, and its result.
+
+The same failure evidence that the release page shows appears where the decision is made: on the request page above the buttons, inside the Approve and Reject dialogs, and on the request's row in the queue. When a request raises exposure (any **Make live**, or a target above the one it was raised against) on a flagged release, **Reject** leads, **Approve** is the quiet button, and the Approve dialog asks you to tick that you have read the failure rate it states. When device reports are unknown (the read failed, the server does not report, or no device reported), the block says so and nothing is added or blocked: unknown is never worded as healthy, and a person decides. **Approve**, **Reject** and **Cancel** are enabled only when you hold the release permission the action needs (the same one the server checks): create for a release, ramp for a target, update for an override edit, the marker or strict serving, discard for a discard, and conclude for everything else.
 
 If an approve call comes back with an error the page cannot place (a 5xx, a timeout), it says **Outcome not confirmed**, re-reads the request and tells you what it now says. It reports **Approved, but the action failed** only when the request reads `failed`.
 
 ### Emergency rollback
 
-A checker with a policy that allows it can run an **Emergency rollback** of the live release without a second approval. The server records it once the rollback has finished and flags it **Needs review** until a *different checker* acknowledges it; until then it refuses another emergency rollback. The review card says "restored vN" when the server states the finished rollback (`rollback_finished`). A review from an older server does not, so its card says "planned to restore vN" and that the outcome is not recorded; open the release to see what is live. If the attempt stops part-way or the answer is lost, the dialog does not offer a retry that the server would refuse: ask another checker to acknowledge it from the Approvals screen or the release page, or raise a normal rollback request.
+A checker with a policy that allows it can run an **Emergency rollback** of the live release without a second approval. The server records it once the rollback has finished and flags it **Needs review** until a *different checker* acknowledges it; until then it refuses another emergency rollback. The review card keeps two facts apart. **Server change** says "Now serves vN" when the server states the finished rollback (`rollback_finished`); a review from an older server does not, so the card says "Planned to serve vN, not confirmed" and that the outcome is not recorded. **Customer recovery** always says "Not confirmed": Airborne does not know that devices booted vN until device reports show it, and the card links to them. After an emergency rollback the dialog reads "Server now serves vN. Device boot unconfirmed." and, separately, that the change needs review. If the attempt stops part-way or the answer is lost, the dialog does not offer a retry that the server would refuse: ask another checker to acknowledge it from the Approvals screen or the release page, or raise a normal rollback request.
 
 Acknowledging needs only membership of the policy's checker list. It does not depend on approval still being on, and it needs no other permission.
 
@@ -320,9 +324,15 @@ The release page refreshes its details and its timeline every **15 seconds** whi
 - **Lookup failed**: Airborne could not read that application's release data. The other applications still load. The overview has a five-second deadline for all lookups together, so an application that has not answered by then is shown as a failed lookup, even if it is only slow. Wait a moment and refresh. If it persists, ask an administrator to check the Airborne server. The server side of this is covered in [Control Center API](/docs/server/control-center).
 - **Nothing matches**: the attention filter or the search box excludes everything. Select **All** or clear the search.
 - **No groups yet**: every application is listed under **Ungrouped** until you create a group.
-- **No applications yet**: create an application first; it appears here once it exists.
+- **No applications yet**: the first-OTA checklist above says what to do; the empty list does not repeat it.
 - **No release has been made live on this platform**: a new release starts at zero traffic, including the first one. Create it, then start its rollout and make it live from its release page; nothing is served until then.
 
-When no app has a release yet, the overview shows a first-OTA checklist: create a platform app, wire the SDK and rebuild, then upload a package and create a targeted release. Ramp and conclude explicitly; the checklist disappears once release state exists.
+An organisation that has not made a release live yet shows a first-OTA checklist, read from the server rather than ticked by hand: an app exists, a first device has reported, and a first release is live. The first step not done is marked **Next**. **Create an app** opens the Create Application form directly. If no app in the organisation reports device telemetry, the device step says it cannot tell instead of staying unticked. When the third step ticks, an organisation that watched the checklist gets a finished state, which **Hide this** dismisses. An organisation that already had a release live before it ever saw the checklist never gets one. This browser remembers only that it showed the checklist; the ticks always come from the server.
 
 Telemetry can show “Reports without comparison” when current boot reports meet the sample threshold but no baseline exists. This never implies health or triggers actions. Release adoption totals deduplicate installs across native versions. Group policy apply stops on error and reports partial or unconfirmed outcomes; re-read policies before retrying.
+
+### Strict creation declarations
+
+Every strict release, including the first, must target a nonempty `app_version` or `version_cohort`. Select that dimension and its compatible value in the wizard's targeting step. Custom nonempty targeting instead requires a `compatibility_exception` reason of at least 20 characters; the server audits the explanation before creation, including approval execution. These are operator declarations, not proof that a native binary is compatible.
+
+The first-run device tick uses the first public manifest request recorded by the server (`first_device_seen_at`), including a strict 404 before any release exists. It persists independently of telemetry retention or settings. A request is unverified and does not confirm a successful boot.

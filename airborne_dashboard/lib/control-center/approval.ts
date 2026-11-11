@@ -289,6 +289,20 @@ export function baseRelease(req: DeploymentRequest): BaseStateRelease | undefine
 
 /** The package version the request concerns, if it can be read from the request itself. */
 /** The package a request concerns. The server states it on the request; a create's snapshot also carries it. */
+/**
+ * Whether approving this request sends the release to more devices than it reaches now. Making live always does;
+ * a ramp does when its target is above the one it was raised against. An unreadable target is treated as raising,
+ * because the cost of reading it that way is one extra tick.
+ */
+export function raisesExposure(req: DeploymentRequest): boolean {
+  if (req.action === "conclude") return true;
+  if (req.action !== "ramp") return false;
+  const target = num(req.payload.body?.traffic_percentage);
+  const base = num(baseRelease(req)?.traffic_percentage);
+  if (target === null) return true;
+  return base === null ? target > 0 : target > base;
+}
+
 export function requestPackageVersion(req: DeploymentRequest): number | null {
   const snap = (req.payload.snapshot ?? {}) as Record<string, unknown>;
   const pkg = snap.package as Record<string, unknown> | undefined;

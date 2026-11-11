@@ -29,7 +29,7 @@ export function Reach({
     <div className={cn("space-y-3 text-sm", className)}>
       {nativeVersions.length > 0 && (
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Native versions</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">App versions</p>
           <dl className="mt-1 space-y-0.5">
             {nativeVersions.map(([k, v]) => (
               <div key={k} className="flex items-baseline gap-2 font-mono text-xs">

@@ -40,3 +40,8 @@ export function approvalPolicyPath(org: string, app: string): string {
 export function createAppPath(org: string): string {
   return `/dashboard/${encodeURIComponent(org)}`;
 }
+
+/** The same page with the Create application form already open: what the first-run checklist links to. */
+export function createAppFormPath(org: string): string {
+  return `${createAppPath(org)}?create=1`;
+}

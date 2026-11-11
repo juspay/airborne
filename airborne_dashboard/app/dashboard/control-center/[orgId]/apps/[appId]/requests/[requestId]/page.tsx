@@ -1,4 +1,5 @@
 "use client";
+import { EvidenceBlock } from "@/components/control-center/telemetry";
 
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import {
   useReleasePermissions,
 } from "@/lib/control-center/hooks";
 import { locateApp } from "@/lib/control-center/format";
+import { evidenceForRelease } from "@/lib/control-center/telemetry";
 import {
   actionLabel,
   isExpired,
@@ -25,7 +27,6 @@ import {
 import { CcPageHeader } from "@/components/control-center/page-header";
 import { LastUpdated, RelativeTime } from "@/components/control-center/time";
 import { PlatformMark } from "@/components/control-center/platform-mark";
-import { Mono } from "@/components/control-center/version";
 import { RequestStatusChip } from "@/components/control-center/status-badge";
 import {
   ReachForRequest,
@@ -43,7 +44,7 @@ import {
   PanelTitle,
   PermissionDenied,
 } from "@/components/control-center/states";
-import { APPROVALS_PATH, CC_ROOT, classicAppPath, groupPath, releasePath } from "@/components/control-center/paths";
+import { APPROVALS_PATH, appPath, CC_ROOT, groupPath, releasePath } from "@/components/control-center/paths";
 
 export default function DeploymentRequestPage() {
   const params = useParams<{ orgId: string; appId: string; requestId: string }>();
@@ -58,13 +59,14 @@ export default function DeploymentRequestPage() {
     if (app !== appId) setApp(appId);
   }, [org, app, orgId, appId, setOrg, setApp]);
 
-  const { overview, refresh: refreshOverview } = useOverview();
+  const { overview, error: overviewError, isLoading: overviewLoading, refresh: refreshOverview } = useOverview();
   const located = useMemo(() => locateApp(overview, orgId, appId), [overview, orgId, appId]);
   const query = useDeploymentRequest(orgId, appId, requestId);
   const request = query.request;
   const { policy } = useApprovalPolicy(orgId, appId);
   const permissions = useReleasePermissions(orgId, appId);
   const releaseId = request?.payload.release_id ?? null;
+  const evidence = evidenceForRelease(located.app, releaseId, Boolean(overviewError));
   const events = useReleaseEvents(orgId, appId, releaseId, Boolean(request && isOpenRequest(request.status)));
 
   const denied = (permissions.isReady && !permissions.read) || query.error?.name === ErrorName.Forbidden;
@@ -81,7 +83,7 @@ export default function DeploymentRequestPage() {
     { label: "Control Center", href: CC_ROOT },
     { label: "Approvals", href: APPROVALS_PATH },
     ...(located.group ? [{ label: located.group.name, href: groupPath(orgId, located.group.id) }] : [{ label: orgId }]),
-    { label: appId, href: classicAppPath(orgId, appId) },
+    { label: appId, href: appPath(orgId, appId) },
     { label: request ? actionLabel(request.action) : "Request" },
   ];
 
@@ -129,6 +131,7 @@ export default function DeploymentRequestPage() {
                 pollMs={query.pollMs}
                 isValidating={query.isValidating}
                 onRefresh={refreshAll}
+                unknown={located.app?.auxiliary_error != null}
               />
               {releaseId && (
                 <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
@@ -144,10 +147,12 @@ export default function DeploymentRequestPage() {
         ) : query.isLoading && !request ? (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
             <div className="space-y-4">
+              <EvidenceBlock org={orgId} app={appId} evidence={evidence} loading={overviewLoading && !overview} />
               <BlockSkeleton className="h-48" />
               <BlockSkeleton className="h-32" />
             </div>
             <div className="space-y-4">
+              <EvidenceBlock org={orgId} app={appId} evidence={evidence} loading={overviewLoading && !overview} />
               <BlockSkeleton className="h-64" />
             </div>
           </div>
@@ -169,15 +174,20 @@ export default function DeploymentRequestPage() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
             <div className="space-y-4">
+              <EvidenceBlock org={orgId} app={appId} evidence={evidence} loading={overviewLoading && !overview} />
               <Panel className="space-y-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <PanelTitle>The change, against what is live</PanelTitle>
-                  <Mono>request {request.id}</Mono>
                 </div>
                 {located.app?.auxiliary_error != null && (
                   <p role="alert">Application approval and marker state could not be read. Refresh before acting.</p>
                 )}
-                <RequestChange org={orgId} request={request} app={located.app} />
+                <RequestChange
+                  org={orgId}
+                  request={request}
+                  app={located.app}
+                  unreadable={Boolean(overviewError) && !overview}
+                />
               </Panel>
 
               <Panel className="space-y-3 p-4">
@@ -188,6 +198,8 @@ export default function DeploymentRequestPage() {
                   policy={policy}
                   me={me}
                   permitted={permissions.isReady && permitted}
+                  evidence={evidence}
+                  evidenceLoading={overviewLoading && !overview}
                   onChanged={refreshAll}
                 />
               </Panel>
@@ -208,6 +220,7 @@ export default function DeploymentRequestPage() {
             </div>
 
             <div className="space-y-4">
+              <EvidenceBlock org={orgId} app={appId} evidence={evidence} loading={overviewLoading && !overview} />
               <Panel className="p-4">
                 <PanelTitle className="mb-2">Facts</PanelTitle>
                 <RequestFacts request={request} platform={located.app?.platform ?? null} />

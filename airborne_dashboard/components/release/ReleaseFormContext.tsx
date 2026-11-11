@@ -20,6 +20,8 @@ import { parseFileRef } from "@/lib/utils";
 import { useOverview } from "@/lib/control-center/hooks";
 import { locateApp } from "@/lib/control-center/format";
 
+import { validCreationTargeting } from "@/lib/control-center/creation-targeting";
+
 const defaultState: ReleaseFormState = {
   mode: "create",
   releaseId: undefined,
@@ -30,6 +32,7 @@ const defaultState: ReleaseFormState = {
   releaseConfigTimeout: 4000,
   configProperties: "{}",
   targetingRules: [],
+  compatibilityException: "",
   schemaFields: [],
   remoteConfigValues: {},
   selectedPackage: null,
@@ -53,7 +56,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
   // approval-gated app is after a checker has spent an approval. Ask for the rule up front.
   const { overview } = useOverview();
   const targetingRequired =
-    mode === "create" && locateApp(overview, org ?? "", app ?? "").app?.serving_policy?.effective_strict === true;
+    mode !== "edit" && locateApp(overview, org ?? "", app ?? "").app?.serving_policy?.effective_strict === true;
 
   const getInitialState = (): ReleaseFormState => {
     const state = { ...defaultState, mode, releaseId };
@@ -106,6 +109,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
   const [releaseConfigTimeout, setReleaseConfigTimeout] = useState(initialState.releaseConfigTimeout);
   const [configProperties, setConfigProperties] = useState(initialState.configProperties);
   const [targetingRules, setTargetingRules] = useState<TargetingRule[]>(initialState.targetingRules);
+  const [compatibilityException, setCompatibilityException] = useState("");
   const [schemaFields, setSchemaFields] = useState<SchemaField[]>([]);
   const [remoteConfigValues, setRemoteConfigValues] = useState<Record<string, any>>(initialState.remoteConfigValues);
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -215,7 +219,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
         case 1:
           return true;
         case 2:
-          if (targetingRequired && targetingRules.length === 0) return false;
+          if (!validCreationTargeting(Boolean(targetingRequired), targetingRules, compatibilityException)) return false;
           return targetingRules.every((rule) => Boolean(rule.dimension && rule.values.trim()));
         case 3:
           if (schemaFields.length > 0) {
@@ -233,7 +237,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
           return false;
       }
     },
-    [schemaFields, remoteConfigValues, selectedPackage, targetingRules, targetingRequired]
+    [schemaFields, remoteConfigValues, selectedPackage, targetingRules, targetingRequired, compatibilityException]
   );
 
   const createReleaseConfig = useCallback((): ReleaseConfigRequest | undefined => {
@@ -259,6 +263,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
         properties: configProps,
       },
       package: { important: importantFiles, lazy: lazyFiles },
+      compatibility_exception: compatibilityException.trim() || undefined,
       dimensions: Object.keys(dimensionsObj).length ? dimensionsObj : undefined,
       resources: Array.from(selectedResources),
     };
@@ -272,6 +277,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     bootTimeout,
     releaseConfigTimeout,
     remoteConfigValues,
+    compatibilityException,
     targetingRules,
     filePriority,
     selectedResources,
@@ -289,6 +295,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       bootTimeout,
       releaseConfigTimeout,
       configProperties,
+      compatibilityException,
       targetingRules,
       schemaFields,
       remoteConfigValues,
@@ -303,6 +310,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       setBootTimeout,
       setReleaseConfigTimeout,
       setConfigProperties,
+      setCompatibilityException,
       setTargetingRules,
       addTargetingRule,
       removeTargetingRule,
@@ -327,6 +335,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       bootTimeout,
       releaseConfigTimeout,
       configProperties,
+      compatibilityException,
       targetingRules,
       schemaFields,
       remoteConfigValues,

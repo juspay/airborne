@@ -11,10 +11,14 @@ for shutdown_signal in (signal.SIGTERM, signal.SIGHUP):
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SERVER = ROOT / 'airborne_server'
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--no-dashboard', action='store_true', help='run the API and real web sample without compiling the dashboard')
+parser.add_argument('--android-emulator', action='store_true', help='use 10.0.2.2 for API-only sandbox asset URLs')
+parser.add_argument('--api-port', type=int, default=None, help='fixed API port for an isolated test sandbox')
 parser.add_argument('--smoke', action='store_true', help='seed, report elapsed time, then clean up')
 args = parser.parse_args()
-if shutil.disk_usage(ROOT).free < 5 * 1024**3:
-    raise SystemExit('Quickstart requires at least 5 GB free.')
+if args.android_emulator and not args.no_dashboard: parser.error('--android-emulator requires --no-dashboard')
+if shutil.disk_usage(ROOT).free < 4 * 1024**3:
+    raise SystemExit('Quickstart requires at least 4 GB free.')
 for tool in ('docker', 'cargo', 'node', 'npm', 'curl', 'jq'):
     if not shutil.which(tool): raise SystemExit(f'Install {tool} first.')
 started = time.monotonic()
@@ -34,20 +38,13 @@ def port():
         return sock.getsockname()[1]
 
 ports = {name: port() for name in ('db', 'sp', 'kc', 's3', 'api', 'dashboard')}
+if args.api_port is not None: ports['api'] = args.api_port
 env = os.environ.copy()
 env.update(SUPERPOSITION_VERSION='0.113.0', DB_PORT=str(ports['db']), SUPERPOSITION_PORT=str(ports['sp']), KEYCLOAK_PORT=str(ports['kc']), LOCALSTACK_PORT=str(ports['s3']), AIRBORNE_DATA_DIR=str(state / 'data'))
 # Resolve the maintained compose definition, then strip all global names and host bindings.
 config = json.loads(subprocess.check_output(['docker', 'compose', '-f', str(SERVER / 'docker-compose.yml'), 'config', '--format', 'json'], env=env))
-keep = {'postgres', 'superposition-data-init', 'superposition', 'keycloak-db', 'keycloak', 'localstack'}
-config['services'] = {k: v for k, v in config['services'].items() if k in keep}
-for name, service in config['services'].items():
-    service.pop('container_name', None)
-    service.pop('restart', None)
-    service['ports'] = []
-    for target, key in {'postgres': [(5432, 'db')], 'superposition': [(8080, 'sp')], 'keycloak': [(8080, 'kc')], 'localstack': [(4566, 's3')]}.get(name, []):
-        service['ports'].append({'target': target, 'published': str(ports[key]), 'host_ip': '127.0.0.1', 'protocol': 'tcp'})
-for volume in config.get('volumes', {}).values(): volume.pop('name', None)
-config.pop('name', None)
+from quickstart_config import isolated_compose
+config = isolated_compose(config, ports)
 compose_file = state / 'compose.json'
 compose_file.write_text(json.dumps(config))
 compose = ['docker', 'compose', '-p', project, '-f', str(compose_file)]
@@ -56,14 +53,14 @@ for line in (SERVER / '.env.example').read_text().splitlines():
     if line and not line.startswith('#') and '=' in line:
         key, value = line.split('=', 1); values[key] = value.split(' #')[0]
 issuer = f"http://localhost:{ports['kc']}/realms/hyperOTA"
-values.update(SERVER_HOST='127.0.0.1', DB_HOST='127.0.0.1', DB_PORT=str(ports['db']), REDIS_URL='', PORT=str(ports['api']), PUBLIC_ENDPOINT=f"http://localhost:{ports['dashboard']}", SUPERPOSITION_URL=f"http://localhost:{ports['sp']}", OIDC_ISSUER_URL=issuer, OIDC_EXTERNAL_ISSUER_URL=issuer, AUTH_ADMIN_ISSUER=issuer, AUTH_ADMIN_TOKEN_URL=issuer+'/protocol/openid-connect/token', AUTH_ADMIN_CLIENT_ID='hyperota', AWS_ENDPOINT_URL=f"http://localhost:{ports['s3']}", CLOUDFRONT_DISTRIBUTION_ID='', USE_ENCRYPTED_SECRETS='false', MIGRATIONS_TO_RUN_ON_BOOT='db,superposition', RUST_LOG='warn', RELEASE_CORS_ALLOWED_ORIGINS=f"http://localhost:{ports['dashboard']}")
+values.update(SERVER_HOST='127.0.0.1', DB_HOST='127.0.0.1', DB_PORT=str(ports['db']), REDIS_URL='', PORT=str(ports['api']), PUBLIC_ENDPOINT=f"http://{'10.0.2.2' if args.android_emulator else 'localhost'}:{ports['dashboard']}", SUPERPOSITION_URL=f"http://localhost:{ports['sp']}", OIDC_ISSUER_URL=issuer, OIDC_EXTERNAL_ISSUER_URL=issuer, AUTH_ADMIN_ISSUER=issuer, AUTH_ADMIN_TOKEN_URL=issuer+'/protocol/openid-connect/token', AUTH_ADMIN_CLIENT_ID='hyperota', AWS_ENDPOINT_URL=f"http://localhost:{ports['s3']}", CLOUDFRONT_DISTRIBUTION_ID='', USE_ENCRYPTED_SECRETS='false', MIGRATIONS_TO_RUN_ON_BOOT='db,superposition', RUST_LOG='warn', RELEASE_CORS_ALLOWED_ORIGINS=f"http://localhost:{ports['dashboard']}")
 import shlex
 (state / '.env').write_text(''.join(f'{k}={shlex.quote(v)}\n' for k,v in values.items()))
 
 def wait(url, timeout=240):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
-        if shutil.disk_usage(ROOT).free < 5 * 1024**3: raise RuntimeError('Stopped: under 5 GB free')
+        if shutil.disk_usage(ROOT).free < 4 * 1024**3: raise RuntimeError('Stopped: under 4 GB free')
         try:
             with urllib.request.urlopen(url, timeout=2) as response:
                 if response.status == 200: return
@@ -98,16 +95,22 @@ try:
     seed_env = {**env, 'AIRBORNE_URL': base, 'QUICKSTART_SEED': '1'}
     with open(state / 'seed.log', 'w') as log:
         run(['python3', str(ROOT / 'scripts' / 'quickstart-seed.py')], cwd=state, env=seed_env, stdout=log, stderr=subprocess.STDOUT)
-    dashboard = ROOT / 'airborne_dashboard'
-    if not (dashboard / 'node_modules').exists(): run(['npm', 'ci'], cwd=dashboard)
-    spawn(['npm', 'run', 'dev', '--', '--hostname', '127.0.0.1', '--port', str(ports['dashboard'])], dashboard, {'BACKEND_URL': base, 'S3_URL': values['AWS_ENDPOINT_URL']+'/hyper-ota-bucket'}, 'dashboard.log')
-    wait(values['PUBLIC_ENDPOINT'] + '/login')
-    print(f"READY in {time.monotonic()-started:.1f}s: {values['PUBLIC_ENDPOINT']}", flush=True)
+    if not args.no_dashboard:
+        dashboard = ROOT / 'airborne_dashboard'
+        if not (dashboard / 'node_modules').exists(): run(['npm', 'ci'], cwd=dashboard)
+        spawn(['npm', 'run', 'dev', '--', '--hostname', '127.0.0.1', '--port', str(ports['dashboard'])], dashboard, {'BACKEND_URL': base, 'S3_URL': values['AWS_ENDPOINT_URL']+'/hyper-ota-bucket'}, 'dashboard.log')
+        wait(values['PUBLIC_ENDPOINT'] + '/login')
+    print(f"SANDBOX READY (not first OTA booted) in {time.monotonic()-started:.1f}s: {base if args.no_dashboard else values['PUBLIC_ENDPOINT']}", flush=True)
     print(f"Credentials: {state / 'credentials.json'} (0600). Real Keycloak auth; no auth bypass. Redis, RedisInsight and docs skipped.", flush=True)
-    print('Next: sign in, open quickstart / first-app. Wire the SDK and bundle a compatible native app (manual edits + rebuild), upload a package, create a targeted release for version_cohort=v1, ramp then conclude. See docs/guides/integrate-react-native. Ctrl-C cleans up this sandbox.', flush=True)
+    sample_socket = socket.socket(); sample_socket.bind(('127.0.0.1', 0)); sample_port = ports['dashboard'] if args.no_dashboard else sample_socket.getsockname()[1]; sample_socket.close()
+    spawn(['python3', str(ROOT / 'scripts/sample/serve.py')], ROOT, {'AIRBORNE_URL':base, 'SAMPLE_PORT':str(sample_port), 'S3_URL':values['AWS_ENDPOINT_URL']+'/hyper-ota-bucket'}, 'sample.log')
+    print(f"Sample: http://localhost:{sample_port} — v1 live, v2 ready, no synthetic failures.", flush=True)
+    print(f"First OTA next command: cd {shlex.quote(str(state))} && AIRBORNE_URL={shlex.quote(base)} python3 {shlex.quote(str(ROOT / 'scripts/quickstart-seed.py'))} --publish-v2", flush=True)
+    print('Then click Check for update in the sample. FIRST OTA BOOTED is measured only when v2 is visible; sandbox readiness does not include native integration or builds. Ctrl-C cleans up only this sandbox.', flush=True)
+
     if not args.smoke:
         while True:
-            if shutil.disk_usage(ROOT).free < 5 * 1024**3: raise RuntimeError('Stopped: under 5 GB free')
+            if shutil.disk_usage(ROOT).free < 4 * 1024**3: raise RuntimeError('Stopped: under 4 GB free')
             if any(p.poll() is not None for p in processes): raise RuntimeError('Sandbox process exited')
             time.sleep(1)
 finally:

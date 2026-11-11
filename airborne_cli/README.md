@@ -293,3 +293,16 @@ node  airborne_cli/src/index.js  --help
 - Valid Airborne server credentials
 
 For both local release config commands, `--release-timeout` is a deprecated alias for `--release-config-timeout` and emits a warning. Existing scripts remain supported. Supplying both names with different values is rejected. `-r` remains supported. The setting writes `config.release_config_timeout`, which controls the SDK wait for fetching the release configuration.
+
+### Integrate a bare native scaffold
+
+```sh
+airborne-devkit init ./MyApp --organisation example --application my-android --endpoint https://ota.example.com --dry-run
+airborne-devkit init ./MyApp --organisation example --application my-android --endpoint https://ota.example.com
+```
+
+Recognizes bare Kotlin MainApplication/MainActivity and Swift RN 0.78/0.79 delegate templates. Shows a unified dry-run diff, writes dependency/native/config changes only after shape validation, and refuses custom native code with exact manual integration links. iOS defaults to the separate application `my-android-ios` (override with `--ios-application`). Install dependencies and rebuild; `init` does not download dependencies or change network security settings. `--sdk` accepts an SDK version or local package path for checkout testing. See [first OTA walkthrough](../airborne_docs/docs/guides/first-ota.md).
+
+For unpublished checkout testing, pass `--sdk file:../airborne/airborne-react-native --android-sdk-project ../airborne/airborne_sdk_android/airborne`. The latter explicitly includes the matching local native SDK instead of the published Maven artifact. It adds its required build plugin and version properties. This is a separate verification mode, not proof that published wrapper/native packages match.
+
+For unpublished checkout testing, pass `--ios-sdk-project /absolute/path/to/airborne_sdk_iOS/hyper-ota` alongside `--sdk` pointing to the matching local wrapper. The generated Podfile defaults to static frameworks and applies Kharcha's repeat-safe Apple fmt workaround for Xcode 27. Published wrapper/native pod compatibility must be checked separately.

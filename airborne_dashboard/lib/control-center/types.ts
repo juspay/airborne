@@ -74,6 +74,8 @@ export interface CacheInvalidation {
 }
 
 export interface AppStatus {
+  /** First manifest request recorded by the server; independent of telemetry retention. */
+  first_device_seen_at?: ISO8601 | null;
   /** Auxiliary lookup failed; null metadata must not be interpreted as safe. */
   auxiliary_error?: string | null;
   unresolved_operations?: PendingOperation[] | null;

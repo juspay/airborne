@@ -171,6 +171,40 @@ export function flagForRelease(app: AppStatus | undefined, releaseId: string): R
   };
 }
 
+/**
+ * What device reports say about one release, for a screen where a person is about to widen it. `unknown` is a read
+ * that failed or an app whose server does not report; `none` is a readable app where nothing came back for this
+ * release. Neither is ever worded as healthy.
+ */
+export type ReleaseEvidence =
+  | { kind: "flagged"; flag: ReleaseFlag; others: number }
+  | { kind: "reports"; row: TelemetryRelease }
+  | { kind: "none"; availability: "silent" | "reporting" }
+  | { kind: "unknown"; reason: "overview" | "unavailable" | "absent" };
+
+export function evidenceForRelease(
+  app: AppStatus | undefined,
+  releaseId: string | null | undefined,
+  overviewFailed = false
+): ReleaseEvidence {
+  if (!app || !releaseId) return { kind: "unknown", reason: "overview" };
+  const availability = telemetryAvailability(app.telemetry);
+  if (availability === "absent") return { kind: "unknown", reason: "absent" };
+  if (availability === "error") return { kind: "unknown", reason: "unavailable" };
+  const flag = flagForRelease(app, releaseId);
+  if (flag)
+    return { kind: "flagged", flag, others: flaggedRows(app).filter((r) => r.release_id === releaseId).length - 1 };
+  if (overviewFailed) return { kind: "unknown", reason: "overview" };
+  const rows = rowsForRelease(app.telemetry, releaseId);
+  if (rows.length > 0) {
+    const worst = [...rows].sort((a, b) => SIGNAL_SEVERITY[b.signal.status] - SIGNAL_SEVERITY[a.signal.status])[0];
+    return { kind: "reports", row: worst };
+  }
+  // A failed overview refresh leaves the last copy on screen; say it may be old rather than reading it as fresh.
+  if (overviewFailed) return { kind: "unknown", reason: "overview" };
+  return { kind: "none", availability: availability === "silent" ? "silent" : "reporting" };
+}
+
 export interface Adoption {
   /** Distinct installs that acknowledged a successful boot: the server's definition of adoption. */
   booted: number;

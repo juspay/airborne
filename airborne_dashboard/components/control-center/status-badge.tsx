@@ -59,7 +59,7 @@ export function toneForStatus(status: ReleaseStatus | string): Tone {
     case "INPROGRESS":
       return "rolling";
     case "CREATED":
-      return "waiting";
+      return "muted";
     case "CONCLUDED":
       return "live";
     case "DISCARDED":
@@ -100,7 +100,7 @@ export function StateChip({ tone, icon: Icon, children, className, variant = "ba
     <span
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium leading-none",
+        "inline-flex max-w-full items-center gap-1.5 text-xs font-medium leading-snug",
         variant === "badge" && "rounded-md border px-1.5 py-1",
         variant === "badge" && TONE_BG[tone],
         TONE_TEXT[tone],
@@ -163,7 +163,7 @@ export function ReleaseStateChip({
     case "concluded_on_control":
       return (
         <StateChip tone="muted" icon={CircleDashed} {...props}>
-          Concluded on control
+          Stopped, never live
         </StateChip>
       );
     default:

@@ -2,7 +2,7 @@
 
 Self-hosted over-the-air JavaScript and asset releases for React Native, Android and iOS. Target compatible app versions, ramp deliberately, and retain bundled code for first boot. Native code changes still require a store build.
 
-## Start here: the 10-minute path
+## Start here: sandbox, then first OTA
 
 With Docker Compose, Rust (the pinned toolchain), Node/npm, Python 3, curl and jq installed:
 
@@ -10,15 +10,13 @@ With Docker Compose, Rust (the pinned toolchain), Node/npm, Python 3, curl and j
 make quickstart
 ```
 
-This starts an isolated local sandbox with real Keycloak authentication, PostgreSQL, Superposition and LocalStack, seeds `quickstart / first-app`, and prints its dashboard URL and credentials file. It uses fresh project names, loopback-only random ports and private state under `.quickstart/`. It skips Redis, RedisInsight, analytics and the docs server. Ctrl-C stops and removes only that sandbox's containers and volumes; logs remain. Do not use this plaintext local configuration in production.
+This starts an isolated local sandbox with real Keycloak authentication, PostgreSQL, Superposition and LocalStack, seeds `quickstart / first-app` with real v1/v2 web bundles (v1 live, v2 prepared at zero exposure), and prints its dashboard URL and credentials file. It uses fresh project names, loopback-only random ports and private state under `.quickstart/`. It skips Redis, RedisInsight, analytics and the docs server. Ctrl-C stops and removes only that sandbox's containers and volumes; logs remain. Do not use this plaintext local configuration in production.
 
-Ten minutes is a walkthrough budget after prerequisites, images and compilation are ready, not a guaranteed cold install time. Image downloads and the first Rust build can take longer. To time setup without leaving it running: `python3 scripts/quickstart.py --smoke`.
+The printed **SANDBOX READY** duration measures infrastructure readiness. **FIRST OTA BOOTED** includes the next command and observing v2 in the sample browser; it is a separate milestone. The sample contains no synthetic failures or device reports. A measured run from a clean local clone reached sandbox readiness in **38.9 s** and visibly booted the web v2 in **46.3 s**. This used `--no-dashboard`, cached images and Rust artifacts, and includes operator delay; it is not a cold-download or native-OTA result. See [verification details](ROUND2-SERVER-REPORT.md).
 
-1. Sign in using the printed credentials. Open `quickstart / first-app`.
-2. Follow the [React Native integration guide](https://airborne.juspay.in/docs/guides/integrate-react-native/). **Native wiring still needs manual edits and a rebuild**; the script does not patch your app. Configure the printed local API endpoint and send `app_version=1.0.0`. A physical device needs a reachable host endpoint; the loopback sandbox is intended for local development.
-3. Bundle and upload files, then cut a package with the CLI described in that guide.
-4. Create a release in the dashboard. Select `version_cohort=v1`, whose exact compatible range is `1.0.0`. Review targeting; strict serving rejects untargeted releases, including the first.
-5. Ramp (up to 50%, preserving the control variant), inspect the test client, then conclude with the experimental variant for all matching devices. Creation alone serves nobody. Relaunch the app and confirm it fetches and boots the new package.
+Open the printed sample URL. Run the printed `--publish-v2` command, then click **Check for update** and confirm “v2 — delivered over the air.” The small sample uses the real public manifest and a checksum-verified downloaded script; it is not a React Native SDK or native-device acceptance test. Its checked-in source is under `scripts/sample/`.
+
+For React Native, follow [Integrate React Native and deliver your first OTA](airborne_docs/docs/guides/first-ota.md). `airborne-devkit init --dry-run` shows the native diff; `init` patches recognized Kotlin/Swift scaffolds and writes configuration. Install dependencies and rebuild the binary before shipping an OTA. Unknown shapes are refused with manual steps.
 
 For your own app, create `app_version` (standard), then `version_cohort` (cohort depending on `app_version`) under Dimensions, and define its compatible range under Cohorts. Never reuse a version range for incompatible native binaries.
 
@@ -33,7 +31,7 @@ For your own app, create `app_version` (standard), then `version_cohort` (cohort
 
 | Choice | Useful when | Costs and limits |
 | --- | --- | --- |
-| Airborne | You want to operate this server, version cohorts and per-app approval policy in your infrastructure. | More services and operational work; manual native wiring; compatibility ranges rely on operator correctness; no automatic fleet rollback from telemetry. Ramps cap at 50% until explicit conclusion. |
+| Airborne | You want to operate this server, version cohorts and per-app approval policy in your infrastructure. | More services and operational work; native compilation and supported-scaffold integration; compatibility ranges rely on operator correctness; no automatic fleet rollback from telemetry. Ramps cap at 50% until explicit conclusion. |
 | Expo Updates / EAS Update | You want Expo's documented configuration and hosted update workflow, channels, runtime-version matching and rollouts. | You must maintain compatible native runtimes; native changes still need a new binary. Airborne does not offer EAS's integrated setup workflow. |
 | CodePush | You have an existing CodePush client and need to assess its independent server path. | App Center retired on March 31, 2025; evaluate the standalone CodePush distribution and its maintenance obligations rather than assuming the old hosted service is available. Airborne is not a drop-in CodePush endpoint. |
 
@@ -43,7 +41,7 @@ Sources checked October 31, 2026: [Expo setup](https://docs.expo.dev/eas-update/
 
 See [server setup](airborne_docs/docs/server), [dashboard releases](airborne_docs/docs/dashboard/releases.mdx), and [maker-checker tradeoffs](airborne_docs/docs/guides/maker-checker-tradeoffs.md). Production requires your own identity, storage, TLS, backups and monitoring configuration. Rollback can be blocked by policy or protections; CDN submission does not prove edge availability, and inactive clients may not update promptly.
 
-Contributions should include relevant tests and matching documentation. See [LICENSE](LICENSE).
+Contributions should include relevant tests and matching documentation. See [CONTRIBUTING](CONTRIBUTING.md) and [LICENSE](LICENSE).
 
 ## SDK internals
 
@@ -170,3 +168,5 @@ A high-performance analytics platform that provides comprehensive OTA update ins
 
 **Note**: While powerful, using these servers is optional. The SDKs can be configured to work with other update distribution and analytics mechanisms if preferred.
 
+
+Strict creation requires a nonempty `app_version` or `version_cohort` target. Locale-only targeting is insufficient. Custom targeting requires an audited `compatibility_exception` explanation (at least 20 characters); empty targeting remains refused. **Compatibility remains a declaration by the operator**, not server verification of the native binary. See [recovery checklist](airborne_docs/docs/server/recovery-checklist.md) and [contribution order](CONTRIBUTING.md).

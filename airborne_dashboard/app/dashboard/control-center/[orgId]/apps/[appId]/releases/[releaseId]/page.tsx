@@ -6,8 +6,7 @@ import { OverviewStateNotice } from "@/components/control-center/overview-state-
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ExternalLink, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShieldCheck } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { ErrorName } from "@/lib/api";
 import {
@@ -59,6 +58,7 @@ import { UnresolvedBanner } from "@/components/control-center/rollback-notices";
 import { CacheStaleNotice } from "@/components/control-center/cache-notice";
 import { LocaleExceptionsNotice } from "@/components/control-center/locale-notice";
 import { ServingChip } from "@/components/control-center/serving-policy";
+import { ClassicLink } from "@/components/control-center/classic-link";
 import { Timeline } from "@/components/control-center/timeline";
 import { Reach } from "@/components/control-center/reach-card";
 import {
@@ -256,12 +256,8 @@ export default function ControlCenterReleasePage() {
                 pollMs={releaseQuery.pollMs}
                 isValidating={releaseQuery.isValidating}
                 onRefresh={refreshAll}
+                unknown={located.app?.auxiliary_error != null}
               />
-              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                <Link href={classicReleasePath(orgId, appId, releaseId)}>
-                  <ExternalLink /> Full release page
-                </Link>
-              </Button>
             </>
           }
         />
@@ -398,6 +394,7 @@ export default function ControlCenterReleasePage() {
                           request={r}
                           platform={located.app?.platform ?? null}
                           me={me}
+                          app={located.app}
                         />
                       ))}
                   </ul>
@@ -501,6 +498,9 @@ export default function ControlCenterReleasePage() {
             </div>
           </div>
         )}
+        {release && !denied && (
+          <ClassicLink href={classicReleasePath(orgId, appId, releaseId)}>Full release page</ClassicLink>
+        )}
       </div>
     </>
   );
@@ -527,7 +527,7 @@ function outcomeBarLabel(outcome: ReleaseOutcome | undefined, fallback: string):
     case "superseded":
       return "was live; superseded";
     case "concluded_on_control":
-      return "control chosen; nothing changed for devices";
+      return "stopped; nothing changed for devices";
     default:
       return fallback;
   }
@@ -593,15 +593,15 @@ function RolloutExplanation({
         case "concluded_on_control":
           return (
             <>
-              Concluded on the control variant: v{pkg} never became live, so the previous package stayed in place for
-              every device (a rollback, or a rollout stopped early).
+              v{pkg} never became live: the previous package stayed in place for every device (a rollback, or a rollout
+              stopped early).
             </>
           );
         default:
           return (
             <>
               This release is concluded, but the server did not report its outcome, so whether v{pkg} is live,
-              superseded or was concluded on control is unknown. No actions are offered until the timeline loads.
+              superseded or was stopped before it went live is unknown. No actions are offered until the timeline loads.
             </>
           );
       }

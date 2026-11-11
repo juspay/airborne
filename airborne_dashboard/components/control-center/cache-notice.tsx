@@ -190,7 +190,7 @@ export function GroupCacheNotice({
         toastSuccess("CDN cache invalidation submitted", `${mayRetry.length} app${mayRetry.length === 1 ? "" : "s"}`);
       } else {
         toastWarning(
-          `CDN cache cleared on ${mayRetry.length - failed.length} of ${stale.length} apps`,
+          `CDN cache cleared on ${mayRetry.length - failed.length} of ${stale.length} app${stale.length === 1 ? "" : "s"}`,
           left.join("; ")
         );
       }

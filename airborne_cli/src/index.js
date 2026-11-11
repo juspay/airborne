@@ -43,6 +43,39 @@ program
   .description("Command-line interface for Airborne operations")
   .version("0.49.1");
 
+program.command("first-release")
+  .description("Create the app_version dimension and prepare an exact-version release; no rollout")
+  .requiredOption("--endpoint <url>")
+  .requiredOption("--organisation <name>")
+  .requiredOption("--application <name>")
+  .requiredOption("--package-version <number>")
+  .requiredOption("--app-version <version>")
+  .action(async options => {
+    try {
+      const { firstRelease } = await import("./init/first-release.js");
+      const token = process.env.AIRBORNE_TOKEN;
+      if (!token) throw new Error("Set AIRBORNE_TOKEN to an authenticated access token");
+      console.log(JSON.stringify(await firstRelease({ ...options, token }), null, 2));
+    } catch (error) { console.error(error.message); process.exitCode = 1; }
+  });
+
+program.command("init [directory]")
+  .description("Integrate a recognized bare React Native Kotlin/Swift scaffold")
+  .requiredOption("--organisation <name>")
+  .requiredOption("--application <name>")
+  .requiredOption("--endpoint <url>")
+  .option("--ios-application <name>", "Distinct iOS application (defaults to application-ios)")
+  .option("--ios-sdk-project <path>", "Local native iOS SDK pod for testing unpublished checkout changes")
+  .option("--android-sdk-project <path>", "Local native Android SDK module for testing unpublished checkout changes")
+  .option("--sdk <version>", "SDK version or local package path", "^0.45.0")
+  .option("--dry-run", "Print unified diff without writing files")
+  .action(async (directory = process.cwd(), options) => {
+    try {
+      const { initProject } = await import("./init/project.js");
+      console.log(initProject(directory, options));
+    } catch (error) { console.error(error.message); process.exitCode = 1; }
+  });
+
 coreCli.commands.forEach((cmd, i) => {
   if (cmd._name !== "PostLogin") {
     program.addCommand(formatCommand(cmd));

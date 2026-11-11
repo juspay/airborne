@@ -1,0 +1,19 @@
+<!doctype html><html><meta charset="utf-8"><title>Airborne first OTA</title>
+<style>body{font:20px system-ui;max-width:700px;margin:15vh auto;padding:24px}button{padding:12px;font:inherit}</style>
+<h1>Your first OTA</h1><p id="version">v1 — bundled baseline</p><button id="check">Check for update</button><p id="status"></p>
+<script>
+check.onclick = async () => {
+  try {
+    const response = await fetch('/manifest');
+    if (!response.ok) throw Error('No live compatible release yet. Publish v2 with the printed command.');
+    const manifest = await response.json();
+    const bundle = await fetch('/bundle');
+    if (!bundle.ok) throw Error('Bundle download failed');
+    const bytes = await bundle.arrayBuffer();
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), x => x.toString(16).padStart(2,'0')).join('');
+    if (digest !== manifest.package.index.checksum) throw Error('Checksum mismatch');
+    const script = document.createElement('script'); script.textContent = new TextDecoder().decode(bytes); document.body.append(script);
+    document.querySelector('#status').textContent = 'Booted release ' + manifest.version;
+  } catch(error) { document.querySelector('#status').textContent = error.message; }
+};
+</script></html>

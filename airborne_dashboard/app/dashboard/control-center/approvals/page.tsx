@@ -269,7 +269,14 @@ function OrgQueue({
           </div>
           <ul className="divide-y">
             {list.map((r) => (
-              <RequestRow key={r.id} org={org.name} request={r} platform={platformOf(r.application)} me={me} />
+              <RequestRow
+                key={r.id}
+                org={org.name}
+                request={r}
+                platform={platformOf(r.application)}
+                me={me}
+                app={apps.find((a) => a.application === r.application)}
+              />
             ))}
           </ul>
         </Panel>

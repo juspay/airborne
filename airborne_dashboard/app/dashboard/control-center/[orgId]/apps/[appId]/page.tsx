@@ -5,7 +5,6 @@ import { approvalStateReady } from "@/lib/control-center/overview-state";
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/providers/app-context";
 import {
@@ -32,6 +31,7 @@ import { RequestRow } from "@/components/control-center/request-card";
 import { PolicySummary } from "@/components/control-center/approval-policy-editor";
 import { BlockSkeleton, EmptyState, ErrorState, Panel, PanelTitle } from "@/components/control-center/states";
 import { approvalPolicyPath, CC_ROOT, classicAppPath, groupPath } from "@/components/control-center/paths";
+import { ClassicLink } from "@/components/control-center/classic-link";
 
 /**
  * One application: what is live and rolling out, what needs attention, and the two per-app policies
@@ -56,12 +56,15 @@ export default function ControlCenterAppPage() {
   // The overview carries the policy too; this read is what a change refreshes first.
   const serving = useServingPolicy(orgId, appId);
   const approvalOn = Boolean(status?.approval_required);
+  // Known off: the state was read and no policy is on. Nothing about approvals is shown then.
+  const approvalKnown = status?.auxiliary_error == null && typeof status?.approval_required === "boolean";
   const reviews = (status?.emergency_needs_review ?? []).filter((r) => !r.acknowledged_by);
   // Acknowledging needs the checker list even after approval was switched off, so read the policy for reviews too.
   const approval = useApprovalPolicy(orgId, approvalOn || reviews.length > 0 ? appId : null);
   const requests = useDeploymentRequests(orgId, approvalOn ? appId : null);
   const open = (requests.requests ?? []).filter((r) => isOpenRequest(r.status));
-  const policy = serving.policy ?? status?.serving_policy;
+  const policy =
+    serving.error || status?.auxiliary_error != null ? undefined : (serving.policy ?? status?.serving_policy);
   // The fresh read carries the security exclusions; the overview's copy covers the rows until it lands.
   const device = useTelemetry(orgId, appId);
   const telemetry = device.telemetry ?? status?.telemetry;
@@ -95,7 +98,7 @@ export default function ControlCenterAppPage() {
           titleAdornment={
             status ? (
               <span className="inline-flex flex-wrap items-center gap-2">
-                <ServingChip policy={policy} />
+                <ServingChip policy={status?.error ? undefined : policy} />
                 {approvalOn && (
                   <Link href={approvalPolicyPath(orgId, appId)} className="hover:underline">
                     <ApprovalRequiredChip pending={open.length} />
@@ -115,12 +118,13 @@ export default function ControlCenterAppPage() {
           }
           actions={
             <>
-              <LastUpdated at={lastUpdatedAt} pollMs={pollMs} isValidating={isValidating} onRefresh={refreshAll} />
-              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                <Link href={classicAppPath(orgId, appId)}>
-                  <ExternalLink /> Classic app page
-                </Link>
-              </Button>
+              <LastUpdated
+                at={lastUpdatedAt}
+                pollMs={pollMs}
+                isValidating={isValidating}
+                onRefresh={refreshAll}
+                unknown={status?.auxiliary_error != null}
+              />
             </>
           }
         />
@@ -202,32 +206,33 @@ export default function ControlCenterAppPage() {
             </div>
 
             <div className="space-y-4">
-              <Panel className="space-y-3 p-4">
-                {approvalOn && approval.policy ? (
-                  <>
-                    <PolicySummary policy={approval.policy} />
-                    <p className="text-xs text-muted-foreground">
-                      {open.length === 0
-                        ? "No open requests."
-                        : `${open.length} request${open.length === 1 ? "" : "s"} awaiting a checker.`}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <PanelTitle>Approval policy</PanelTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {!approvalStateReady(status, approval.isReady, Boolean(approval.error))
-                        ? "Unknown: approval state could not be verified. Refresh before acting."
-                        : approvalOn
-                          ? "Loading the policy…"
-                          : "Off: release changes here are direct. An organisation admin can turn maker-checker on."}
-                    </p>
-                  </>
-                )}
-                <Button asChild variant="outline" size="sm">
-                  <Link href={approvalPolicyPath(orgId, appId)}>Open approval policy</Link>
-                </Button>
-              </Panel>
+              {/* Approval vocabulary appears once a policy is on, or when its state cannot be read. */}
+              {(approvalOn || !approvalKnown) && (
+                <Panel className="space-y-3 p-4">
+                  {approvalOn && approval.policy ? (
+                    <>
+                      <PolicySummary policy={approval.policy} />
+                      <p className="text-xs text-muted-foreground">
+                        {open.length === 0
+                          ? "No open requests."
+                          : `${open.length} request${open.length === 1 ? "" : "s"} awaiting a checker.`}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <PanelTitle>Approval policy</PanelTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {!approvalStateReady(status, approval.isReady, Boolean(approval.error))
+                          ? "Unknown: approval state could not be verified. Refresh before acting."
+                          : "Loading the policy…"}
+                      </p>
+                    </>
+                  )}
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={approvalPolicyPath(orgId, appId)}>Open approval policy</Link>
+                  </Button>
+                </Panel>
+              )}
 
               {hasExclusions(blocked) && (
                 <Panel className="p-4">
@@ -242,13 +247,33 @@ export default function ControlCenterAppPage() {
                   </div>
                   <ul className="divide-y">
                     {open.slice(0, 6).map((r) => (
-                      <RequestRow key={r.id} org={orgId} request={r} platform={status.platform} me={me} dense />
+                      <RequestRow
+                        key={r.id}
+                        org={orgId}
+                        request={r}
+                        platform={status.platform}
+                        me={me}
+                        app={status}
+                        dense
+                      />
                     ))}
                   </ul>
                 </Panel>
               )}
             </div>
           </div>
+        )}
+        {status && (
+          <ClassicLink
+            href={classicAppPath(orgId, appId)}
+            setUp={
+              approvalKnown && !approvalOn
+                ? { href: approvalPolicyPath(orgId, appId), label: "Set up approvals" }
+                : undefined
+            }
+          >
+            Classic app page
+          </ClassicLink>
         )}
       </div>
     </>

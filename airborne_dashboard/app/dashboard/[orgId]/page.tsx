@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR, { mutate } from "swr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Rocket, Search, Plus } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { ORG_APP_NAME_MAX_LENGTH, ORG_APP_NAME_RULE_TEXT, validateOrgAppName } from "@/lib/name-validation";
 import { useAppContext } from "@/providers/app-context";
@@ -36,6 +37,11 @@ export default function ApplicationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  // The first-run checklist links here with ?create=1: open the form instead of making the person find the button.
+  const wantsCreateForm = useSearchParams()?.get("create") === "1";
+  useEffect(() => {
+    if (wantsCreateForm && canCreateApplication) setIsCreateModalOpen(true);
+  }, [wantsCreateForm, canCreateApplication]);
   const [isCreatingApp, setIsCreatingApp] = useState(false);
   const [formData, setFormData] = useState({ name: "", description: "" });
   const appNameError = useMemo(() => validateOrgAppName(formData.name, "Application"), [formData.name]);

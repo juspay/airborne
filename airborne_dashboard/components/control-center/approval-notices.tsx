@@ -177,9 +177,7 @@ export function EmergencyExplainer({ className }: { className?: string }) {
   return (
     <ApprovalNotice title="Emergency rollback skips approval" tone="emergency" icon={Siren} className={className}>
       <p className="text-muted-foreground">
-        One checker restores the previous live release now, with a required reason. It is recorded as an emergency in
-        the timeline and stays marked <strong className="text-foreground">Needs review</strong> until a different
-        checker acknowledges it. It can only restore the previous known-good release.
+        Restore the previous release with a recorded reason; a different checker must review it afterward.
       </p>
     </ApprovalNotice>
   );

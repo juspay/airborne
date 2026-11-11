@@ -459,10 +459,7 @@ pub(super) async fn create_release_impl(
     let dimensions = req.dimensions.clone().unwrap_or_default();
     let strict = serving_policy::get(&state, &organisation, &application).await?["effective_strict"].as_bool().unwrap_or(true);
     validate_creation_targeting(strict, &dimensions, req.compatibility_exception.as_deref())?;
-    if let Some(reason) = &req.compatibility_exception {
-        // Persist the exception before any upstream mutation; audit failure blocks creation.
-        control_center::required_event(&state, &auth_response, "", "compatibility_exception", serde_json::json!({"reason":reason,"dimensions":dimensions})).await?;
-    }
+
 
 
     if utils::check_non_concluded_releases(
@@ -546,6 +543,12 @@ pub(super) async fn create_release_impl(
             .collect::<HashMap<_, _>>(),
     ));
 
+    if strict && !["app_version", "version_cohort"].iter().any(|key| dimensions.get(*key).and_then(Value::as_str).is_some_and(|v| !v.trim().is_empty())) {
+        let mut payload = serde_json::json!({"reason":req.compatibility_exception,"dimensions":dimensions,"outcome":"creation_attempt"});
+        if let Some(approval) = maker_checker::audit_context() { payload["approval"] = approval; }
+        // Required before the upstream write; failed attempts remain explicitly labelled.
+        control_center::required_event(&state, &auth_response, "", "compatibility_exception", payload).await?;
+    }
     write_lock::check().await?;
     let created_experiment_response = Box::pin(write_lock::mutate(control_center::create_expected(&control_variant, &experimental_variant, &dimensions), created_experiment_response.idempotency_key(write_lock::reason()).change_reason(write_lock::user_reason(&format!("Release creation for application {} with PATCH-style overrides", application))?).send())).await?;
 
@@ -1414,9 +1417,7 @@ async fn serve_release_handler(
     .map_err(|e| ABError::NotFound(format!("Workspace unavailable; keep current code: {}", e)))?;
 
     // The app exists (workspace lookup succeeded). A first strict fetch may return 404.
-    if let Err(error) = device_seen::record(&state, &organisation, &application).await {
-        log::warn!("First device request could not be recorded: {error}");
-    }
+    device_seen::record(&state, &organisation, &application);
 
     let context: HashMap<String, String> = req
         .headers()
@@ -2036,6 +2037,11 @@ fn validate_creation_targeting(
     dimensions: &HashMap<String, Value>,
     exception: Option<&str>,
 ) -> airborne_types::Result<()> {
+    if exception.is_some_and(|r| r.trim().chars().count() > 2000) {
+        return Err(ABError::BadRequest(
+            "Compatibility exception exceeds 2000 characters".into(),
+        ));
+    }
     let explicit_version = ["app_version", "version_cohort"].iter().any(|key| {
         dimensions
             .get(*key)
@@ -2044,9 +2050,10 @@ fn validate_creation_targeting(
     });
     if strict
         && (dimensions.is_empty()
-            || (!explicit_version && exception.is_none_or(|r| r.trim().len() < 20)))
+            || (!explicit_version
+                && !exception.is_some_and(|r| (20..=2000).contains(&r.trim().chars().count()))))
     {
-        return Err(ABError::BadRequest("Strict creation requires a nonempty app_version or version_cohort target declaring compatible native versions. For custom targeting provide compatibility_exception (at least 20 characters explaining native compatibility); it is audited. Compatibility remains the operator's declaration, not server verification.".into()));
+        return Err(ABError::BadRequest("Strict creation requires a nonempty app_version or version_cohort target declaring compatible native versions. For custom targeting provide compatibility_exception (20–2000 Unicode characters explaining native compatibility); it is audited. Compatibility remains the operator's declaration, not server verification.".into()));
     }
     Ok(())
 }
@@ -2065,6 +2072,11 @@ mod creation_targeting_tests {
         )
         .is_ok());
         assert!(validate_creation_targeting(true, &locale, Some(" ")).is_err());
+        assert!(validate_creation_targeting(true, &locale, Some("原".repeat(7).as_str())).is_err());
+        assert!(validate_creation_targeting(true, &locale, Some("原".repeat(20).as_str())).is_ok());
+        assert!(
+            validate_creation_targeting(false, &locale, Some("x".repeat(2001).as_str())).is_err()
+        );
         assert!(validate_creation_targeting(
             true,
             &HashMap::new(),

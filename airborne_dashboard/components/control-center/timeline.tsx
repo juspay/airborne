@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,11 +18,17 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { describeContext } from "@/lib/control-center/format";
-import { actionLabel, describePolicyChange, emergencyRestoredVersion } from "@/lib/control-center/approval";
+import {
+  actionLabel,
+  describePolicyChange,
+  emergencyRestoredVersion,
+  requestStatusLabel,
+} from "@/lib/control-center/approval";
 import type { ApprovalPolicy, ReleaseEvent, ReleaseEventAction } from "@/lib/control-center/types";
 import { TONE_TEXT, type Tone } from "./status-badge";
 import { RelativeTime } from "./time";
 import { BlockSkeleton, EmptyState, ErrorState } from "./states";
+import { oneRowPerRequest, requestIdOf, REQUEST_EVENT_STATUS } from "@/lib/control-center/timeline-rows";
 
 const META: Record<ReleaseEventAction, { icon: ComponentType<{ className?: string }>; tone: Tone; label: string }> = {
   created: { icon: GitCommitHorizontal, tone: "muted", label: "Created" },
@@ -51,11 +57,12 @@ const META: Record<ReleaseEventAction, { icon: ComponentType<{ className?: strin
 const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
 
 /** A request event's payload is the request: name the action and both people. */
-function requestSummary(ev: ReleaseEvent): string | null {
+function requestSummary(ev: ReleaseEvent, named = false): string | null {
   const p = ev.payload ?? {};
   const bits: string[] = [];
   const action = str(p.action);
-  if (action) bits.push(actionLabel(action).toLowerCase());
+  // A grouped row already names the request in its heading; a loose event does not.
+  if (action && !named) bits.push(actionLabel(action).toLowerCase());
   const requester = str(p.requester);
   const decider = str(p.decided_by);
   switch (ev.action) {
@@ -95,7 +102,7 @@ function requestSummary(ev: ReleaseEvent): string | null {
   return bits.join(" · ") || null;
 }
 
-function summarise(ev: ReleaseEvent): string | null {
+function summarise(ev: ReleaseEvent, named = false): string | null {
   const p = ev.payload ?? {};
   switch (ev.action) {
     case "operation_resolved":
@@ -114,7 +121,9 @@ function summarise(ev: ReleaseEvent): string | null {
     case "concluded": {
       const v = p.chosen_variant;
       if (typeof v !== "string") return null;
-      return v.toLowerCase().includes("control") ? "on control: nothing changed for devices" : "made live";
+      return v.toLowerCase().includes("control")
+        ? "stayed on the previous release: nothing changed for devices"
+        : "made live";
     }
     case "requested":
     case "approved":
@@ -124,7 +133,7 @@ function summarise(ev: ReleaseEvent): string | null {
     case "stale":
     case "executed":
     case "failed":
-      return requestSummary(ev);
+      return requestSummary(ev, named);
     case "emergency_rollback": {
       // The server nests the record under `details`; older and sample events keep the fields at the top.
       const d = (p.details && typeof p.details === "object" ? p.details : p) as Record<string, unknown>;
@@ -194,15 +203,36 @@ interface Row {
   count: number;
   /** The oldest of them; `ev` is the newest. */
   first: ReleaseEvent;
+  /** Set for a request: the one row that stands for every event of it, and where the request stands now. */
+  request?: { action: string; status: string };
 }
 
-/** Newest first. Consecutive events with the same action, actor and sentence become one row with a count. */
-function mergeRows(list: ReleaseEvent[]): Row[] {
+/**
+ * Newest first. A request is one row, however many events it left: it reads as the request and where it stands
+ * now. Other consecutive identical events become one row with a count.
+ */
+function mergeRows(list: ReleaseEvent[], byRequest: boolean): Row[] {
   const rows: Row[] = [];
-  for (const ev of list) {
+  for (const ev of byRequest ? oneRowPerRequest(list) : list) {
+    if (byRequest && requestIdOf(ev)) {
+      rows.push({
+        ev,
+        detail: summarise(ev, true),
+        count: 1,
+        first: ev,
+        request: { action: str(ev.payload?.action) ?? "", status: REQUEST_EVENT_STATUS[ev.action] ?? ev.action },
+      });
+      continue;
+    }
     const detail = summarise(ev);
     const last = rows[rows.length - 1];
-    if (last && last.ev.action === ev.action && last.ev.actor === ev.actor && last.detail === detail) {
+    if (
+      !last?.request &&
+      last &&
+      last.ev.action === ev.action &&
+      last.ev.actor === ev.actor &&
+      last.detail === detail
+    ) {
       last.count += 1;
       last.first = ev;
     } else {
@@ -212,12 +242,16 @@ function mergeRows(list: ReleaseEvent[]): Row[] {
   return rows;
 }
 
+/** Rows shown before "Show all": enough to see what just happened, short enough to find the page's actions. */
+export const TIMELINE_RECENT = 5;
+
 export function Timeline({
   events,
   isLoading,
   error,
   onRetry,
-  limit,
+  limit = TIMELINE_RECENT,
+  byRequest = true,
   className,
   dense,
 }: {
@@ -225,14 +259,21 @@ export function Timeline({
   isLoading: boolean;
   error?: Error;
   onRetry?: () => void;
+  /** Rows shown until "Show all". */
   limit?: number;
+  /** One row per request. Off on a request's own page, where its steps are the point. */
+  byRequest?: boolean;
   className?: string;
   dense?: boolean;
 }) {
+  const [all, setAll] = useState(false);
   if (isLoading && !events) return <BlockSkeleton className={cn("h-28", className)} />;
   if (error && !events) return <ErrorState title="Timeline unavailable" message={error.message} onRetry={onRetry} />;
-  const list = mergeRows([...(events ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)));
-  const shown = limit ? list.slice(0, limit) : list;
+  const list = mergeRows(
+    [...(events ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    byRequest
+  );
+  const shown = all ? list : list.slice(0, limit);
   if (shown.length === 0)
     return (
       <div className={className}>
@@ -261,7 +302,7 @@ export function Timeline({
         </p>
       )}
       <ol className={cn("relative", className)} aria-label="Release timeline">
-        {shown.map(({ ev, detail, count, first }, i) => {
+        {shown.map(({ ev, detail, count, first, request }, i) => {
           const meta = META[ev.action] ?? META.created;
           const Icon = meta.icon;
           return (
@@ -282,7 +323,12 @@ export function Timeline({
               </span>
               <div className="min-w-0 flex-1 leading-tight">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-sm font-medium">{meta.label}</span>
+                  <span className="text-sm font-medium">
+                    {request ? `${actionLabel(request.action)} request` : meta.label}
+                  </span>
+                  {request && (
+                    <span className="text-sm text-muted-foreground">· {requestStatusLabel(request.status)}</span>
+                  )}
                   {count > 1 && (
                     <span className="text-sm font-medium tabular-nums" title={`${count} identical events in a row`}>
                       ×{count}
@@ -313,10 +359,17 @@ export function Timeline({
             </li>
           );
         })}
-        {limit && list.length > limit && (
-          <li className="pl-10 pt-1 text-xs text-muted-foreground">+{list.length - limit} earlier</li>
-        )}
       </ol>
+      {list.length > limit && (
+        <button
+          type="button"
+          onClick={() => setAll((a) => !a)}
+          aria-expanded={all}
+          className="mt-1 pl-10 text-xs text-muted-foreground underline hover:text-foreground"
+        >
+          {all ? `Show the latest ${limit}` : `Show all ${list.length}`}
+        </button>
+      )}
     </>
   );
 }

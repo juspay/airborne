@@ -57,7 +57,7 @@ const ITEMS: {
     label: (n) => `${n} Awaiting approval`,
   },
   { key: "rolling", field: "rollingOut", tone: "rolling", icon: CircleDot, label: (n) => `${n} rolling out` },
-  { key: "waiting", field: "notStarted", tone: "waiting", icon: Clock, label: (n) => `${n} not started` },
+  { key: "waiting", field: "notStarted", tone: "muted", icon: Clock, label: (n) => `${n} not started` },
   { key: "failed", field: "lookupFailed", tone: "danger", icon: AlertTriangle, label: (n) => `${n} lookup failed` },
   { key: "nothing", field: "nothingLive", tone: "muted", icon: CircleDashed, label: (n) => `${n} nothing live` },
   {
@@ -127,7 +127,7 @@ export function AttentionStrip({
           focus === "all" ? "border-foreground/40 bg-foreground/5" : "text-muted-foreground hover:text-foreground"
         )}
       >
-        All · {totals.apps} apps in {totals.groups} group{totals.groups === 1 ? "" : "s"}
+        All · {totals.apps} app{totals.apps === 1 ? "" : "s"} in {totals.groups} group{totals.groups === 1 ? "" : "s"}
         {totals.orgs > 1 ? ` across ${totals.orgs} orgs` : ""}
       </button>
       {ITEMS.map((i) => {
@@ -152,7 +152,9 @@ export function AttentionStrip({
         );
       })}
       {summary.stateUnknown > 0 && (
-        <span role="alert">State unreadable for {summary.stateUnknown} apps. Refresh before acting.</span>
+        <span role="alert">
+          State unreadable for {summary.stateUnknown} app{summary.stateUnknown === 1 ? "" : "s"}. Refresh before acting.
+        </span>
       )}
       {quiet && totals.apps > 0 && (
         <span className="text-xs text-muted-foreground">

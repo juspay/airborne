@@ -192,7 +192,7 @@ reserved `otherwise`, invalid versions, reversed endpoints and invalid priority
 return 400. Like other targeting edits, range creation requires cohort `update`
 permission and is blocked while maker-checker is enabled.
 
-New applications default to strict serving, so target the intended version/cohort
+For applications with strict serving enabled, target the intended version/cohort
 and explicitly ramp and conclude even the first release. A general concluded
 release alone does not opt a strict application's devices into default fallback.
 See [stored strict policy](/docs/server/control-center#stored-strict-serving-policy)

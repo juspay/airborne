@@ -91,11 +91,18 @@ fn latest_live(exps: &[ExperimentResponse]) -> Vec<&ExperimentResponse> {
 pub(crate) fn version(exp: &ExperimentResponse) -> i64 {
     utils::extract_integer_from_experiment::<i64>(&experimental(exp), "package.version")
 }
-fn creation_actor<'a>(actors: &'a [(String, String)], id: &str) -> &'a str {
+fn creation_actor<'a>(actors: &'a [(String, String, Value)], id: &str) -> &'a str {
     actors
         .iter()
-        .find(|(release, actor)| release == id && !actor.trim().is_empty())
-        .map(|(_, actor)| actor.as_str())
+        .find(|(release, actor, _)| release == id && !actor.trim().is_empty())
+        .map(|(_, actor, payload)| {
+            payload
+                .get("approval")
+                .and_then(|a| a.get("requester"))
+                .and_then(Value::as_str)
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or(actor.as_str())
+        })
         .unwrap_or("Unknown actor (legacy release)")
 }
 
@@ -123,8 +130,8 @@ pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Re
             .filter(e::app_id.eq(a))
             .filter(e::action.eq("created"))
             .order((e::created_at.asc(), e::id.asc()))
-            .select((e::release_id, e::actor))
-            .load::<(String, String)>(&mut c)?)
+            .select((e::release_id, e::actor, e::payload))
+            .load::<(String, String, Value)>(&mut c)?)
     })?;
     let live=latest_live(&exps).into_iter().map(|e|json!({"release_id":e.id,"package_version":version(e),"config_version":utils::extract_string_from_experiment(&experimental(e),"config.version"),"dimensions":context(e),"concluded_at":utils::dt(&e.last_modified)})).collect::<Vec<_>>();
     let active=exps.iter().filter(|e|matches!(e.status,ExperimentStatusType::Created|ExperimentStatusType::Inprogress)).map(|e|json!({"release_id":e.id,"package_version":version(e),"status":e.status.as_str(),"traffic_percentage":e.traffic_percentage,"experimental_variant":experimental(e).map(|v|v.id.clone()).unwrap_or_default(),"dimensions":context(e),"created_at":utils::dt(&e.created_at),"created_by":creation_actor(&actors, &e.id)})).collect::<Vec<_>>();
@@ -624,8 +631,12 @@ mod actor_tests {
     #[test]
     fn actor_comes_from_scoped_creation_audit() {
         let rows = vec![
-            ("other".into(), "wrong".into()),
-            ("r1".into(), "real-owner".into()),
+            ("other".into(), "wrong".into(), serde_json::json!({})),
+            (
+                "r1".into(),
+                "checker".into(),
+                serde_json::json!({"approval":{"requester":"real-owner"}}),
+            ),
         ];
         assert_eq!(super::creation_actor(&rows, "r1"), "real-owner");
         assert_eq!(

@@ -55,6 +55,7 @@ export type ReleaseConfigRequest = {
     important: string[];
     lazy: string[];
   };
+  compatibility_exception?: string;
   dimensions?: Record<string, string | string[]>;
   resources: string[];
   package_id?: string;
@@ -82,6 +83,7 @@ export interface ReleaseFormState {
 
   // Targeting (Step 2)
   targetingRules: TargetingRule[];
+  compatibilityException: string;
 
   // Remote Config (Step 3)
   schemaFields: SchemaField[];
@@ -110,6 +112,7 @@ export interface ReleaseFormActions {
   setConfigProperties: (properties: string) => void;
 
   // Targeting
+  setCompatibilityException: (reason: string) => void;
   setTargetingRules: React.Dispatch<React.SetStateAction<TargetingRule[]>>;
   addTargetingRule: () => void;
   removeTargetingRule: (index: number) => void;
@@ -170,6 +173,7 @@ export interface ApiReleaseData {
     important: Array<{ file_path: string }>;
     lazy: Array<{ file_path: string }>;
   };
+  compatibility_exception?: string;
   dimensions?: Record<string, string | string[]>;
   resources: Array<{ file_id: string }>;
 }
