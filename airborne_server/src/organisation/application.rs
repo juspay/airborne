@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use diesel::SelectableHelper;
 use std::collections::HashMap;
 
 use actix_web::web::{Json, ReqData};
@@ -178,12 +179,8 @@ async fn add_application(
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let mut inserted_workspace: WorkspaceName = conn.transaction::<_, ABError, _>(|conn| {
-    let workspace = diesel::insert_into(workspace_names::table)
-        .values(&new_workspace_name)
-        .get_result(conn)
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
-        })?;
+    let workspace = insert_workspace(conn, &new_workspace_name)
+        .map_err(|e| ABError::InternalServerError(format!("Failed to store workspace name: {}", e)))?;
 
     diesel::sql_query("INSERT INTO hyperotaserver.serving_policies(org_id,app_id,strict) VALUES($1,$2,true) ON CONFLICT DO NOTHING")
         .bind::<diesel::sql_types::Text,_>(&organisation)
@@ -256,4 +253,37 @@ fn validate_application_name(name: &str) -> airborne_types::Result<()> {
     }
 
     Ok(())
+}
+
+fn insert_workspace(
+    conn: &mut diesel::PgConnection,
+    new: &NewWorkspaceName<'_>,
+) -> diesel::QueryResult<WorkspaceName> {
+    diesel::insert_into(workspace_names::table)
+        .values(new)
+        .returning(WorkspaceName::as_returning())
+        .get_result(conn)
+}
+
+#[cfg(test)]
+mod replay_regression {
+    use super::*;
+    use diesel::Connection;
+    #[test]
+    #[ignore = "requires TEST_DATABASE_URL"]
+    fn workspace_insert_returns_model_column_order() {
+        let mut conn =
+            diesel::PgConnection::establish(&std::env::var("TEST_DATABASE_URL").unwrap()).unwrap();
+        conn.test_transaction::<_, diesel::result::Error, _>(|conn| {
+            let new = NewWorkspaceName {
+                organization_id: "kharcha-replay-regression",
+                application_id: "scratch",
+                workspace_name: "pending",
+            };
+            let row = insert_workspace(conn, &new)?;
+            assert_eq!(row.application_id, "scratch");
+            assert_eq!(row.workspace_name, "pending");
+            Ok(())
+        });
+    }
 }

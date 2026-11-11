@@ -64,7 +64,7 @@ pub async fn load(
         .await
         .map_err(|_| ABError::InternalServerError("Operation journal deadline".into()))?
 }
-// A replacement retains lineage in the durable rollback journal, even when
+// A replacement retains lineage in the durable journal or scoped abandonment audit, even when
 // release-event recording failed. Scope every lookup to the application.
 pub async fn rollback_parent(
     state: &web::Data<AppState>,
@@ -81,9 +81,12 @@ pub async fn rollback_parent(
     }
     run_blocking!({
         let mut c = pool.get_timeout(std::time::Duration::from_secs(2))?;
-        let rows = diesel::sql_query("SELECT source_release_id FROM hyperotaserver.release_operations WHERE org_id=$1 AND app_id=$2 AND kind='rollback' AND data->>'replacement_release_id'=$3")
-            .bind::<Text,_>(org).bind::<Text,_>(app).bind::<Text,_>(replacement).load::<Parent>(&mut c)?;
-        Ok(rows.into_iter().next().map(|r| r.source_release_id))
+        c.transaction::<_,ABError,_>(|c| {
+            diesel::sql_query("SET LOCAL statement_timeout='2s'").execute(c)?;
+            let rows = diesel::sql_query("SELECT source_release_id FROM hyperotaserver.release_operations WHERE org_id=$1 AND app_id=$2 AND kind='rollback' AND data->>'replacement_release_id'=$3 UNION ALL SELECT release_id AS source_release_id FROM hyperotaserver.release_events WHERE org_id=$1 AND app_id=$2 AND action='rollback_abandoned' AND payload->>'replacement_release_id'=$3 LIMIT 1")
+                .bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(&replacement).load::<Parent>(c)?;
+            Ok(rows.into_iter().next().map(|r| r.source_release_id))
+        })
     })
 }
 
@@ -96,16 +99,24 @@ pub struct PendingApp {
     #[diesel(sql_type=Jsonb)]
     pub operations: Value,
 }
-pub async fn pending_apps(state: &web::Data<AppState>) -> airborne_types::Result<Vec<PendingApp>> {
+pub async fn pending_apps(
+    state: &web::Data<AppState>,
+    pairs: &[(String, String)],
+) -> airborne_types::Result<Vec<PendingApp>> {
+    let pairs = serde_json::json!(pairs
+        .iter()
+        .map(|(org, app)| serde_json::json!({"org_id":org,"app_id":app}))
+        .collect::<Vec<_>>());
     let pool = state.db_pool.clone();
     run_blocking!({
-        let mut c = pool.get_timeout(std::time::Duration::from_secs(2))?;
-        let rows=diesel::sql_query("SELECT org_id,app_id,jsonb_agg(jsonb_build_object('operation_id',id,'message','Upstream outcome is not confirmed. Writes are paused for this app.','expected',data->'expected','before',data->'before','upstream_workspace',data->'workspace') ORDER BY created_at) AS operations FROM hyperotaserver.release_operations WHERE kind='write' AND state='unresolved' GROUP BY org_id,app_id").load::<PendingApp>(&mut c)?;
+        let mut c = pool.get_timeout(std::time::Duration::from_millis(250))?;
+        c.transaction::<_,ABError,_>(|c| {
+        diesel::sql_query("SET LOCAL statement_timeout='500ms'").execute(c)?;
+        let rows=diesel::sql_query("SELECT org_id,app_id,jsonb_agg(jsonb_build_object('operation_id',id,'message','Upstream outcome is not confirmed. Writes are paused for this app.') ORDER BY created_at) AS operations FROM hyperotaserver.release_operations WHERE kind='write' AND state='unresolved' AND (org_id,app_id) IN (SELECT org_id,app_id FROM jsonb_to_recordset($1) AS allowed(org_id text,app_id text)) GROUP BY org_id,app_id").bind::<Jsonb,_>(pairs).load::<PendingApp>(c)?;
         Ok(rows)
+        })
     })
 }
-// A rejected/pre-dispatch plan owns no upstream transition. Re-plan it, even
-// after a source/registry change; retain the row id for the unique source index.
 // A rejected/pre-dispatch plan owns no upstream transition. Re-plan it, even
 // after a source/registry change; retain the row id for the unique source index.
 pub async fn has_confirmed(

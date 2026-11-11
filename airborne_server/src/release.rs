@@ -31,7 +31,7 @@ use chrono::{DateTime, Utc};
 use http::{HeaderValue, StatusCode};
 use log::info;
 use open_feature::EvaluationContext;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{collections::HashMap, sync::Arc};
 use superposition_provider::{AllFeatureProvider, SuperpositionAPIProvider};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
@@ -46,6 +46,55 @@ pub(crate) mod serving_policy;
 mod types;
 pub mod utils;
 pub(crate) mod write_lock;
+
+fn validate_ramp_traffic_percentage(traffic_percentage: u8) -> airborne_types::Result<()> {
+    if traffic_percentage > 50 {
+        return Err(ABError::BadRequest(
+            "Traffic percentage must be between 0 and 50".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn experiment_lookup_error<E>(
+    error: &superposition_sdk::error::SdkError<E>,
+    failure_message: &str,
+) -> ABError {
+    use superposition_sdk::error::SdkError;
+    let (status, code) = match error {
+        SdkError::ServiceError(e) => match e.raw().status().as_u16() {
+            // Upstream 404 is ambiguous: it can mean an absent workspace too.
+            404 => {
+                let body = e.raw().body().bytes().unwrap_or_default();
+                let text = String::from_utf8_lossy(body).to_lowercase();
+                if text.contains("workspace") {
+                    (503, "upstream_workspace_unavailable")
+                } else if text.contains("experiment") || text.contains("release") {
+                    (404, "release_not_found")
+                } else {
+                    (404, "release_or_workspace_not_found")
+                }
+            }
+            401 | 403 => (502, "upstream_authentication_failed"),
+            _ => (502, "upstream_release_unavailable"),
+        },
+        SdkError::DispatchFailure(_) => (503, "upstream_connection_failed"),
+        SdkError::TimeoutError(_) => (504, "upstream_read_timeout"),
+        _ => (502, "upstream_release_invalid_response"),
+    };
+    lookup_failure(status, code, failure_message)
+}
+
+fn lookup_failure(status: u16, code: &str, message: &str) -> ABError {
+    ABError::ReleaseOperation {
+        status,
+        body: json!({
+            "code": code, "message": message, "stage": "read_release",
+            "mutation_committed": false, "mutation_may_have_committed": false,
+            "automatic_retry": false
+        }),
+    }
+}
 
 fn encode_url_path(raw_url: &str) -> String {
     match url::Url::parse(raw_url) {
@@ -134,8 +183,7 @@ async fn get_release(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|_| ABError::InternalServerError("Failed to get workspace name".to_string()))?;
+    .await?;
 
     let exp_details = state
         .release_superposition_client
@@ -147,7 +195,7 @@ async fn get_release(
         .await
         .map_err(|e| {
             info!("Failed to get experiment details: {:?}", e);
-            ABError::NotFound("Release/Experiment not found".to_string())
+            experiment_lookup_error(&e, "Failed to get experiment details from Superposition")
         })?;
 
     let experimental_variant = exp_details
@@ -404,11 +452,13 @@ pub(super) async fn create_release_impl(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
+    .await?;
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
+    let strict = serving_policy::get(&state, &organisation, &application).await?["effective_strict"].as_bool().unwrap_or(true);
+    validate_creation_targeting(strict, &dimensions)?;
+
 
     if utils::check_non_concluded_releases(
         superposition_org_id_from_env.clone(),
@@ -495,7 +545,7 @@ pub(super) async fn create_release_impl(
     let created_experiment_response = Box::pin(write_lock::mutate(control_center::create_expected(&control_variant, &experimental_variant, &dimensions), created_experiment_response.idempotency_key(write_lock::reason()).change_reason(write_lock::user_reason(&format!("Release creation for application {} with PATCH-style overrides", application))?).send())).await?;
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
-    maker_checker::protect_created(&organisation,&application,&experiment_id_for_ramping).await?;
+    maker_checker::protect_created(&state, &organisation,&application,&experiment_id_for_ramping, req.rollback_sensitive.as_deref()).await?;
     control_center::event(
         &state,
         &auth_response,
@@ -652,8 +702,7 @@ async fn list_releases(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
+    .await?;
 
     let status = release_query.status.clone().map(|s| s.into());
 
@@ -946,6 +995,7 @@ pub(super) async fn ramp_release_impl(
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<RampReleaseResponse>> {
     write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
+    validate_ramp_traffic_percentage(req.traffic_percentage)?;
 
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
@@ -974,10 +1024,7 @@ pub(super) async fn ramp_release_impl(
             application.clone(),
             organisation.clone(),
         )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+        .await?;
 
         let details = state
             .release_superposition_client
@@ -987,7 +1034,10 @@ pub(super) async fn ramp_release_impl(
             .id(&experiment_id)
             .send()
             .await
-            .map_err(|_| ABError::InternalServerError("Failed to read release".into()))?;
+            .map_err(|e| {
+                info!("Failed to read release {}: {:?}", experiment_id, e);
+                experiment_lookup_error(&e, "Failed to read release")
+            })?;
         control_center::ensure_active(&details.status)?;
 
         info!(
@@ -1039,7 +1089,7 @@ async fn ramp_experiment(
     change_reason: &Option<String>,
 ) -> airborne_types::Result<()> {
     write_lock::check().await?;
-    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id,"status":"INPROGRESS","traffic_percentage":traffic_percentage}),     state
+    Box::pin(write_lock::mutate_ramp(serde_json::json!({"id":experiment_id,"status":"INPROGRESS","traffic_percentage":traffic_percentage}),     state
         .release_superposition_client
         .ramp_experiment()
         .org_id(state.env.superposition_org_id.clone())
@@ -1097,10 +1147,7 @@ pub(super) async fn conclude_release_impl(
             application.clone(),
             organisation.clone(),
         )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+        .await?;
 
         let experiment_details = state
             .release_superposition_client
@@ -1112,9 +1159,7 @@ pub(super) async fn conclude_release_impl(
             .await
             .map_err(|e| {
                 info!("Failed to get experiment details: {:?}", e);
-                ABError::InternalServerError(
-                    "Failed to get experiment details from Superposition".to_string(),
-                )
+                experiment_lookup_error(&e, "Failed to get experiment details from Superposition")
             })?;
 
         control_center::ensure_inprogress(&experiment_details.status)?;
@@ -1235,10 +1280,7 @@ pub(super) async fn discard_release_impl(
             application.clone(),
             organisation.clone(),
         )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+        .await?;
 
         let experiment_details = state
             .release_superposition_client
@@ -1250,9 +1292,7 @@ pub(super) async fn discard_release_impl(
             .await
             .map_err(|e| {
                 info!("Failed to get experiment details: {:?}", e);
-                ABError::InternalServerError(
-                    "Failed to get experiment details from Superposition".to_string(),
-                )
+                experiment_lookup_error(&e, "Failed to get experiment details from Superposition")
             })?;
 
         if experiment_details.status != ExperimentStatusType::Created {
@@ -1366,7 +1406,7 @@ async fn serve_release_handler(
         organisation.clone(),
     )
     .await
-    .map_err(|e| ABError::NotFound(format!("Failed to get workspace name: {}", e)))?;
+    .map_err(|e| ABError::NotFound(format!("Workspace unavailable; keep current code: {}", e)))?;
 
     let context: HashMap<String, String> = req
         .headers()
@@ -1386,7 +1426,7 @@ async fn serve_release_handler(
         .collect();
 
     // If toss not sent fallback to
-    let toss = query.into_inner().toss.unwrap_or("99".into());
+    let toss = query.toss.clone().unwrap_or("99".into());
 
     info!(
         "Got Toss for serving release: {}, workspace: {}, org: {}, app: {}",
@@ -1411,7 +1451,9 @@ async fn serve_release_handler(
 
     log::info!("Final evaluation Context {:?}", evaluation_context);
 
-    let strict = serving_policy::cached(&state, &organisation, &application).await?
+    let strict = serving_policy::cached(&state, &organisation, &application)
+        .await
+        .map_err(|_| ABError::NotFound("Serving policy unavailable; keep current code".into()))?
         ["effective_strict"]
         .as_bool()
         .unwrap_or(true);
@@ -1435,10 +1477,12 @@ async fn serve_release_handler(
             .send()
             .await
             .map_err(|e| {
-                ABError::InternalServerError(format!("Failed to resolve strict release: {e}"))
+                log::error!("Strict release resolve failed: {e}");
+                ABError::NotFound("Release resolution unavailable; keep current code".into())
             })?;
         let defaults = builder.send().await.map_err(|e| {
-            ABError::InternalServerError(format!("Failed to resolve strict defaults: {e}"))
+            log::error!("Strict defaults resolve failed: {e}");
+            ABError::NotFound("Release resolution unavailable; keep current code".into())
         })?;
         let resolved_json = crate::utils::document::document_to_json_value(&resolved.config);
         let default_json = crate::utils::document::document_to_json_value(&defaults.config);
@@ -1455,11 +1499,13 @@ async fn serve_release_handler(
         serde_json::from_value(dotted_docs_to_nested(
             resolved_json
                 .as_object()
-                .ok_or_else(|| ABError::InternalServerError("Invalid resolved release".into()))?
+                .ok_or_else(|| {
+                    ABError::NotFound("Release resolution unavailable; keep current code".into())
+                })?
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone())),
         )?)
-        .map_err(|e| ABError::InternalServerError(format!("Invalid strict release: {e}")))?
+        .map_err(|e| ABError::NotFound(format!("Invalid strict release; keep current code: {e}")))?
     } else {
         get_release_config_from_provider(&provider, &evaluation_context).await?
     };
@@ -1482,7 +1528,7 @@ async fn serve_release_handler(
         let files_result = utils::get_files_by_file_keys_async(
             state.db_pool.clone(),
             &state.redis_cache,
-            organisation,
+            organisation.clone(),
             application.clone(),
             all_files,
         )
@@ -1578,6 +1624,26 @@ async fn serve_release_handler(
     };
 
     let release_response = ServeReleaseResponse {
+        blocked_package_versions: crate::telemetry::blocked(&state, &organisation, &application)
+            .await
+            .map_err(|e| {
+                log::error!("Security exclusions unavailable: {e}");
+                ABError::NotFound("Security policy unavailable; keep current code".into())
+            })?,
+        telemetry: crate::telemetry::served(
+            &state,
+            &organisation,
+            &application,
+            &of_release_config.package.version.to_string(),
+            &of_release_config.config.version,
+            query.telemetry_platform.as_deref(),
+            query.native_version.as_deref(),
+        )
+        .await
+        .unwrap_or_else(|e| {
+            log::warn!("Optional telemetry receipt unavailable: {e}");
+            None
+        }),
         version: "2".to_string(),
         config: of_release_config.config,
         package: ServePackage {
@@ -1598,7 +1664,7 @@ async fn serve_release_handler(
         )
         .header(
             actix_web::http::header::CACHE_CONTROL,
-            HeaderValue::from_static("public, s-maxage=60, max-age=0, stale-if-error=300"),
+            HeaderValue::from_static("public, max-age=0, s-maxage=60, stale-if-error=300"),
         )
         .status(StatusCode::OK))
 }
@@ -1642,17 +1708,13 @@ pub(super) async fn update_release_impl(
         )
         .await?;
 
-        maker_checker::protect_created(&organisation, &application, &path.to_string()).await?;
         let workspace_name = get_workspace_name_for_application(
             state.db_pool.clone(),
             &state.redis_cache,
             application.clone(),
             organisation.clone(),
         )
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
-        })?;
+        .await?;
         let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
         let dimensions = req.dimensions.clone().unwrap_or_default();
@@ -1693,9 +1755,7 @@ pub(super) async fn update_release_impl(
             .await
             .map_err(|e| {
                 info!("Failed to get experiment details: {:?}", e);
-                ABError::InternalServerError(
-                    "Failed to get experiment details from Superposition".to_string(),
-                )
+                experiment_lookup_error(&e, "Failed to get experiment details from Superposition")
             })?;
         control_center::ensure_active(&experiment_details.status)?;
         let experiment_variant_id = experiment_details
@@ -1782,6 +1842,14 @@ pub(super) async fn update_release_impl(
             Value::Object(serde_json::Map::new())
         });
 
+        maker_checker::protect_created(
+            &state,
+            &organisation,
+            &application,
+            &release_id,
+            req.rollback_sensitive.as_deref(),
+        )
+        .await?;
         Ok(Json(CreateReleaseResponse {
             warnings: targeting_warnings(&dimensions),
             id: release_id.clone(),
@@ -1877,7 +1945,7 @@ pub(super) async fn update_release_impl(
     .await
 }
 
-fn strict_release_application(setting: &str, org: &str, app: &str) -> bool {
+pub(crate) fn strict_release_application(setting: &str, org: &str, app: &str) -> bool {
     setting
         .split(',')
         .any(|entry| entry.trim() == format!("{org}/{app}"))
@@ -1896,6 +1964,16 @@ fn has_targeted_release(
 #[cfg(test)]
 mod release_safety_tests {
     use super::*;
+    #[test]
+    fn ramp_traffic_percentage_is_validated_before_writes() {
+        assert!(validate_ramp_traffic_percentage(0).is_ok());
+        assert!(validate_ramp_traffic_percentage(50).is_ok());
+        assert!(matches!(
+            validate_ramp_traffic_percentage(51),
+            Err(ABError::BadRequest(_))
+        ));
+    }
+
     #[test]
     fn strict_selection_rejects_default_and_empty_release() {
         assert!(!has_targeted_release("old-rn", "old-rn", "1", "1"));
@@ -1940,5 +2018,128 @@ mod targeting_warning_tests {
             Value::String("kn".into())
         )]))
         .is_empty());
+    }
+}
+
+fn validate_creation_targeting(
+    strict: bool,
+    dimensions: &HashMap<String, Value>,
+) -> airborne_types::Result<()> {
+    if strict && dimensions.is_empty() {
+        return Err(ABError::BadRequest("Strict serving requires a targeted release, including the first release. Create an app_version dimension and a version_cohort with a compatible version range in Cohorts, then select that cohort in Create Release → Targeting. After creation, ramp and conclude the release explicitly.".into()));
+    }
+    Ok(())
+}
+#[cfg(test)]
+mod creation_targeting_tests {
+    use super::*;
+    #[test]
+    fn strict_creation_requires_targeting_but_legacy_allows_defaults() {
+        assert!(validate_creation_targeting(true, &HashMap::new()).is_err());
+        assert!(validate_creation_targeting(false, &HashMap::new()).is_ok());
+        assert!(validate_creation_targeting(
+            true,
+            &HashMap::from([("version_cohort".into(), serde_json::json!("v1"))])
+        )
+        .is_ok());
+    }
+}
+
+#[cfg(test)]
+mod lookup_error_tests {
+    use super::*;
+    #[test]
+    fn read_failures_are_definitely_before_mutation() {
+        for (status, code) in [
+            (404, "release_or_workspace_not_found"),
+            (502, "upstream_authentication_failed"),
+            (503, "upstream_connection_failed"),
+            (504, "upstream_read_timeout"),
+        ] {
+            let ABError::ReleaseOperation {
+                status: actual,
+                body,
+            } = lookup_failure(status, code, "Read refused")
+            else {
+                panic!()
+            };
+            assert_eq!(actual, status);
+            assert_eq!(body["code"], code);
+            assert_eq!(body["mutation_committed"], false);
+            assert_eq!(body["automatic_retry"], false);
+        }
+    }
+}
+
+#[cfg(test)]
+mod upstream_read_fault_tests {
+    use super::*;
+    #[tokio::test]
+    async fn injected_reads_distinguish_faults_without_write_retry() {
+        use std::io::{Read, Write};
+        for (status, message, expected) in [
+            (404, "Experiment not found", "release_not_found"),
+            (404, "Workspace not found", "upstream_workspace_unavailable"),
+            (403, "Forbidden", "upstream_authentication_failed"),
+            (503, "Unavailable", "upstream_release_unavailable"),
+        ] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 8192];
+                let count = stream.read(&mut request).unwrap();
+                assert!(String::from_utf8_lossy(&request[..count]).starts_with("GET "));
+                let body = json!({"message":message}).to_string();
+                write!(stream,"HTTP/1.1 {status} Fault\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",body.len(),body).unwrap();
+            });
+            let client = superposition_sdk::Client::from_conf(
+                superposition_sdk::Config::builder()
+                    .bearer_token("scratch".into())
+                    .endpoint_url(format!("http://{addr}"))
+                    .retry_config(aws_smithy_types::retry::RetryConfig::disabled())
+                    .behavior_version_latest()
+                    .build(),
+            );
+            let error = client
+                .get_experiment()
+                .org_id("scratch")
+                .workspace_id("scratch")
+                .id("1")
+                .send()
+                .await
+                .unwrap_err();
+            server.join().unwrap();
+            let ABError::ReleaseOperation { body, .. } =
+                experiment_lookup_error(&error, "Release read failed")
+            else {
+                panic!()
+            };
+            assert_eq!(body["code"], expected);
+            assert_eq!(body["mutation_committed"], false);
+        }
+        let addr = "127.0.0.1:0";
+        let client = superposition_sdk::Client::from_conf(
+            superposition_sdk::Config::builder()
+                .bearer_token("scratch".into())
+                .endpoint_url(format!("http://{addr}"))
+                .retry_config(aws_smithy_types::retry::RetryConfig::disabled())
+                .behavior_version_latest()
+                .build(),
+        );
+        let error = client
+            .get_experiment()
+            .org_id("scratch")
+            .workspace_id("scratch")
+            .id("1")
+            .send()
+            .await
+            .unwrap_err();
+        let ABError::ReleaseOperation { body, .. } =
+            experiment_lookup_error(&error, "Release read failed")
+        else {
+            panic!()
+        };
+        assert_eq!(body["code"], "upstream_connection_failed");
     }
 }

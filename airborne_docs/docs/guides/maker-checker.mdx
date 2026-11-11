@@ -1,0 +1,90 @@
+---
+title: Maker-checker releases
+description: Enable separate maker and checker identities for application releases, operate the request queue, and handle emergency rollback safely.
+---
+
+Maker-checker adds a second-person approval step to selected release changes in one application. It is disabled by default. When enabled, a maker submits an immutable deployment request and an eligible checker other than the requester approves it. Approval executes the action immediately.
+
+For defaults and their tradeoffs, see [Maker-checker defaults and tradeoffs](/docs/guides/maker-checker-tradeoffs). For request and policy routes, see the [Control Center API reference](/docs/server/control-center).
+
+## Before enabling
+
+Maker-checker requires the Keycloak identity-directory adapter. Other authentication providers fail closed until they have directory support. Each roster member must be an enabled Keycloak user with access to the application and the ordinary release permissions needed to execute the action.
+
+Deploy the server to the whole fleet before enabling any application policy:
+
+1. Apply the additive database migration.
+2. Deploy the enforcing server version to every traffic-serving instance, job, and internal writer. Keep policies disabled.
+3. Drain old instances and outstanding upstream writes. Confirm all deployed versions and routing.
+4. An operator with database authority sets `hyperotaserver.approval_deployment.enforcement_ready=true` for the singleton deployment row. Airborne cannot attest that old binaries have disappeared, so policy enablement returns `409` until this gate is set.
+5. Deploy updated clients and documentation, then enable individual application policies.
+
+There is no new environment variable. See the [server deployment order](/docs/server/configuration#maker-checker-deployment-fence) before upgrading or downgrading.
+
+## Configure a policy
+
+Each application has its own policy:
+
+| Field | Meaning | Default / limit |
+| --- | --- | --- |
+| `enabled` | Enforce maker-checker for protected writes. | `false` |
+| `makers` | Canonical identity subjects allowed to raise requests. | Empty set |
+| `checkers` | Canonical identity subjects allowed to approve requests. | Empty set |
+| `request_ttl_hours` | Time before a pending request expires. | `24`, from `1` through `720` hours |
+| `emergency_rollback` | Allow the constrained single-checker emergency rollback path. | `true` |
+
+`PUT /api/control-center/approval-policy` replaces the complete object; omitted fields take their defaults. Only an actual organisation owner or admin may change it, even if the actor is a super admin. Enabling requires at least two distinct people and at least one different eligible checker for every maker. Changes record both before and after policy values in the audit log. Disabling cancels pending requests; it never executes them.
+
+Makers and checkers are explicit sets, so a person may appear in both. The authenticated canonical subject (`AuthResponse.sub`) is used for self-approval checks, never a display name or identity supplied in a request. **No one can approve their own request**, including an owner, admin, or super admin. An API token acts as its owner.
+
+## What needs a request
+
+With the policy enabled, request these changes:
+
+- Create a release, including its initial rollout or conclusion.
+- Increase a rollout target.
+- Conclude a release on either variant.
+- Change a release's overrides, package/config/resources, or rollback-sensitive marker.
+- Re-release a predecessor after a concluded release, unless using the emergency path below.
+- Lower a target or roll back a ramping release when that release is marked `security` or `one_way_migration`.
+
+Lowering an ordinary target, discarding a `CREATED` release, and rolling back an ordinary `INPROGRESS` release remain direct risk-reducing operations. They still require ordinary permissions and are audited. Direct writes that require approval return `403` with code `approval_required` and instructions to raise a request.
+
+The marker is declared as `rollback_sensitive: "security"` or `"one_way_migration"`. The server does not infer a vulnerability or migration from release contents. Setting or clearing the marker itself requires approval.
+
+## Request lifecycle
+
+1. A maker submits `POST /api/control-center/deployment-requests` with exactly `action`, `payload`, and a nonblank `reason`. Reserved `Airborne operation` text is refused. Payloads include `body` for create and `release_id` plus `body` for other actions.
+2. The server resolves and freezes the snapshot, including immutable package/file versions and complete overrides, saves the app base state, and computes a SHA-256 payload hash. Clients cannot provide or later edit the snapshot, hash, requester, or base state.
+3. A checker reviews the frozen change and approves, or a checker rejects with a reason. The requester may cancel. A checker can reject their own request, but cannot approve it.
+4. Approval checks current policy membership, ordinary release permissions, expiry and freshness again, then executes immediately through the existing release write and recovery paths.
+
+Statuses are `pending`, `executing`, `executed`, `failed`, `rejected`, `cancelled`, `expired`, and `stale`. A competing decision returns `409`. A failed request can be approved again only after recovery, current-state, expiry, and eligibility checks pass. An interrupted `executing` request is never blindly replayed: inspect and recover the durable upstream operation, then raise a new request if needed. Do not treat elapsed time or an upstream 4xx alone as proof that a write did not happen.
+
+Freshness is deliberately app-wide: any app release/config revision or protection change can make a request stale, even if it appears unrelated to the targeted dimension. Listing filters by status before returning at most 1,000 newest matching rows; counts and lookup by request UUID do not depend on that queue cap. Requests do not have expiry notifications or a background expiry sweeper.
+
+There are no multi-application requests or atomic group policy updates in v1. A group-level policy action, where available in the dashboard, writes each application's policy separately.
+
+For approved package/file selectors, use immutable `@version:` selectors. Tag aliases and incomplete uploads cannot enter a snapshot. An upstream update to an `INPROGRESS` experiment may be rejected; updates to `CREATED` releases are supported.
+
+## Emergency rollback
+
+When `emergency_rollback` is enabled, a current checker can roll back the latest live release to its compatible predecessor without waiting for a second checker. The caller must provide a nonblank reason. There is no caller-selected target. If the source is marked rollback-sensitive, the checker must also explicitly confirm the risk.
+
+The server records an outstanding review after a successful rollback. A different current checker must acknowledge the review at `/api/releases/{source_release_id}/acknowledge-emergency` with an independent review reason. The path ID is the emergency source release, not the replacement. A pending review blocks another emergency rollback. Successful emergency rollbacks remain visible as needing review.
+
+## Rollback, limits, and trust boundaries
+
+Before downgrading binaries, first disable policies and allow the audited cancellation of pending work, resolve unknown operations, drain writers, and reset the deployment readiness gate to false. Never route an unenforcing old binary behind an enabled policy. The down migration refuses to drop enabled policy storage.
+
+Maker-checker protects Airborne API writes. **Direct Superposition or database access bypasses it.** Organisation owners/admins can change the policy; those changes are audited, not prevented. **One person controlling two distinct identities defeats separation of duties.** Two tokens for the same subject remain one identity. Device-side boot-guard rollback is unaffected.
+
+The server freezes auxiliary property-schema, dimension, cohort/targeting, file-tag, and native-build writes while policy is enabled while policy is enabled; v1 has no generic approval action for them. New immutable package/file versions may still be created, but snapshots require complete file URL, positive size, checksum, and immutable selectors. A direct database/Superposition/S3/object-store administrator can bypass API controls or change external file contents. Existing upstream unknown-outcome limits also apply: drain old writers before enabling, and inspect durable operation state after uncertain outcomes.
+
+Emergency rollback requires at least two checkers so a different person can acknowledge. A failed rollback does not insert a blocking review. Resolve unknown release operations before retrying. To recover an interrupted `executing` request, retry its decision after operation reconciliation; this marks it failed without replay. Inspect the actual release state before raising a fresh request.
+
+### Postgres and HTTP regression tests
+
+Start this server tree separately on `:8096` against a disposable, migrated Postgres database. Set `TEST_DATABASE_URL`, `TEST_API_URL=http://127.0.0.1:8096`, `TEST_ORG`, `TEST_APP` (a fresh name containing `scratch` or `test`), `TEST_SUB`, and `TEST_TOKEN`. The subject/token must have ordinary release write/read permission in that app. Run `cargo test -p airborne_server real_decide_gate_emergency_acknowledge -- --ignored`. The test seeds policy, request and emergency rows and exercises self-approval refusal, direct-create gating, same-actor acknowledgement refusal and non-checker emergency refusal through HTTP. Use a disposable app: a failed assertion can leave fixtures behind.
+
+Set `TEST_ORG_READER_TOKEN` to an organisation reader with no explicit app grant and run `cargo test -p airborne_server implicit_app_read_does_not_allow_write -- --ignored` to exercise middleware READ inheritance and write denial. These tests do not cover concurrent successful approvals, stale/tampered/expired payload execution, successful predecessor restoration or cross-process crash injection; those acceptance cases still need a full test environment.

@@ -16,6 +16,7 @@ Functionally the server is two things at once: a **management API** (create orgs
 - **Dimensions** — key/value targeting attributes (for example app version or user segment) evaluated by the configuration engine so different cohorts can receive different releases.
 - **RBAC** — authentication via an OIDC provider (Keycloak by default) and authorization via [Casbin](https://casbin.org/) policies stored in Postgres, with organisation- and application-scoped roles.
 - **Release delivery** — public release routes the SDK calls to obtain the release config for an application/namespace.
+- **Control Center API** — user-scoped release overviews, organisation app groups, release event history, and rollback actions. See [Control Center API](/docs/server/control-center).
 - **Dashboard** — a single-page app served by the same binary; it talks to the API through the configured public endpoint.
 
 ## Runtime dependencies
@@ -31,6 +32,17 @@ The server does not run alone. The local `docker-compose.yml` provisions the ful
 | **Object storage (S3)** | Stores uploaded files, packages, and resources. In dev this is [LocalStack](https://www.localstack.cloud/); in production it is real Amazon S3. |
 | **KMS** | Key-management service used for envelope encryption of secrets (see [`USE_ENCRYPTED_SECRETS`](/docs/server/configuration#encryption)). LocalStack in dev, real AWS KMS in production. |
 | **Analytics server** (optional) | A separate service that ingests OTA events. It runs on one of two stacks: **Kafka + ClickHouse**, or **Victoria Metrics + Grafana**. See the [analytics variables](/docs/server/configuration#analytics-server). |
+
+Control Center and durable release recovery add application tables to the same Airborne Postgres database:
+
+| Table | Purpose | Migration |
+| --- | --- | --- |
+| `app_groups` | Organisation-owned application groups. | `2026-10-31-000001_control_center` |
+| `app_group_members` | Application and platform membership for groups. | `2026-10-31-000001_control_center` |
+| `release_events` | Best-effort append-only release lifecycle audit trail. | `2026-10-31-000001_control_center` |
+| `release_operations` | Durable rollback operations and unresolved upstream write intents used for recovery. | `2026-10-31-000002_release_operations` |
+
+**Current release state remains in Superposition**; the audit table records Airborne-observed actions and is used to build release history. The operation table is recovery state, not an audit log; retain it during binary rollback and never delete unresolved rows as cleanup.
 
 :::note
 Keycloak is the **default** authentication provider, but `AUTHN_PROVIDER` also accepts `oidc`, `okta`, and `auth0`. The Keycloak admin variables (`AUTH_ADMIN_*`) are only mandatory when `AUTHN_PROVIDER=keycloak`. See [Authentication](/docs/server/configuration#authentication--oidc).

@@ -21,7 +21,7 @@ The classic-preset blog is enabled (`blog: {...}` in `docusaurus.config.ts`, `ro
 - Posts live in `blog/` (e.g. `blog/2026-07-06-welcome/index.md`). Authors are defined in `blog/authors.yml`, tags in `blog/tags.yml` — reference them by key from a post's front matter so `onInlineAuthors`/`onInlineTags` stay clean.
 - **Truncate marker is MDX, not HTML.** Use `{/* truncate */}` for the "read more" fold. `<!-- truncate -->` **breaks the build** (MDX rejects the `<!` — "Unexpected character `!`").
 - Navbar/footer both link to `/blog`. RSS + Atom feeds are generated at `/blog/rss.xml` and `/blog/atom.xml`.
-- **Known non-fatal noise:** `docusaurus-plugin-llms-txt` (v0.1.3) logs `[ERROR] Multiple sidebars found for route /blog/<post>` for each blog post — its `extractSectionName` requires a navbar item whose `sidebarId` matches the route's sidebar, and blog routes have none. The plugin catches this per-post, so the build stays green (exit 0); the post is just omitted from `llms.txt`. The plugin exposes no route/blog exclusion option, so this is expected until upstream fixes it (see the llms.txt caveat below).
+- **llms.txt blog support:** `plugins/llms-txt.cjs` adapts blog routes to a dedicated Blog section for the upstream metadata extractor. This prevents its missing-sidebar error and includes blog posts in llms.txt without changing navigation.
 
 ## Critical conventions (these caused real bugs — follow them)
 
@@ -69,7 +69,7 @@ The **API Reference** section is generated, not hand-written. Pipeline: `smithy/
 - **Grouping** in the sidebar comes from each operation's `@tags(["Category"])`. The generated `docs/api-reference/endpoints/sidebar.ts` is imported into `sidebars.ts` and spread under the "API Reference" category after the three conceptual pages.
 - **Config:** `docusaurus.config.ts` registers `docusaurus-plugin-openapi-docs` (+ `docusaurus-theme-openapi-docs`, `docusaurus-plugin-sass`) and sets `docItemComponent: "@theme/ApiItem"`.
 - **What is committed:** only `openapi/airborne.openapi.json` (the spec). The generated `docs/api-reference/endpoints/**` (`.api.mdx`, JSON sidecars, `sidebar.ts`) is **git-ignored** and regenerated on every build/start via the `prebuild`/`prestart`/`pretypecheck` hooks. This keeps generated artifacts out of git and avoids secret-scanner false positives on the embedded base64 `api:` blob (it trips `generic-api-key`; it is compressed OpenAPI metadata, not a secret). Repo-root `.gitleaks.toml` and `.gitguardian.yaml` also allowlist that path.
-- **Scope:** only the ~22 operations bound to the `Airborne` service in `smithy/models/main.smithy` are documented. Dashboard/admin-only endpoints (RBAC, cohorts, config/property schemas, release lifecycle) are intentionally not in the contract and not in this reference.
+- **Scope:** only the operations bound to the `Airborne` service in `smithy/models/main.smithy` are documented. Dashboard/admin-only endpoints (RBAC, cohorts, config/property schemas) are intentionally not in the contract and not in this reference.
 
 ## Diagrams, sitemap, and llms.txt
 

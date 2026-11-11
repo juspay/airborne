@@ -44,11 +44,22 @@ struct Ready {
     #[diesel(sql_type=Bool)]
     ready: bool,
 }
+// One statement: status and audit event commit together. Concurrent readers cannot
+// emit duplicates; a decision uses compare-and-swap before dispatching execution.
+const EXPIRE_SQL: &str = "WITH expired AS (UPDATE hyperotaserver.deployment_requests SET status='expired',data=jsonb_set(data,'{status}','\"expired\"'),updated_at=now() WHERE org_id=$1 AND ($2='' OR app_id=$2) AND status IN ('pending','failed') AND (data->>'expires_at')::timestamptz <= now() RETURNING *) INSERT INTO hyperotaserver.release_events(id,org_id,app_id,release_id,action,actor,payload) SELECT id,org_id,app_id,coalesce(data->'payload'->>'release_id',''),'expired','system:expiry',data FROM expired ON CONFLICT(id) DO NOTHING";
+fn expire(c: &mut diesel::PgConnection, org: &str, app: &str) -> Result<()> {
+    diesel::sql_query(EXPIRE_SQL)
+        .bind::<Text, _>(org)
+        .bind::<Text, _>(app)
+        .execute(c)?;
+    Ok(())
+}
 async fn rows(state: &web::Data<AppState>, org: &str, app: &str, kind: &str) -> Result<Vec<Value>> {
     let pool = state.db_pool.clone();
     let (org, app, kind) = (org.to_owned(), app.to_owned(), kind.to_owned());
     run_blocking!({
-        let mut c = pool.get()?;
+        let mut c = pool.get_timeout(std::time::Duration::from_secs(1))?;
+        expire(&mut c, &org, &app)?;
         let query=match kind.as_str() {
             "policy"=>"SELECT data FROM hyperotaserver.approval_policies WHERE org_id=$1 AND app_id=$2",
             "requests"=>"SELECT data || jsonb_build_object('status',status,'updated_at',updated_at) AS data FROM hyperotaserver.deployment_requests WHERE org_id=$1 AND ($2='' OR app_id=$2) ORDER BY created_at DESC LIMIT 1000",
@@ -78,6 +89,12 @@ fn scope(auth: &AuthResponse) -> Result<(String, String)> {
 }
 fn hash(value: &Value) -> String {
     format!("{:x}", Sha256::digest(serde_json::to_vec(value).unwrap()))
+}
+fn coded(status: u16, code: &str, message: &str) -> ABError {
+    ABError::ReleaseOperation {
+        status,
+        body: json!({"code":code,"message":message}),
+    }
 }
 fn required(app: &str) -> ABError {
     ABError::ReleaseOperation {
@@ -115,7 +132,7 @@ pub fn executing(org: &str, app: &str) -> bool {
         .unwrap_or(false)
 }
 pub fn audit_context() -> Option<Value> {
-    EXECUTION.try_with(|e|json!({"request_id":e.request["id"],"requester":e.request["requester"],"approver":e.request["decided_by"],"payload_hash":e.request["payload_hash"]})).ok()
+    EXECUTION.try_with(|e|json!({"request_id":e.request["id"],"requester":e.request["requester"],"emergency":e.request["emergency"],"approver":if e.request["emergency"]==true {Value::Null} else {e.request["decided_by"].clone()},"payload_hash":e.request["payload_hash"]})).ok()
 }
 fn approved(org: &str, app: &str, action: &str, id: &str) -> bool {
     EXECUTION
@@ -312,6 +329,7 @@ async fn save_request(
     if !transition_allowed(data["status"].as_str().unwrap_or(""), status) {
         return Err(ABError::Conflict("Invalid request transition".into()));
     }
+    let previous = data["status"].as_str().unwrap_or("").to_owned();
     let mut data = data.clone();
     data["status"] = json!(status);
     data["updated_at"] = json!(Utc::now());
@@ -323,7 +341,8 @@ async fn save_request(
     );
     let copy = data.clone();
     write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{
-        diesel::sql_query("UPDATE hyperotaserver.deployment_requests SET status=$1,data=$2,updated_at=now() WHERE id=$3 AND org_id=$4 AND app_id=$5").bind::<Text,_>(&status).bind::<Jsonb,_>(&copy).bind::<SqlUuid,_>(Uuid::parse_str(copy["id"].as_str().unwrap()).unwrap()).bind::<Text,_>(&org).bind::<Text,_>(&app).execute(c)?;
+        let changed = diesel::sql_query("UPDATE hyperotaserver.deployment_requests SET status=$1,data=$2,updated_at=now() WHERE id=$3 AND org_id=$4 AND app_id=$5 AND status=$6").bind::<Text,_>(&status).bind::<Jsonb,_>(&copy).bind::<SqlUuid,_>(Uuid::parse_str(copy["id"].as_str().unwrap()).unwrap()).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(&previous).execute(c)?;
+        if changed != 1 { return Err(coded(409,"not_pending","Request status changed; refresh before deciding")); }
         diesel::sql_query("INSERT INTO hyperotaserver.release_events(id,org_id,app_id,release_id,action,actor,payload) VALUES($1,$2,$3,$4,$5,$6,$7)").bind::<SqlUuid,_>(Uuid::new_v4()).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(copy["payload"]["release_id"].as_str().unwrap_or("")).bind::<Text,_>(if status=="executing"{"approved"}else{&status}).bind::<Text,_>(&actor).bind::<Jsonb,_>(&copy).execute(c)?;Ok(())
     })).await?;
     Ok(data)
@@ -341,21 +360,9 @@ async fn request_queue(
         status.unwrap_or("").to_owned(),
     );
     run_blocking!({
-        let mut c = pool.get()?;
+        let mut c = pool.get_timeout(std::time::Duration::from_secs(1))?;
+        expire(&mut c, &org, &app)?;
         Ok(diesel::sql_query("SELECT data || jsonb_build_object('status',status,'updated_at',updated_at) AS data FROM hyperotaserver.deployment_requests WHERE org_id=$1 AND ($2='' OR app_id=$2) AND ($3='' OR status=$3) ORDER BY created_at DESC LIMIT 1000").bind::<Text,_>(org).bind::<Text,_>(app).bind::<Text,_>(status).load::<Row>(&mut c)?.into_iter().map(|r|r.data).collect())
-    })
-}
-#[derive(QueryableByName)]
-struct Count {
-    #[diesel(sql_type=diesel::sql_types::BigInt)]
-    total: i64,
-}
-async fn pending_count(state: &web::Data<AppState>, org: &str, app: &str) -> Result<i64> {
-    let pool = state.db_pool.clone();
-    let (org, app) = (org.to_owned(), app.to_owned());
-    run_blocking!({
-        let mut c = pool.get()?;
-        Ok(diesel::sql_query("SELECT count(*) AS total FROM hyperotaserver.deployment_requests WHERE org_id=$1 AND app_id=$2 AND status='pending'").bind::<Text,_>(org).bind::<Text,_>(app).get_result::<Count>(&mut c)?.total)
     })
 }
 pub fn routes(c: &mut web::ServiceConfig) {
@@ -403,9 +410,10 @@ async fn put_policy(
         if p.enabled {
             let pool=state.db_pool.clone();let ready=run_blocking!({let mut c=pool.get()?;Ok(diesel::sql_query("SELECT enforcement_ready AS ready FROM hyperotaserver.approval_deployment WHERE singleton").get_result::<Ready>(&mut c)?.ready)})?;
             if !ready{return Err(ABError::Conflict("All Airborne instances must enforce maker-checker before an operator sets approval_deployment.enforcement_ready; mixed-version enablement is unsafe".into()))}
+            if p.emergency_rollback && p.checkers.len()<2 {return Err(ABError::BadRequest("Emergency rollback requires two different checkers for acknowledgement".into()))}
             if !valid_roster(&p){return Err(ABError::BadRequest("Each maker needs a different checker; at least two distinct people required".into()))}
         }
-        for sub in p.makers.union(&p.checkers){member(&state,sub,&o,&a).await?;if p.enabled {for action in ["create","ramp","conclude","update"]{permission(&state,sub,&o,&a,action).await?;}}}
+        for sub in p.makers.union(&p.checkers).filter(|_| p.enabled){member(&state,sub,&o,&a).await?;if p.enabled {for action in ["create","ramp","conclude","update"]{permission(&state,sub,&o,&a,action).await?;}}}
         let after=json!(p);let (org,app,actor)=(o.clone(),a.clone(),auth_response.sub.clone());let copy=after.clone();
         write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{
             diesel::sql_query("INSERT INTO hyperotaserver.approval_policies(org_id,app_id,data) VALUES($1,$2,$3) ON CONFLICT(org_id,app_id) DO UPDATE SET data=excluded.data").bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Jsonb,_>(&copy).execute(c)?;
@@ -450,6 +458,15 @@ async fn snapshot_payload(
             .is_some_and(|v| !matches!(v, "security" | "one_way_migration"))
         {
             return Err(ABError::BadRequest("Invalid rollback_sensitive".into()));
+        }
+        if action == "create" {
+            let strict = super::serving_policy::get(state, org, app).await?["effective_strict"]
+                .as_bool()
+                .unwrap_or(true);
+            super::validate_creation_targeting(
+                strict,
+                &req.dimensions.clone().unwrap_or_default(),
+            )?;
         }
         let (workspace, _) = control_center::experiments(state, org, app).await?;
         let mut b = SNAPSHOT_VERSION
@@ -528,7 +545,7 @@ async fn create_request(
     let (o, a) = scope(&auth_response)?;
     write_lock::locked(&state,&o,&a,async{
         let p=policy(&state,&o,&a).await?;
-        if !p.enabled||!p.makers.contains(&auth_response.sub){return Err(ABError::Forbidden("Enabled policy and maker membership required".into()))}
+        if !p.enabled||!p.makers.contains(&auth_response.sub){return Err(coded(403,"not_maker","Enabled policy and maker membership required"))}
         permission(&state,&auth_response.sub,&o,&a,permission_action(&req.action)).await?;
         if !["create","ramp","conclude","update","rollback","discard","set_rollback_sensitive","set_strict_serving"].contains(&req.action.as_str()){return Err(ABError::BadRequest("Unknown deployment action".into()))}
         if req.reason.trim().is_empty(){return Err(ABError::BadRequest("Request reason required".into()))}
@@ -537,15 +554,22 @@ async fn create_request(
         if !payload.is_object(){return Err(ABError::BadRequest("payload must be an object".into()))}
         let allowed=if req.action=="create"{vec!["body"]}else{vec!["release_id","body"]};
         if payload.as_object().unwrap().keys().any(|k|!allowed.contains(&k.as_str())) {return Err(ABError::BadRequest("Unknown payload field".into()))}
+        // The package and config version a request concerns, so clients can show and link them directly.
+        let (mut package_version, mut config_version) = (Value::Null, Value::Null);
         if req.action!="create" && req.action!="set_strict_serving" {
             let(_,exps)=control_center::experiments(&state,&o,&a).await?;
-            if !exps.iter().any(|e|Some(e.id.as_str())==payload["release_id"].as_str()){return Err(ABError::NotFound("Release not found in this application".into()))}
+            let exp=exps.iter().find(|e|Some(e.id.as_str())==payload["release_id"].as_str()).ok_or_else(||ABError::NotFound("Release not found in this application".into()))?;
+            package_version=json!(control_center::version(exp));
+            config_version=json!(utils::extract_string_from_experiment(&control_center::experimental(exp),"config.version"));
         }
         if req.action=="set_strict_serving" && payload.get("release_id").is_some(){return Err(ABError::BadRequest("set_strict_serving has no release_id".into()))}
         if req.action=="set_rollback_sensitive"{validate_marker(&payload["body"]["rollback_sensitive"])?;}
         let id=Uuid::new_v4();payload["config_version"]=json!(id.to_string());
         let resolved=snapshot_payload(&state,&o,&a,&req.action,&payload).await?;payload["snapshot"]=resolved;
-        let data=json!({"id":id,"org":o,"application":a,"action":req.action,"payload":payload,"payload_hash":hash(&payload),"base_state":base_state(&state,&o,&a).await?,"requester":auth_response.sub,"reason":req.reason,"status":"pending","expires_at":Utc::now()+chrono::Duration::hours(p.request_ttl_hours),"decided_by":null,"decision_reason":null,"created_at":Utc::now(),"updated_at":Utc::now(),"result":null});
+        // A create or update owns a fresh version assigned before its immutable snapshot.
+        if req.action=="create" || req.action=="update" {config_version=payload["config_version"].clone();}
+        if let Some(v)=payload["snapshot"]["package"]["version"].as_i64(){package_version=json!(v);}
+        let data=json!({"id":id,"org":o,"application":a,"action":req.action,"payload":payload,"payload_hash":hash(&payload),"base_state":base_state(&state,&o,&a).await?,"requester":auth_response.sub,"reason":req.reason,"status":"pending","expires_at":Utc::now()+chrono::Duration::hours(p.request_ttl_hours),"decided_by":null,"decision_reason":null,"created_at":Utc::now(),"updated_at":Utc::now(),"result":null,"package_version":package_version,"config_version":config_version});
         let(org,app,copy)=(o.clone(),a.clone(),data.clone());
         let actor=auth_response.sub.clone();
         write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{
@@ -600,7 +624,8 @@ async fn find(state: &web::Data<AppState>, org: &str, app: &str, id: Uuid) -> Re
     let pool = state.db_pool.clone();
     let (org, app) = (org.to_owned(), app.to_owned());
     run_blocking!({
-        let mut c = pool.get()?;
+        let mut c = pool.get_timeout(std::time::Duration::from_secs(1))?;
+        expire(&mut c, &org, &app)?;
         diesel::sql_query("SELECT data || jsonb_build_object('status',status,'updated_at',updated_at) AS data FROM hyperotaserver.deployment_requests WHERE id=$1 AND org_id=$2 AND app_id=$3").bind::<SqlUuid,_>(id).bind::<Text,_>(org).bind::<Text,_>(app).get_result::<Row>(&mut c).optional()?.map(|r|r.data).ok_or_else(||ABError::NotFound("Request not found in this application".into()))
     })
 }
@@ -630,10 +655,26 @@ fn validate_marker(v: &Value) -> Result<()> {
         ))
     }
 }
-async fn marker(org: &str, app: &str, id: &str, v: Value) -> Result<()> {
+async fn marker(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    id: &str,
+    v: Value,
+) -> Result<()> {
     validate_marker(&v)?;
+    let threshold = if v.as_str() == Some("security") {
+        let (_, exps) = control_center::experiments(state, org, app).await?;
+        let e = exps
+            .iter()
+            .find(|e| e.id == id)
+            .ok_or_else(|| ABError::NotFound("Security release missing".into()))?;
+        Some(control_center::version(e).to_string())
+    } else {
+        None
+    };
     let (o, a, id) = (org.to_owned(), app.to_owned(), id.to_owned());
-    write_lock::store(move|c|{diesel::sql_query("INSERT INTO hyperotaserver.release_protections(org_id,app_id,release_id,data) VALUES($1,$2,$3,$4) ON CONFLICT(org_id,app_id,release_id) DO UPDATE SET data=excluded.data").bind::<Text,_>(o).bind::<Text,_>(a).bind::<Text,_>(id).bind::<Jsonb,_>(json!({"rollback_sensitive":v})).execute(c)?;Ok(())}).await
+    write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{if let Some(version)=threshold {diesel::sql_query("INSERT INTO hyperotaserver.blocked_packages(org_id,app_id,package_version,source_release) SELECT org_id,app_id,version::text,$3 FROM hyperotaserver.packages_v2 WHERE org_id=$1 AND app_id=$2 AND version < $4::integer ON CONFLICT DO NOTHING").bind::<Text,_>(&o).bind::<Text,_>(&a).bind::<Text,_>(&id).bind::<Text,_>(version).execute(c)?;} diesel::sql_query("INSERT INTO hyperotaserver.release_protections(org_id,app_id,release_id,data) VALUES($1,$2,$3,$4) ON CONFLICT(org_id,app_id,release_id) DO UPDATE SET data=excluded.data").bind::<Text,_>(o).bind::<Text,_>(a).bind::<Text,_>(id).bind::<Jsonb,_>(json!({"rollback_sensitive":v})).execute(c)?;Ok(())})).await
 }
 #[post("/deployment-requests/{id}/{decision}")]
 async fn decide(
@@ -647,13 +688,18 @@ async fn decide(
     write_lock::validate_user_reason(&req.reason)?;
     write_lock::locked(&state,&o,&a,async{
         let mut r=find(&state,&o,&a,id).await?;let p=policy(&state,&o,&a).await?;
-        if decision=="approve"&&r["requester"]==auth_response.sub{return Err(ABError::Forbidden("Nobody may approve their own request".into()))}
-        if r["status"]!="pending" && !(decision=="approve" && r["status"]=="failed") {return Err(ABError::Conflict("Request is no longer pending. Executing/unknown outcomes require recovery before another request".into()))}
+        if r["status"]=="expired" {return Err(coded(409,"request_expired","Request expired"))}
+        if decision=="approve"&&r["requester"]==auth_response.sub{return Err(coded(403,"self_approval","Nobody may approve their own request"))}
+        if r["status"]!="pending" && r["status"]!="executing" && !(decision=="approve" && r["status"]=="failed") {return Err(coded(409,"not_pending","Request is no longer pending. Executing/unknown outcomes require recovery before another request"))}
         if decision=="cancel" {
-            if r["requester"]!=auth_response.sub{return Err(ABError::Forbidden("Only requester can cancel".into()))}
-        }else if !p.enabled||!p.checkers.contains(&auth_response.sub){return Err(ABError::Forbidden("Current checker membership required".into()))}
+            if r["requester"]!=auth_response.sub{return Err(coded(403,"not_requester","Only requester can cancel"))}
+        }else if !p.enabled||!p.checkers.contains(&auth_response.sub){return Err(coded(403,"not_checker","Current checker membership required"))}
         member(&state,&auth_response.sub,&o,&a).await?;
         permission(&state,&auth_response.sub,&o,&a,permission_action(r["action"].as_str().unwrap_or(""))).await?;
+        if r["status"]=="executing" {
+            r["decision_reason"]=json!("Interrupted execution reconciled; inspect actual release state and raise a new request");
+            return Ok(Json(save_request(&o,&a,&r,"failed",&auth_response.sub).await?));
+        }
         r["decided_by"]=json!(auth_response.sub);r["decision_reason"]=json!(req.reason);
         if decision=="reject"||decision=="cancel" {
             if decision=="reject"&&req.reason.trim().is_empty(){return Err(ABError::BadRequest("Rejection reason required".into()))}
@@ -661,21 +707,21 @@ async fn decide(
         }
         if decision!="approve"{return Err(ABError::NotFound("Unknown decision".into()))}
         let requester=r["requester"].as_str().unwrap_or("");
-        if !p.makers.contains(requester){return Err(ABError::Forbidden("Requester is no longer an eligible maker".into()))}
+        if !p.makers.contains(requester){return Err(coded(403,"not_maker","Requester is no longer an eligible maker"))}
         member(&state,requester,&o,&a).await?;
         permission(&state,requester,&o,&a,permission_action(r["action"].as_str().unwrap())).await?;
         let expiry=chrono::DateTime::parse_from_rfc3339(r["expires_at"].as_str().unwrap()).map_err(|_|ABError::InternalServerError("Invalid expiry".into()))?;
-        if expiry<=Utc::now(){save_request(&o,&a,&r,"expired",&auth_response.sub).await?;return Err(ABError::Conflict("Request expired".into()))}
-        if hash(&r["payload"])!=r["payload_hash"] {return Err(ABError::Conflict("Payload hash mismatch".into()))}
+        if expiry<=Utc::now(){save_request(&o,&a,&r,"expired",&auth_response.sub).await?;return Err(coded(409,"request_expired","Request expired"))}
+        if hash(&r["payload"])!=r["payload_hash"] {return Err(coded(409,"hash_mismatch","Payload hash mismatch"))}
         if base_state(&state,&o,&a).await?!=r["base_state"] || snapshot_payload(&state,&o,&a,r["action"].as_str().unwrap(),&r["payload"]).await?!=r["payload"]["snapshot"] {
-            save_request(&o,&a,&r,"stale",&auth_response.sub).await?;return Err(ABError::Conflict("Request stale; raise a new request".into()))
+            save_request(&o,&a,&r,"stale",&auth_response.sub).await?;return Err(coded(409,"request_stale","Request stale; raise a new request"))
         }
-        if expiry<=Utc::now(){save_request(&o,&a,&r,"expired",&auth_response.sub).await?;return Err(ABError::Conflict("Request expired during validation".into()))}
+        if expiry<=Utc::now(){save_request(&o,&a,&r,"expired",&auth_response.sub).await?;return Err(coded(409,"request_expired","Request expired during validation"))}
         r=save_request(&o,&a,&r,"executing",&auth_response.sub).await?;
         let result=EXECUTION.scope(Execution{org:o.clone(),app:a.clone(),request:r.clone()},Box::pin(execute(&state,&auth_response,&r))).await;
         match result {
             Ok(value)=>{r["result"]=value;Ok(Json(save_request(&o,&a,&r,"executed",&auth_response.sub).await?))},
-            Err(error)=>{r["result"]=json!({"error":error.to_string(),"recovery":"Inspect release operations before raising another request"});save_request(&o,&a,&r,"failed",&auth_response.sub).await?;Err(error)}
+            Err(error)=>{r["result"]=json!({"error":error.to_string(),"recovery":"Inspect release operations before raising another request"});save_request(&o,&a,&r,"failed",&auth_response.sub).await?;Err(ABError::ReleaseOperation{status:crate::types::AppError::status_code(&error).as_u16(),body:json!({"code":"execution_failed","message":error.to_string(),"request_id":id,"request_status":"failed"})})}
         }
     }).await
 }
@@ -749,7 +795,7 @@ async fn execute(state: &web::Data<AppState>, auth: &AuthResponse, r: &Value) ->
             id
         };
         if action == "set_rollback_sensitive" || p["body"].get("rollback_sensitive").is_some() {
-            marker(&o, &a, rid, p["body"]["rollback_sensitive"].clone()).await?;
+            marker(state, &o, &a, rid, p["body"]["rollback_sensitive"].clone()).await?;
         }
     }
     Ok(result)
@@ -761,17 +807,25 @@ async fn response_json(response: HttpResponse) -> Result<Value> {
     serde_json::from_slice(&bytes)
         .map_err(|_| ABError::InternalServerError("Invalid execution result".into()))
 }
-pub async fn overview(
+/// One authorized-pair query for all local overview metadata, with a bounded pool
+/// wait and transaction-local SQL budget. No global tenant scan is returned.
+pub async fn overview_batch(
     state: &web::Data<AppState>,
-    org: &str,
-    app: &str,
-    status: &mut Value,
-) -> Result<()> {
-    status["approval_required"] = json!(policy(state, org, app).await?.enabled);
-    status["pending_requests"] = json!(pending_count(state, org, app).await?);
-    status["emergency_needs_review"] = json!(rows(state, org, app, "reviews").await?);
-    status["release_protections"] = json!(rows(state, org, app, "protections").await?);
-    Ok(())
+    pairs: &[(String, String)],
+) -> Result<Vec<Value>> {
+    let pool = state.db_pool.clone();
+    let pairs = pairs.to_vec();
+    run_blocking!({
+        let mut c = pool.get_timeout(std::time::Duration::from_millis(250))?;
+        c.transaction::<_,ABError,_>(|c| {
+            diesel::sql_query("SET LOCAL statement_timeout='500ms'").execute(c)?;
+            let allowed = json!(pairs.iter().map(|(org,app)|json!({"org_id":org,"app_id":app})).collect::<Vec<_>>());
+            let expiry = EXPIRE_SQL.replace("org_id=$1 AND ($2='' OR app_id=$2)", "(org_id,app_id) IN (SELECT org_id,app_id FROM jsonb_to_recordset($1) AS allowed(org_id text,app_id text))");
+            diesel::sql_query(expiry).bind::<Jsonb,_>(&allowed).execute(c)?;
+            let rows = diesel::sql_query(include_str!("overview_aux.sql")).bind::<Jsonb,_>(&allowed).load::<Row>(c)?;
+            Ok(rows.into_iter().map(|r|r.data).collect())
+        })
+    })
 }
 
 pub async fn emergency(
@@ -784,7 +838,11 @@ pub async fn emergency(
     write_lock::user_reason(reason)?;
     let (o, a) = scope(auth)?;
     let p = policy(state, &o, &a).await?;
-    if !p.enabled || !p.emergency_rollback || !p.checkers.contains(&auth.sub) {
+    if !p.enabled
+        || !p.emergency_rollback
+        || p.checkers.len() < 2
+        || !p.checkers.contains(&auth.sub)
+    {
         return Err(ABError::Forbidden("Emergency rollback requires an enabled policy, emergency_rollback and checker membership".into()));
     }
     member(state, &auth.sub, &o, &a).await?;
@@ -890,9 +948,9 @@ pub async fn acknowledge(
     write_lock::locked(&state,&o,&a,async{
         if req.reason.trim().is_empty(){return Err(ABError::BadRequest("Acknowledgement reason required".into()))}
         let p=policy(&state,&o,&a).await?;
-        if !p.checkers.contains(&auth_response.sub){return Err(ABError::Forbidden("Current checker required".into()))}
-        let review=rows(&state,&o,&a,"reviews").await?.into_iter().find(|r|r["release_id"]==id).ok_or_else(||ABError::NotFound("Unacknowledged emergency not found".into()))?;
-        if review["actor"]==auth_response.sub{return Err(ABError::Forbidden("A different checker must acknowledge".into()))}
+        if !p.checkers.contains(&auth_response.sub){return Err(coded(403,"not_checker","Current checker required"))}
+        let review=rows(&state,&o,&a,"reviews").await?.into_iter().find(|r|r["release_id"]==id).ok_or_else(||coded(404,"emergency_not_found","Unacknowledged emergency not found"))?;
+        if review["actor"]==auth_response.sub{return Err(coded(403,"same_checker","A different checker must acknowledge"))}
         let(org,app,actor,rid,reason)=(o.clone(),a.clone(),auth_response.sub.clone(),id.clone(),req.reason.clone());
         write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{
             diesel::sql_query("UPDATE hyperotaserver.emergency_reviews SET acknowledged_by=$1,data=data || $2 WHERE org_id=$3 AND app_id=$4 AND release_id=$5 AND acknowledged_by IS NULL").bind::<Text,_>(&actor).bind::<Jsonb,_>(json!({"acknowledgement_reason":reason,"acknowledged_at":Utc::now()})).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(&rid).execute(c)?;
@@ -901,12 +959,22 @@ pub async fn acknowledge(
     }).await
 }
 // A restored sensitive predecessor must retain its downgrade protection.
-pub async fn protect_created(org: &str, app: &str, id: &str) -> Result<()> {
+pub async fn protect_created(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    id: &str,
+    declared: Option<&str>,
+) -> Result<()> {
+    if let Some(v) = declared {
+        marker(state, org, app, id, json!(v)).await?;
+        return Ok(());
+    }
     if let Ok(v) =
         EXECUTION.try_with(|e| e.request["payload"]["body"]["rollback_sensitive"].clone())
     {
         if !v.is_null() {
-            marker(org, app, id, v).await?;
+            marker(state, org, app, id, v).await?;
         }
     }
     Ok(())
@@ -937,7 +1005,7 @@ pub async fn inherit_predecessor(
     {
         let protections = rows(state, org, app, "protections").await?;
         if let Some(p) = protections.iter().find(|p| p["release_id"] == previous.id) {
-            marker(org, app, new_id, p["rollback_sensitive"].clone()).await?;
+            marker(state, org, app, new_id, p["rollback_sensitive"].clone()).await?;
         }
     }
     Ok(())
@@ -967,6 +1035,10 @@ mod review_version_tests {
 }
 
 #[cfg(test)]
+#[path = "postgres_tests.rs"]
+mod database_integration;
+
+#[cfg(test)]
 #[path = "review_tests.rs"]
 mod review_tests;
 
@@ -987,24 +1059,19 @@ mod tests {
 
     #[test]
     fn roster_requires_a_distinct_checker_for_every_maker() {
-        for makers in [vec![], vec!["a"], vec!["a", "b"]] {
-            for checkers in [vec![], vec!["a"], vec!["b"], vec!["a", "b"]] {
-                let p = Policy {
-                    makers: makers.iter().map(|s| s.to_string()).collect(),
-                    checkers: checkers.iter().map(|s| s.to_string()).collect(),
-                    ..Policy::default()
-                };
-                assert_eq!(
-                    valid_roster(&p),
-                    makers
-                        .iter()
-                        .chain(checkers.iter())
-                        .collect::<BTreeSet<_>>()
-                        .len()
-                        >= 2
-                        && makers.iter().all(|m| checkers.iter().any(|c| c != m))
-                );
-            }
+        for (makers, checkers, expected) in [
+            (vec!["a"], vec!["a"], false),
+            (vec!["a"], vec!["b"], true),
+            (vec!["a", "b"], vec!["a"], false),
+            (vec!["a", "b"], vec!["a", "b"], true),
+            (vec![], vec![], false),
+        ] {
+            let p = Policy {
+                makers: makers.into_iter().map(String::from).collect(),
+                checkers: checkers.into_iter().map(String::from).collect(),
+                ..Policy::default()
+            };
+            assert_eq!(valid_roster(&p), expected);
         }
     }
     #[test]
@@ -1060,5 +1127,114 @@ mod tests {
     fn payload_hash_is_order_independent_and_content_bound() {
         assert_eq!(hash(&json!({"b":2,"a":1})), hash(&json!({"a":1,"b":2})));
         assert_ne!(hash(&json!({"a":1})), hash(&json!({"a":2})));
+    }
+}
+
+#[cfg(test)]
+mod postgres_http_tests {
+    use super::*;
+    // Runs against a separately started server using this tree and a disposable,
+    // migrated Postgres database. Never point this at a production application.
+    #[actix_web::test]
+    #[ignore = "requires TEST_DATABASE_URL, TEST_API_URL (:8096), TEST_ORG, TEST_APP, TEST_SUB and TEST_TOKEN for a scratch app"]
+    async fn real_decide_gate_emergency_acknowledge() {
+        let env = |k| std::env::var(k).unwrap();
+        let (org, app, sub) = (env("TEST_ORG"), env("TEST_APP"), env("TEST_SUB"));
+        assert!(
+            app.contains("scratch") || app.contains("test"),
+            "scratch app required"
+        );
+        let mut c = diesel::PgConnection::establish(&env("TEST_DATABASE_URL")).unwrap();
+        let id = Uuid::new_v4();
+        let policy = json!({"enabled":true,"makers":[sub],"checkers":[sub,"other-checker"],"emergency_rollback":true});
+        diesel::sql_query("INSERT INTO hyperotaserver.approval_policies(org_id,app_id,data) VALUES($1,$2,$3) ON CONFLICT(org_id,app_id) DO UPDATE SET data=excluded.data").bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Jsonb,_>(policy).execute(&mut c).unwrap();
+        let request = json!({"id":id,"status":"pending","requester":sub,"action":"create"});
+        diesel::sql_query("INSERT INTO hyperotaserver.deployment_requests(id,org_id,app_id,status,data) VALUES($1,$2,$3,'pending',$4)").bind::<SqlUuid,_>(id).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Jsonb,_>(request).execute(&mut c).unwrap();
+        let client = reqwest::Client::new();
+        let call = |path: String| {
+            client
+                .post(format!("{}{}", env("TEST_API_URL"), path))
+                .bearer_auth(env("TEST_TOKEN"))
+                .header("x-organisation", &org)
+                .header("x-application", &app)
+        };
+        let response = call(format!(
+            "/api/control-center/deployment-requests/{id}/approve"
+        ))
+        .json(&json!({"reason":"self approval regression"}))
+        .send()
+        .await
+        .unwrap();
+        assert_eq!(
+            response.status(),
+            403,
+            "self approval must fail before execution"
+        );
+        let response=call("/api/releases".into()).json(&json!({"config":{"boot_timeout":1000,"release_config_timeout":1000},"package_id":"missing"})).send().await.unwrap();
+        assert_eq!(response.status(), 403);
+        assert_eq!(
+            response.json::<Value>().await.unwrap()["code"],
+            "approval_required"
+        );
+        // Same checker must never acknowledge their own emergency.
+        diesel::sql_query("INSERT INTO hyperotaserver.emergency_reviews(id,org_id,app_id,release_id,actor,data) VALUES($1,$2,$3,'test-release',$4,'{}')").bind::<SqlUuid,_>(id).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(&sub).execute(&mut c).unwrap();
+        let response = call("/api/releases/test-release/acknowledge-emergency".into())
+            .json(&json!({"reason":"same actor"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 403);
+        // A non-checker is refused before predecessor lookup or mutation.
+        diesel::sql_query("UPDATE hyperotaserver.approval_policies SET data=jsonb_set(data,'{checkers}','[\"other-checker\"]') WHERE org_id=$1 AND app_id=$2").bind::<Text,_>(&org).bind::<Text,_>(&app).execute(&mut c).unwrap();
+        let response = call("/api/releases/test-release/rollback".into())
+            .json(&json!({"reason":"non-checker","emergency":true}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 403);
+        diesel::sql_query("DELETE FROM hyperotaserver.emergency_reviews WHERE id=$1")
+            .bind::<SqlUuid, _>(id)
+            .execute(&mut c)
+            .unwrap();
+        diesel::sql_query("DELETE FROM hyperotaserver.deployment_requests WHERE id=$1")
+            .bind::<SqlUuid, _>(id)
+            .execute(&mut c)
+            .unwrap();
+        diesel::sql_query(
+            "DELETE FROM hyperotaserver.approval_policies WHERE org_id=$1 AND app_id=$2",
+        )
+        .bind::<Text, _>(&org)
+        .bind::<Text, _>(&app)
+        .execute(&mut c)
+        .unwrap();
+    }
+}
+
+#[cfg(test)]
+mod org_member_middleware_tests {
+    #[actix_web::test]
+    #[ignore = "requires TEST_API_URL, TEST_ORG, TEST_APP, TEST_ORG_READER_TOKEN with org READ and no explicit app grant"]
+    async fn implicit_app_read_does_not_allow_write() {
+        let env = |k| std::env::var(k).unwrap();
+        let client = reqwest::Client::new();
+        let request = |method| {
+            client
+                .request(method, format!("{}/api/releases", env("TEST_API_URL")))
+                .bearer_auth(env("TEST_ORG_READER_TOKEN"))
+                .header("x-organisation", env("TEST_ORG"))
+                .header("x-application", env("TEST_APP"))
+        };
+        let response = request(reqwest::Method::GET).send().await.unwrap();
+        assert_eq!(
+            response.status(),
+            200,
+            "organisation reader must pass middleware for an existing app"
+        );
+        let response=request(reqwest::Method::POST).json(&serde_json::json!({"config":{"boot_timeout":1000,"release_config_timeout":1000},"package_id":"missing"})).send().await.unwrap();
+        assert_eq!(
+            response.status(),
+            403,
+            "implicit READ must never grant write"
+        );
     }
 }

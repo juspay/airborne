@@ -162,6 +162,8 @@ pub struct ConcludeReleaseResponse {
 
 #[derive(Serialize)]
 pub struct ServeReleaseResponse {
+    pub blocked_package_versions: Vec<String>,
+    pub telemetry: Option<Value>,
     pub version: String,
     pub config: Config,
     pub package: ServePackage,
@@ -171,6 +173,8 @@ pub struct ServeReleaseResponse {
 #[derive(Deserialize)]
 pub struct ServeReleaseQueryParams {
     pub toss: Option<String>,
+    pub telemetry_platform: Option<String>,
+    pub native_version: Option<String>,
 }
 
 pub struct BuildOverrides {

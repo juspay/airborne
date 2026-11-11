@@ -14,3 +14,7 @@ airborne-gcp.json
 
 .masterkey*
 /**/.python-*
+
+.airborne-data/
+compose.persistence-local.yml
+>>>>>>> 31953250 (fix(server): validate writes and isolate optional serving failures)

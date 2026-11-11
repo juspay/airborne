@@ -53,6 +53,8 @@ The local `docker-compose.yml` services translate to AWS as follows:
 Provision the data dependencies (RDS, S3, KMS) and the supporting services (Keycloak, Superposition) **first**. The Airborne server fails to boot if Postgres, the OIDC issuer, Superposition, or the S3 bucket are unreachable.
 :::
 
+Maker-checker roster validation currently requires the Keycloak identity-directory adapter. A managed OIDC provider can still authenticate normal Airborne users, but maker-checker enablement fails closed until that provider has directory support.
+
 ## Build and push the image
 
 The production image is built from `airborne_server/Dockerfile` (a multi-stage build: a Node stage for the bundled frontend, a Rust stage for the server and the Diesel CLI, and a slim Ubuntu runtime). The `CMD` is the server binary, and the Diesel CLI is included in the image so you can run migrations from a task if you choose.
@@ -107,6 +109,18 @@ See [boot-time migrations](/docs/server/configuration#boot-time-migrations) for 
 :::caution
 If multiple tasks start simultaneously with `db` in the boot list, they may all attempt migrations at once. For predictable rollouts, prefer a single one-off migration task, or ensure your migrations are safe to run concurrently.
 :::
+
+## Maker-checker rollout order
+
+If you plan to use maker-checker, follow the safe mixed-version order in [Configuration](/docs/server/configuration#maker-checker-deployment-fence): apply the additive database migration, deploy the enforcing version to every ECS task, job and internal writer with policies still off, drain old tasks and in-flight upstream writes, validate fleet routing, then have an operator attest `hyperotaserver.approval_deployment.enforcement_ready=true` in the singleton database row. Only then enable policies. The readiness flag is operator-controlled and has no environment-variable equivalent; there are no new server environment variables.
+
+For downgrade, disable policies, audit/cancel pending work, resolve uncertain operations, drain writers, and reset readiness false before starting old tasks. Never run an unenforcing task behind enabled policies. See the [maker-checker guide](/docs/guides/maker-checker) for identity requirements, request lifecycle, emergency rollback and limits.
+
+## Release writer database connections
+
+Airborne's release coordination uses PostgreSQL **session advisory locks**. Use a direct/session-pinned RDS endpoint, or configure RDS Proxy to pin each dedicated writer session to one PostgreSQL backend. Do not put PgBouncer transaction pooling in this path; `pgbouncer=true` in the DSN is explicitly refused. Each Airborne task has a per-process cap of **64 writer sessions**, separate from the read/audit pool. This bounds Airborne lock connections but does not prove the Superposition deployment can accept the same write burst.
+
+In a local Superposition demo, 50 simultaneous writes exhausted its connection pool. Test bursts against your own Superposition deployment before treating a concurrency target as supported.
 
 ## Health check
 

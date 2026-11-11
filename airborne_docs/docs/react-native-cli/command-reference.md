@@ -3,7 +3,7 @@ title: Command Reference
 description: A compact reference of the airborne-devkit workflow commands, the re-exposed Core CLI operations, and the three input methods.
 ---
 
-This page summarizes the commands `airborne-devkit` provides. There are two groups: the **devkit-specific commands** (login plus the five special workflow commands), and the **re-exposed Core CLI operations** for working with organisations, applications, dimensions, files, packages, and releases.
+This page summarizes the commands `airborne-devkit` provides. There are two groups: the **devkit-specific commands** (login, the five special workflow commands, and the four release lifecycle commands), and the **re-exposed Core CLI operations** for working with organisations, applications, dimensions, files, packages, and releases.
 
 All commands accept `-h, --help` for inline usage, and `-V, --version` is available on the CLI itself.
 
@@ -17,6 +17,10 @@ All commands accept `-h, --help` for inline usage, and `-V, --version` is availa
 | `update-local-release-config`   | Re-bundle and update an existing `release_config.json`. See [Local configuration](/docs/react-native-cli/local-configuration#update-local-release-config). |
 | `create-remote-files`           | Upload or register the bundled files with Airborne. See [Remote files and packages](/docs/react-native-cli/remote-files-and-packages#create-remote-files). |
 | `create-remote-package`         | Assemble registered files into a deployable package. See [Remote files and packages](/docs/react-native-cli/remote-files-and-packages#create-remote-package). |
+| `ramp-release`                  | Start a release and set its traffic percentage (0–50). See [Release lifecycle](/docs/react-native-cli/release-lifecycle#ramp-release). |
+| `conclude-release`              | Promote a ramped release or keep the previous one. See [Release lifecycle](/docs/react-native-cli/release-lifecycle#conclude-release). |
+| `discard-release`               | Cancel a release that was never ramped. See [Release lifecycle](/docs/react-native-cli/release-lifecycle#discard-release). |
+| `rollback-release`              | Roll a release back according to its state. See [Release lifecycle](/docs/react-native-cli/release-lifecycle#rollback-release). |
 
 ## Core CLI operations under airborne-devkit
 
@@ -35,9 +39,10 @@ The available operations are:
 - **Dimension** — `CreateDimension`, `UpdateDimension`, `DeleteDimension`, `ListDimensions`
 - **File** — `CreateFile`, `UploadFile`, `ListFiles`, `ListFileGroups`
 - **Package** — `CreatePackage`, `ListPackages`
-- **Release** — `CreateRelease`, `GetRelease`, `ListReleases`, `ServeRelease`, `ServeReleaseV2`
+- **Release** — `CreateRelease`, `GetRelease`, `ListReleases`, `RampRelease`, `ConcludeRelease`, `DiscardRelease`, `RollbackRelease`, `ServeRelease`, `ServeReleaseV2`
+- **Control Center** — `GetControlCenterRollbackPreview`, `ListControlCenterOperations`, `ResolveControlCenterOperation` and the approval and deployment-request operations
 
-For the full parameter tables and examples for each of these, see the [Core CLI command reference](/docs/core-cli/command-reference). (When using them through `airborne-devkit`, omit the `--token` parameter shown there.)
+The [release lifecycle commands](/docs/react-native-cli/release-lifecycle) wrap the four lifecycle operations with the organisation and application taken from `airborne-config.json`. For the full parameter tables and examples for each of these, see the [Core CLI command reference](/docs/core-cli/command-reference). (When using them through `airborne-devkit`, omit the `--token` parameter shown there.)
 
 ## Input methods
 

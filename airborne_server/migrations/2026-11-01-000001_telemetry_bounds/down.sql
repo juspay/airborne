@@ -1,0 +1,2 @@
+DROP INDEX hyperotaserver.device_reports_retention;
+DROP INDEX hyperotaserver.telemetry_limits_retention;

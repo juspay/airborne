@@ -40,7 +40,7 @@ cp output/source/openapi/Airborne.openapi.json ../airborne_docs/openapi/airborne
 ```
 
 :::note[Scope of this reference]
-This reference covers the operations in the Smithy API contract — the stable, SDK/CLI-backed surface. The server also exposes additional **dashboard/admin** endpoints (member and role management, cohorts, config and property schemas, and the release lifecycle) that are driven through the [Dashboard](/docs/dashboard/overview) and are not part of this contract.
+This reference covers the operations in the Smithy API contract — the stable, SDK/CLI-backed surface. The server also exposes additional **dashboard/admin** endpoints (member and role management, cohorts, and config and property schemas) that are driven through the [Dashboard](/docs/dashboard/overview) and are not part of this contract.
 :::
 
 ## Tenancy: organisation and application context

@@ -22,6 +22,7 @@ For local development you rarely set these by hand. `make setup` seeds `airborne
 | --- | --- | --- | --- |
 | `PORT` | No | `8081` | TCP port the HTTP server binds on (`0.0.0.0:PORT`). |
 | `SERVER_PATH_PREFIX` | No | `api` | Path prefix for the management API and the health route. The health check is `GET /{SERVER_PATH_PREFIX}/health`. |
+| `RELEASE_CORS_ALLOWED_ORIGINS` | No | (empty) | Comma-separated origins allowed to fetch `/release/*` from a browser, or `*` for any origin. Required for web clients. Empty disables CORS. |
 | `KEEP_ALIVE` | No | `30` | Actix-web keep-alive timeout, in seconds. |
 | `BACKLOG` | No | `1024` | Listen backlog (max pending connections). |
 | `ACTIX_WORKERS` | No | `4` | Number of Actix worker threads. |
@@ -51,6 +52,12 @@ The server connects to PostgreSQL for application data **and** Casbin policies. 
 `DB_URL` / `DB_MIGRATION_URL` are optional overrides. If you provide them you can omit the corresponding discrete parts, but `DB_USER`, `DB_HOST`, `DB_PORT`, and `DB_NAME` are still read as required by `config.rs`, so keep them set. The `make db-migration` target separately reads `DATABASE_URL`/`DB_URL` from `.env` for the Diesel CLI.
 :::
 
+### Release writer connections
+
+Release writes use PostgreSQL **session advisory locks** on dedicated writer connections. The writer session must stay pinned to the same PostgreSQL backend for the duration of the lock. If the DB URL contains `pgbouncer=true`, Airborne refuses release writes because PgBouncer transaction pooling cannot preserve session locks. Use a direct PostgreSQL endpoint or a session-pinned proxy configuration. With RDS Proxy, enable session pinning for these writer sessions.
+
+Each server process admits at most **64 writer sessions**; this is a per-process safety bound, not a supported Superposition concurrency guarantee. Read and audit queries use their separate pool. See [Control Center server notes](/docs/server/control-center#deadlines-and-write-coordination) and your [deployment guide](/docs/server/deploy-ecs#release-writer-database-connections).
+
 ## Redis
 
 Redis is an **optional** but recommended cache. It backs two things: the OIDC login **PKCE + nonce** hardening, and read caches for file, package, and workspace lookups.
@@ -78,7 +85,7 @@ If `REDIS_URL` is set but the value is invalid or the instance is unreachable at
 
 ## Authentication / OIDC
 
-Authentication is OIDC-based. `AUTHN_PROVIDER` selects the flavour; the shared `OIDC_*` variables describe the issuer and client; the `AUTH_ADMIN_*` variables back provider-specific signup and user-management flows (mandatory for Keycloak).
+Authentication is OIDC-based. `AUTHN_PROVIDER` selects the flavour; the shared `OIDC_*` variables describe the issuer and client; the `AUTH_ADMIN_*` variables back provider-specific signup and user-management flows (mandatory for Keycloak). Maker-checker roster validation currently also needs the Keycloak identity-directory adapter; other providers fail closed for policy enablement until they add directory support.
 
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
@@ -255,6 +262,20 @@ Recognized tokens:
 The same Keycloak→Casbin import is also available as an explicit one-off command: run the server binary with `authz-import-keycloak --dry-run` (preview) or `authz-import-keycloak --apply` (apply). Use this instead of `keycloaktocasbin` in `MIGRATIONS_TO_RUN_ON_BOOT` when you want a controlled, out-of-band migration.
 :::
 
+## Maker-checker deployment fence
+
+Maker-checker adds **no environment variables**. Applications remain disabled by default. The operator-controlled readiness gate is stored in the singleton database row at `hyperotaserver.approval_deployment.enforcement_ready`; it is not a server setting that can self-certify fleet readiness.
+
+Use this order before enabling an application policy:
+
+1. Apply the additive database migration first. It creates empty/off policy storage and retains the existing audit action values.
+2. Deploy the enforcing server build to every traffic-serving instance, job, and internal writer. Keep all application policies disabled.
+3. Drain old instances and outstanding upstream writes. Verify deployed versions, routing, and upstream write quiescence. Keep direct/session-pinned PostgreSQL advisory-lock sessions; RDS Proxy/PgBouncer transaction pooling constraints still apply.
+4. An operator with database authority explicitly sets `hyperotaserver.approval_deployment.enforcement_ready=true` for the singleton row. The API returns `409` until this attestation exists.
+5. Deploy regenerated clients and docs. Enable application policies only after the fleet is safe.
+
+Before downgrading binaries, disable policies first, allow the audited cancellation of pending requests, resolve unknown operations, drain writers, and reset the readiness flag to false. Never place an unenforcing old binary behind enabled policy state. The down migration refuses to drop enabled policy storage and keeps historical additive audit actions. See the [maker-checker guide](/docs/guides/maker-checker) for operational behavior and trust limits.
+
 ## Metrics (optional)
 
 The Airborne server can **push** its own Prometheus metrics to a [Victoria Metrics](https://victoriametrics.com/) instance. This is opt-in and independent of the [analytics server](#analytics-server) below.
@@ -289,3 +310,19 @@ The analytics server (`airborne_analytics_server`) is an **optional, separate** 
 :::caution
 The analytics `.env.example` also lists `DEFAULT_TENANT_ID`, and the stack-specific env files (`.env.victoria-metrics`, `.env.kafka-clickhouse`) use `KAFKA_BROKER_URL` and `VICTORIA_METRICS_URL`. These names are **not read** by `config.rs` in the current code — the parser reads `KAFKA_BROKERS` (not `KAFKA_BROKER_URL`) and has no Victoria-Metrics URL variable. Treat the table above (the variables `config.rs` actually parses) as authoritative, and the extra names as scaffolding for the Docker stacks.
 :::
+
+## Strict serving override
+
+| Variable | Required | Default / Example | Purpose |
+| --- | --- | --- | --- |
+| `STRICT_RELEASE_APPLICATIONS` | No | Empty; `org/app,org/other` | Forces strict serving on for listed applications, in addition to their stored policy. New applications default strict; existing apps are explicitly backfilled legacy. See [serving policy](/docs/server/control-center#stored-strict-serving-policy). |
+
+### Device telemetry
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TELEMETRY_SIGNING_KEY` | unset (disabled) | At least 32 random bytes, shared by every API instance. Signs one-day release receipts; rotation invalidates queued reports. Keep secret. |
+
+The existing `RELEASE_CORS_ALLOWED_ORIGINS` also permits POST telemetry preflights. IP rate limiting is off by default. Set `TELEMETRY_RATE_LIMIT=true` to cap each IPv4 /24 or IPv6 /56 at 120 batches/minute. `TELEMETRY_TRUSTED_PROXIES` is a comma-separated list of exact socket-peer IP addresses; only those peers may supply `X-Forwarded-For`. The trusted proxy must overwrite that header with the client address. IPv4-mapped IPv6 addresses use IPv4 buckets. Telemetry retains seven days on ingest, caps native versions at 32 per release, and summarizes at most the newest 50,000 reports and 1,000 groups (sampled, not fleet totals).
+
+`SERVER_HOST` sets the HTTP bind address (default `0.0.0.0`). The authenticated local quickstart sets `127.0.0.1` ; there is no `QUICKSTART_BIND` setting.

@@ -27,6 +27,7 @@ mod organisation;
 mod package;
 mod provider;
 mod release;
+mod telemetry;
 mod token;
 mod types;
 mod user;
@@ -550,13 +551,26 @@ async fn main() -> std::io::Result<()> {
                             .wrap(Auth)
                             .service(control_center::add_routes()),
                     )
+                    .service(
+                        web::scope("/telemetry")
+                            .wrap(telemetry_cors(&release_cors_origins))
+                            .app_data(
+                                web::JsonConfig::default()
+                                    .limit(16384)
+                                    .error_handler(middleware::json_error_handler),
+                            )
+                            .service(telemetry::ingest),
+                    )
                     .service(release::add_routes("releases")),
             )
     })
     .workers(num_workers)
     .keep_alive(std::time::Duration::from_secs(keep_alive))
     .backlog(backlog)
-    .bind(("0.0.0.0", port))?
+    .bind((
+        std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".into()),
+        port,
+    ))?
     .run()
     .await
 }
@@ -611,6 +625,24 @@ fn release_cors(origins: &ReleaseCorsOrigins) -> Condition<Cors> {
     let base = Cors::default()
         .allowed_methods(vec!["GET", "HEAD"])
         .allowed_headers(vec!["x-dimension"])
+        .expose_headers(vec!["x-amzn-errortype"])
+        .max_age(3600);
+    match origins {
+        ReleaseCorsOrigins::Disabled => Condition::new(false, base),
+        ReleaseCorsOrigins::Any => Condition::new(true, base.allow_any_origin()),
+        ReleaseCorsOrigins::List(list) => Condition::new(
+            true,
+            list.iter()
+                .fold(base, |cors, origin| cors.allowed_origin(origin)),
+        ),
+    }
+}
+
+fn telemetry_cors(origins: &ReleaseCorsOrigins) -> Condition<Cors> {
+    let base = Cors::default()
+        .allowed_methods(vec!["POST"])
+        .allowed_headers(vec!["content-type"])
+        .expose_headers(vec!["x-amzn-errortype"])
         .max_age(3600);
     match origins {
         ReleaseCorsOrigins::Disabled => Condition::new(false, base),

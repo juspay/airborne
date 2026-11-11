@@ -88,15 +88,11 @@ fn latest_live(exps: &[ExperimentResponse]) -> Vec<&ExperimentResponse> {
     }
     selected.into_values().collect()
 }
-pub(super) fn version(exp: &ExperimentResponse) -> i64 {
+pub(crate) fn version(exp: &ExperimentResponse) -> i64 {
     utils::extract_integer_from_experiment::<i64>(&experimental(exp), "package.version")
 }
 pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Result<Value> {
-    let pending = super::operations::load(state, org, app, None)
-        .await?
-        .iter()
-        .map(super::write_lock::details)
-        .collect::<Vec<_>>();
+    let pending = Value::Null; // overview attaches the authorized batch result
     let exps = match tokio::time::timeout(
         std::time::Duration::from_millis(1500),
         experiments(state, org, app),
@@ -113,7 +109,7 @@ pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Re
     let live=latest_live(&exps).into_iter().map(|e|json!({"release_id":e.id,"package_version":version(e),"config_version":utils::extract_string_from_experiment(&experimental(e),"config.version"),"dimensions":context(e),"concluded_at":utils::dt(&e.last_modified)})).collect::<Vec<_>>();
     let active=exps.iter().filter(|e|matches!(e.status,ExperimentStatusType::Created|ExperimentStatusType::Inprogress)).map(|e|json!({"release_id":e.id,"package_version":version(e),"status":e.status.as_str(),"traffic_percentage":e.traffic_percentage,"experimental_variant":experimental(e).map(|v|v.id.clone()).unwrap_or_default(),"dimensions":context(e),"created_at":utils::dt(&e.created_at),"created_by":e.created_by})).collect::<Vec<_>>();
     Ok(
-        json!({"application":app,"platform":null,"live":live,"active":active,"unresolved_operations":pending,"last_activity_at":exps.iter().max_by_key(|e|e.last_modified).map(|e|utils::dt(&e.last_modified)),"error":null}),
+        json!({"application":app,"platform":null,"telemetry":tokio::time::timeout(std::time::Duration::from_millis(100),crate::telemetry::summary(state,org,app)).await.ok().and_then(|r|r.ok()).unwrap_or_else(||json!({"error":"Telemetry unavailable"})),"live":live,"active":active,"unresolved_operations":pending,"last_activity_at":exps.iter().max_by_key(|e|e.last_modified).map(|e|utils::dt(&e.last_modified)),"error":null}),
     )
 }
 pub async fn event(
@@ -124,6 +120,8 @@ pub async fn event(
     payload: Value,
 ) {
     let mut payload = payload;
+    payload["server_recorded_at"] = json!(Utc::now());
+    payload["availability_confirmed"] = json!(false);
     if let Some(approval) = super::maker_checker::audit_context() {
         payload["approval"] = approval;
     }
@@ -139,7 +137,7 @@ pub async fn event(
         log::error!("Failed to append release event");
     }
 }
-async fn required_event(
+pub(super) async fn required_event(
     state: &web::Data<AppState>,
     auth: &AuthResponse,
     release: &str,
@@ -152,6 +150,15 @@ async fn required_event(
     let Some(app) = auth.application.as_ref().map(|a| a.name.clone()) else {
         return Err(ABError::InternalServerError("Audit scope missing".into()));
     };
+    use sha2::{Digest, Sha256};
+    let event_id = payload
+        .get("operation_id")
+        .filter(|id| !id.is_null())
+        .map(|id| {
+            let digest = Sha256::digest(format!("{org}/{app}/{release}/{action}/{id}"));
+            Uuid::from_bytes(digest[..16].try_into().unwrap())
+        })
+        .unwrap_or_else(Uuid::new_v4);
     let pool = state.db_pool.clone();
     let actor = auth.sub.clone();
     let release = release.to_string();
@@ -160,7 +167,7 @@ async fn required_event(
         let mut c = pool.get()?;
         diesel::insert_into(e::table)
             .values((
-                e::id.eq(Uuid::new_v4()),
+                e::id.eq(event_id),
                 e::org_id.eq(org),
                 e::app_id.eq(app),
                 e::release_id.eq(release),
@@ -168,6 +175,8 @@ async fn required_event(
                 e::actor.eq(actor),
                 e::payload.eq(payload),
             ))
+            .on_conflict(e::id)
+            .do_nothing()
             .execute(&mut c)?;
         Ok(())
     })
@@ -190,13 +199,19 @@ pub async fn events(
         .find(|e| e.id == id)
         .ok_or_else(|| ABError::NotFound("Release not found".into()))?;
     let pool = state.db_pool.clone();
+    let created_at = DateTime::from_timestamp(exp.created_at.secs(), 0).unwrap_or_default();
     let rows = run_blocking!({
         let mut c = pool.get()?;
         Ok(e::table
             .filter(e::org_id.eq(org))
             .filter(e::app_id.eq(app))
-            .filter(e::release_id.eq(id).or(e::release_id.eq("")))
-            .order((e::created_at.asc(), e::id.asc()))
+            .filter(
+                e::release_id
+                    .eq(id)
+                    .or(e::release_id.eq("").and(e::created_at.ge(created_at))),
+            )
+            .order((e::created_at.desc(), e::id.desc()))
+            .limit(1000)
             .select((e::action, e::actor, e::created_at, e::payload))
             .load::<(String, String, DateTime<Utc>, Value)>(&mut c)?)
     })?;
@@ -214,8 +229,14 @@ pub async fn events(
             events.push(json!({"action":action,"actor":exp.last_modified_by,"created_at":utils::dt(&exp.last_modified),"payload":{"chosen_variant":exp.chosen_variant},"synthetic":true}));
         }
     }
-    events.sort_by_key(|e| e["created_at"].as_str().unwrap_or_default().to_string());
-    Ok(Json(json!({"events":events,"outcome":outcome(exp, &exps)})))
+    events.sort_by_key(|e| {
+        e["created_at"]
+            .as_str()
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+    });
+    Ok(Json(
+        json!({"events":events,"outcome":outcome(exp, &exps),"audit_completeness":"best_effort"}),
+    ))
 }
 #[derive(Deserialize)]
 pub struct RollbackRequest {
@@ -377,6 +398,7 @@ pub async fn invalidate(state: &web::Data<AppState>, org: &str, app: &str) -> Re
     if state.env.cloudfront_distribution_id.is_empty() {
         return Ok(());
     }
+    let publication_observed_at = Utc::now();
     let mut failed = Vec::new();
     for path in [
         format!("/release/{org}/{app}*"),
@@ -401,8 +423,7 @@ pub async fn invalidate(state: &web::Data<AppState>, org: &str, app: &str) -> Re
             failed.push(path);
         }
     }
-    let payload =
-        json!({"failed_paths":failed,"attempts_per_path":3,"mutation_may_have_committed":true});
+    let payload = json!({"failed_paths":failed,"attempts_per_path":3,"mutation_may_have_committed":true,"publication_observed_at":publication_observed_at,"invalidation_submission_finished_at":Utc::now(),"availability_confirmed":false});
     let (org, app) = (org.to_owned(), app.to_owned());
     let action = if failed.is_empty() {
         "cache_invalidated"

@@ -5,7 +5,7 @@ description: Roll releases out to specific segments and app versions using dimen
 
 import Screenshot from '@site/src/components/Screenshot';
 
-A first release goes to everyone. Real rollouts are more careful: ship to one city first, hold an update back from old native versions, or expose a change to internal beta devices only — then ramp traffic up while you watch adoption. This guide shows how Airborne's **dimensions**, **version cohorts**, and **checkpoints** make that precise, and how to ramp and monitor a release safely.
+Every release starts at zero traffic and requires an explicit ramp and conclusion, including after a Superposition rebuild. Real rollouts are more careful: ship to one city first, hold an update back from old native versions, or expose a change to internal beta devices only — then ramp traffic up while you watch adoption. This guide shows how Airborne's **dimensions**, **version cohorts**, and **checkpoints** make that precise, and how to ramp and monitor a release safely.
 
 :::info[The mental model]
 A **release** is targeted by matching the **dimensions** sent by each device against the release's targeting rules. Dimensions are evaluated in **priority order**, and rules are **AND-ed** together. A **cohort** dimension turns a raw value (like an app version) into named segments (like "v2 and above"). You then ramp the matched audience between a control and experiment, and conclude to make it 100%.
@@ -39,18 +39,18 @@ Why a cohort instead of targeting `app_version` directly? Because checkpoints gi
 
 ## Step 3 — Create a targeted release
 
-Open **Releases → Create Release** and step through to **Targeting** (step 2). Because this isn't your first release, you can add rules. Click **Add Rule** and build a rule from three parts:
+Open **Releases → Create Release** and step through to **Targeting** (step 2). You can add rules even on your first release. Click **Add Rule** and build a rule from three parts:
 
 <Screenshot name="release-wizard-2-targeting" caption="A targeting rule has three parts — ① the dimension, ② the operator, and ③ the value. For a cohort dimension the value is a dropdown of your checkpoints and groups." />
 
 1. **Dimension** — pick `version_cohort` (or any dimension).
-2. **Operator** — `Equals`, `Not equals`, or a comparison.
-3. **Value** — for a cohort dimension this is a dropdown of your checkpoints/groups (for example `v2_and_above`); for a standard dimension it's free text (for example `city = Bengaluru`).
+2. **Operator** — always `Equals`: a release matches a device when every rule's value is exactly what the device sends. Comparisons and ranges live in the cohort, which is why step 2 exists.
+3. **Value** — for a cohort dimension this is a dropdown of your checkpoints, ranges and groups (for example `v2_and_above`); for a standard dimension it's free text (for example `city = Bengaluru`).
 
-Add more rules to narrow further — for example `version_cohort = v2_and_above` **and** `city = Bengaluru`. All rules must match for a device to receive the release. Leaving targeting empty sends the release to everyone.
+Add more rules to narrow further — for example `version_cohort = v2_and_above` **and** `city = Bengaluru`. All rules must match for a device to receive the release. Strict apps reject empty targeting. Only legacy apps with strict serving disabled can create an untargeted default release.
 
-:::caution[The first release can't be targeted]
-Your application's very first release always goes to all users. Targeting becomes available from the second release onward.
+:::caution[Target the first release]
+Strict applications require targeting. If the application has no dimensions, open Dimensions to create `app_version` (standard) and `version_cohort` (cohort depending on `app_version`), then open Cohorts to define a compatible range, then select it here. Review any prefill. The first release starts at zero traffic: ramp it explicitly (up to 50%, retaining a control variant), then conclude with the experimental variant for all matching devices.
 :::
 
 Finish the wizard (pick the package, set file priorities, add resources) and confirm. See [Dashboard → Releases](/docs/dashboard/releases) for every step.
@@ -65,8 +65,34 @@ Click **Ramp** and raise the traffic percentage. Traffic is capped at **50%** wh
 
 <Screenshot name="release-ramp-dialog" caption="Ramp dialog — increase the share of the targeted audience that gets the experiment." width="640px" />
 
+:::tip[From the command line]
+The dashboard buttons map to `POST /api/releases/{release_id}/ramp`, `/conclude`, `/discard` and `/rollback`, and to the `airborne-devkit` commands `ramp-release`, `conclude-release`, `discard-release` and `rollback-release` — see [Release lifecycle](/docs/react-native-cli/release-lifecycle). The percentage is capped at 50 there too.
+:::
+
 - **Conclude** — promote the experiment to 100% of the matched audience.
-- **Revert / Discard** — stop the rollout and fall back to the control.
+- **Discard** — cancel a release that is still in `CREATED` status. The discard API rejects running releases with `409`.
+- **Rollback a `CREATED` release** — `POST /api/releases/{release_id}/rollback` discards it; the currently served config stays unchanged.
+- **Rollback an `INPROGRESS` release** — the same endpoint concludes the experiment on its control variant, returning traffic to the control package and config.
+- **Rollback a `CONCLUDED` release** — only works on the **latest live release** for its dimensions. Airborne finds the previous live release for the same dimensions and creates a replacement release with that release's historical package and config, ramps the replacement and concludes it. The endpoint returns `action: "rereleased"`, the replacement's `new_release_id`, and `reconciled_keys`.
+
+Rollback requires a non-blank reason in the JSON body, and the caller needs release write/conclude permission. A discarded release, a concluded release whose control variant is live, or a release with another ongoing experiment for the same dimensions cannot be rolled back and returns `409`.
+
+### Rolling back a live release
+
+Before confirming, fetch `GET /api/control-center/releases/{release_id}/rollback-preview` with `x-organisation` and `x-application`. It is read-only and requires release-read access. Show the action, resulting package, and every `reconciled_keys.kept_current` / `reconciled_keys.dropped` entry. Do not offer confirmation when `blocked` is set (`superseded`, `ongoing`, `no_predecessor`, `incompatible`, or `unresolved`). POST recalculates under the app lock, so the preview is not a reservation.
+
+- **Only the latest live release.** A newer live release for the same dimensions makes the rollback ineligible. The refusal names `current_live_release_id`.
+- **Config reconciliation.** Newly registered keys keep their current value and appear in `kept_current`; keys no longer registered are dropped; remaining keys get historical values. This does not prove that an older package works with the changed config.
+- **Conservative validation.** Advanced schema assertions/patterns and keys with compute or validation functions are blocked as incompatible before creation. Valid configurations using them may need operator review.
+- **Durable progress.** Airborne persists the operation and plan before writes. Retry a definite partial failure on the same original release; the server resumes only its own recorded transition. A completed retry returns recorded success, even if the earlier response was lost, and reports `current_live_release_id` / `later_release_id` when applicable.
+- **Changed replacement.** `409 replacement_changed` means a person or unrelated release changed the replacement. Inspect its variants, target, chosen variant, and Superposition change history. Do not automatically resume or overwrite it.
+- **Unknown upstream result.** A failure known to have stopped before reaching Superposition does not pause writes. A timed-out or otherwise ambiguous write may have been accepted, so Airborne pauses every release write for that app. This pause is app-wide because broad and specific Superposition contexts can overlap in affected devices or config keys; Airborne cannot safely prove they are independent. `own_attempt: true` on an error means this request itself may have changed upstream; when absent/false, an earlier write is blocking it. Retry to let Airborne reconcile automatically if current state or positive Superposition audit history proves the marked expected change. If it remains unresolved, inspect the experiment and change history plus the original request's server/proxy logs. Never infer rejection from elapsed time, an absent marker or a terminal state alone.
+- **Admin recovery.** Use the dashboard's **Writes paused** panel and **Review recovery** action as the normal path; it replaces manual SQL. Only an organisation owner/admin or super admin can submit recovery. The server re-reads upstream, requires an audited reason, and records `operation_resolved` with the actor, finding, reason, termination attestation and verification. `applied` needs positive expected-state evidence. For `did_not_apply`, Airborne requires unchanged upstream state and the operator must check logs and attest that the original request has ended and cannot execute later. Airborne cannot independently verify request termination. Direct SQL is an audited last resort only if the route cannot establish a finding.
+- **Change reasons.** User reasons are preserved along with the `Airborne operation <UUID>` marker so reconciliation can match audit history. Superposition's total limit is 255 bytes; the marker leaves at most **197 bytes** for the user reason. Longer reasons are rejected before dispatch rather than truncated.
+- **Deadlines and writer limits.** Upstream calls have a five-second deadline and two-second connect deadline. The 90-second operation budget is checked before mutation dispatch and does not cancel an in-flight SDK call. Each server process caps dedicated writer sessions at 64. Session advisory locks require RDS Proxy session pinning or a direct/session-pinned PostgreSQL endpoint; PgBouncer transaction pooling does not work, and a DSN with `pgbouncer=true` is refused.
+- **Load.** A burst of 50 simultaneous writes exhausted the local Superposition demo's connection pool. Test bursts against your own deployment; Airborne's 64-writer cap is not a promise that Superposition can handle 64 concurrent writes.
+
+Rollback and operation recovery require a write-drained deployment. Apply migrations `2026-10-31-000002_release_operations` and `2026-10-31-000003_operation_recovery` first, drain mutation routes on every old instance and resolve ambiguous requests, deploy all new instances while writes remain disabled, then re-enable writes and exercise preview/rollback/contention. Do not run old and new release writers concurrently; retain the operations table and unresolved rows during binary rollback. See [Control Center server notes](/docs/server/control-center) for the full recovery and rollout procedure.
 
 ## Step 5 — Monitor adoption
 
@@ -77,6 +103,12 @@ The **Analytics** tab tracks how the rollout is going — adoption over time, do
 You can also confirm what's being served to a slice of users with the **Targeting** tab and with [Views](/docs/dashboard/views) (saved dimension filters).
 
 <Screenshot name="release-targeting-tab" caption="The Targeting tab shows the dimension rules applied to this release." />
+
+## Step 6 — Review release history
+
+The Control Center release timeline is available at `GET /api/control-center/releases/{release_id}/events` with a Bearer token and `x-organisation` / `x-application` headers. It returns lifecycle events such as `created`, `ramped`, `concluded`, `discarded`, and `rolled_back`, including the actor, timestamp, and action payload.
+
+Superposition remains the source of truth for a release's current state and variants. Postgres `release_events` is a best-effort audit trail; `release_operations` stores durable rollback and unresolved-write recovery state. Older releases can show synthesized events (`synthetic: true`). Use Superposition-backed state to determine what is currently live.
 
 ## Putting it together
 
@@ -92,3 +124,76 @@ A safe rollout usually looks like:
 - [Dashboard → Dimensions](/docs/dashboard/dimensions) and [Cohorts](/docs/dashboard/cohorts) — the full feature reference.
 - [Dashboard → Releases](/docs/dashboard/releases) — the complete wizard and lifecycle.
 - [Core CLI](/docs/core-cli/command-reference) — create dimensions and releases (`CreateDimension`, `CreateRelease`) from scripts/CI.
+
+## Require targeted releases for binary safety
+
+Set the server environment variable `STRICT_RELEASE_APPLICATIONS` to a comma-separated
+list of exact `organisation/application` names, for example
+`example/example-android,example/example-ios`.
+This is an explicit per-application opt-in. Existing applications keep legacy
+workspace-default fallback until opted in; changing that default silently could
+stop OTA for applications that intentionally publish untargeted releases.
+
+For opted-in apps, `/release` and `/release/v2` return HTTP 404 when resolution
+selects only the workspace default (including when no release matches the binary).
+Every release, including bootstrap, must target a binary-compatible version cohort.
+An untargeted release is treated as a default and is not served in strict mode.
+The server compares resolved config version to resolution with no dimensions,
+using the same toss and requiring identical Superposition snapshot versions. A
+concurrent configuration change fails closed with 404. Do not target only rollout identifiers without
+binary version constraints. Strict mode prevents default fallback; operators must
+still define compatible cohort boundaries and send accurate dimensions.
+
+The Android SDK rejects non-200 release fetches in `UpdateTask.fetch`;
+iOS cannot parse the 404 error body as an application manifest and follows its
+manifest-fetch failure path. A fresh binary therefore boots its bundled code.
+An existing installation may retain its previously cached valid OTA according to
+SDK fallback rules; 404 does not erase cached code. Test each native baseline before
+enabling this setting in production.
+
+## General and locale-specific rollouts
+
+Superposition ranks matching contexts by specificity/priority, rather than release
+creation time across different contexts. A concluded `version_cohort + locale=kn`
+release can therefore keep winning over a newer `version_cohort` release. This is
+intentional targeting behavior, not evidence that conclusion failed. Automatically
+deleting or overwriting specific contexts could destroy intentional exceptions.
+
+Release creation and release-list responses include `warnings` for general
+rollouts. Before concluding one, probe all supported locales with the public
+release endpoint. To supersede a locale exception, create and conclude an explicit
+release for that same cohort and locale. A general rollout alone does not promise
+that every locale receives its package.
+
+## Independent closed version ranges
+
+Use `POST /api/organisations/applications/dimension/version_cohort/cohort/range`
+with bearer auth and organisation/application headers:
+
+```json
+{"name":"v2_only","lower":"2.0.0","upper":"2.9.9","priority":0}
+```
+
+Both endpoints are inclusive, with semantic-version validation (full major,
+minor and patch required). Lower must not exceed upper by SemVer precedence;
+prerelease and build metadata bounds return 400 because the upstream `jp_ver_*`
+comparators do not implement their SemVer precedence correctly. Use stable
+`major.minor.patch` bounds only. The
+response echoes the four fields. `priority` is the insertion index in the cohort
+enum, starting at zero; the first matching entry wins overlaps. It must be no
+greater than the current `otherwise` index. Existing entries retain their relative
+order and definitions. The new range uses `jp_ver_ge` AND `jp_ver_le`.
+
+This is separate from checkpoints: adding a checkpoint continues to close the
+previous checkpoint band, but leaves independent closed ranges unchanged.
+Adding a range never closes or rewrites another band. Group priority controls
+continue to apply to groups. Use a new cohort name for every range; duplicates,
+reserved `otherwise`, invalid versions, reversed endpoints and invalid priority
+return 400. Like other targeting edits, range creation requires cohort `update`
+permission and is blocked while maker-checker is enabled.
+
+New applications default to strict serving, so target the intended version/cohort
+and explicitly ramp and conclude even the first release. A general concluded
+release alone does not opt a strict application's devices into default fallback.
+See [stored strict policy](/docs/server/control-center#stored-strict-serving-policy)
+for context preview and migration of legacy apps.

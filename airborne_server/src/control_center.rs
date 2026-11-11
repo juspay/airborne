@@ -69,9 +69,11 @@ pub fn add_routes() -> Scope {
     Scope::new("")
         .service(crate::release::recovery::list)
         .service(crate::release::recovery::resolve)
+        .service(crate::release::recovery::abandon_rollback)
         .configure(crate::release::maker_checker::routes)
         .service(crate::release::control_center::retry_cache)
         .configure(crate::release::serving_policy::routes)
+        .service(crate::telemetry::read)
         .service(overview)
         .service(list_groups)
         .service(create_group)
@@ -143,6 +145,16 @@ async fn save_group(
     }
     if req.name.trim().is_empty() {
         return Err(ABError::BadRequest("Name required".into()));
+    }
+    let unique = req
+        .members
+        .iter()
+        .map(|m| &m.application)
+        .collect::<std::collections::HashSet<_>>();
+    if unique.len() != req.members.len() {
+        return Err(ABError::BadRequest(
+            "Duplicate application in group members".into(),
+        ));
     }
     let pool = state.db_pool.clone();
     let name = req.name.trim().to_string();
@@ -302,6 +314,7 @@ async fn overview(
     let mut queues = Vec::new();
     for org in access.organisations {
         let mut allowed = Vec::new();
+        let mut authorization_error = false;
         for app in org.applications {
             if tokio::time::timeout_at(
                 deadline,
@@ -315,9 +328,14 @@ async fn overview(
                 ),
             )
             .await
-            .map_err(|_| {
-                ABError::InternalServerError("Overview authorization deadline exceeded".into())
-            })?? {
+            .unwrap_or_else(|_| {
+                authorization_error = true;
+                Ok(false)
+            })
+            .unwrap_or_else(|_| {
+                authorization_error = true;
+                false
+            }) {
                 allowed.push(app.application);
             }
         }
@@ -336,16 +354,22 @@ async fn overview(
         .ok()
         .and_then(|r| r.ok())
         .unwrap_or(false);
+        let mut groups_error = false;
         let groups = if can_read_groups {
             tokio::time::timeout_at(deadline, load_groups(&state, org.name.clone()))
                 .await
-                .ok()
-                .and_then(|r| r.ok())
-                .unwrap_or_default()
+                .unwrap_or_else(|_| {
+                    groups_error = true;
+                    Ok(Vec::new())
+                })
+                .unwrap_or_else(|_| {
+                    groups_error = true;
+                    Vec::new()
+                })
         } else {
             Vec::new()
         };
-        organisations.push(json!({"name":org.name,"groups":groups,"ungrouped":[]}));
+        organisations.push(json!({"name":org.name,"groups":groups,"ungrouped":[],"groups_error":groups_error,"authorization_error":authorization_error}));
         queues.push(std::collections::VecDeque::from(allowed));
     }
     let mut jobs = Vec::new();
@@ -368,7 +392,24 @@ async fn overview(
     let mut statuses = jobs.iter().map(|(index,_,app)|((*index,app.clone()),json!({"application":app,"platform":null,"live":[],"active":[],"last_activity_at":null,"error":"Release lookup deadline exceeded"}))).collect::<std::collections::BTreeMap<_,_>>();
     // Pause state is local durable data, independent of upstream lookup deadlines.
     // Only attach rows for applications already authorized above.
-    let pending = crate::release::operations::pending_apps(&state).await?;
+    let pairs = jobs
+        .iter()
+        .map(|(_, org, app)| (org.clone(), app.clone()))
+        .collect::<Vec<_>>();
+    let local_deadline =
+        deadline.min(tokio::time::Instant::now() + std::time::Duration::from_secs(1));
+    let (pending, auxiliary) = tokio::join!(
+        tokio::time::timeout_at(
+            local_deadline,
+            crate::release::operations::pending_apps(&state, &pairs)
+        ),
+        tokio::time::timeout_at(
+            local_deadline,
+            crate::release::maker_checker::overview_batch(&state, &pairs)
+        )
+    );
+    let pending = pending.ok().and_then(|r| r.ok());
+    let auxiliary = auxiliary.ok().and_then(|r| r.ok());
     let work = stream::iter(jobs.into_iter().map(|(index,org,app)| {
         let state=state.clone();
         async move {
@@ -383,13 +424,60 @@ async fn overview(
     }
     for ((index, app), status) in statuses.iter_mut() {
         let org = organisations[*index]["name"].as_str().unwrap();
-        crate::release::maker_checker::overview(&state, org, app, status).await?;
-        status["serving_policy"] = crate::release::serving_policy::get(&state, org, app).await?;
+        if let Some(aux) = auxiliary.as_ref().and_then(|rows| {
+            rows.iter()
+                .find(|r| r["org_id"] == org && r["app_id"] == *app)
+        }) {
+            for key in [
+                "approval_required",
+                "pending_requests",
+                "emergency_needs_review",
+                "release_protections",
+            ] {
+                status[key] = aux[key].clone();
+            }
+            let forced = crate::release::strict_release_application(
+                &std::env::var("STRICT_RELEASE_APPLICATIONS").unwrap_or_default(),
+                org,
+                app,
+            );
+            status["serving_policy"] = json!({"strict":aux["strict"],"deployment_override":forced,"effective_strict":forced||aux["strict"]==true});
+            let event = &aux["cache_event"];
+            status["cache_invalidation"] = if state.env.cloudfront_distribution_id.is_empty() {
+                json!({"status":"not_applicable"})
+            } else if event.is_null() {
+                Value::Null
+            } else if event["action"] == "cache_invalidation_failed" {
+                json!({"status":"failed","at":event["at"],"failed_paths":event["payload"]["failed_paths"],"attempts_per_path":event["payload"]["attempts_per_path"]})
+            } else {
+                json!({"status":"ok","at":event["at"],"publication_observed_at":event["payload"]["publication_observed_at"],"invalidation_submitted_at":event["payload"]["invalidation_submission_finished_at"],"availability_confirmed":false})
+            };
+        } else {
+            for key in [
+                "approval_required",
+                "pending_requests",
+                "emergency_needs_review",
+                "release_protections",
+                "serving_policy",
+                "cache_invalidation",
+            ] {
+                status[key] = Value::Null;
+            }
+            status["auxiliary_error"] = json!("Auxiliary status unavailable or deadline exceeded");
+        }
+        if pending.is_none() {
+            status["auxiliary_error"] = json!("Operation journal unavailable");
+        }
         status["unresolved_operations"] = pending
-            .iter()
-            .find(|p| p.org_id == org && p.app_id == *app)
-            .map(|p| p.operations.clone())
-            .unwrap_or(json!([]));
+            .as_ref()
+            .map(|pending| {
+                pending
+                    .iter()
+                    .find(|p| p.org_id == org && p.app_id == *app)
+                    .map(|p| p.operations.clone())
+                    .unwrap_or(json!([]))
+            })
+            .unwrap_or(Value::Null);
     }
     for (index, org) in organisations.iter_mut().enumerate() {
         let mut grouped = std::collections::HashSet::new();

@@ -108,9 +108,15 @@ spec:
 
 The variables you must get right are the same ones called out in the [ECS env-wiring section](/docs/server/deploy-ecs#wire-the-environment-variables): `DB_*`, `OIDC_*`, `AUTH_ADMIN_*` (since the default provider is Keycloak), `SUPERPOSITION_*`, `AWS_BUCKET`, `PUBLIC_ENDPOINT`, and the `USE_ENCRYPTED_SECRETS` / `MASTER_KEY` pair.
 
+Maker-checker currently requires Keycloak directory lookups to validate real, enabled roster members. Other AuthN providers fail closed on policy enablement until they implement an identity-directory adapter.
+
 :::tip
 In production, do not hand-write the Secret. Use **External Secrets Operator** to sync values from AWS Secrets Manager / SSM, or SealedSecrets. With `USE_ENCRYPTED_SECRETS=true`, the Secret holds the KMS-encrypted blobs and the encrypted `MASTER_KEY`, and the pod's IRSA role is granted `kms:Decrypt`. With `USE_ENCRYPTED_SECRETS=false`, the Secret holds plaintext values synced from your secret store.
 :::
+
+## Release writer database connections
+
+Release writes use PostgreSQL **session advisory locks**. Configure RDS Proxy to pin each dedicated writer session to one backend, or use a direct/session-pinned endpoint. PgBouncer transaction pooling is unsupported; a DSN with `pgbouncer=true` is refused. Each server pod admits at most **64 writer sessions**, separate from its read/audit pool. This Airborne cap does not establish Superposition's safe mutation concurrency. A local Superposition demo exhausted its connection pool during a 50-writer burst, so test bursts against your own deployment.
 
 ## IRSA for S3 / KMS
 
@@ -134,6 +140,8 @@ Two options, mirroring the [ECS guidance](/docs/server/deploy-ecs#run-migrations
 - **On boot** — include `db` in `MIGRATIONS_TO_RUN_ON_BOOT`. Simpler, but with multiple replicas they may all attempt migrations on startup.
 
 Recognized tokens are `db`, `superposition`, and `keycloaktocasbin` — see [boot-time migrations](/docs/server/configuration#boot-time-migrations). The Keycloak→Casbin import can also be run out-of-band as a Job via the binary's `authz-import-keycloak --apply` subcommand.
+
+If you enable maker-checker, apply the additive DB migration, deploy the enforcing server to all pods, jobs and internal writers with policies disabled, drain old pods and outstanding upstream writes, validate routing, then have a database operator set `hyperotaserver.approval_deployment.enforcement_ready=true` for the singleton readiness row. Enable policies only after that attestation. No environment variable controls this fence. Before downgrade, disable policies, audit/cancel pending requests, resolve uncertain operations, drain writers, and reset readiness false. Follow [Configuration's maker-checker deployment fence](/docs/server/configuration#maker-checker-deployment-fence) and the [maker-checker guide](/docs/guides/maker-checker).
 
 ## Probes
 

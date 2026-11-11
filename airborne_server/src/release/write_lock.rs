@@ -125,7 +125,9 @@ pub async fn locked_inner<T>(
             operation.await
         })
         .await;
-    let result = verify(conn.clone()).await.and(result);
+    crate::telemetry::invalidate(org, app).await;
+    let verified = verify(conn.clone()).await;
+    let result = result.and_then(|value| verified.map(|_| value));
     let result = match super::operations::load(state, org, app, None).await {
         Ok(pending) => {
             if let Some(op) = pending.first().filter(|_| reconcile) {
@@ -308,6 +310,11 @@ pub fn last_reason() -> Option<String> {
 pub fn reason() -> String {
     SESSION.with(|s| format!("Airborne operation {}", s.token))
 }
+// Reader contract deliberately excludes config snapshots and upstream identifiers.
+pub fn reader_details(op: &super::operations::Operation) -> Value {
+    serde_json::json!({"code":"unresolved","operation_id":op.id,
+        "message":"Upstream outcome is not confirmed. Writes are paused for this app."})
+}
 pub fn details(op: &super::operations::Operation) -> Value {
     serde_json::json!({"code":"unresolved", "operation_id":op.id,
         "message":"Upstream outcome is not confirmed. Writes are paused for this app. Retry to re-read upstream, or ask an organisation admin to review and resolve this operation.",
@@ -396,7 +403,33 @@ fn audit_confirms(mut v: Value, expected: &Value) -> bool {
 // The unresolved record is committed BEFORE dispatch, so cancellation, a process
 // crash, a lost response and a lost advisory session all fail closed durably.
 pub async fn mutate<T, E>(
+    expected: Value,
+    future: impl std::future::Future<
+        Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
+    >,
+) -> airborne_types::Result<T>
+where
+    E: std::fmt::Debug,
+{
+    mutate_with_definite_rejections(expected, &[400, 401, 403, 404, 422], future).await
+}
+
+pub async fn mutate_ramp<T, E>(
+    expected: Value,
+    future: impl std::future::Future<
+        Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
+    >,
+) -> airborne_types::Result<T>
+where
+    E: std::fmt::Debug,
+{
+    // Superposition validates ramp inputs before applying them.
+    mutate_with_definite_rejections(expected, &[400, 422], future).await
+}
+
+async fn mutate_with_definite_rejections<T, E>(
     mut expected: Value,
+    definite_rejection_statuses: &[u16],
     future: impl std::future::Future<
         Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
     >,
@@ -433,7 +466,7 @@ where
             Ok(value)
         }
         Err(error) => {
-            let rejection = rejected_upstream_response(&error, &[400, 401, 403, 404, 422]);
+            let rejection = rejected_upstream_response(&error, definite_rejection_statuses);
             if definitely_rejected(&error) || rejection.is_some() {
                 op.advance("rejected")?;
                 super::operations::save(
@@ -520,8 +553,8 @@ pub async fn default_values(
     ))
 }
 
-// Smithy uses the Hyper connector. Only typed connect-phase failures are safe;
-// socket resets, generic IO errors, read/operation timeouts and responses are not.
+// Only operation-specific client statuses known to reject before any write, and
+// typed connect-phase failures, establish non-application.
 fn rejected_upstream_response<E>(
     error: &superposition_sdk::error::SdkError<E>,
     definite_statuses: &[u16],
@@ -561,16 +594,9 @@ fn definitely_rejected<E>(error: &superposition_sdk::error::SdkError<E>) -> bool
             }
             false
         }
-        // A service rejection may follow config writes; only pre-dispatch failures
-        // establish non-application without independent config verification.
+        // Server errors, timeouts and unparseable responses can follow partial writes.
         _ => false,
     }
-}
-
-// Reader contract deliberately excludes config snapshots and upstream identifiers.
-pub fn reader_details(op: &super::operations::Operation) -> Value {
-    serde_json::json!({"code":"unresolved","operation_id":op.id,
-        "message":"Upstream outcome is not confirmed. Writes are paused for this app."})
 }
 
 #[cfg(test)]
@@ -663,10 +689,9 @@ mod tests {
         assert!(!definitely_rejected(&operation));
     }
     #[tokio::test]
-    async fn actual_connector_refusal_is_rejected() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        drop(listener);
+    async fn actual_connector_invalid_address_is_rejected() {
+        // Port zero cannot be a listening TCP service; no bind/drop race.
+        let addr = "127.0.0.1:0";
         let client = superposition_sdk::Client::from_conf(
             superposition_sdk::Config::builder()
                 .bearer_token("scratch".into())
@@ -686,6 +711,56 @@ mod tests {
             .await
             .unwrap_err();
         assert!(definitely_rejected(&error), "{error:?}");
+    }
+    #[tokio::test]
+    async fn actual_upstream_bad_request_is_rejected_without_becoming_unresolved() {
+        use std::io::{Read, Write};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 8192];
+            let _ = stream.read(&mut request).unwrap();
+            let body = r#"{"message":"invalid traffic percentage"}"#;
+            write!(
+                stream,
+                "HTTP/1.1 400 Bad Request\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+        });
+        let client = superposition_sdk::Client::from_conf(
+            superposition_sdk::Config::builder()
+                .bearer_token("scratch".into())
+                .endpoint_url(format!("http://{addr}"))
+                .retry_config(aws_smithy_types::retry::RetryConfig::disabled())
+                .behavior_version_latest()
+                .build(),
+        );
+        let error = client
+            .ramp_experiment()
+            .org_id("scratch")
+            .workspace_id("scratch")
+            .id("1")
+            .traffic_percentage(51)
+            .change_reason("scratch")
+            .send()
+            .await
+            .unwrap_err();
+        server.join().unwrap();
+
+        assert!(matches!(
+            &error,
+            superposition_sdk::error::SdkError::ServiceError(_)
+        ));
+        assert!(!definitely_rejected(&error));
+        assert!(matches!(
+            rejected_upstream_response(&error, &[400]),
+            Some(ABError::BadRequest(_))
+        ));
+        assert!(rejected_upstream_response(&error, &[]).is_none());
     }
     #[test]
     fn upstream_history_requires_generated_suffix_and_transition() {
@@ -713,7 +788,7 @@ mod tests {
         assert!(!experiment_matches(&actual, &expected));
     }
     #[test]
-    fn unknown_create_does_not_resolve_from_unchanged_state() {
+    fn marker_containment_requires_expected_fields() {
         assert!(!contains(
             &json!({"status":"CREATED","change_reason":"other"}),
             &json!({"status":"CREATED","change_reason":"own"})

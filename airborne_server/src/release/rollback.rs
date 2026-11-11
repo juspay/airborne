@@ -6,6 +6,7 @@ use super::control_center::*;
 use super::operations::{self, Operation};
 use super::write_lock;
 use super::*;
+use futures::{stream, StreamExt};
 use serde_json::json;
 use superposition_sdk::types::{ExperimentResponse, ExperimentType, VariantType};
 use uuid::Uuid;
@@ -43,9 +44,25 @@ pub(super) async fn plan(
     let values = p["overrides"]["EXPERIMENTAL"].clone();
     let check = check_artifacts(state, org, app, &values);
     match tokio::time::timeout(std::time::Duration::from_secs(10), check).await {
-        Ok(Ok(())) => {},
-        Ok(Err(message)) => p["blocked"] = blocked("missing_files", &message, None),
-        Err(_) => p["blocked"] = blocked("missing_files", "Artifact verification deadline exceeded; no rollback is allowed until all restored files are accessible", None),
+        Ok(Ok(())) => {}
+        Ok(Err(message)) => {
+            p["blocked"] = blocked(
+                if message.starts_with("Unknown:") {
+                    "artifact_verification_unknown"
+                } else {
+                    "missing_files"
+                },
+                &message,
+                None,
+            )
+        }
+        Err(_) => {
+            p["blocked"] = blocked(
+                "artifact_verification_unknown",
+                "Artifact verification timed out; retry verification",
+                None,
+            )
+        }
     }
     Ok(p)
 }
@@ -89,22 +106,31 @@ async fn check_artifacts(
         .timeout(std::time::Duration::from_secs(3))
         .build()
         .map_err(|_| "Cannot initialize artifact verification".to_string())?;
-    for file in files {
-        if file.size <= 0 || file.checksum.is_empty() {
-            return Err(format!("Restored file {} is incomplete", file.file_path));
+    let mut checks = stream::iter(files.into_iter().map(|file| {
+        let client = client.clone();
+        async move {
+            if file.size <= 0 || file.checksum.is_empty() {
+                return Err(format!("Restored file {} is incomplete", file.file_path));
+            }
+            let response = client.head(&file.url).send().await.map_err(|_| {
+                format!(
+                    "Unknown: restored file {} could not be verified",
+                    file.file_path
+                )
+            })?;
+            if !response.status().is_success() {
+                return Err(format!(
+                    "Restored file {} is inaccessible (HTTP {})",
+                    file.file_path,
+                    response.status()
+                ));
+            }
+            Ok(())
         }
-        let response = client
-            .head(&file.url)
-            .send()
-            .await
-            .map_err(|_| format!("Restored file {} is inaccessible", file.file_path))?;
-        if !response.status().is_success() {
-            return Err(format!(
-                "Restored file {} is inaccessible (HTTP {})",
-                file.file_path,
-                response.status()
-            ));
-        }
+    }))
+    .buffer_unordered(8);
+    while let Some(result) = checks.next().await {
+        result?;
     }
     Ok(())
 }
@@ -468,6 +494,10 @@ pub async fn preview(
             }
         }
     }
+    // Security exclusions apply on devices, not on the server: a rollback to an excluded package is
+    // still served, and upgraded SDKs refuse to run it. The dialog needs the list to say so. `null`
+    // means the lookup failed.
+    p["blocked_package_versions"] = json!(crate::telemetry::blocked(&state, &org, &app).await.ok());
     Ok(Json(public_preview(p)))
 }
 pub(super) async fn resumable(
@@ -849,15 +879,10 @@ pub async fn run(
     op.advance("completed")?;
     op.data["result"] = result.clone();
     op.data["stage"] = json!("completed");
+    // Terminal event is durable before completion. Retry deduplicates by operation/action.
+    required_event(state, auth, id, "rolled_back",
+        json!({"reason":reason,"operation_id":op.id,"result":result,"approval":super::maker_checker::audit_context()})).await?;
     save(state, org, app, id, &op).await?;
-    event(
-        state,
-        auth,
-        id,
-        "rolled_back",
-        json!({"reason":reason,"operation_id":op.id,"result":result}),
-    )
-    .await;
     Ok(actix_web::HttpResponse::Ok().json(result))
 }
 

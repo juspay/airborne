@@ -157,7 +157,7 @@ const config: Config = {
     "docusaurus-plugin-sass",
     // Generates /llms.txt and /llms-full.txt at build time for LLM consumers.
     [
-      "docusaurus-plugin-llms-txt",
+      require.resolve("./plugins/llms-txt.cjs"),
       {
         title: "Airborne documentation",
         description: "Over-the-air updates for React Native, Android, and iOS apps.",
