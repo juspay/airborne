@@ -190,6 +190,7 @@ export const uploadFiles = async (filesToUpload, config) => {
       results.errors.forEach(({ file, error }) => {
         console.log(`  • ${file}: ${error}`);
       });
+      throw new Error(`${results.failed} file operation(s) failed`);
     }
   } catch (err) {
     console.error("\n💥 Upload process failed:", err.message);
@@ -321,6 +322,7 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
       results.errors.forEach(({ file, error }) => {
         console.log(`  • ${file}: ${error}`);
       });
+      throw new Error(`${results.failed} file operation(s) failed`);
     }
   } catch (err) {
     console.error("\n💥 File creation process failed:", err.message);
