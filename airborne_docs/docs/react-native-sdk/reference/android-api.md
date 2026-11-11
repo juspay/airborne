@@ -127,3 +127,17 @@ Overrides you typically provide:
 - [JavaScript API](/docs/react-native-sdk/reference/javascript-api) — the JS helpers for reading downloaded content.
 - [iOS API](/docs/react-native-sdk/reference/ios-api) — the iOS equivalent.
 - [Callbacks & events](/docs/react-native-sdk/reference/callbacks-and-events) — the full event catalogue delivered to `onEvent`.
+
+## Opt-in boot guard
+
+Override `AirborneInterface.bootGuardEnabled(): Boolean` to return `true` before
+constructing the React Native wrapper. Direct Android SDK users set
+`applicationManager.bootGuardEnabled = true` before `loadApplication` and call
+`applicationManager.markBootSuccess()` after rendering. React Native apps call
+`markBootSuccess(namespace)` from JS. The default is false.
+
+This API requires the modified native SDK as well as a new app binary. For this
+unpublished fork, include `airborne_sdk_android/airborne` as Gradle project
+`:airborne` in the host settings; the RN plugin selects that local project when
+present. Otherwise its released Maven dependency does not contain this API. Build
+and validate both old and new architecture variants on a machine with Android SDK.

@@ -1,3 +1,4 @@
+import { configureTelemetry, event } from './telemetry';
 import type {
   AirborneBootEvent,
   AirborneWebOptions,
@@ -108,6 +109,7 @@ interface PersistedState {
   /** The last copy of each resource that reached the cache, by file_path. */
   resources?: Record<string, ReleaseFile>;
   guard?: GuardState;
+  blocked?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +183,7 @@ function sanitizeState(value: unknown): PersistedState {
     }
     state.resources = resources;
   }
+  if (Array.isArray(value.blocked)) { state.blocked = value.blocked.filter((v): v is string => typeof v === "string"); }
   const guard = sanitizeGuard(value.guard);
   if (guard) {
     state.guard = guard;
@@ -247,7 +250,7 @@ function ownState(
   guardEnabled: boolean
 ): PersistedState {
   if (state.bundledVersion !== bundledVersion) {
-    return { current: null };
+    return { current: null, blocked: state.blocked };
   }
   if (!guardEnabled || state.guard?.binary !== bundledVersion) {
     return { ...state, guard: undefined };
@@ -365,6 +368,7 @@ async function fetchReleaseConfig(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const url = new URL(options.releaseConfigUrl);
+    if (options.telemetryEnabled) { url.searchParams.set('telemetry_platform', 'web'); url.searchParams.set('native_version', options.nativeVersion ?? options.dimensions?.app_version ?? 'unknown'); }
     url.searchParams.set('toss', getToss(options.namespace));
     const headers: Record<string, string> = {};
     if (options.dimensions && Object.keys(options.dimensions).length > 0) {
@@ -842,7 +846,7 @@ async function adoptHostDeploy(
       return null;
     }
     adopted = true;
-    return { current: null, bundledVersion };
+    return { current: null, bundledVersion, blocked: state.blocked };
   });
   if (!reporter.saved(saved) || !adopted) {
     return;
@@ -1533,6 +1537,8 @@ async function openBootGuard(
   );
   if (rolledBack !== undefined) {
     emit(options, { type: 'rollback', packageVersion: rolledBack });
+    const failed = readState(options.namespace).current;
+    if (failed?.package.version === rolledBack) event(options.namespace, failed, 'rollback');
   }
 }
 
@@ -1553,18 +1559,10 @@ async function discardBootGuard(
 /** The package to boot, substituting lastGood (or nothing) for a blocked one. */
 function selectPackage(state: PersistedState): ReleaseConfig | null {
   const { current, guard } = state;
-  if (
-    !current ||
-    !guard?.blocked ||
-    current.package.version !== guard.blocked
-  ) {
-    return current;
-  }
-  const lastGood = guard.lastGood;
-  if (lastGood && lastGood.package.version !== guard.blocked) {
-    return lastGood;
-  }
-  return null;
+  const denied = (release: ReleaseConfig) => state.blocked?.includes(release.package.version) || guard?.blocked === release.package.version;
+  if (!current || !denied(current)) return current;
+  const lastGood = guard?.lastGood;
+  return lastGood && !denied(lastGood) ? lastGood : null;
 }
 
 /**
@@ -1734,6 +1732,7 @@ export async function bootAirborne(
   options: AirborneWebOptions
 ): Promise<BootResult> {
   const { namespace, bundled } = options;
+  configureTelemetry(options);
   const reporter = new BootReporter(options);
   // Captured once: a later redeploy of the host page must not adopt what this
   // boot goes on downloading.
@@ -1760,6 +1759,12 @@ export async function bootAirborne(
     options,
     sanitizeTimeout(timeouts.release_config_timeout)
   );
+  if (fetched) {
+    const offered = fetched;
+    reporter.saved(await updateState(namespace, (state) => ({ ...state,
+      blocked: [...new Set([...(state.blocked ?? []), ...(offered.blocked_package_versions ?? [])])],
+    })));
+  }
   // An OTA package whose index or important files cannot be verified is not
   // run. It is treated as if no release had been served: the cached package,
   // or else the bundled one, boots. The bundled package itself is exempt.
@@ -1777,14 +1782,15 @@ export async function bootAirborne(
 
   // A release naming the blocked package is refused outright.
   const refused =
-    options.bootGuardEnabled === true &&
     fetched !== null &&
-    readOwnState().guard?.blocked === fetched.package.version;
+    (readOwnState().blocked?.includes(fetched.package.version) ||
+      (options.bootGuardEnabled === true && readOwnState().guard?.blocked === fetched.package.version));
   if (refused && fetched) {
     emit(options, {
       type: 'blocked-package',
-      packageVersion: fetched.package.version,
+      packageVersion: fetched!.package.version,
     });
+    event(namespace, fetched!, 'blocked_package');
   }
   const latest = refused ? null : fetched;
 
@@ -1806,7 +1812,7 @@ export async function bootAirborne(
         latest,
         bundledVersion,
         reporter
-      );
+      ).then(() => event(namespace, latest, 'package_downloaded'));
       const settled = () => {
         packageSettled = true;
       };
@@ -1957,6 +1963,7 @@ export async function bootAirborne(
     );
   }
 
+  if (resolved.source === 'ota') event(namespace, resolved.releaseConfig, 'boot_started');
   // Bundled boots are never tracked.
   if (options.bootGuardEnabled && resolved.source === 'ota') {
     await trackBoot(options, resolved.releaseConfig, reporter);
@@ -1971,6 +1978,7 @@ export async function bootAirborne(
     }
     // For example a Content-Security-Policy whose script-src lacks blob:.
     // The bundled package runs instead, and must not acknowledge this one.
+    event(namespace, resolved.releaseConfig, 'boot_failed');
     endBootSession(namespace);
     const failedVersion = resolved.releaseConfig.package.version;
     reporter.error(
@@ -1996,7 +2004,8 @@ export async function bootAirborne(
  * the boot guard is on and an OTA package booted.
  */
 export async function markBootSuccess(namespace: string): Promise<void> {
-  requireRuntime(namespace);
+  const runtime = requireRuntime(namespace);
+  if (runtime.source === 'ota') event(namespace, runtime.releaseConfig, 'boot_success');
   await bootSessionOf(namespace)?.acknowledge();
 }
 

@@ -102,7 +102,7 @@ Open **Releases → Create Release**. Step 1 sets the boot and release-config ti
 
 <Screenshot name="release-wizard-1-configure" caption="Step 1 — Configure: boot timeout and release-config timeout (milliseconds)." />
 
-Skip targeting for your **first** release (it goes to all users — see the [targeting guide](/docs/guides/create-and-target-a-release) for later releases), then pick the package you just created:
+Target your first release to an explicit compatible `app_version` or `version_cohort` (see the [targeting guide](/docs/guides/create-and-target-a-release)), then pick the package you just created:
 
 <Screenshot name="release-wizard-4-package" caption="Step 4 — pick the package version to ship." />
 
@@ -118,7 +118,7 @@ The full wizard (remote config, file priorities, resources) is documented in [Da
 
 ## Step 5 — Verify and roll out
 
-Open the release to watch it. A first release is served to everyone; later releases run as experiments you ramp from here.
+Open the release to watch it. Every release starts at zero traffic. Explicitly ramp it, verify serving, and conclude the experimental variant when ready.
 
 <Screenshot name="release-detail" caption="The release detail page: status, traffic, downloads, errors, and the rollout progress bar." />
 

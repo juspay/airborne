@@ -95,3 +95,20 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 - [JavaScript API](/docs/react-native-sdk/reference/javascript-api) — the JS helpers for reading downloaded content.
 - [Android API](/docs/react-native-sdk/reference/android-api) — the Android equivalent.
 - [Callbacks & events](/docs/react-native-sdk/reference/callbacks-and-events) — the full event catalogue delivered to `onEvent`.
+
+## Opt-in boot guard
+
+Implement `bootGuardEnabled() -> Bool` on `AirborneDelegate` and return `true`.
+`AirborneServices` forwards this setting before the manager starts. React Native
+calls `markBootSuccess(namespace)` after rendering; direct Swift callers use
+`AirborneServices.markBootSuccess()`. Direct `AJPApplicationManager` users implement
+the same optional delegate setting and call `prepareBoot()` immediately before
+executing the selected JS, then `markBootSuccess()` after rendering.
+
+Both RN architectures expose the new namespace-aware promise API. This codegen
+spec change requires a native rebuild and `pod install`; an OTA-only SDK upgrade
+cannot install it. For this unpublished fork, override the `Airborne` pod with a
+local `:path` to `airborne_sdk_iOS/hyper-ota` so the RN bridge
+links these modified Swift sources rather than released pod 0.36.4. The local source podspec matches the existing RN version constraint and must not
+be published as that version. the RN tarball alone does not ship the
+separate native SDK checkout.

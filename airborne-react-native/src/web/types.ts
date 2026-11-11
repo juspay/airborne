@@ -7,6 +7,8 @@ export interface ReleaseFile {
 
 export interface ReleaseConfig {
   version: string;
+  blocked_package_versions?: string[];
+  telemetry?: { receipt: string; expires_at: number; ingest_path: string };
   config: {
     version: string;
     boot_timeout: number;
@@ -56,6 +58,8 @@ export interface AirborneWebOptions {
   namespace: string;
   /** Sent as the `x-dimension` header, e.g. `{ app_version: '1.0.0' }`. */
   dimensions?: Record<string, string>;
+  telemetryEnabled?: boolean;
+  nativeVersion?: string;
   /**
    * The web equivalent of what ships in the binary: the release config and
    * files deployed with the host page. Used when nothing newer is available.

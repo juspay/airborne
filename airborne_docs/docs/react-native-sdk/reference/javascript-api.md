@@ -189,3 +189,49 @@ import Airborne from 'airborne-react-native';
 
 - [Android API](/docs/react-native-sdk/reference/android-api) and [iOS API](/docs/react-native-sdk/reference/ios-api) — the native callbacks behind these functions.
 - [Callbacks & events](/docs/react-native-sdk/reference/callbacks-and-events) — the SDK event stream.
+
+## `markBootSuccess(namespace): Promise<void>`
+
+```tsx
+import { markBootSuccess } from 'airborne-react-native';
+// In the root component, after the first successful render:
+useEffect(() => { markBootSuccess('my-app').catch(console.error); }, []);
+```
+
+Enable the local boot guard only when every OTA entry point acknowledges a successful
+first render. The guard defaults **off**, so upgrading the SDK cannot roll back a
+healthy application that predates this API. Enable it in the native bootstrap or web
+host, before any OTA code executes; setting it in downloaded JS is too late.
+
+An OTA boot durably records the package version and increments its unacknowledged
+attempt count before handing control to JS. Acknowledgement clears pending and saves
+that running package as last-good. After two unacknowledged launches of the same
+package, the next launch blocks it and uses last-good, or bundled code if no usable
+last-good exists. Bundled code is never tracked or blocked. A last-good that itself
+fails twice is also blocked and falls back to bundled code.
+
+The block survives offline launches and unchanged release configs. Offering a different version does not clear the block: the replacement must
+finish installing and be acknowledged as healthy before the block is cleared. This decision
+is entirely local: no crash-report endpoint, server trust, or telemetry uploader is
+involved. Native tracker/onEvent channels emit `rollback` and `blocked-package`;
+web has an optional `onEvent` callback with `type` and `packageVersion` fields.
+
+The pending marker detects a process dying during JS load or before acknowledgement.
+Web retains failure on errors attributed to its own injected bundle before success,
+including script evaluation errors that otherwise fire script.onload. Unrelated
+window errors and unattributed promise rejections do not veto acknowledgement. Crashes after
+acknowledgement are outside this guard. A force-quit before acknowledgement counts
+like a crash; two consecutive interrupted boots can cause rollback. Choose the
+acknowledgement point accordingly. This is boot recovery, not a general crash monitor.
+
+State uses one atomic record replacement (web localStorage, synchronous Android
+SharedPreferences commit, iOS atomic JSON file write). Native last-good package files
+are copied before committing the reference; web retains last-good Cache Storage.
+Storage failure is platform-dependent: web and iOS log the failure and run the OTA package without a durable boot guard; Android refuses guarded execution when persisting the marker fails. Clearing app/browser storage loses
+history. Web requires persistent localStorage and Cache Storage, and assumes one
+booting tab per namespace: simultaneous tabs are not coordinated. Resources are
+independently updated and are not transactionally rolled back with a package.
+Native guarded mode retains package files and snapshots; account for additional disk
+usage. Install a new native binary to clear stale native guard state after an app
+version change (iOS does so automatically); package versions must identify immutable
+code. Reusing a version for different code cannot safely unblock that package.

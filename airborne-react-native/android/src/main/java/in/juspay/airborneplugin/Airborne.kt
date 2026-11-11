@@ -81,6 +81,7 @@ class Airborne(
         airborneObjectMap.put(airborneInterface.getNamespace(), this)
         // Read once; the SDK caches it when the boot guard initialises.
         applicationManager.bootGuardEnabled = airborneInterface.bootGuardEnabled()
+        applicationManager.telemetryEnabled = airborneInterface.telemetryEnabled()
         applicationManager.loadApplication(airborneInterface.getNamespace(), airborneInterface.getLazyDownloadCallback())
     }
 

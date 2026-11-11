@@ -47,7 +47,8 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bob build",
-    "release": "release-it --only-version"
+    "release": "release-it --only-version",
+    "test:web": "node scripts/test-web-api.cjs && node scripts/test-web-security.cjs && node scripts/test-web-telemetry.cjs && node scripts/test-web-telemetry-browser.cjs"
   },
   "keywords": [
     "react-native",
@@ -94,7 +95,9 @@
     "react-native-builder-bob": "^0.40.11",
     "release-it": "^19.0.6",
     "turbo": "^1.10.7",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "esbuild": "0.25.5",
+    "playwright": "1.64.1"
   },
   "peerDependencies": {
     "react": "*",
