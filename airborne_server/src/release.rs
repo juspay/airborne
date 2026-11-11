@@ -38,12 +38,13 @@ use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBui
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
 pub mod control_center;
+pub(crate) mod maker_checker;
 pub(crate) mod operations;
 pub(crate) mod recovery;
 pub(crate) mod rollback;
 mod types;
 pub mod utils;
-mod write_lock;
+pub(crate) mod write_lock;
 
 fn encode_url_path(raw_url: &str) -> String {
     match url::Url::parse(raw_url) {
@@ -89,7 +90,8 @@ pub fn add_routes(path: &str) -> Scope {
             .service(get_release)
             .service(update_release)
             .service(discard_release)
-            .service(control_center::rollback),
+            .service(control_center::rollback)
+            .service(maker_checker::acknowledge),
     )
 }
 
@@ -379,13 +381,22 @@ async fn create_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<CreateReleaseResponse>> {
-    let auth_response = auth_response.into_inner();
+    create_release_impl(req, auth_response.into_inner(), state).await
+}
+
+pub(super) async fn create_release_impl(
+    req: Json<CreateReleaseRequest>,
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<CreateReleaseResponse>> {
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
     write_lock::locked(&state, &organisation, &application, async {
+        maker_checker::gate(&state, &organisation, &application, "create", "", &serde_json::to_value(&*req).map_err(|_| ABError::BadRequest("Invalid payload".into()))?).await?;
+
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
         &state.redis_cache,
@@ -483,6 +494,7 @@ async fn create_release(
     let created_experiment_response = Box::pin(write_lock::mutate(control_center::create_expected(&control_variant, &experimental_variant, &dimensions), created_experiment_response.idempotency_key(write_lock::reason()).change_reason(write_lock::user_reason(&format!("Release creation for application {} with PATCH-style overrides", application))?).send())).await?;
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
+    maker_checker::protect_created(&organisation,&application,&experiment_id_for_ramping).await?;
     control_center::event(
         &state,
         &auth_response,
@@ -966,14 +978,34 @@ async fn ramp_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<RampReleaseResponse>> {
+    ramp_release_impl(release_id, req, auth_response.into_inner(), state).await
+}
+
+pub(super) async fn ramp_release_impl(
+    release_id: Path<String>,
+    req: Json<RampReleaseRequest>,
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<RampReleaseResponse>> {
     write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
-    let auth_response = auth_response.into_inner();
+
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
     write_lock::locked(&state, &organisation, &application, async {
+        maker_checker::gate(
+            &state,
+            &organisation,
+            &application,
+            "ramp",
+            &release_id.to_string(),
+            &serde_json::to_value(&*req)
+                .map_err(|_| ABError::BadRequest("Invalid payload".into()))?,
+        )
+        .await?;
+
         let experiment_id = release_id.to_string();
 
         let superposition_org_id_from_env = state.env.superposition_org_id.clone();
@@ -1078,14 +1110,25 @@ async fn conclude_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ConcludeReleaseResponse>> {
+    conclude_release_impl(release_id, req, auth_response.into_inner(), state).await
+}
+
+pub(super) async fn conclude_release_impl(
+    release_id: Path<String>,
+    req: Json<ConcludeReleaseRequest>,
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<ConcludeReleaseResponse>> {
     write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
-    let auth_response = auth_response.into_inner();
+
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
     write_lock::locked(&state, &organisation, &application, async {
+        maker_checker::gate(&state, &organisation, &application, "conclude", &release_id.to_string(), &serde_json::to_value(&*req).map_err(|_| ABError::BadRequest("Invalid payload".into()))?).await?;
+
         let experiment_id = release_id.to_string();
 
         let superposition_org_id_from_env = state.env.superposition_org_id.clone();
@@ -1196,14 +1239,34 @@ async fn discard_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<DiscardReleaseResponse>> {
+    discard_release_impl(release_id, req, auth_response.into_inner(), state).await
+}
+
+pub(super) async fn discard_release_impl(
+    release_id: Path<String>,
+    req: Json<DiscardReleaseRequest>,
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<DiscardReleaseResponse>> {
     write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
-    let auth_response = auth_response.into_inner();
+
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
     write_lock::locked(&state, &organisation, &application, async {
+        maker_checker::gate(
+            &state,
+            &organisation,
+            &application,
+            "discard",
+            &release_id.to_string(),
+            &serde_json::to_value(&*req)
+                .map_err(|_| ABError::BadRequest("Invalid payload".into()))?,
+        )
+        .await?;
+
         let experiment_id = release_id.to_string();
 
         let superposition_org_id_from_env = state.env.superposition_org_id.clone();
@@ -1545,13 +1608,33 @@ async fn update_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<CreateReleaseResponse>> {
-    let auth_response = auth_response.into_inner();
+    update_release_impl(path, req, auth_response.into_inner(), state).await
+}
+
+pub(super) async fn update_release_impl(
+    path: Path<String>,
+    req: Json<CreateReleaseRequest>,
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+) -> airborne_types::Result<Json<CreateReleaseResponse>> {
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
     write_lock::locked(&state, &organisation, &application, async {
+        maker_checker::gate(
+            &state,
+            &organisation,
+            &application,
+            "update",
+            &path.to_string(),
+            &serde_json::to_value(&*req)
+                .map_err(|_| ABError::BadRequest("Invalid payload".into()))?,
+        )
+        .await?;
+
+        maker_checker::protect_created(&organisation, &application, &path.to_string()).await?;
         let workspace_name = get_workspace_name_for_application(
             state.db_pool.clone(),
             &state.redis_cache,

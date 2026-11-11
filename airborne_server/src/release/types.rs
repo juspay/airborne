@@ -7,8 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use superposition_sdk::types::ExperimentStatusType;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CreateReleaseRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_sensitive: Option<String>,
     pub config: ConfigRequest,
     pub package_id: Option<String>,
     pub package: Option<PackageRequest>,
@@ -16,14 +18,14 @@ pub struct CreateReleaseRequest {
     pub resources: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigRequest {
     pub boot_timeout: u64,
     pub release_config_timeout: u64,
     pub properties: Option<BTreeMap<String, serde_json::Value>>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PackageRequest {
     pub properties: Option<serde_json::Value>,
     pub important: Option<Vec<String>>,
@@ -129,13 +131,13 @@ pub struct ListReleaseQuery {
     pub status: Option<ReleaseStatus>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RampReleaseRequest {
     pub traffic_percentage: u8,
     pub change_reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ConcludeReleaseRequest {
     pub chosen_variant: String,
     pub change_reason: Option<String>,
@@ -196,7 +198,7 @@ pub struct ListExperimentsQuery {
     pub status: Option<ExperimentStatusType>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DiscardReleaseRequest {
     pub change_reason: Option<String>,
 }
