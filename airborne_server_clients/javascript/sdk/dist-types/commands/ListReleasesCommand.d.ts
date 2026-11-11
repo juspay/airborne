@@ -48,6 +48,9 @@ declare const ListReleasesCommand_base: {
  * // { // ListReleasesResponse
  * //   data: [ // GetReleaseResponseList // required
  * //     { // GetReleaseResponse
+ * //       warnings: [ // ReleaseWarnings
+ * //         "STRING_VALUE",
+ * //       ],
  * //       id: "STRING_VALUE",
  * //       created_at: "STRING_VALUE",
  * //       config: { // GetReleaseConfig

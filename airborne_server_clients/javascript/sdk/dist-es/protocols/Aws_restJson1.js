@@ -1,8 +1,8 @@
 import { AirborneServiceException as __BaseException } from "../models/AirborneServiceException";
-import { BadRequestError, ForbiddenError, InternalServerError, NotFoundError, Unauthorized, } from "../models/models_0";
+import { BadRequestError, ConflictError, ForbiddenError, InternalServerError, NotFoundError, ReleaseSupersededError, RollbackPartialFailureError, RollbackReplacementChangedError, RollbackUnprocessableError, Unauthorized, UnresolvedOperationError, } from "../models/models_0";
 import { loadRestJsonErrorCode, parseJsonBody as parseBody, parseJsonErrorBody as parseErrorBody, } from "@aws-sdk/core";
 import { requestBuilder as rb } from "@smithy/core";
-import { decorateServiceException as __decorateServiceException, expectBoolean as __expectBoolean, expectInt32 as __expectInt32, expectLong as __expectLong, expectNonNull as __expectNonNull, expectObject as __expectObject, expectString as __expectString, _json, collectBody, isSerializableHeaderValue, map, take, withBaseException, } from "@smithy/smithy-client";
+import { decorateServiceException as __decorateServiceException, expectBoolean as __expectBoolean, expectInt32 as __expectInt32, expectLong as __expectLong, expectNonNull as __expectNonNull, expectObject as __expectObject, expectString as __expectString, parseRfc3339DateTimeWithOffset as __parseRfc3339DateTimeWithOffset, _json, collectBody, isSerializableHeaderValue, map, take, withBaseException, } from "@smithy/smithy-client";
 export const se_CreateApplicationCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -13,6 +13,23 @@ export const se_CreateApplicationCommand = async (input, context) => {
     let body;
     body = JSON.stringify(take(input, {
         'application': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_CreateControlCenterGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+    });
+    b.bp("/api/control-center/groups");
+    let body;
+    body = JSON.stringify(take(input, {
+        'members': _ => _json(_),
+        'name': [],
     }));
     b.m("POST")
         .h(headers)
@@ -114,6 +131,19 @@ export const se_CreateReleaseCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_DeleteControlCenterGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+    });
+    b.bp("/api/control-center/groups/{id}");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    b.m("DELETE")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_DeleteDimensionCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = map({}, isSerializableHeaderValue, {
@@ -124,6 +154,44 @@ export const se_DeleteDimensionCommand = async (input, context) => {
     b.p('dimension', () => input.dimension, '{dimension}', false);
     let body;
     b.m("DELETE")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetControlCenterOverviewCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = {};
+    b.bp("/api/control-center/overview");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetControlCenterReleaseEventsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/releases/{release_id}/events");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_GetControlCenterRollbackPreviewCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/releases/{release_id}/rollback-preview");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    b.m("GET")
         .h(headers)
         .b(body);
     return b.build();
@@ -149,6 +217,35 @@ export const se_GetUserCommand = async (input, context) => {
     let body;
     b.m("GET")
         .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_ListControlCenterGroupsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+    });
+    b.bp("/api/control-center/groups");
+    let body;
+    b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_ListControlCenterOperationsCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/operations");
+    const query = map({
+        [_s]: [, input[_s]],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
         .b(body);
     return b.build();
 };
@@ -180,7 +277,7 @@ export const se_ListFileGroupsCommand = async (input, context) => {
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
-        [_s]: [, input[_s]],
+        [_se]: [, input[_se]],
         [_t]: [, input[_t]],
     });
     let body;
@@ -200,7 +297,7 @@ export const se_ListFilesCommand = async (input, context) => {
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
-        [_s]: [, input[_s]],
+        [_se]: [, input[_se]],
         [_t]: [, input[_t]],
     });
     let body;
@@ -230,7 +327,7 @@ export const se_ListPackagesCommand = async (input, context) => {
     const query = map({
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
-        [_s]: [, input[_s]],
+        [_se]: [, input[_se]],
         [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
     });
     let body;
@@ -252,7 +349,7 @@ export const se_ListReleasesCommand = async (input, context) => {
         [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
         [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
         [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
-        [_st]: [, input[_st]],
+        [_s]: [, input[_s]],
     });
     let body;
     b.m("GET")
@@ -297,6 +394,44 @@ export const se_RequestOrganisationCommand = async (input, context) => {
         .b(body);
     return b.build();
 };
+export const se_ResolveControlCenterOperationCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/control-center/operations/{id}/resolve");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'finding': [],
+        'reason': [],
+        'request_terminated': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_RollbackReleaseCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+        [_xa]: input[_a],
+    });
+    b.bp("/api/releases/{release_id}/rollback");
+    b.p('release_id', () => input.release_id, '{release_id}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'reason': [],
+    }));
+    b.m("POST")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
 export const se_ServeReleaseCommand = async (input, context) => {
     const b = rb(input, context);
     const headers = {};
@@ -317,6 +452,24 @@ export const se_ServeReleaseV2Command = async (input, context) => {
     b.p('application', () => input.application, '{application}', false);
     let body;
     b.m("GET")
+        .h(headers)
+        .b(body);
+    return b.build();
+};
+export const se_UpdateControlCenterGroupCommand = async (input, context) => {
+    const b = rb(input, context);
+    const headers = map({}, isSerializableHeaderValue, {
+        'content-type': 'application/json',
+        [_xo]: input[_o],
+    });
+    b.bp("/api/control-center/groups/{id}");
+    b.p('id', () => input.id, '{id}', false);
+    let body;
+    body = JSON.stringify(take(input, {
+        'members': _ => _json(_),
+        'name': [],
+    }));
+    b.m("PUT")
         .h(headers)
         .b(body);
     return b.build();
@@ -393,6 +546,22 @@ export const de_CreateApplicationCommand = async (output, context) => {
         'access': _json,
         'application': __expectString,
         'organisation': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_CreateControlCenterGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'id': __expectString,
+        'members': _json,
+        'name': __expectString,
     });
     Object.assign(contents, doc);
     return contents;
@@ -486,6 +655,21 @@ export const de_CreateReleaseCommand = async (output, context) => {
         'experiment': _json,
         'id': __expectString,
         'package': _ => de_ServePackage(_, context),
+        'warnings': _json,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_DeleteControlCenterGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'success': __expectBoolean,
     });
     Object.assign(contents, doc);
     return contents;
@@ -498,6 +682,54 @@ export const de_DeleteDimensionCommand = async (output, context) => {
         $metadata: deserializeMetadata(output),
     });
     await collectBody(output.body, context);
+    return contents;
+};
+export const de_GetControlCenterOverviewCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'generated_at': _ => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+        'organisations': _ => de_ControlCenterOrganisationOverviewList(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_GetControlCenterReleaseEventsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'events': _ => de_ControlCenterReleaseEventList(_, context),
+        'outcome': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_GetControlCenterRollbackPreviewCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'action': _ => de_Document(_, context),
+        'blocked': _ => de_Document(_, context),
+        'current_package_version': _ => de_Document(_, context),
+        'reconciled_keys': _ => de_Document(_, context),
+        'resulting_package_version': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
     return contents;
 };
 export const de_GetReleaseCommand = async (output, context) => {
@@ -516,6 +748,7 @@ export const de_GetReleaseCommand = async (output, context) => {
         'id': __expectString,
         'package': _ => de_ServePackage(_, context),
         'resources': _json,
+        'warnings': _json,
     });
     Object.assign(contents, doc);
     return contents;
@@ -532,6 +765,34 @@ export const de_GetUserCommand = async (output, context) => {
         'organisations': _json,
         'user_id': __expectString,
         'user_token': _json,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_ListControlCenterGroupsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'groups': _json,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_ListControlCenterOperationsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'operations': _ => de_ControlCenterUnresolvedOperationDetailsList(_, context),
     });
     Object.assign(contents, doc);
     return contents;
@@ -668,6 +929,42 @@ export const de_RequestOrganisationCommand = async (output, context) => {
     Object.assign(contents, doc);
     return contents;
 };
+export const de_ResolveControlCenterOperationCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'finding': __expectString,
+        'operation_id': __expectString,
+        'state': __expectString,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_RollbackReleaseCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'action': __expectString,
+        'current_live_release_id': _ => de_Document(_, context),
+        'later_release_id': _ => de_Document(_, context),
+        'new_release_id': _ => de_Document(_, context),
+        'reconciled_keys': _json,
+        'release_id': __expectString,
+        'rolled_back_to_package_version': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
 export const de_ServeReleaseCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -696,6 +993,22 @@ export const de_ServeReleaseV2Command = async (output, context) => {
         'config': _ => de_GetReleaseConfig(_, context),
         'package': _json,
         'resources': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+export const de_UpdateControlCenterGroupCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = map({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+    const doc = take(data, {
+        'id': __expectString,
+        'members': _json,
+        'name': __expectString,
     });
     Object.assign(contents, doc);
     return contents;
@@ -787,6 +1100,24 @@ const de_CommandError = async (output, context) => {
         case "Unauthorized":
         case "io.airborne.server#Unauthorized":
             throw await de_UnauthorizedRes(parsedOutput, context);
+        case "ConflictError":
+        case "io.airborne.server#ConflictError":
+            throw await de_ConflictErrorRes(parsedOutput, context);
+        case "UnresolvedOperationError":
+        case "io.airborne.server#UnresolvedOperationError":
+            throw await de_UnresolvedOperationErrorRes(parsedOutput, context);
+        case "ReleaseSupersededError":
+        case "io.airborne.server#ReleaseSupersededError":
+            throw await de_ReleaseSupersededErrorRes(parsedOutput, context);
+        case "RollbackPartialFailureError":
+        case "io.airborne.server#RollbackPartialFailureError":
+            throw await de_RollbackPartialFailureErrorRes(parsedOutput, context);
+        case "RollbackReplacementChangedError":
+        case "io.airborne.server#RollbackReplacementChangedError":
+            throw await de_RollbackReplacementChangedErrorRes(parsedOutput, context);
+        case "RollbackUnprocessableError":
+        case "io.airborne.server#RollbackUnprocessableError":
+            throw await de_RollbackUnprocessableErrorRes(parsedOutput, context);
         default:
             const parsedBody = parsedOutput.body;
             return throwDefaultError({
@@ -801,6 +1132,7 @@ const de_BadRequestErrorRes = async (parsedOutput, context) => {
     const contents = map({});
     const data = parsedOutput.body;
     const doc = take(data, {
+        'code': __expectString,
         'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -810,10 +1142,25 @@ const de_BadRequestErrorRes = async (parsedOutput, context) => {
     });
     return __decorateServiceException(exception, parsedOutput.body);
 };
+const de_ConflictErrorRes = async (parsedOutput, context) => {
+    const contents = map({});
+    const data = parsedOutput.body;
+    const doc = take(data, {
+        'code': __expectString,
+        'message': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new ConflictError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+};
 const de_ForbiddenErrorRes = async (parsedOutput, context) => {
     const contents = map({});
     const data = parsedOutput.body;
     const doc = take(data, {
+        'code': __expectString,
         'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -827,6 +1174,7 @@ const de_InternalServerErrorRes = async (parsedOutput, context) => {
     const contents = map({});
     const data = parsedOutput.body;
     const doc = take(data, {
+        'code': __expectString,
         'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -840,6 +1188,7 @@ const de_NotFoundErrorRes = async (parsedOutput, context) => {
     const contents = map({});
     const data = parsedOutput.body;
     const doc = take(data, {
+        'code': __expectString,
         'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -849,14 +1198,98 @@ const de_NotFoundErrorRes = async (parsedOutput, context) => {
     });
     return __decorateServiceException(exception, parsedOutput.body);
 };
+const de_ReleaseSupersededErrorRes = async (parsedOutput, context) => {
+    const contents = map({});
+    const data = parsedOutput.body;
+    const doc = take(data, {
+        'code': __expectString,
+        'current_live_release_id': _ => de_Document(_, context),
+        'message': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new ReleaseSupersededError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+};
+const de_RollbackPartialFailureErrorRes = async (parsedOutput, context) => {
+    const contents = map({});
+    const data = parsedOutput.body;
+    const doc = take(data, {
+        'code': __expectString,
+        'message': __expectString,
+        'replacement_release_id': _ => de_Document(_, context),
+        'rollback_operation_id': __expectString,
+        'stage': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new RollbackPartialFailureError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+};
+const de_RollbackReplacementChangedErrorRes = async (parsedOutput, context) => {
+    const contents = map({});
+    const data = parsedOutput.body;
+    const doc = take(data, {
+        'code': __expectString,
+        'message': __expectString,
+        'operation_id': __expectString,
+        'replacement_release_id': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new RollbackReplacementChangedError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+};
+const de_RollbackUnprocessableErrorRes = async (parsedOutput, context) => {
+    const contents = map({});
+    const data = parsedOutput.body;
+    const doc = take(data, {
+        'code': __expectString,
+        'current_live_release_id': _ => de_Document(_, context),
+        'message': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new RollbackUnprocessableError({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+};
 const de_UnauthorizedRes = async (parsedOutput, context) => {
     const contents = map({});
     const data = parsedOutput.body;
     const doc = take(data, {
+        'code': __expectString,
         'message': __expectString,
     });
     Object.assign(contents, doc);
     const exception = new Unauthorized({
+        $metadata: deserializeMetadata(parsedOutput),
+        ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+};
+const de_UnresolvedOperationErrorRes = async (parsedOutput, context) => {
+    const contents = map({});
+    const data = parsedOutput.body;
+    const doc = take(data, {
+        'before': _ => de_Document(_, context),
+        'code': __expectString,
+        'expected': _ => de_Document(_, context),
+        'message': __expectString,
+        'operation_id': __expectString,
+        'own_attempt': __expectBoolean,
+        'upstream_org': _ => de_Document(_, context),
+        'upstream_workspace': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
+    const exception = new UnresolvedOperationError({
         $metadata: deserializeMetadata(parsedOutput),
         ...contents
     });
@@ -892,6 +1325,129 @@ const de_ConfigProperties = (output, context) => {
     return take(output, {
         'tenant_info': (_) => de_Document(_, context),
     });
+};
+const de_ControlCenterActiveRelease = (output, context) => {
+    return take(output, {
+        'created_at': (_) => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+        'created_by': __expectString,
+        'dimensions': (_) => de_Document(_, context),
+        'experimental_variant': __expectString,
+        'package_version': __expectLong,
+        'release_id': __expectString,
+        'status': __expectString,
+        'traffic_percentage': __expectInt32,
+    });
+};
+const de_ControlCenterActiveReleaseList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterActiveRelease(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterAppStatus = (output, context) => {
+    return take(output, {
+        'active': (_) => de_ControlCenterActiveReleaseList(_, context),
+        'application': __expectString,
+        'error': (_) => de_Document(_, context),
+        'last_activity_at': (_) => de_Document(_, context),
+        'live': (_) => de_ControlCenterLiveReleaseList(_, context),
+        'platform': (_) => de_Document(_, context),
+        'unresolved_operations': (_) => de_ControlCenterUnresolvedOperationList(_, context),
+    });
+};
+const de_ControlCenterAppStatusList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterAppStatus(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterLiveRelease = (output, context) => {
+    return take(output, {
+        'concluded_at': (_) => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+        'config_version': __expectString,
+        'dimensions': (_) => de_Document(_, context),
+        'package_version': __expectLong,
+        'release_id': __expectString,
+    });
+};
+const de_ControlCenterLiveReleaseList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterLiveRelease(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterOrganisationOverview = (output, context) => {
+    return take(output, {
+        'groups': (_) => de_ControlCenterOverviewGroupList(_, context),
+        'name': __expectString,
+        'ungrouped': (_) => de_ControlCenterAppStatusList(_, context),
+    });
+};
+const de_ControlCenterOrganisationOverviewList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterOrganisationOverview(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterOverviewGroup = (output, context) => {
+    return take(output, {
+        'id': __expectString,
+        'members': (_) => de_ControlCenterAppStatusList(_, context),
+        'name': __expectString,
+    });
+};
+const de_ControlCenterOverviewGroupList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterOverviewGroup(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterReleaseEvent = (output, context) => {
+    return take(output, {
+        'action': __expectString,
+        'actor': __expectString,
+        'created_at': (_) => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+        'payload': (_) => de_Document(_, context),
+        'synthetic': __expectBoolean,
+    });
+};
+const de_ControlCenterReleaseEventList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterReleaseEvent(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterUnresolvedOperation = (output, context) => {
+    return take(output, {
+        'before': (_) => de_Document(_, context),
+        'expected': (_) => de_Document(_, context),
+        'message': __expectString,
+        'operation_id': __expectString,
+        'upstream_workspace': (_) => de_Document(_, context),
+    });
+};
+const de_ControlCenterUnresolvedOperationDetails = (output, context) => {
+    return take(output, {
+        'before': (_) => de_Document(_, context),
+        'code': __expectString,
+        'expected': (_) => de_Document(_, context),
+        'message': __expectString,
+        'operation_id': __expectString,
+        'upstream_org': (_) => de_Document(_, context),
+        'upstream_workspace': (_) => de_Document(_, context),
+    });
+};
+const de_ControlCenterUnresolvedOperationDetailsList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterUnresolvedOperationDetails(entry, context);
+    });
+    return retVal;
+};
+const de_ControlCenterUnresolvedOperationList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_ControlCenterUnresolvedOperation(entry, context);
+    });
+    return retVal;
 };
 const de_CreateFileResponse = (output, context) => {
     return take(output, {
@@ -955,6 +1511,7 @@ const de_GetReleaseResponse = (output, context) => {
         'id': __expectString,
         'package': (_) => de_ServePackage(_, context),
         'resources': _json,
+        'warnings': _json,
     });
 };
 const de_GetReleaseResponseList = (output, context) => {
@@ -992,8 +1549,8 @@ const _fp = "file_path";
 const _o = "organisation";
 const _p = "page";
 const _pp = "per_page";
-const _s = "search";
-const _st = "status";
+const _s = "status";
+const _se = "search";
 const _t = "tags";
 const _ta = "tag";
 const _xa = "x-application";

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import path from "path";
-import { CreateApplicationAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteDimensionAction, GetReleaseAction, GetUserAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ServeReleaseAction, ServeReleaseV2Action, UpdateDimensionAction, UpdateFileAction, UploadFileAction } from "./action.js";
+import { CreateApplicationAction, CreateControlCenterGroupAction, CreateDimensionAction, CreateFileAction, CreateOrganisationAction, CreatePackageAction, CreateReleaseAction, DeleteControlCenterGroupAction, DeleteDimensionAction, GetControlCenterOverviewAction, GetControlCenterReleaseEventsAction, GetControlCenterRollbackPreviewAction, GetReleaseAction, GetUserAction, ListControlCenterGroupsAction, ListControlCenterOperationsAction, ListDimensionsAction, ListFileGroupsAction, ListFilesAction, ListOrganisationsAction, ListPackagesAction, ListReleasesAction, PostLoginAction, RequestOrganisationAction, ResolveControlCenterOperationAction, RollbackReleaseAction, ServeReleaseAction, ServeReleaseV2Action, UpdateControlCenterGroupAction, UpdateDimensionAction, UpdateFileAction, UploadFileAction } from "./action.js";
 import { promises as fsPromises } from "fs";
 import fs from "fs";
 import { fileURLToPath } from 'url';
@@ -171,6 +171,77 @@ JSON file format (params.json):
     try {
       
       const output = await CreateApplicationAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("CreateControlCenterGroup")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--name <name>", "name parameter")
+ .option("--members <members...>", "members parameter", [])
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Create a group with a name and full member list. Requires Bearer authentication and an x-organisation header. Only organisation admins/owners can create groups.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli CreateControlCenterGroup \\
+     --organisation <organisation> \\
+     --name <name> \\
+     --members <members> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli CreateControlCenterGroup @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli CreateControlCenterGroup @params.json --organisation <value> --name <value> --token <value>
+
+Parameters:
+    --organisation <string> (required)
+    --name <string> (required)
+    --members (required)
+        undefined (optional)
+            application <string> (required)
+            platform <android | ios | web | other> (required)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli CreateControlCenterGroup \\
+     --organisation <organisation> \\
+     --name <name> \\
+     --members <members> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli CreateControlCenterGroup @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli CreateControlCenterGroup @params.json --organisation <value> --name <value> --token <value>
+
+JSON file format (params.json):
+{
+  "organisation": "example_organisation",
+  "name": "example_name",
+  "members": "example_members",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await CreateControlCenterGroupAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
@@ -511,7 +582,7 @@ program
  .option("--application <application>", "application parameter")
  .option("--token <token>", "Bearer token for authentication")
   .description(`
- Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.:
+ Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Returns 409 if another release is already ongoing for the same dimensions. Requires a bearer token.:
 
 Usage 1 - Individual options:
   $ airborne-core-cli CreateRelease \\
@@ -590,6 +661,69 @@ JSON file format (params.json):
 
 
 program
+  .command("DeleteControlCenterGroup")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--id <id>", "id parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Delete a group by UUID. Requires Bearer authentication and x-organisation. Only organisation admins/owners can delete groups.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli DeleteControlCenterGroup \\
+     --id <id> \\
+     --organisation <organisation> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli DeleteControlCenterGroup @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli DeleteControlCenterGroup @params.json --id <value> --organisation <value> --token <value>
+
+Parameters:
+    --id <string> (required)
+    --organisation <string> (required)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli DeleteControlCenterGroup \\
+     --id <id> \\
+     --organisation <organisation> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli DeleteControlCenterGroup @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli DeleteControlCenterGroup @params.json --id <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "id": "example_id",
+  "organisation": "example_organisation",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await DeleteControlCenterGroupAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("DeleteDimension")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--dimension <dimension>", "dimension parameter")
@@ -647,6 +781,196 @@ JSON file format (params.json):
     try {
       
       const output = await DeleteDimensionAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetControlCenterOverview")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Return the authenticated user's release overview across accessible organisations and applications. No x-organisation or x-application header is required.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetControlCenterOverview \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetControlCenterOverview @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetControlCenterOverview @params.json --token <value>
+
+Parameters:
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetControlCenterOverview \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetControlCenterOverview @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetControlCenterOverview @params.json --token <value>
+
+JSON file format (params.json):
+{
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetControlCenterOverviewAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetControlCenterReleaseEvents")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--release_id <release_id>", "release_id parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Return the ordered audit timeline for a release. Requires Bearer authentication plus x-organisation and x-application headers.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetControlCenterReleaseEvents \\
+     --release_id <release_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetControlCenterReleaseEvents @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetControlCenterReleaseEvents @params.json --release_id <value> --organisation <value> --token <value>
+
+Parameters:
+    --release_id <string> (required)
+    --organisation <string> (required)
+    --application <string> (required)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetControlCenterReleaseEvents \\
+     --release_id <release_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetControlCenterReleaseEvents @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetControlCenterReleaseEvents @params.json --release_id <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "release_id": "example_release_id",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetControlCenterReleaseEventsAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("GetControlCenterRollbackPreview")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--release_id <release_id>", "release_id parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Compute the rollback decision and package/config reconciliation without persisting an operation or changing upstream, audit, journal, or cache state. Requires release read permission and organisation/application scope headers.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli GetControlCenterRollbackPreview \\
+     --release_id <release_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli GetControlCenterRollbackPreview @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli GetControlCenterRollbackPreview @params.json --release_id <value> --organisation <value> --token <value>
+
+Parameters:
+    --release_id <string> (required)
+    --organisation <string> (required)
+    --application <string> (required)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli GetControlCenterRollbackPreview \\
+     --release_id <release_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli GetControlCenterRollbackPreview @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli GetControlCenterRollbackPreview @params.json --release_id <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "release_id": "example_release_id",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await GetControlCenterRollbackPreviewAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
@@ -769,6 +1093,132 @@ JSON file format (params.json):
     try {
       
       const output = await GetUserAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("ListControlCenterGroups")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List groups for the organisation in x-organisation. Member applications are filtered to those the caller can read. Requires Bearer authentication.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListControlCenterGroups \\
+     --organisation <organisation> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli ListControlCenterGroups @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListControlCenterGroups @params.json --organisation <value> --token <value>
+
+Parameters:
+    --organisation <string> (required)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListControlCenterGroups \\
+     --organisation <organisation> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli ListControlCenterGroups @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListControlCenterGroups @params.json --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "organisation": "example_organisation",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListControlCenterGroupsAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("ListControlCenterOperations")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--status <status>", "status parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ List unresolved upstream write outcomes for an application. Requires Bearer authentication, scope headers, and release read access.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ListControlCenterOperations \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--status <status>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ListControlCenterOperations @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ListControlCenterOperations @params.json --organisation <value> --application <value> --token <value>
+
+Parameters:
+    --organisation <string> (required)
+    --application <string> (required)
+    --status <string> (optional)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ListControlCenterOperations \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --token <string> \\
+     [--status <status>]
+
+2. Using JSON file:
+   $ airborne-core-cli ListControlCenterOperations @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ListControlCenterOperations @params.json --organisation <value> --application <value> --token <value>
+
+JSON file format (params.json):
+{
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "status": "example_status",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ListControlCenterOperationsAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {
@@ -1425,6 +1875,172 @@ JSON file format (params.json):
 
 
 program
+  .command("ResolveControlCenterOperation")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--id <id>", "id parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--finding <finding>", "finding parameter (allowed values: did_not_apply, applied)", (value) => {
+  const allowedValues = ["did_not_apply", "applied"];
+  if (!allowedValues.includes(value)) {
+    throw new Error("--finding must be one of: did_not_apply, applied");
+  }
+  return value;
+})
+ .option("--reason <reason>", "reason parameter")
+ .option("--request_terminated <request_terminated>", "request_terminated parameter", (value) => {
+  if (value.toLowerCase() === 'true') return true;
+  if (value.toLowerCase() === 'false') return false;
+  throw new Error("--request_terminated must be true or false");
+})
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text `Airborne operation`. Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli ResolveControlCenterOperation \\
+     --id <id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --finding <finding> \\
+     --reason <reason> \\
+     --token <string> \\
+     [--request_terminated <request_terminated>]
+
+Usage 2 - JSON file:
+  airborne-core-cli ResolveControlCenterOperation @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli ResolveControlCenterOperation @params.json --id <value> --organisation <value> --token <value>
+
+Parameters:
+    --id <string> (required)
+    --organisation <string> (required)
+    --application <string> (required)
+    --finding <did_not_apply | applied> (required)
+    --reason <string> (required) : Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400.
+    --request_terminated <boolean> (optional) : Must be true for did_not_apply. The operator confirms the original request cannot execute later.
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli ResolveControlCenterOperation \\
+     --id <id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --finding <finding> \\
+     --reason <reason> \\
+     --token <string> \\
+     [--request_terminated <request_terminated>]
+
+2. Using JSON file:
+   $ airborne-core-cli ResolveControlCenterOperation @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli ResolveControlCenterOperation @params.json --id <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "id": "example_id",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "finding": "example_finding",
+  "reason": "example_reason",
+  "request_terminated": "example_request_terminated",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await ResolveControlCenterOperationAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("RollbackRelease")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--release_id <release_id>", "release_id parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--application <application>", "application parameter")
+ .option("--reason <reason>", "reason parameter")
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Roll back a release according to its lifecycle state. Writes are durable and retries of a completed operation return its recorded success, including later unrelated live-release diagnostics. Unknown upstream outcomes return 409 unresolved and require real-state/operator review; changed replacements return 409 replacement_changed and must not be resumed automatically. Re-release only works while the source is the latest live release for its dimensions. Requires Bearer authentication plus x-organisation and x-application; callers need release write/conclude permission.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli RollbackRelease \\
+     --release_id <release_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --reason <reason> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli RollbackRelease @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli RollbackRelease @params.json --release_id <value> --organisation <value> --token <value>
+
+Parameters:
+    --release_id <string> (required)
+    --organisation <string> (required)
+    --application <string> (required)
+    --reason <string> (required) : The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli RollbackRelease \\
+     --release_id <release_id> \\
+     --organisation <organisation> \\
+     --application <application> \\
+     --reason <reason> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli RollbackRelease @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli RollbackRelease @params.json --release_id <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "release_id": "example_release_id",
+  "organisation": "example_organisation",
+  "application": "example_application",
+  "reason": "example_reason",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await RollbackReleaseAction(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
   .command("ServeRelease")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
  .option("--organisation <organisation>", "organisation parameter")
@@ -1540,6 +2156,82 @@ JSON file format (params.json):
     try {
       
       const output = await ServeReleaseV2Action(paramsFile, options);
+      console.log(printColoredJSON(output));
+      process.exit(0);
+    } catch (err) {
+      console.error("Error message:", err.message);
+      console.error("Error executing:", printColoredJSON(err));
+      process.exit(1);
+    }
+  });
+
+
+program
+  .command("UpdateControlCenterGroup")
+  .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--id <id>", "id parameter")
+ .option("--organisation <organisation>", "organisation parameter")
+ .option("--name <name>", "name parameter")
+ .option("--members <members...>", "members parameter", [])
+ .option("--token <token>", "Bearer token for authentication")
+  .description(`
+ Replace a group's name and complete member list. Requires Bearer authentication and x-organisation. Only organisation admins/owners can update groups.:
+
+Usage 1 - Individual options:
+  $ airborne-core-cli UpdateControlCenterGroup \\
+     --id <id> \\
+     --organisation <organisation> \\
+     --name <name> \\
+     --members <members> \\
+     --token <string>
+
+Usage 2 - JSON file:
+  airborne-core-cli UpdateControlCenterGroup @file.json
+
+Usage 3 - Mixed Usage:
+  $ airborne-core-cli UpdateControlCenterGroup @params.json --id <value> --organisation <value> --token <value>
+
+Parameters:
+    --id <string> (required)
+    --organisation <string> (required)
+    --name <string> (required)
+    --members (required)
+        undefined (optional)
+            application <string> (required)
+            platform <android | ios | web | other> (required)
+    --token <string> (required) : Bearer token for authentication
+
+`)
+  .usage('<action> [options]')
+  .addHelpText('after', `
+Examples:
+
+1. Using individual options:
+   $ airborne-core-cli UpdateControlCenterGroup \\
+     --id <id> \\
+     --organisation <organisation> \\
+     --name <name> \\
+     --members <members> \\
+     --token <string>
+
+2. Using JSON file:
+   $ airborne-core-cli UpdateControlCenterGroup @params.json
+
+3. Mixed approach (JSON file + CLI overrides):
+   $ airborne-core-cli UpdateControlCenterGroup @params.json --id <value> --organisation <value> --token <value>
+
+JSON file format (params.json):
+{
+  "id": "example_id",
+  "organisation": "example_organisation",
+  "name": "example_name",
+  "members": "example_members",
+  "token": "your_bearer_token_here"
+}`)
+  .action(async (paramsFile, options) => {
+    try {
+      
+      const output = await UpdateControlCenterGroupAction(paramsFile, options);
       console.log(printColoredJSON(output));
       process.exit(0);
     } catch (err) {

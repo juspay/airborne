@@ -1,7 +1,7 @@
 import fs from "fs";
 import { promises as fsPromises } from "fs";
 import path from "path";
-import { CreateApplicationCommand, CreateDimensionCommand, CreateFileCommand, CreateOrganisationCommand, CreatePackageCommand, CreateReleaseCommand, DeleteDimensionCommand, GetReleaseCommand, GetUserCommand, ListDimensionsCommand, ListFileGroupsCommand, ListFilesCommand, ListOrganisationsCommand, ListPackagesCommand, ListReleasesCommand, PostLoginCommand, RequestOrganisationCommand, ServeReleaseCommand, ServeReleaseV2Command, UpdateDimensionCommand, UpdateFileCommand, UploadFileCommand, AirborneClient } from "airborne-server-sdk"
+import { CreateApplicationCommand, CreateControlCenterGroupCommand, CreateDimensionCommand, CreateFileCommand, CreateOrganisationCommand, CreatePackageCommand, CreateReleaseCommand, DeleteControlCenterGroupCommand, DeleteDimensionCommand, GetControlCenterOverviewCommand, GetControlCenterReleaseEventsCommand, GetControlCenterRollbackPreviewCommand, GetReleaseCommand, GetUserCommand, ListControlCenterGroupsCommand, ListControlCenterOperationsCommand, ListDimensionsCommand, ListFileGroupsCommand, ListFilesCommand, ListOrganisationsCommand, ListPackagesCommand, ListReleasesCommand, PostLoginCommand, RequestOrganisationCommand, ResolveControlCenterOperationCommand, RollbackReleaseCommand, ServeReleaseCommand, ServeReleaseV2Command, UpdateControlCenterGroupCommand, UpdateDimensionCommand, UpdateFileCommand, UploadFileCommand, AirborneClient } from "airborne-server-sdk"
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -153,6 +153,30 @@ export async function CreateApplicationAction(paramsFile, options){
   return await client.send(command);
 }
 
+export async function CreateControlCenterGroupAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","name","members","members[].undefined.application","members[].undefined.platform","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new CreateControlCenterGroupCommand(finalOptions);
+  return await client.send(command);
+}
+
 export async function CreateDimensionAction(paramsFile, options){
   let finalOptions = {};
   const requiredParams = ["dimension","description","dimension_type","organisation","application","token"];
@@ -278,6 +302,30 @@ export async function CreateReleaseAction(paramsFile, options){
   return await client.send(command);
 }
 
+export async function DeleteControlCenterGroupAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new DeleteControlCenterGroupCommand(finalOptions);
+  return await client.send(command);
+}
+
 export async function DeleteDimensionAction(paramsFile, options){
   let finalOptions = {};
   const requiredParams = ["dimension","organisation","application","token"];
@@ -299,6 +347,78 @@ export async function DeleteDimensionAction(paramsFile, options){
   
   const client = await getClient(finalOptions.token, true);
   const command = new DeleteDimensionCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetControlCenterOverviewAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetControlCenterOverviewCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetControlCenterReleaseEventsAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetControlCenterReleaseEventsCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetControlCenterRollbackPreviewAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetControlCenterRollbackPreviewCommand(finalOptions);
   return await client.send(command);
 }
 
@@ -347,6 +467,54 @@ export async function GetUserAction(paramsFile, options){
   
   const client = await getClient(finalOptions.token, true);
   const command = new GetUserCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function ListControlCenterGroupsAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new ListControlCenterGroupsCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function ListControlCenterOperationsAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new ListControlCenterOperationsCommand(finalOptions);
   return await client.send(command);
 }
 
@@ -542,6 +710,54 @@ export async function RequestOrganisationAction(paramsFile, options){
   return await client.send(command);
 }
 
+export async function ResolveControlCenterOperationAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","application","finding","reason","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new ResolveControlCenterOperationCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function RollbackReleaseAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","reason","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new RollbackReleaseCommand(finalOptions);
+  return await client.send(command);
+}
+
 export async function ServeReleaseAction(paramsFile, options){
   let finalOptions = {};
   const requiredParams = ["organisation","application","token"];
@@ -587,6 +803,30 @@ export async function ServeReleaseV2Action(paramsFile, options){
   
   const client = await getClient(finalOptions.token, true);
   const command = new ServeReleaseV2Command(finalOptions);
+  return await client.send(command);
+}
+
+export async function UpdateControlCenterGroupAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","name","members","members[].undefined.application","members[].undefined.platform","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1); 
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+  
+
+  
+  const client = await getClient(finalOptions.token, true);
+  const command = new UpdateControlCenterGroupCommand(finalOptions);
   return await client.send(command);
 }
 

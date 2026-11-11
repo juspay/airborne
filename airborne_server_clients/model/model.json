@@ -1853,6 +1853,9 @@
                     "target": "io.airborne.server#CreateApplication"
                 },
                 {
+                    "target": "io.airborne.server#CreateControlCenterGroup"
+                },
+                {
                     "target": "io.airborne.server#CreateDimension"
                 },
                 {
@@ -1868,13 +1871,31 @@
                     "target": "io.airborne.server#CreateRelease"
                 },
                 {
+                    "target": "io.airborne.server#DeleteControlCenterGroup"
+                },
+                {
                     "target": "io.airborne.server#DeleteDimension"
+                },
+                {
+                    "target": "io.airborne.server#GetControlCenterOverview"
+                },
+                {
+                    "target": "io.airborne.server#GetControlCenterReleaseEvents"
+                },
+                {
+                    "target": "io.airborne.server#GetControlCenterRollbackPreview"
                 },
                 {
                     "target": "io.airborne.server#GetRelease"
                 },
                 {
                     "target": "io.airborne.server#GetUser"
+                },
+                {
+                    "target": "io.airborne.server#ListControlCenterGroups"
+                },
+                {
+                    "target": "io.airborne.server#ListControlCenterOperations"
                 },
                 {
                     "target": "io.airborne.server#ListDimensions"
@@ -1901,10 +1922,19 @@
                     "target": "io.airborne.server#RequestOrganisation"
                 },
                 {
+                    "target": "io.airborne.server#ResolveControlCenterOperation"
+                },
+                {
+                    "target": "io.airborne.server#RollbackRelease"
+                },
+                {
                     "target": "io.airborne.server#ServeRelease"
                 },
                 {
                     "target": "io.airborne.server#ServeReleaseV2"
+                },
+                {
+                    "target": "io.airborne.server#UpdateControlCenterGroup"
                 },
                 {
                     "target": "io.airborne.server#UpdateDimension"
@@ -1980,6 +2010,13 @@
         "io.airborne.server#BadRequestError": {
             "type": "structure",
             "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (AB_005).",
+                        "smithy.api#required": {}
+                    }
+                },
                 "message": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -2006,6 +2043,653 @@
             },
             "traits": {
                 "smithy.api#documentation": "Configuration properties"
+            }
+        },
+        "io.airborne.server#ConflictError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (AB_007).",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.",
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 409
+            }
+        },
+        "io.airborne.server#ControlCenterActiveRelease": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "package_version": {
+                    "target": "smithy.api#Long",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "status": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "traffic_percentage": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "experimental_variant": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Exact variant identifier of the experimental variant; conclude requires this value.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "dimensions": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {},
+                        "smithy.api#timestampFormat": "date-time"
+                    }
+                },
+                "created_by": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A release that is created or currently in progress."
+            }
+        },
+        "io.airborne.server#ControlCenterActiveReleaseList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterActiveRelease"
+            }
+        },
+        "io.airborne.server#ControlCenterAppStatus": {
+            "type": "structure",
+            "members": {
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "platform": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Platform label from the containing group; JSON null for an ungrouped application.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "live": {
+                    "target": "io.airborne.server#ControlCenterLiveReleaseList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "active": {
+                    "target": "io.airborne.server#ControlCenterActiveReleaseList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "unresolved_operations": {
+                    "target": "io.airborne.server#ControlCenterUnresolvedOperationList",
+                    "traits": {
+                        "smithy.api#documentation": "Unresolved upstream writes. While any item exists, writes are paused for this application.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "last_activity_at": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "RFC 3339 timestamp, or JSON null when the application has no release activity.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "error": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Sanitized lookup failure message, or JSON null when lookup succeeded.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Release state for one application, including per-application lookup failures."
+            }
+        },
+        "io.airborne.server#ControlCenterAppStatusList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterAppStatus"
+            }
+        },
+        "io.airborne.server#ControlCenterGroup": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "UUID identifying the group.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "members": {
+                    "target": "io.airborne.server#ControlCenterGroupMemberList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A configured application group."
+            }
+        },
+        "io.airborne.server#ControlCenterGroupList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterGroup"
+            }
+        },
+        "io.airborne.server#ControlCenterGroupMember": {
+            "type": "structure",
+            "members": {
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "platform": {
+                    "target": "io.airborne.server#ControlCenterPlatform",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A group member identifies an application and the platform label shown in Control Center."
+            }
+        },
+        "io.airborne.server#ControlCenterGroupMemberList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterGroupMember"
+            }
+        },
+        "io.airborne.server#ControlCenterGroupPath": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A group UUID path parameter and the organisation whose group is being changed."
+            }
+        },
+        "io.airborne.server#ControlCenterGroupRequest": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Group name; must contain a non-whitespace character.",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "members": {
+                    "target": "io.airborne.server#ControlCenterGroupMemberList",
+                    "traits": {
+                        "smithy.api#documentation": "Complete membership list. Updates replace the existing list.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Request body used to create or replace a group's name and complete member list."
+            }
+        },
+        "io.airborne.server#ControlCenterLiveRelease": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "package_version": {
+                    "target": "smithy.api#Long",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "config_version": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "dimensions": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "concluded_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#documentation": "RFC 3339 timestamp for the concluded live release.",
+                        "smithy.api#required": {},
+                        "smithy.api#timestampFormat": "date-time"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A release that is currently live for one dimensions context."
+            }
+        },
+        "io.airborne.server#ControlCenterLiveReleaseList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterLiveRelease"
+            }
+        },
+        "io.airborne.server#ControlCenterOrganisationOverview": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "groups": {
+                    "target": "io.airborne.server#ControlCenterOverviewGroupList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "ungrouped": {
+                    "target": "io.airborne.server#ControlCenterAppStatusList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ControlCenterOrganisationOverviewList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterOrganisationOverview"
+            }
+        },
+        "io.airborne.server#ControlCenterOverviewGroup": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "members": {
+                    "target": "io.airborne.server#ControlCenterAppStatusList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A group and its release status entries in the overview response."
+            }
+        },
+        "io.airborne.server#ControlCenterOverviewGroupList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterOverviewGroup"
+            }
+        },
+        "io.airborne.server#ControlCenterPlatform": {
+            "type": "enum",
+            "members": {
+                "ANDROID": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "android"
+                    }
+                },
+                "IOS": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "ios"
+                    }
+                },
+                "WEB": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "web"
+                    }
+                },
+                "OTHER": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "other"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Supported application platforms for a Control Center group member."
+            }
+        },
+        "io.airborne.server#ControlCenterReleaseEvent": {
+            "type": "structure",
+            "members": {
+                "action": {
+                    "target": "io.airborne.server#ControlCenterReleaseEventAction",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "actor": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {},
+                        "smithy.api#timestampFormat": "date-time"
+                    }
+                },
+                "payload": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "synthetic": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ControlCenterReleaseEventAction": {
+            "type": "enum",
+            "members": {
+                "CREATED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "created"
+                    }
+                },
+                "RAMPED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "ramped"
+                    }
+                },
+                "CONCLUDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "concluded"
+                    }
+                },
+                "DISCARDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "discarded"
+                    }
+                },
+                "ROLLED_BACK": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rolled_back"
+                    }
+                },
+                "OPERATION_RESOLVED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "operation_resolved"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Recorded timeline action. The timeline can also include synthetic created/concluded/discarded entries."
+            }
+        },
+        "io.airborne.server#ControlCenterReleaseEventList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterReleaseEvent"
+            }
+        },
+        "io.airborne.server#ControlCenterReleaseEventsInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Release identifier, organisation, and application used to fetch a release timeline."
+            }
+        },
+        "io.airborne.server#ControlCenterReleaseOutcome": {
+            "type": "enum",
+            "members": {
+                "ACTIVE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#documentation": "Created or in progress.",
+                        "smithy.api#enumValue": "active"
+                    }
+                },
+                "LIVE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#documentation": "Concluded on the experimental variant and still the latest live release for its dimensions.",
+                        "smithy.api#enumValue": "live"
+                    }
+                },
+                "SUPERSEDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#documentation": "Concluded on the experimental variant but replaced by a later live release.",
+                        "smithy.api#enumValue": "superseded"
+                    }
+                },
+                "CONCLUDED_ON_CONTROL": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#documentation": "Concluded with the control variant, so the experimental variant never went live.",
+                        "smithy.api#enumValue": "concluded_on_control"
+                    }
+                },
+                "DISCARDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#documentation": "Discarded before it went live.",
+                        "smithy.api#enumValue": "discarded"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Server-computed outcome of a release. Clients must use this value rather than infer it from the events."
+            }
+        },
+        "io.airborne.server#ControlCenterUnresolvedOperation": {
+            "type": "structure",
+            "members": {
+                "operation_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "expected": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "before": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "upstream_workspace": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "An upstream write whose outcome has not been confirmed."
+            }
+        },
+        "io.airborne.server#ControlCenterUnresolvedOperationDetails": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "operation_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "expected": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "before": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "upstream_workspace": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "upstream_org": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ControlCenterUnresolvedOperationDetailsList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterUnresolvedOperationDetails"
+            }
+        },
+        "io.airborne.server#ControlCenterUnresolvedOperationList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterUnresolvedOperation"
             }
         },
         "io.airborne.server#CreateApplication": {
@@ -2057,6 +2741,70 @@
             },
             "traits": {
                 "smithy.api#documentation": "Create application request"
+            }
+        },
+        "io.airborne.server#CreateControlCenterGroup": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreateControlCenterGroupInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterGroup"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Create a group with a name and full member list. Requires Bearer authentication and an x-organisation header. Only organisation admins/owners can create groups.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/groups"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#CreateControlCenterGroupInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "members": {
+                    "target": "io.airborne.server#ControlCenterGroupMemberList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Input for creating a group."
             }
         },
         "io.airborne.server#CreateDimension": {
@@ -2463,12 +3211,18 @@
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
+                },
+                {
+                    "target": "io.airborne.server#UnresolvedOperationError"
                 }
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.",
+                "smithy.api#documentation": "Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Returns 409 if another release is already ongoing for the same dimensions. Requires a bearer token.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/releases"
@@ -2591,6 +3345,12 @@
         "io.airborne.server#CreateReleaseResponse": {
             "type": "structure",
             "members": {
+                "warnings": {
+                    "target": "io.airborne.server#ReleaseWarnings",
+                    "traits": {
+                        "smithy.api#documentation": "Advisory targeting warnings emitted by create, update and list."
+                    }
+                },
                 "id": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -2635,6 +3395,54 @@
             },
             "traits": {
                 "smithy.api#documentation": "A created release."
+            }
+        },
+        "io.airborne.server#DeleteControlCenterGroup": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ControlCenterGroupPath"
+            },
+            "output": {
+                "target": "io.airborne.server#DeleteControlCenterGroupResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Delete a group by UUID. Requires Bearer authentication and x-organisation. Only organisation admins/owners can delete groups.",
+                "smithy.api#http": {
+                    "method": "DELETE",
+                    "uri": "/api/control-center/groups/{id}"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#DeleteControlCenterGroupResponse": {
+            "type": "structure",
+            "members": {
+                "success": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
             }
         },
         "io.airborne.server#DeleteDimension": {
@@ -3018,6 +3826,13 @@
         "io.airborne.server#ForbiddenError": {
             "type": "structure",
             "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (AB_006).",
+                        "smithy.api#required": {}
+                    }
+                },
                 "message": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -3028,6 +3843,153 @@
             "traits": {
                 "smithy.api#error": "client",
                 "smithy.api#httpError": 403
+            }
+        },
+        "io.airborne.server#GetControlCenterOverview": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetControlCenterOverviewInput"
+            },
+            "output": {
+                "target": "io.airborne.server#GetControlCenterOverviewResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Return the authenticated user's release overview across accessible organisations and applications. No x-organisation or x-application header is required.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/overview"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#GetControlCenterOverviewInput": {
+            "type": "structure",
+            "members": {},
+            "traits": {
+                "smithy.api#documentation": "Overview is user-scoped and does not require organisation/application scope headers."
+            }
+        },
+        "io.airborne.server#GetControlCenterOverviewResponse": {
+            "type": "structure",
+            "members": {
+                "generated_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {},
+                        "smithy.api#timestampFormat": "date-time"
+                    }
+                },
+                "organisations": {
+                    "target": "io.airborne.server#ControlCenterOrganisationOverviewList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#GetControlCenterReleaseEvents": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ControlCenterReleaseEventsInput"
+            },
+            "output": {
+                "target": "io.airborne.server#GetControlCenterReleaseEventsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Return the ordered audit timeline for a release. Requires Bearer authentication plus x-organisation and x-application headers.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/releases/{release_id}/events"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#GetControlCenterReleaseEventsResponse": {
+            "type": "structure",
+            "members": {
+                "events": {
+                    "target": "io.airborne.server#ControlCenterReleaseEventList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "outcome": {
+                    "target": "io.airborne.server#ControlCenterReleaseOutcome",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#GetControlCenterRollbackPreview": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#RollbackPreviewInput"
+            },
+            "output": {
+                "target": "io.airborne.server#RollbackPreviewResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Compute the rollback decision and package/config reconciliation without persisting an operation or changing upstream, audit, journal, or cache state. Requires release read permission and organisation/application scope headers.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/releases/{release_id}/rollback-preview"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
             }
         },
         "io.airborne.server#GetRelease": {
@@ -3133,6 +4095,12 @@
         "io.airborne.server#GetReleaseResponse": {
             "type": "structure",
             "members": {
+                "warnings": {
+                    "target": "io.airborne.server#ReleaseWarnings",
+                    "traits": {
+                        "smithy.api#documentation": "Advisory targeting warnings."
+                    }
+                },
                 "id": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -3242,6 +4210,13 @@
         "io.airborne.server#InternalServerError": {
             "type": "structure",
             "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (AB_003).",
+                        "smithy.api#required": {}
+                    }
+                },
                 "message": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -3253,6 +4228,141 @@
                 "smithy.api#documentation": "Internal server error",
                 "smithy.api#error": "server",
                 "smithy.api#httpError": 500
+            }
+        },
+        "io.airborne.server#ListControlCenterGroups": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListControlCenterGroupsInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ListControlCenterGroupsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List groups for the organisation in x-organisation. Member applications are filtered to those the caller can read. Requires Bearer authentication.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/groups"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#ListControlCenterGroupsInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Path and organisation header for listing groups."
+            }
+        },
+        "io.airborne.server#ListControlCenterGroupsResponse": {
+            "type": "structure",
+            "members": {
+                "groups": {
+                    "target": "io.airborne.server#ControlCenterGroupList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ListControlCenterOperations": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListControlCenterOperationsInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ListControlCenterOperationsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List unresolved upstream write outcomes for an application. Requires Bearer authentication, scope headers, and release read access.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/operations"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#ListControlCenterOperationsInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "status": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "status"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "List unresolved write operations for one application. `status` is currently `unresolved`."
+            }
+        },
+        "io.airborne.server#ListControlCenterOperationsResponse": {
+            "type": "structure",
+            "members": {
+                "operations": {
+                    "target": "io.airborne.server#ControlCenterUnresolvedOperationDetailsList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
             }
         },
         "io.airborne.server#ListDimensions": {
@@ -3984,6 +5094,13 @@
         "io.airborne.server#NotFoundError": {
             "type": "structure",
             "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (AB_001).",
+                        "smithy.api#required": {}
+                    }
+                },
                 "message": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -3995,6 +5112,23 @@
                 "smithy.api#documentation": "Not found error",
                 "smithy.api#error": "client",
                 "smithy.api#httpError": 404
+            }
+        },
+        "io.airborne.server#OperationRecoveryFinding": {
+            "type": "enum",
+            "members": {
+                "DID_NOT_APPLY": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "did_not_apply"
+                    }
+                },
+                "APPLIED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "applied"
+                    }
+                }
             }
         },
         "io.airborne.server#Organisation": {
@@ -4104,6 +5238,28 @@
                 ]
             }
         },
+        "io.airborne.server#ReconciledKeys": {
+            "type": "structure",
+            "members": {
+                "kept_current": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Keys registered after the historical release; they keep their current value.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "dropped": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Keys in the historical release that are no longer registered; they are dropped.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "How the configuration of a re-released rollback was reconciled with the currently registered keys."
+            }
+        },
         "io.airborne.server#ReleaseConfig": {
             "type": "structure",
             "members": {
@@ -4175,6 +5331,45 @@
             },
             "traits": {
                 "smithy.api#documentation": "Details of the experiment backing a release, used to ramp it out gradually."
+            }
+        },
+        "io.airborne.server#ReleaseSupersededError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Rollback block code (`superseded`).",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "current_live_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Identifier of the release that is currently live for the same dimensions, or JSON null when no live release exists.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Returned by rollback when the release is a concluded release that is no longer the latest live release for its dimensions. Nothing is changed.",
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 409
+            }
+        },
+        "io.airborne.server#ReleaseWarnings": {
+            "type": "list",
+            "member": {
+                "target": "smithy.api#String"
+            },
+            "traits": {
+                "smithy.api#documentation": "Advisory release warnings."
             }
         },
         "io.airborne.server#RequestOrganisation": {
@@ -4275,6 +5470,588 @@
             },
             "traits": {
                 "smithy.api#documentation": "Request organisation response"
+            }
+        },
+        "io.airborne.server#ResolveControlCenterOperation": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ResolveControlCenterOperationInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ResolveControlCenterOperationResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text `Airborne operation`. Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/operations/{id}/resolve"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#ResolveControlCenterOperationInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "finding": {
+                    "target": "io.airborne.server#OperationRecoveryFinding",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400.",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "request_terminated": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Must be true for did_not_apply. The operator confirms the original request cannot execute later."
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ResolveControlCenterOperationResponse": {
+            "type": "structure",
+            "members": {
+                "operation_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "state": {
+                    "target": "io.airborne.server#ResolvedOperationState",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "finding": {
+                    "target": "io.airborne.server#OperationRecoveryFinding",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ResolvedOperationState": {
+            "type": "enum",
+            "members": {
+                "CONFIRMED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "confirmed"
+                    }
+                },
+                "REJECTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rejected"
+                    }
+                }
+            }
+        },
+        "io.airborne.server#RollbackFailureStage": {
+            "type": "enum",
+            "members": {
+                "CREATE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#documentation": "The server is creating or recovering the replacement before recording its identifier.",
+                        "smithy.api#enumValue": "create"
+                    }
+                },
+                "RAMP": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "ramp"
+                    }
+                },
+                "CONCLUDE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "conclude"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Stage of a rollback re-release at which a failure occurred after the replacement release was created."
+            }
+        },
+        "io.airborne.server#RollbackPartialFailureError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (AB_003).",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "replacement_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Identifier of the replacement release, or JSON null when no replacement was created.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "rollback_operation_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Durable rollback operation identifier.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "stage": {
+                    "target": "io.airborne.server#RollbackFailureStage",
+                    "traits": {
+                        "smithy.api#documentation": "Step that failed.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.",
+                "smithy.api#error": "server",
+                "smithy.api#httpError": 502
+            }
+        },
+        "io.airborne.server#RollbackPreviewBlocked": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "io.airborne.server#RollbackPreviewBlockedCode",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "current_live_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "operation_id": {
+                    "target": "smithy.api#Document"
+                },
+                "replacement_release_id": {
+                    "target": "smithy.api#Document"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Why preview cannot safely proceed. Diagnostic identifiers are JSON null when they do not apply."
+            }
+        },
+        "io.airborne.server#RollbackPreviewBlockedCode": {
+            "type": "enum",
+            "members": {
+                "SUPERSEDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "superseded"
+                    }
+                },
+                "ONGOING": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "ongoing"
+                    }
+                },
+                "NO_PREDECESSOR": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "no_predecessor"
+                    }
+                },
+                "INCOMPATIBLE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "incompatible"
+                    }
+                },
+                "UNRESOLVED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "unresolved"
+                    }
+                }
+            }
+        },
+        "io.airborne.server#RollbackPreviewInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Read-authorized path and application scope for rollback preview."
+            }
+        },
+        "io.airborne.server#RollbackPreviewResponse": {
+            "type": "structure",
+            "members": {
+                "action": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "current_package_version": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "resulting_package_version": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "reconciled_keys": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "blocked": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Side-effect-free rollback decision. Action, resulting package, reconciliation details and blocked are nullable when unavailable."
+            }
+        },
+        "io.airborne.server#RollbackRelease": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#RollbackReleaseInput"
+            },
+            "output": {
+                "target": "io.airborne.server#RollbackReleaseResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#ReleaseSupersededError"
+                },
+                {
+                    "target": "io.airborne.server#RollbackPartialFailureError"
+                },
+                {
+                    "target": "io.airborne.server#RollbackReplacementChangedError"
+                },
+                {
+                    "target": "io.airborne.server#RollbackUnprocessableError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                },
+                {
+                    "target": "io.airborne.server#UnresolvedOperationError"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Roll back a release according to its lifecycle state. Writes are durable and retries of a completed operation return its recorded success, including later unrelated live-release diagnostics. Unknown upstream outcomes return 409 unresolved and require real-state/operator review; changed replacements return 409 replacement_changed and must not be resumed automatically. Re-release only works while the source is the latest live release for its dimensions. Requires Bearer authentication plus x-organisation and x-application; callers need release write/conclude permission.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/releases/{release_id}/rollback"
+                },
+                "smithy.api#tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "io.airborne.server#RollbackReleaseAction": {
+            "type": "enum",
+            "members": {
+                "DISCARDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "discarded"
+                    }
+                },
+                "CONCLUDED_CONTROL": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "concluded_control"
+                    }
+                },
+                "RERELEASED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rereleased"
+                    }
+                }
+            }
+        },
+        "io.airborne.server#RollbackReleaseInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Path, scope headers, and reason for a release rollback request."
+            }
+        },
+        "io.airborne.server#RollbackReleaseRequest": {
+            "type": "structure",
+            "members": {
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Rollback reason. Whitespace-only values are rejected. The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+            }
+        },
+        "io.airborne.server#RollbackReleaseResponse": {
+            "type": "structure",
+            "members": {
+                "action": {
+                    "target": "io.airborne.server#RollbackReleaseAction",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "rolled_back_to_package_version": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Control package version, historical package version, or JSON null if unavailable.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "new_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Replacement release identifier, or JSON null when rollback does not create one.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "reconciled_keys": {
+                    "target": "io.airborne.server#ReconciledKeys",
+                    "traits": {
+                        "smithy.api#documentation": "Config reconciliation result, sorted. Both lists are empty when the rollback discards or concludes on control.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "current_live_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Current live release in the same dimensions context, or JSON null."
+                    }
+                },
+                "later_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "A later unrelated live release, or JSON null. Completed retries still report the recorded rollback as successful."
+                    }
+                }
+            }
+        },
+        "io.airborne.server#RollbackReplacementChangedError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "operation_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "replacement_release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "The rollback replacement was changed outside the durable rollback operation. Human inspection is required; do not resume automatically.",
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 409
+            }
+        },
+        "io.airborne.server#RollbackUnprocessableError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Rollback block code: `no_predecessor` or `incompatible`.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Actionable explanation of why the rollback cannot proceed.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "current_live_release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "The live release for this dimensions context, or JSON null.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Returned by rollback when no earlier live release exists or the historical package and config cannot be reconciled. Nothing is created.",
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 422
             }
         },
         "io.airborne.server#ServeFile": {
@@ -4439,6 +6216,13 @@
         "io.airborne.server#Unauthorized": {
             "type": "structure",
             "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Airborne error code (for example, AB_004).",
+                        "smithy.api#required": {}
+                    }
+                },
                 "message": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -4450,6 +6234,140 @@
                 "smithy.api#documentation": "Unauthorized error",
                 "smithy.api#error": "client",
                 "smithy.api#httpError": 401
+            }
+        },
+        "io.airborne.server#UnresolvedOperationError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "operation_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "expected": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "The exact state expected after the upstream write.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "before": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "The state observed before dispatch.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "upstream_workspace": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "upstream_org": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "own_attempt": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "True when this request itself may have changed upstream state; absent when an earlier write is blocking this request."
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.",
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 409
+            }
+        },
+        "io.airborne.server#UpdateControlCenterGroup": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#UpdateControlCenterGroupInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterGroup"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Replace a group's name and complete member list. Requires Bearer authentication and x-organisation. Only organisation admins/owners can update groups.",
+                "smithy.api#http": {
+                    "method": "PUT",
+                    "uri": "/api/control-center/groups/{id}"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#UpdateControlCenterGroupInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "members": {
+                    "target": "io.airborne.server#ControlCenterGroupMemberList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Input for replacing a group's name and members."
             }
         },
         "io.airborne.server#UpdateDimension": {

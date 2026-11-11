@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub mod application;
+pub(crate) mod journal_lifecycle;
 pub mod user;
 
 // Constants
@@ -175,6 +176,16 @@ async fn create_organisation(
         ));
     }
 
+    let lifecycle = journal_lifecycle::exclusive(&state, &organisation).await?;
+    if state
+        .authz_provider
+        .organisation_exists(state.get_ref(), &organisation)
+        .await?
+    {
+        return Err(ABError::BadRequest("Organisation name is taken".into()));
+    }
+    let _lifecycle = journal_lifecycle::reset(lifecycle, &organisation).await?;
+
     state
         .authz_provider
         .create_organisation(state.get_ref(), &organisation, sub)
@@ -226,10 +237,12 @@ async fn delete_organisation(
         .as_ref()
         .is_some_and(|org| org.name == organisation && org.is_admin_or_higher())
     {
+        let lifecycle = journal_lifecycle::exclusive(&state, &organisation).await?;
         state
             .authz_provider
             .delete_organisation(state.get_ref(), &organisation)
             .await?;
+        let _lifecycle = journal_lifecycle::reset(lifecycle, &organisation).await?;
 
         Ok(Json(
             json!({"Success" : "Organisation deleted successfully"}),
