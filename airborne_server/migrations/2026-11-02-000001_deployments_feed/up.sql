@@ -1,0 +1,3 @@
+CREATE INDEX release_events_feed ON hyperotaserver.release_events(org_id, app_id, created_at DESC, id DESC);
+ALTER TABLE hyperotaserver.release_events DROP CONSTRAINT release_events_action_check;
+ALTER TABLE hyperotaserver.release_events ADD CONSTRAINT release_events_action_check CHECK(action IN ('created','ramped','concluded','discarded','rolled_back','operation_resolved','requested','approved','rejected','cancelled','expired','stale','executed','failed','emergency_rollback','emergency_acknowledged','policy_changed','cache_invalidated','cache_invalidation_failed','rollback_abandoned','compatibility_exception','cache_retried'));

@@ -17,6 +17,7 @@ export * from "./DeleteDimensionCommand";
 export * from "./DiscardReleaseCommand";
 export * from "./GetControlCenterApprovalPolicyCommand";
 export * from "./GetControlCenterDeploymentRequestCommand";
+export * from "./GetControlCenterDeploymentsCommand";
 export * from "./GetControlCenterOverviewCommand";
 export * from "./GetControlCenterReleaseEventsCommand";
 export * from "./GetControlCenterRollbackPreviewCommand";

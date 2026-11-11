@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.se_UploadFileCommand = exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_UpdateControlCenterGroupCommand = exports.se_UpdateControlCenterApprovalPolicyCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RollbackReleaseCommand = exports.se_ResolveControlCenterOperationCommand = exports.se_RequestOrganisationCommand = exports.se_RejectControlCenterDeploymentRequestCommand = exports.se_RampReleaseCommand = exports.se_PutServingPolicyCommand = exports.se_PreviewServingPolicyCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_ListControlCenterOperationsCommand = exports.se_ListControlCenterGroupsCommand = exports.se_ListControlCenterDeploymentRequestsCommand = exports.se_IngestTelemetryReportsCommand = exports.se_GetUserCommand = exports.se_GetTelemetrySummaryCommand = exports.se_GetServingPolicyCommand = exports.se_GetReleaseCommand = exports.se_GetControlCenterRollbackPreviewCommand = exports.se_GetControlCenterReleaseEventsCommand = exports.se_GetControlCenterOverviewCommand = exports.se_GetControlCenterDeploymentRequestCommand = exports.se_GetControlCenterApprovalPolicyCommand = exports.se_DiscardReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_DeleteControlCenterGroupCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateControlCenterGroupCommand = exports.se_CreateControlCenterDeploymentRequestCommand = exports.se_CreateCohortRangeCommand = exports.se_CreateApplicationCommand = exports.se_ConcludeReleaseCommand = exports.se_CancelControlCenterDeploymentRequestCommand = exports.se_ApproveControlCenterDeploymentRequestCommand = exports.se_AcknowledgeEmergencyRollbackCommand = void 0;
-exports.de_UploadFileCommand = exports.de_UpdateFileCommand = exports.de_UpdateDimensionCommand = exports.de_UpdateControlCenterGroupCommand = exports.de_UpdateControlCenterApprovalPolicyCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RollbackReleaseCommand = exports.de_ResolveControlCenterOperationCommand = exports.de_RequestOrganisationCommand = exports.de_RejectControlCenterDeploymentRequestCommand = exports.de_RampReleaseCommand = exports.de_PutServingPolicyCommand = exports.de_PreviewServingPolicyCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_ListControlCenterOperationsCommand = exports.de_ListControlCenterGroupsCommand = exports.de_ListControlCenterDeploymentRequestsCommand = exports.de_IngestTelemetryReportsCommand = exports.de_GetUserCommand = exports.de_GetTelemetrySummaryCommand = exports.de_GetServingPolicyCommand = exports.de_GetReleaseCommand = exports.de_GetControlCenterRollbackPreviewCommand = exports.de_GetControlCenterReleaseEventsCommand = exports.de_GetControlCenterOverviewCommand = exports.de_GetControlCenterDeploymentRequestCommand = exports.de_GetControlCenterApprovalPolicyCommand = exports.de_DiscardReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_DeleteControlCenterGroupCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateControlCenterGroupCommand = exports.de_CreateControlCenterDeploymentRequestCommand = exports.de_CreateCohortRangeCommand = exports.de_CreateApplicationCommand = exports.de_ConcludeReleaseCommand = exports.de_CancelControlCenterDeploymentRequestCommand = exports.de_ApproveControlCenterDeploymentRequestCommand = exports.de_AcknowledgeEmergencyRollbackCommand = void 0;
+exports.se_UpdateFileCommand = exports.se_UpdateDimensionCommand = exports.se_UpdateControlCenterGroupCommand = exports.se_UpdateControlCenterApprovalPolicyCommand = exports.se_ServeReleaseV2Command = exports.se_ServeReleaseCommand = exports.se_RollbackReleaseCommand = exports.se_ResolveControlCenterOperationCommand = exports.se_RequestOrganisationCommand = exports.se_RejectControlCenterDeploymentRequestCommand = exports.se_RampReleaseCommand = exports.se_PutServingPolicyCommand = exports.se_PreviewServingPolicyCommand = exports.se_PostLoginCommand = exports.se_ListReleasesCommand = exports.se_ListPackagesCommand = exports.se_ListOrganisationsCommand = exports.se_ListFilesCommand = exports.se_ListFileGroupsCommand = exports.se_ListDimensionsCommand = exports.se_ListControlCenterOperationsCommand = exports.se_ListControlCenterGroupsCommand = exports.se_ListControlCenterDeploymentRequestsCommand = exports.se_IngestTelemetryReportsCommand = exports.se_GetUserCommand = exports.se_GetTelemetrySummaryCommand = exports.se_GetServingPolicyCommand = exports.se_GetReleaseCommand = exports.se_GetControlCenterRollbackPreviewCommand = exports.se_GetControlCenterReleaseEventsCommand = exports.se_GetControlCenterOverviewCommand = exports.se_GetControlCenterDeploymentsCommand = exports.se_GetControlCenterDeploymentRequestCommand = exports.se_GetControlCenterApprovalPolicyCommand = exports.se_DiscardReleaseCommand = exports.se_DeleteDimensionCommand = exports.se_DeleteControlCenterGroupCommand = exports.se_CreateReleaseCommand = exports.se_CreatePackageCommand = exports.se_CreateOrganisationCommand = exports.se_CreateFileCommand = exports.se_CreateDimensionCommand = exports.se_CreateControlCenterGroupCommand = exports.se_CreateControlCenterDeploymentRequestCommand = exports.se_CreateCohortRangeCommand = exports.se_CreateApplicationCommand = exports.se_ConcludeReleaseCommand = exports.se_CancelControlCenterDeploymentRequestCommand = exports.se_ApproveControlCenterDeploymentRequestCommand = exports.se_AcknowledgeEmergencyRollbackCommand = void 0;
+exports.de_UpdateDimensionCommand = exports.de_UpdateControlCenterGroupCommand = exports.de_UpdateControlCenterApprovalPolicyCommand = exports.de_ServeReleaseV2Command = exports.de_ServeReleaseCommand = exports.de_RollbackReleaseCommand = exports.de_ResolveControlCenterOperationCommand = exports.de_RequestOrganisationCommand = exports.de_RejectControlCenterDeploymentRequestCommand = exports.de_RampReleaseCommand = exports.de_PutServingPolicyCommand = exports.de_PreviewServingPolicyCommand = exports.de_PostLoginCommand = exports.de_ListReleasesCommand = exports.de_ListPackagesCommand = exports.de_ListOrganisationsCommand = exports.de_ListFilesCommand = exports.de_ListFileGroupsCommand = exports.de_ListDimensionsCommand = exports.de_ListControlCenterOperationsCommand = exports.de_ListControlCenterGroupsCommand = exports.de_ListControlCenterDeploymentRequestsCommand = exports.de_IngestTelemetryReportsCommand = exports.de_GetUserCommand = exports.de_GetTelemetrySummaryCommand = exports.de_GetServingPolicyCommand = exports.de_GetReleaseCommand = exports.de_GetControlCenterRollbackPreviewCommand = exports.de_GetControlCenterReleaseEventsCommand = exports.de_GetControlCenterOverviewCommand = exports.de_GetControlCenterDeploymentsCommand = exports.de_GetControlCenterDeploymentRequestCommand = exports.de_GetControlCenterApprovalPolicyCommand = exports.de_DiscardReleaseCommand = exports.de_DeleteDimensionCommand = exports.de_DeleteControlCenterGroupCommand = exports.de_CreateReleaseCommand = exports.de_CreatePackageCommand = exports.de_CreateOrganisationCommand = exports.de_CreateFileCommand = exports.de_CreateDimensionCommand = exports.de_CreateControlCenterGroupCommand = exports.de_CreateControlCenterDeploymentRequestCommand = exports.de_CreateCohortRangeCommand = exports.de_CreateApplicationCommand = exports.de_ConcludeReleaseCommand = exports.de_CancelControlCenterDeploymentRequestCommand = exports.de_ApproveControlCenterDeploymentRequestCommand = exports.de_AcknowledgeEmergencyRollbackCommand = exports.se_UploadFileCommand = void 0;
+exports.de_UploadFileCommand = exports.de_UpdateFileCommand = void 0;
 const AirborneServiceException_1 = require("../models/AirborneServiceException");
 const models_0_1 = require("../models/models_0");
 const core_1 = require("@aws-sdk/core");
@@ -340,13 +341,42 @@ const se_GetControlCenterDeploymentRequestCommand = async (input, context) => {
     return b.build();
 };
 exports.se_GetControlCenterDeploymentRequestCommand = se_GetControlCenterDeploymentRequestCommand;
+const se_GetControlCenterDeploymentsCommand = async (input, context) => {
+    const b = (0, core_2.requestBuilder)(input, context);
+    const headers = {};
+    b.bp("/api/control-center/deployments");
+    const query = (0, smithy_client_1.map)({
+        [_or]: [, input[_or]],
+        [_g]: [, input[_g]],
+        [_ap]: [, input[_ap]],
+        [_ac]: [() => input.action !== void 0, () => ((input[_ac] || []))],
+        [_p]: [, input[_p]],
+        [_act]: [, input[_act]],
+        [_s]: [, input[_s]],
+        [_c]: [, input[_c]],
+        [_l]: [() => input.limit !== void 0, () => (input[_l].toString())],
+    });
+    let body;
+    b.m("GET")
+        .h(headers)
+        .q(query)
+        .b(body);
+    return b.build();
+};
+exports.se_GetControlCenterDeploymentsCommand = se_GetControlCenterDeploymentsCommand;
 const se_GetControlCenterOverviewCommand = async (input, context) => {
     const b = (0, core_2.requestBuilder)(input, context);
     const headers = {};
     b.bp("/api/control-center/overview");
+    const query = (0, smithy_client_1.map)({
+        [_or]: [, input[_or]],
+        [_g]: [, input[_g]],
+        [_ap]: [, input[_ap]],
+    });
     let body;
     b.m("GET")
         .h(headers)
+        .q(query)
         .b(body);
     return b.build();
 };
@@ -461,7 +491,7 @@ const se_ListControlCenterDeploymentRequestsCommand = async (input, context) => 
     });
     b.bp("/api/control-center/deployment-requests");
     const query = (0, smithy_client_1.map)({
-        [_s]: [, input[_s]],
+        [_st]: [, input[_st]],
     });
     let body;
     b.m("GET")
@@ -492,7 +522,7 @@ const se_ListControlCenterOperationsCommand = async (input, context) => {
     });
     b.bp("/api/control-center/operations");
     const query = (0, smithy_client_1.map)({
-        [_s]: [, input[_s]],
+        [_st]: [, input[_st]],
     });
     let body;
     b.m("GET")
@@ -510,8 +540,8 @@ const se_ListDimensionsCommand = async (input, context) => {
     });
     b.bp("/api/organisations/applications/dimension/list");
     const query = (0, smithy_client_1.map)({
-        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_pa]: [() => input.page !== void 0, () => (input[_pa].toString())],
+        [_co]: [() => input.count !== void 0, () => (input[_co].toString())],
     });
     let body;
     b.m("GET")
@@ -529,8 +559,8 @@ const se_ListFileGroupsCommand = async (input, context) => {
     });
     b.bp("/api/file/groups");
     const query = (0, smithy_client_1.map)({
-        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_pa]: [() => input.page !== void 0, () => (input[_pa].toString())],
+        [_co]: [() => input.count !== void 0, () => (input[_co].toString())],
         [_se]: [, input[_se]],
         [_t]: [, input[_t]],
     });
@@ -550,7 +580,7 @@ const se_ListFilesCommand = async (input, context) => {
     });
     b.bp("/api/file/list");
     const query = (0, smithy_client_1.map)({
-        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
+        [_pa]: [() => input.page !== void 0, () => (input[_pa].toString())],
         [_pp]: [() => input.per_page !== void 0, () => (input[_pp].toString())],
         [_se]: [, input[_se]],
         [_t]: [, input[_t]],
@@ -582,8 +612,8 @@ const se_ListPackagesCommand = async (input, context) => {
     });
     b.bp("/api/packages/list");
     const query = (0, smithy_client_1.map)({
-        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_pa]: [() => input.page !== void 0, () => (input[_pa].toString())],
+        [_co]: [() => input.count !== void 0, () => (input[_co].toString())],
         [_se]: [, input[_se]],
         [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
     });
@@ -604,10 +634,10 @@ const se_ListReleasesCommand = async (input, context) => {
     });
     b.bp("/api/releases/list");
     const query = (0, smithy_client_1.map)({
-        [_p]: [() => input.page !== void 0, () => (input[_p].toString())],
-        [_c]: [() => input.count !== void 0, () => (input[_c].toString())],
+        [_pa]: [() => input.page !== void 0, () => (input[_pa].toString())],
+        [_co]: [() => input.count !== void 0, () => (input[_co].toString())],
         [_al]: [() => input.all !== void 0, () => (input[_al].toString())],
-        [_s]: [, input[_s]],
+        [_st]: [, input[_st]],
     });
     let body;
     b.m("GET")
@@ -1279,6 +1309,25 @@ const de_GetControlCenterDeploymentRequestCommand = async (output, context) => {
     return contents;
 };
 exports.de_GetControlCenterDeploymentRequestCommand = de_GetControlCenterDeploymentRequestCommand;
+const de_GetControlCenterDeploymentsCommand = async (output, context) => {
+    if (output.statusCode !== 200 && output.statusCode >= 300) {
+        return de_CommandError(output, context);
+    }
+    const contents = (0, smithy_client_1.map)({
+        $metadata: deserializeMetadata(output),
+    });
+    const data = (0, smithy_client_1.expectNonNull)(((0, smithy_client_1.expectObject)(await (0, core_1.parseJsonBody)(output.body, context))), "body");
+    const doc = (0, smithy_client_1.take)(data, {
+        'audit_completeness': smithy_client_1._json,
+        'errors': _ => de_DeploymentReadErrorList(_, context),
+        'items': _ => de_DeploymentEventList(_, context),
+        'next_cursor': _ => de_Document(_, context),
+        'partial': smithy_client_1.expectBoolean,
+    });
+    Object.assign(contents, doc);
+    return contents;
+};
+exports.de_GetControlCenterDeploymentsCommand = de_GetControlCenterDeploymentsCommand;
 const de_GetControlCenterOverviewCommand = async (output, context) => {
     if (output.statusCode !== 200 && output.statusCode >= 300) {
         return de_CommandError(output, context);
@@ -2339,6 +2388,44 @@ const de_CreateFileResponse = (output, context) => {
         'version': smithy_client_1.expectInt32,
     });
 };
+const de_DeploymentEvent = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'action': smithy_client_1.expectString,
+        'actor': (_) => de_Document(_, context),
+        'app': smithy_client_1.expectString,
+        'at': smithy_client_1.expectString,
+        'event_id': smithy_client_1.expectString,
+        'from_target': (_) => de_Document(_, context),
+        'group': (_) => de_Document(_, context),
+        'org': smithy_client_1.expectString,
+        'package_version': (_) => de_Document(_, context),
+        'platform': (_) => de_Document(_, context),
+        'recovered': smithy_client_1.expectBoolean,
+        'release_id': (_) => de_Document(_, context),
+        'request_id': (_) => de_Document(_, context),
+        'summary': smithy_client_1.expectString,
+        'to_target': (_) => de_Document(_, context),
+    });
+};
+const de_DeploymentEventList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_DeploymentEvent(entry, context);
+    });
+    return retVal;
+};
+const de_DeploymentReadError = (output, context) => {
+    return (0, smithy_client_1.take)(output, {
+        'app': (_) => de_Document(_, context),
+        'org': smithy_client_1.expectString,
+        'reason': smithy_client_1.expectString,
+    });
+};
+const de_DeploymentReadErrorList = (output, context) => {
+    const retVal = (output || []).filter((e) => e != null).map((entry) => {
+        return de_DeploymentReadError(entry, context);
+    });
+    return retVal;
+};
 const de_DeploymentRequestPayload = (output, context) => {
     return (0, smithy_client_1.take)(output, {
         'body': (_) => de_Document(_, context),
@@ -2458,17 +2545,26 @@ const deserializeMetadata = (output) => ({
 });
 const collectBodyString = (streamBody, context) => (0, smithy_client_1.collectBody)(streamBody, context).then(body => context.utf8Encoder(body));
 const _a = "application";
+const _ac = "action";
+const _act = "actor";
 const _al = "all";
-const _c = "count";
+const _ap = "app";
+const _c = "cursor";
 const _ch = "checksum";
+const _co = "count";
 const _d = "dimension";
 const _fp = "file_path";
+const _g = "group";
+const _l = "limit";
 const _nv = "native_version";
 const _o = "organisation";
-const _p = "page";
+const _or = "org";
+const _p = "platform";
+const _pa = "page";
 const _pp = "per_page";
-const _s = "status";
+const _s = "since";
 const _se = "search";
+const _st = "status";
 const _t = "tags";
 const _ta = "tag";
 const _tp = "telemetry_platform";

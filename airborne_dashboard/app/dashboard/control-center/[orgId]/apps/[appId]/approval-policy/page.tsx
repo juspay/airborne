@@ -16,7 +16,7 @@ import { RequestRow } from "@/components/control-center/request-card";
 import { EmergencyReviewCard } from "@/components/control-center/emergency-review";
 import { ApprovalNotice } from "@/components/control-center/approval-notices";
 import { BlockSkeleton, EmptyState, Panel, PanelTitle } from "@/components/control-center/states";
-import { APPROVALS_PATH, CC_ROOT, classicAppPath, groupPath } from "@/components/control-center/paths";
+import { appPath, APPROVALS_PATH } from "@/components/control-center/paths";
 import { ShieldOff } from "lucide-react";
 
 /** Policy editor under the application's Control Center settings. Owners and admins edit; others read. */
@@ -43,18 +43,11 @@ export default function ApprovalPolicyPage() {
   const access = getOrgAccess(orgId);
   const canEdit = access.includes("owner") || access.includes("admin");
 
-  const crumbs = [
-    { label: "Control Center", href: CC_ROOT },
-    ...(located.group ? [{ label: located.group.name, href: groupPath(orgId, located.group.id) }] : [{ label: orgId }]),
-    { label: appId, href: classicAppPath(orgId, appId) },
-    { label: "Approval policy" },
-  ];
-
   return (
     <>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6">
         <CcPageHeader
-          crumbs={crumbs}
+          back={{ label: appId, href: appPath(orgId, appId) }}
           title={
             <span className="inline-flex items-baseline gap-3">
               <span>Approval policy</span>

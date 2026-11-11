@@ -1,4 +1,5 @@
 "use client";
+import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
@@ -26,21 +27,25 @@ const PAGE_AUTHZ = definePagePermissions({
 });
 
 export default function ApplicationUsersPage() {
-  const { token, org, app, updateOrgs } = useAppContext();
+  const { token, org, app: contextApp, updateOrgs } = useAppContext();
+  // The address names the application. The context only learns it a moment after load, and a request sent before
+  // that goes out without `x-application` and is refused, so the page never asks until it knows which one.
+  const routeApp = useParams<{ appId?: string }>()?.appId;
+  const app = routeApp ? decodeURIComponent(routeApp) : contextApp;
   const permissions = usePagePermissions(PAGE_AUTHZ);
   const canReadRoles = permissions.can("read_roles");
   const canCreateRoles = permissions.can("create_roles");
   const { data, error, mutate } = useSWR<OrgUsers>(
-    token && org ? "/organisations/applications/user/list" : null,
-    (url: string) => apiFetch<any>(url, {}, { token, org, app })
+    token && org && app ? ["/organisations/applications/user/list", org, app] : null,
+    ([url]: [string, string, string]) => apiFetch<any>(url, {}, { token, org, app })
   );
   const { data: roleData, mutate: mutateRoles } = useSWR<RoleListResponse>(
-    token && org && canReadRoles ? "/organisations/applications/user/roles/list" : null,
-    (url: string) => apiFetch<RoleListResponse>(url, {}, { token, org, app })
+    token && org && app && canReadRoles ? ["/organisations/applications/user/roles/list", org, app] : null,
+    ([url]: [string, string, string]) => apiFetch<RoleListResponse>(url, {}, { token, org, app })
   );
   const { data: permissionData } = useSWR<PermissionListResponse>(
-    token && org && canReadRoles ? "/organisations/applications/user/permissions/list" : null,
-    (url: string) => apiFetch<PermissionListResponse>(url, {}, { token, org, app })
+    token && org && app && canReadRoles ? ["/organisations/applications/user/permissions/list", org, app] : null,
+    ([url]: [string, string, string]) => apiFetch<PermissionListResponse>(url, {}, { token, org, app })
   );
   const { data: orgUsersData } = useSWR<OrgUsers>(token && org ? "/organisations/user/list" : null, (url: string) =>
     apiFetch<OrgUsers>(url, {}, { token, org })

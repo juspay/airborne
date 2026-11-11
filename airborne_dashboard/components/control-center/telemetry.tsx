@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { platformLabel } from "@/lib/control-center/format";
+import { absoluteTime, platformLabel } from "@/lib/control-center/format";
 import {
   adoptionFor,
   baselineOf,
@@ -32,6 +32,7 @@ import {
   signalLabel,
   sortRows,
   sortVersions,
+  splitServedRows,
   telemetryAvailability,
   telemetrySummary,
   worstSignal,
@@ -711,6 +712,7 @@ function ReportsTable({
   totals?: Adoption;
 }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const [showEarlier, setShowEarlier] = useState(false);
   const toggle = (key: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -726,6 +728,11 @@ function ReportsTable({
         : null;
   const cols = 6;
   const num = "text-right tabular-nums";
+  const split = showRelease
+    ? splitServedRows(rows, (id) => served(id) !== null)
+    : { served: rows, earlier: [], collapsible: false };
+  const shown = split.collapsible ? (showEarlier ? [...split.served, ...split.earlier] : split.served) : rows;
+  const earlierReleases = new Set(split.earlier.map((r) => r.release_id)).size;
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-sm">
@@ -746,9 +753,9 @@ function ReportsTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
+          {shown.map((r, i) => {
             const key = `${r.release_id}:${r.native_version}:${r.platform}`;
-            const first = i === 0 || rows[i - 1].release_id !== r.release_id;
+            const first = i === 0 || shown[i - 1].release_id !== r.release_id;
             const relation = served(r.release_id);
             const expanded = open.has(key);
             const flagged =
@@ -766,7 +773,17 @@ function ReportsTable({
                         version={Number(r.package_version)}
                         className={relation ? undefined : "text-muted-foreground"}
                       />
-                      <span className="text-xs text-muted-foreground">{relation ?? "not served now"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {relation ?? "earlier release, not served now"}
+                      </span>
+                      {!relation && (
+                        // Two releases can ship the same package: the release's own id and age tell them apart.
+                        <span className="ml-2 text-[11px] text-muted-foreground/80">
+                          release …{r.release_id.slice(-6)}
+                          {r.release_created > 0 &&
+                            ` · created ${absoluteTime(new Date(r.release_created * 1000).toISOString())}`}
+                        </span>
+                      )}
                     </Link>
                   </td>
                 </tr>
@@ -820,6 +837,22 @@ function ReportsTable({
               ),
             ];
           })}
+          {split.collapsible && (
+            <tr className="border-t">
+              <td colSpan={cols} className="px-4 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowEarlier((v) => !v)}
+                  aria-expanded={showEarlier}
+                  className="inline-flex items-center gap-1.5 rounded text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {showEarlier ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  {showEarlier ? "Hide" : "Show"} {earlierReleases} earlier release{earlierReleases === 1 ? "" : "s"}{" "}
+                  not served now
+                </button>
+              </td>
+            </tr>
+          )}
           {totals && rows.length > 1 && (
             <tr className="border-t font-medium [&>td]:px-2 [&>td]:py-2 sm:[&>td]:px-3">
               <td className="pl-4 text-xs text-muted-foreground">All of the above</td>

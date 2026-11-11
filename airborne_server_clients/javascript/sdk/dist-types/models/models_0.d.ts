@@ -1277,10 +1277,136 @@ export interface GetControlCenterDeploymentRequestInput {
     application: string | undefined;
 }
 /**
+ * @public
+ * @enum
+ */
+export declare const DeploymentAction: {
+    readonly APPROVED: "approved";
+    readonly CACHE_FAILED: "cache_failed";
+    readonly CACHE_RETRIED: "cache_retried";
+    readonly CANCELLED: "cancelled";
+    readonly CONCLUDED: "concluded";
+    readonly CREATED: "created";
+    readonly DISCARDED: "discarded";
+    readonly EMERGENCY_ACKNOWLEDGED: "emergency_acknowledged";
+    readonly EMERGENCY_ROLLBACK: "emergency_rollback";
+    readonly EXECUTED: "executed";
+    readonly EXPIRED: "expired";
+    readonly FAILED: "failed";
+    readonly POLICY_CHANGED: "policy_changed";
+    readonly RAMPED: "ramped";
+    readonly REJECTED: "rejected";
+    readonly REQUESTED: "requested";
+    readonly ROLLBACK_ABANDONED: "rollback_abandoned";
+    readonly ROLLED_BACK: "rolled_back";
+    readonly STALE: "stale";
+};
+/**
+ * @public
+ */
+export type DeploymentAction = typeof DeploymentAction[keyof typeof DeploymentAction];
+/**
+ * Durable cross-app audit feed, newest first. Reuse cursors with identical filters.
+ * @public
+ */
+export interface GetControlCenterDeploymentsInput {
+    org?: string | undefined;
+    group?: string | undefined;
+    app?: string | undefined;
+    action?: (DeploymentAction)[] | undefined;
+    platform?: string | undefined;
+    actor?: string | undefined;
+    since?: string | undefined;
+    cursor?: string | undefined;
+    limit?: number | undefined;
+}
+/**
+ * What the feed can and cannot promise about its own completeness.
+ * @public
+ */
+export interface DeploymentAuditCompleteness {
+    /**
+     * False while any recorded history may be missing events.
+     * @public
+     */
+    complete: boolean | undefined;
+    /**
+     * Actions whose rows are committed with the state change they describe.
+     * @public
+     */
+    transactional_actions: (string)[] | undefined;
+    /**
+     * Actions whose rows are written afterwards and can be lost.
+     * @public
+     */
+    best_effort_actions: (string)[] | undefined;
+    /**
+     * List of strings
+     * @public
+     */
+    notes: (string)[] | undefined;
+}
+/**
+ * @public
+ */
+export interface DeploymentReadError {
+    org: string | undefined;
+    app: __DocumentType | undefined;
+    reason: string | undefined;
+}
+/**
+ * @public
+ */
+export interface DeploymentEvent {
+    event_id: string | undefined;
+    at: string | undefined;
+    org: string | undefined;
+    group: __DocumentType | undefined;
+    app: string | undefined;
+    platform: __DocumentType | undefined;
+    release_id: __DocumentType | undefined;
+    package_version: __DocumentType | undefined;
+    /**
+     * The approval request this event belongs to, or JSON null. Set on a request's own events (requested,
+     * approved, rejected, cancelled, expired, stale, failed, executed) and on a release write that an approved
+     * request made. Null for writes made without a request and for older events that did not record one.
+     * @public
+     */
+    request_id: __DocumentType | undefined;
+    action: DeploymentAction | undefined;
+    /**
+     * True when an operator confirmed this write after an ambiguous upstream result;
+     * `action` is the action that write completed.
+     * @public
+     */
+    recovered: boolean | undefined;
+    actor: __DocumentType | undefined;
+    from_target: __DocumentType | undefined;
+    to_target: __DocumentType | undefined;
+    summary: string | undefined;
+}
+/**
+ * @public
+ */
+export interface GetControlCenterDeploymentsResponse {
+    items: (DeploymentEvent)[] | undefined;
+    next_cursor: __DocumentType | undefined;
+    partial: boolean | undefined;
+    errors: (DeploymentReadError)[] | undefined;
+    /**
+     * What the feed can and cannot promise about its own completeness.
+     * @public
+     */
+    audit_completeness: DeploymentAuditCompleteness | undefined;
+}
+/**
  * Overview is user-scoped and does not require organisation/application scope headers.
  * @public
  */
 export interface GetControlCenterOverviewInput {
+    org?: string | undefined;
+    group?: string | undefined;
+    app?: string | undefined;
 }
 /**
  * A release that is created or currently in progress.

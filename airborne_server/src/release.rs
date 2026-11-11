@@ -83,7 +83,16 @@ fn experiment_lookup_error<E>(
         SdkError::TimeoutError(_) => (504, "upstream_read_timeout"),
         _ => (502, "upstream_release_invalid_response"),
     };
-    lookup_failure(status, code, failure_message)
+    // A missing release is not a failure of the upstream read: say what a person needs to know.
+    lookup_failure(
+        status,
+        code,
+        if status == 404 {
+            "Release not found"
+        } else {
+            failure_message
+        },
+    )
 }
 
 fn lookup_failure(status: u16, code: &str, message: &str) -> ABError {
@@ -550,18 +559,13 @@ pub(super) async fn create_release_impl(
         control_center::required_event(&state, &auth_response, "", "compatibility_exception", payload).await?;
     }
     write_lock::check().await?;
-    let created_experiment_response = Box::pin(write_lock::mutate(control_center::create_expected(&control_variant, &experimental_variant, &dimensions), created_experiment_response.idempotency_key(write_lock::reason()).change_reason(write_lock::user_reason(&format!("Release creation for application {} with PATCH-style overrides", application))?).send())).await?;
+    let create_call = created_experiment_response.idempotency_key(write_lock::reason()).change_reason(write_lock::user_reason(&format!("Release creation for application {} with PATCH-style overrides", application))?).send();
+    // The "created" audit row commits with the journal's confirmed step.
+    let audit = operations::Audit::new(&auth_response, "created", serde_json::json!({"compatibility_exception":req.compatibility_exception,"package_version":pkg_version}));
+    let created_experiment_response = Box::pin(write_lock::mutate_created(control_center::create_expected(&control_variant, &experimental_variant, &dimensions), audit, |r| r.id.to_string(), create_call)).await?;
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
     maker_checker::protect_created(&state, &organisation,&application,&experiment_id_for_ramping, req.rollback_sensitive.as_deref()).await?;
-    control_center::event(
-        &state,
-        &auth_response,
-        &experiment_id_for_ramping,
-        "created",
-        serde_json::json!({"compatibility_exception":req.compatibility_exception}),
-    )
-    .await;
 
     let response_important = final_important.unwrap_or_else(|| {
         package_data
@@ -1059,23 +1063,20 @@ pub(super) async fn ramp_release_impl(
 
         ramp_experiment(
             &state,
+            &auth_response,
             &workspace_name,
             &experiment_id,
             req.traffic_percentage as i32,
             &req.change_reason,
+            (
+                control_center::package_version_of(&details.variants),
+                details.traffic_percentage,
+            ),
         )
         .await?;
 
         info!("Successfully ramped experiment {}", experiment_id);
 
-        control_center::event(
-            &state,
-            &auth_response,
-            &release_id.to_string(),
-            "ramped",
-            serde_json::json!({"traffic_percentage":req.traffic_percentage}),
-        )
-        .await;
         Ok(Json(RampReleaseResponse {
             success: true,
             message: format!(
@@ -1091,25 +1092,36 @@ pub(super) async fn ramp_release_impl(
 
 async fn ramp_experiment(
     state: &AppState,
+    auth: &AuthResponse,
     workspace_name: &String,
     experiment_id: &String,
     traffic_percentage: i32,
     change_reason: &Option<String>,
+    (package_version, from_target): (Option<i64>, i32),
 ) -> airborne_types::Result<()> {
     write_lock::check().await?;
-    Box::pin(write_lock::mutate_ramp(serde_json::json!({"id":experiment_id,"status":"INPROGRESS","traffic_percentage":traffic_percentage}),     state
+    let call = state
         .release_superposition_client
         .ramp_experiment()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name)
         .id(experiment_id.to_string())
         .traffic_percentage(traffic_percentage)
-        .change_reason(write_lock::user_reason(&(change_reason.clone().unwrap_or_else(|| {
-            format!(
-                "Ramping release {} to {}% traffic",
-                experiment_id, traffic_percentage
-            )
-        })))?).send())).await?;
+        .change_reason(write_lock::user_reason(
+            &(change_reason.clone().unwrap_or_else(|| {
+                format!(
+                    "Ramping release {} to {}% traffic",
+                    experiment_id, traffic_percentage
+                )
+            })),
+        )?)
+        .send();
+    let audit = operations::Audit::new(
+        auth,
+        "ramped",
+        serde_json::json!({"traffic_percentage":traffic_percentage,"from_target":from_target,"package_version":package_version}),
+    );
+    Box::pin(write_lock::mutate_ramp(serde_json::json!({"id":experiment_id,"status":"INPROGRESS","traffic_percentage":traffic_percentage}), Some(audit), call)).await?;
     Ok(())
 }
 
@@ -1196,7 +1208,7 @@ pub(super) async fn conclude_release_impl(
 
         write_lock::check().await?;
 
-    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id,"status":"CONCLUDED","chosen_variant":transformed_variant_id}),         state
+    let conclude_call = state
             .release_superposition_client
             .conclude_experiment()
             .org_id(superposition_org_id_from_env)
@@ -1208,16 +1220,9 @@ pub(super) async fn conclude_release_impl(
                     "Concluding release {} with variant {}",
                     release_id, req.chosen_variant
                 )
-            })))?).send())).await?;
-
-        control_center::event(
-            &state,
-            &auth_response,
-            &experiment_id,
-            "concluded",
-            serde_json::json!({"chosen_variant":req.chosen_variant}),
-        )
-        .await;
+            })))?).send();
+    let audit = operations::Audit::new(&auth_response, "concluded", serde_json::json!({"chosen_variant":req.chosen_variant,"package_version":control_center::package_version_of(&experiment_details.variants)}));
+    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id,"status":"CONCLUDED","chosen_variant":transformed_variant_id}), Some(audit), conclude_call)).await?;
         info!(
             "Successfully concluded experiment {} with variant {}",
             experiment_id, transformed_variant_id
@@ -1311,32 +1316,27 @@ pub(super) async fn discard_release_impl(
 
         write_lock::check().await?;
 
+        let discard_call = state
+            .release_superposition_client
+            .discard_experiment()
+            .workspace_id(workspace_name)
+            .org_id(superposition_org_id_from_env)
+            .id(experiment_id.to_string())
+            .change_reason(write_lock::user_reason(
+                &(req
+                    .change_reason
+                    .clone()
+                    .unwrap_or_else(|| format!("Discarding release {} ", release_id))),
+            )?)
+            .send();
+        let audit = operations::Audit::new(&auth_response, "discarded", serde_json::json!({"change_reason":req.change_reason,"package_version":control_center::package_version_of(&experiment_details.variants)}));
         Box::pin(write_lock::mutate(
             serde_json::json!({"id":experiment_id,"status":"DISCARDED"}),
-            state
-                .release_superposition_client
-                .discard_experiment()
-                .workspace_id(workspace_name)
-                .org_id(superposition_org_id_from_env)
-                .id(experiment_id.to_string())
-                .change_reason(write_lock::user_reason(
-                    &(req
-                        .change_reason
-                        .clone()
-                        .unwrap_or_else(|| format!("Discarding release {} ", release_id))),
-                )?)
-                .send(),
+            Some(audit),
+            discard_call,
         ))
         .await?;
 
-        control_center::event(
-            &state,
-            &auth_response,
-            &experiment_id,
-            "discarded",
-            serde_json::json!({"change_reason":req.change_reason}),
-        )
-        .await;
         info!("Successfully discarded experiment {}", experiment_id);
 
         Ok(Json(DiscardReleaseResponse {
@@ -1817,8 +1817,10 @@ pub(super) async fn update_release_impl(
             .variant_list(control_variant)
             .variant_list(experiment_variant);
 
+        // Draft edits have no feed action; they are journaled but not audited.
         let updated_experiment_response = Box::pin(write_lock::mutate(
             serde_json::json!({"id":release_id,"variants":expected_variants}),
+            None,
             updated_experiment_response
                 .change_reason(write_lock::user_reason(&format!(
                     "Release update for application {} with PATCH-style overrides",
@@ -2173,6 +2175,15 @@ mod upstream_read_fault_tests {
             };
             assert_eq!(body["code"], expected);
             assert_eq!(body["mutation_committed"], false);
+            // A missing release says so; other read failures keep the caller's wording.
+            assert_eq!(
+                body["message"],
+                if status == 404 && expected == "release_not_found" {
+                    "Release not found"
+                } else {
+                    "Release read failed"
+                }
+            );
         }
         let addr = "127.0.0.1:0";
         let client = superposition_sdk::Client::from_conf(

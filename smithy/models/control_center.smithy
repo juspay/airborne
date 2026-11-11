@@ -582,7 +582,14 @@ structure ResolveControlCenterOperationResponse {
 }
 
 /// Overview is user-scoped and does not require organisation/application scope headers.
-structure GetControlCenterOverviewInput {}
+structure GetControlCenterOverviewInput {
+    @httpQuery("org")
+    org: String
+    @httpQuery("group")
+    group: String
+    @httpQuery("app")
+    app: String
+}
 
 /// Create a group with a name and full member list. Requires Bearer authentication and an x-organisation header. Only organisation admins/owners can create groups.
 @tags(["Control Center"])
@@ -687,4 +694,131 @@ operation RollbackRelease {
     input: RollbackReleaseInput
     output: RollbackReleaseResponse
     errors: [Unauthorized ForbiddenError BadRequestError NotFoundError ConflictError ReleaseSupersededError UnresolvedOperationError RollbackReplacementChangedError RollbackUnprocessableError InternalServerError RollbackPartialFailureError ApprovalRequiredError]
+}
+
+/// Durable cross-app audit feed, newest first. Reuse cursors with identical filters.
+structure GetControlCenterDeploymentsInput {
+    @httpQuery("org")
+    org: String
+    @httpQuery("group")
+    group: String
+    @httpQuery("app")
+    app: String
+    @httpQuery("action")
+    action: DeploymentActionList
+    @httpQuery("platform")
+    platform: String
+    @httpQuery("actor")
+    actor: String
+    @httpQuery("since")
+    since: String
+    @httpQuery("cursor")
+    cursor: String
+    @httpQuery("limit")
+    @range(min: 1, max: 200)
+    limit: Integer
+}
+list DeploymentActionList { member: DeploymentAction }
+enum DeploymentAction {
+    CREATED = "created"
+    RAMPED = "ramped"
+    CONCLUDED = "concluded"
+    ROLLED_BACK = "rolled_back"
+    DISCARDED = "discarded"
+    EMERGENCY_ROLLBACK = "emergency_rollback"
+    REQUESTED = "requested"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CACHE_FAILED = "cache_failed"
+    CACHE_RETRIED = "cache_retried"
+    POLICY_CHANGED = "policy_changed"
+    EXECUTED = "executed"
+    FAILED = "failed"
+    STALE = "stale"
+    CANCELLED = "cancelled"
+    ROLLBACK_ABANDONED = "rollback_abandoned"
+    EMERGENCY_ACKNOWLEDGED = "emergency_acknowledged"
+}
+structure DeploymentEvent {
+    @required
+    event_id: String
+    @required
+    at: String
+    @required
+    org: String
+    @required
+    group: Document
+    @required
+    app: String
+    @required
+    platform: Document
+    @required
+    release_id: Document
+    @required
+    package_version: Document
+    /// The approval request this event belongs to, or JSON null. Set on a request's own events (requested,
+    /// approved, rejected, cancelled, expired, stale, failed, executed) and on a release write that an approved
+    /// request made. Null for writes made without a request and for older events that did not record one.
+    @required
+    request_id: Document
+    @required
+    action: DeploymentAction
+    /// True when an operator confirmed this write after an ambiguous upstream result;
+    /// `action` is the action that write completed.
+    @required
+    recovered: Boolean
+    @required
+    actor: Document
+    @required
+    from_target: Document
+    @required
+    to_target: Document
+    @required
+    summary: String
+}
+list DeploymentEventList { member: DeploymentEvent }
+structure DeploymentReadError {
+    @required
+    org: String
+    @required
+    app: Document
+    @required
+    reason: String
+}
+list DeploymentReadErrorList { member: DeploymentReadError }
+/// What the feed can and cannot promise about its own completeness.
+structure DeploymentAuditCompleteness {
+    /// False while any recorded history may be missing events.
+    @required
+    complete: Boolean
+    /// Actions whose rows are committed with the state change they describe.
+    @required
+    transactional_actions: StringList
+    /// Actions whose rows are written afterwards and can be lost.
+    @required
+    best_effort_actions: StringList
+    @required
+    notes: StringList
+}
+structure GetControlCenterDeploymentsResponse {
+    @required
+    items: DeploymentEventList
+    @required
+    next_cursor: Document
+    @required
+    partial: Boolean
+    @required
+    errors: DeploymentReadErrorList
+    @required
+    audit_completeness: DeploymentAuditCompleteness
+}
+@tags(["Control Center"])
+@http(method: "GET", uri: "/api/control-center/deployments")
+@requiresauth
+@readonly
+operation GetControlCenterDeployments {
+    input: GetControlCenterDeploymentsInput
+    output: GetControlCenterDeploymentsResponse
+    errors: [Unauthorized ForbiddenError BadRequestError InternalServerError]
 }

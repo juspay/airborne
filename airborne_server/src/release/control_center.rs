@@ -88,6 +88,15 @@ fn latest_live(exps: &[ExperimentResponse]) -> Vec<&ExperimentResponse> {
     }
     selected.into_values().collect()
 }
+/// The package version a release serves, read from its experimental variant, for audit
+/// payloads. `None` when the release records none (0 is the extractor's "missing").
+pub(crate) fn package_version_of(variants: &[superposition_sdk::types::Variant]) -> Option<i64> {
+    let version: i64 = utils::extract_integer_from_experiment(
+        &variants.iter().find(|v| v.variant_type == Experimental),
+        "package.version",
+    );
+    (version > 0).then_some(version)
+}
 pub(crate) fn version(exp: &ExperimentResponse) -> i64 {
     utils::extract_integer_from_experiment::<i64>(&experimental(exp), "package.version")
 }
@@ -139,14 +148,9 @@ pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Re
         json!({"application":app,"platform":null,"first_device_seen_at":super::device_seen::read(state,org,app).await?,"telemetry":tokio::time::timeout(std::time::Duration::from_millis(100),crate::telemetry::summary(state,org,app)).await.ok().and_then(|r|r.ok()).unwrap_or_else(||json!({"error":"Telemetry unavailable"})),"live":live,"active":active,"unresolved_operations":pending,"last_activity_at":exps.iter().max_by_key(|e|e.last_modified).map(|e|utils::dt(&e.last_modified)),"error":null}),
     )
 }
-pub async fn event(
-    state: &web::Data<AppState>,
-    auth: &AuthResponse,
-    release: &str,
-    action: &str,
-    payload: Value,
-) {
-    let mut payload = payload;
+/// Server-side fields every release lifecycle event carries. Must run inside the writer session
+/// (reads the operator reason and the approval context from task-locals).
+pub fn decorate(mut payload: Value) -> Value {
     payload["server_recorded_at"] = json!(Utc::now());
     payload["availability_confirmed"] = json!(false);
     if let Some(approval) = super::maker_checker::audit_context() {
@@ -157,12 +161,7 @@ pub async fn event(
             payload["reason"] = json!(reason);
         }
     }
-    if required_event(state, auth, release, action, payload)
-        .await
-        .is_err()
-    {
-        log::error!("Failed to append release event");
-    }
+    payload
 }
 pub(super) async fn required_event(
     state: &web::Data<AppState>,
@@ -529,6 +528,7 @@ pub async fn retry_cache(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    required_event(&state, &auth_response, "", "cache_retried", json!({})).await?;
     invalidate(&state, &org, &app).await?;
     Ok(Json(
         json!({"status":if state.env.cloudfront_distribution_id.is_empty(){"not_applicable"}else{"invalidation_submitted"}}),

@@ -16,7 +16,7 @@ Everything in Airborne lives inside two levels of hierarchy:
 - An **Organisation** is the top-level workspace for a team or company. It owns applications and a roster of users.
 - An **Application** lives inside an organisation and is the unit you actually ship to — for example one mobile app per platform. Files, packages, releases, dimensions, cohorts, remote configs, views, and tokens are all scoped to a single application.
 
-You always operate "inside" one organisation and (usually) one application at a time. The header shows your current organisation and application and lets you switch between them.
+You always have a **scope**: All, one organisation, one group, or one application. The **Scope** control in the header shows it in full, and it is also in the page's address, so a link or a refresh keeps it.
 
 <Screenshot name="org-overview" caption="The organisation overview lists every application in the org and is where you create new ones." />
 
@@ -24,15 +24,19 @@ You always operate "inside" one organisation and (usually) one application at a 
 
 The **header** (across the top) stays visible everywhere and contains:
 
-- The **organisation switcher** on the left — click it to jump between organisations or to `+ Create Organisation`.
-- The **application switcher** in the left sidebar — switch between apps in the current organisation.
+- The **Scope** control on the left, one control for where you are: `All`, then an organisation, a group, an application. Open it to search or pick; each row says what it is. It also has **Create** or **Request an organisation**. On a phone it takes a row of its own.
 - A global **`+ Create`** menu — a shortcut to `Create File`, `Create Package`, or `New Release` for the current app.
 - The **theme toggle** (light/dark) and a **sign-out** menu.
 
-The **left sidebar** changes depending on where you are:
+The **left sidebar** follows the scope, in sections named for what their links belong to:
 
-- **At the organisation level** it shows, in order: `Control Center`, `Applications`, and `Users`.
-- **At the application level** it shows, in order: `Control Center`, `Overview`, `Files`, `Packages`, `Releases`, `Views`, `Dimensions`, `Users`, `Tokens`, `Remote Configs`, and `Cohorts`.
+- **Control Center**, always: `Overview`, `Deployments` and `Approvals`. All three show only what is in scope.
+- **Organisation · name**, whenever an organisation, group or application is in scope: the organisation's `Applications` and `Users`.
+- **Application · name**, only when an application is in scope: `Files`, `Packages`, `Releases`, `Views`, `Dimensions`, `App users`, `Tokens`, `Remote Configs`, and `Cohorts`.
+
+At application scope `Overview` is the application's own page (its status, serving policy and approvals); there is no separate Status or Summary entry. The application's older summary page is the **Classic app page** link at the foot of that page. Choosing an application in the Scope control opens that page. **Create** is always in the header; with no application in scope it first asks **Which app?**.
+
+Changing the scope keeps the kind of page where it can: from Deployments you stay on Deployments, from an application's Files page you land on the other application's Files page.
 
 ## Feature tour
 
@@ -43,7 +47,7 @@ Use these pages to go deeper on each area of the dashboard:
 | [Authentication & onboarding](/docs/dashboard/authentication-and-onboarding) | Signing in, registering, OIDC, and creating your first organisation. |
 | [Organisations](/docs/dashboard/organisations) | Creating and switching organisations and the org overview. |
 | [Applications](/docs/dashboard/applications) | Creating an application and reading the app overview. |
-| [Control Center](/docs/dashboard/control-center) | The cross-platform view of live and rolling-out releases across your apps, with groups and attention filters. |
+| [Control Center](/docs/dashboard/control-center) | The cross-platform view of live and rolling-out releases across your apps, with groups, attention filters, and a Deployments feed. |
 | [Users & roles](/docs/dashboard/users-and-roles) | Inviting users and the RBAC permission model. |
 | [Files](/docs/dashboard/files) | Registering files, version history, and tags. |
 | [Packages](/docs/dashboard/packages) | Bundling an index file plus other files into a package. |

@@ -340,16 +340,24 @@ pub async fn resolve(
     }
     let (_, exps) = super::control_center::experiments(state, org, app).await?;
     for mut op in pending {
-        let found = exps
-            .iter()
-            .any(|e| experiment_matches(&super::control_center::snapshot(e), &op.data["expected"]))
-            || history_confirms(state, &op).await?;
+        let live = exps.iter().find(|e| {
+            experiment_matches(&super::control_center::snapshot(e), &op.data["expected"])
+        });
+        let found = live.is_some() || history_confirms(state, &op).await?;
         if !found {
             return Err(unresolved(&op));
         }
         if apply {
             op.advance("confirmed")?;
-            super::operations::save(state, org, app, "write", "", &op).await?;
+            // The mutation was applied but its response was lost: record its audit
+            // event with the confirmation, atomically, using the journaled intent.
+            let release = op.data["expected"]["id"]
+                .as_str()
+                .map(str::to_owned)
+                .or_else(|| live.map(|e| e.id.clone()))
+                .unwrap_or_default();
+            let event = super::operations::reconciled_event(org, app, &op, &release);
+            super::operations::save_with_event(state, org, app, "write", "", &op, event).await?;
         }
     }
     Ok(())
@@ -404,6 +412,7 @@ fn audit_confirms(mut v: Value, expected: &Value) -> bool {
 // crash, a lost response and a lost advisory session all fail closed durably.
 pub async fn mutate<T, E>(
     expected: Value,
+    audit: Option<super::operations::Audit>,
     future: impl std::future::Future<
         Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
     >,
@@ -411,11 +420,12 @@ pub async fn mutate<T, E>(
 where
     E: std::fmt::Debug,
 {
-    mutate_with_definite_rejections(expected, &[400, 401, 403, 404, 422], future).await
+    mutate_with_definite_rejections(expected, &[400, 401, 403, 404, 422], audit, None, future).await
 }
 
 pub async fn mutate_ramp<T, E>(
     expected: Value,
+    audit: Option<super::operations::Audit>,
     future: impl std::future::Future<
         Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
     >,
@@ -424,12 +434,42 @@ where
     E: std::fmt::Debug,
 {
     // Superposition validates ramp inputs before applying them.
-    mutate_with_definite_rejections(expected, &[400, 422], future).await
+    mutate_with_definite_rejections(expected, &[400, 422], audit, None, future).await
 }
 
+/// A mutation whose release id exists only in the upstream response (release creation).
+pub async fn mutate_created<T, E>(
+    expected: Value,
+    audit: super::operations::Audit,
+    release_of: impl FnOnce(&T) -> String + Send + 'static,
+    future: impl std::future::Future<
+        Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
+    >,
+) -> airborne_types::Result<T>
+where
+    E: std::fmt::Debug,
+{
+    mutate_with_definite_rejections(
+        expected,
+        &[400, 401, 403, 404, 422],
+        Some(audit),
+        Some(Box::new(release_of)),
+        future,
+    )
+    .await
+}
+
+type ReleaseOf<T> = Box<dyn FnOnce(&T) -> String + Send>;
+
+// With `audit`, the event row is written in the same DB transaction as the journal's
+// `confirmed` step: a confirmed mutation cannot exist without its event. If that
+// transaction fails, the entry stays `unresolved` (with the intent journaled), and the
+// next write, or an operator, resolves it and the event is still recorded.
 async fn mutate_with_definite_rejections<T, E>(
     mut expected: Value,
     definite_rejection_statuses: &[u16],
+    audit: Option<super::operations::Audit>,
+    release_of: Option<ReleaseOf<T>>,
     future: impl std::future::Future<
         Output = std::result::Result<T, superposition_sdk::error::SdkError<E>>,
     >,
@@ -438,6 +478,11 @@ where
     E: std::fmt::Debug,
 {
     check().await?;
+    if audit.is_some() && release_of.is_none() && expected["id"].as_str().is_none() {
+        return Err(ABError::InternalServerError(
+            "Audited release mutation has no release id".into(),
+        ));
+    }
     let session = SESSION.with(Arc::clone);
     expected["change_reason"] = Value::String(reason());
     let (workspace, exps) =
@@ -454,6 +499,9 @@ where
         state: "unresolved".into(),
         data: serde_json::json!({"expected":expected,"before":before,"config_before":config_before,"workspace":workspace,"upstream_org":session.state.env.superposition_org_id}),
     };
+    if let Some(audit) = &audit {
+        op.data["audit"] = audit.journal();
+    }
     super::operations::save(&session.state, &session.org, &session.app, "write", "", &op).await?;
     let result = future.await;
     *session.experiments.lock().unwrap() = None;
@@ -461,8 +509,30 @@ where
         Ok(value) => {
             check().await?;
             op.advance("confirmed")?;
-            super::operations::save(&session.state, &session.org, &session.app, "write", "", &op)
-                .await?;
+            let event = audit.map(|audit| {
+                let release = release_of
+                    .map(|f| f(&value))
+                    .or_else(|| expected["id"].as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                super::operations::new_event(
+                    &session.org,
+                    &session.app,
+                    &op,
+                    audit,
+                    &release,
+                    false,
+                )
+            });
+            super::operations::save_with_event(
+                &session.state,
+                &session.org,
+                &session.app,
+                "write",
+                "",
+                &op,
+                event,
+            )
+            .await?;
             Ok(value)
         }
         Err(error) => {

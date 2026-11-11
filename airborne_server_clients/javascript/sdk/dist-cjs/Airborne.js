@@ -20,6 +20,7 @@ const DeleteDimensionCommand_1 = require("./commands/DeleteDimensionCommand");
 const DiscardReleaseCommand_1 = require("./commands/DiscardReleaseCommand");
 const GetControlCenterApprovalPolicyCommand_1 = require("./commands/GetControlCenterApprovalPolicyCommand");
 const GetControlCenterDeploymentRequestCommand_1 = require("./commands/GetControlCenterDeploymentRequestCommand");
+const GetControlCenterDeploymentsCommand_1 = require("./commands/GetControlCenterDeploymentsCommand");
 const GetControlCenterOverviewCommand_1 = require("./commands/GetControlCenterOverviewCommand");
 const GetControlCenterReleaseEventsCommand_1 = require("./commands/GetControlCenterReleaseEventsCommand");
 const GetControlCenterRollbackPreviewCommand_1 = require("./commands/GetControlCenterRollbackPreviewCommand");
@@ -72,6 +73,7 @@ const commands = {
     DiscardReleaseCommand: DiscardReleaseCommand_1.DiscardReleaseCommand,
     GetControlCenterApprovalPolicyCommand: GetControlCenterApprovalPolicyCommand_1.GetControlCenterApprovalPolicyCommand,
     GetControlCenterDeploymentRequestCommand: GetControlCenterDeploymentRequestCommand_1.GetControlCenterDeploymentRequestCommand,
+    GetControlCenterDeploymentsCommand: GetControlCenterDeploymentsCommand_1.GetControlCenterDeploymentsCommand,
     GetControlCenterOverviewCommand: GetControlCenterOverviewCommand_1.GetControlCenterOverviewCommand,
     GetControlCenterReleaseEventsCommand: GetControlCenterReleaseEventsCommand_1.GetControlCenterReleaseEventsCommand,
     GetControlCenterRollbackPreviewCommand: GetControlCenterRollbackPreviewCommand_1.GetControlCenterRollbackPreviewCommand,

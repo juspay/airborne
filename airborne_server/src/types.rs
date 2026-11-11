@@ -43,6 +43,8 @@ pub struct AppState {
     pub authn_provider: Arc<dyn AuthNProvider>,
     pub authz_provider: Arc<dyn AuthZProvider>,
     pub db_pool: db::DbPool,
+    /// Bounds concurrent deployments-feed reads below the pool size (see db::feed_read_permits).
+    pub feed_read_permits: Arc<tokio::sync::Semaphore>,
     pub release_write_db_url: String,
     pub redis_cache: Option<RedisCache>,
     pub s3_client: aws_sdk_s3::Client,

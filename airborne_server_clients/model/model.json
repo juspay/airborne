@@ -1991,6 +1991,9 @@
                     "target": "io.airborne.server#GetControlCenterDeploymentRequest"
                 },
                 {
+                    "target": "io.airborne.server#GetControlCenterDeployments"
+                },
+                {
                     "target": "io.airborne.server#GetControlCenterOverview"
                 },
                 {
@@ -4472,6 +4475,298 @@
                 }
             }
         },
+        "io.airborne.server#DeploymentAction": {
+            "type": "enum",
+            "members": {
+                "CREATED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "created"
+                    }
+                },
+                "RAMPED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "ramped"
+                    }
+                },
+                "CONCLUDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "concluded"
+                    }
+                },
+                "ROLLED_BACK": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rolled_back"
+                    }
+                },
+                "DISCARDED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "discarded"
+                    }
+                },
+                "EMERGENCY_ROLLBACK": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "emergency_rollback"
+                    }
+                },
+                "REQUESTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "requested"
+                    }
+                },
+                "APPROVED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "approved"
+                    }
+                },
+                "REJECTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rejected"
+                    }
+                },
+                "EXPIRED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "expired"
+                    }
+                },
+                "CACHE_FAILED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "cache_failed"
+                    }
+                },
+                "CACHE_RETRIED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "cache_retried"
+                    }
+                },
+                "POLICY_CHANGED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "policy_changed"
+                    }
+                },
+                "EXECUTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "executed"
+                    }
+                },
+                "FAILED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "failed"
+                    }
+                },
+                "STALE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "stale"
+                    }
+                },
+                "CANCELLED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "cancelled"
+                    }
+                },
+                "ROLLBACK_ABANDONED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rollback_abandoned"
+                    }
+                },
+                "EMERGENCY_ACKNOWLEDGED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "emergency_acknowledged"
+                    }
+                }
+            }
+        },
+        "io.airborne.server#DeploymentActionList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#DeploymentAction"
+            }
+        },
+        "io.airborne.server#DeploymentAuditCompleteness": {
+            "type": "structure",
+            "members": {
+                "complete": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "False while any recorded history may be missing events.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "transactional_actions": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Actions whose rows are committed with the state change they describe.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "best_effort_actions": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Actions whose rows are written afterwards and can be lost.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "notes": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "What the feed can and cannot promise about its own completeness."
+            }
+        },
+        "io.airborne.server#DeploymentEvent": {
+            "type": "structure",
+            "members": {
+                "event_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "org": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "group": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "app": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "platform": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "release_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "package_version": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "request_id": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "The approval request this event belongs to, or JSON null. Set on a request's own events (requested,\napproved, rejected, cancelled, expired, stale, failed, executed) and on a release write that an approved\nrequest made. Null for writes made without a request and for older events that did not record one.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "action": {
+                    "target": "io.airborne.server#DeploymentAction",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "recovered": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "True when an operator confirmed this write after an ambiguous upstream result;\n`action` is the action that write completed.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "actor": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "from_target": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "to_target": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "summary": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#DeploymentEventList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#DeploymentEvent"
+            }
+        },
+        "io.airborne.server#DeploymentReadError": {
+            "type": "structure",
+            "members": {
+                "org": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "app": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#DeploymentReadErrorList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#DeploymentReadError"
+            }
+        },
         "io.airborne.server#DeploymentRequestAction": {
             "type": "enum",
             "members": {
@@ -5285,6 +5580,141 @@
                 }
             }
         },
+        "io.airborne.server#GetControlCenterDeployments": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetControlCenterDeploymentsInput"
+            },
+            "output": {
+                "target": "io.airborne.server#GetControlCenterDeploymentsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/deployments"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#GetControlCenterDeploymentsInput": {
+            "type": "structure",
+            "members": {
+                "org": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "org"
+                    }
+                },
+                "group": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "group"
+                    }
+                },
+                "app": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "app"
+                    }
+                },
+                "action": {
+                    "target": "io.airborne.server#DeploymentActionList",
+                    "traits": {
+                        "smithy.api#httpQuery": "action"
+                    }
+                },
+                "platform": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "platform"
+                    }
+                },
+                "actor": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "actor"
+                    }
+                },
+                "since": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "since"
+                    }
+                },
+                "cursor": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "cursor"
+                    }
+                },
+                "limit": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#httpQuery": "limit",
+                        "smithy.api#range": {
+                            "min": 1,
+                            "max": 200
+                        }
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Durable cross-app audit feed, newest first. Reuse cursors with identical filters."
+            }
+        },
+        "io.airborne.server#GetControlCenterDeploymentsResponse": {
+            "type": "structure",
+            "members": {
+                "items": {
+                    "target": "io.airborne.server#DeploymentEventList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "next_cursor": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "partial": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "errors": {
+                    "target": "io.airborne.server#DeploymentReadErrorList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "audit_completeness": {
+                    "target": "io.airborne.server#DeploymentAuditCompleteness",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
         "io.airborne.server#GetControlCenterOverview": {
             "type": "operation",
             "input": {
@@ -5325,7 +5755,26 @@
         },
         "io.airborne.server#GetControlCenterOverviewInput": {
             "type": "structure",
-            "members": {},
+            "members": {
+                "org": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "org"
+                    }
+                },
+                "group": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "group"
+                    }
+                },
+                "app": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "app"
+                    }
+                }
+            },
             "traits": {
                 "smithy.api#documentation": "Overview is user-scoped and does not require organisation/application scope headers."
             }

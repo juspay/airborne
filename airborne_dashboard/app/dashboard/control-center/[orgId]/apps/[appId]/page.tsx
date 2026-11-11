@@ -26,11 +26,14 @@ import { AppStatusRow, RowHeader } from "@/components/control-center/app-status-
 import { ServingChip, ServingPolicyPanel } from "@/components/control-center/serving-policy";
 import { DeploymentFlags, DeviceReportsPanel, ExclusionsPanel } from "@/components/control-center/telemetry";
 import { hasExclusions } from "@/lib/control-center/telemetry";
+import { filterOverview, scopeOutcome } from "@/lib/control-center/scope";
+import { OrgReadNotice } from "@/components/control-center/read-notice";
+import { NotFoundActions } from "@/components/control-center/not-found-actions";
 import { EmergencyReviewCard } from "@/components/control-center/emergency-review";
 import { RequestRow } from "@/components/control-center/request-card";
 import { PolicySummary } from "@/components/control-center/approval-policy-editor";
 import { BlockSkeleton, EmptyState, ErrorState, Panel, PanelTitle } from "@/components/control-center/states";
-import { approvalPolicyPath, CC_ROOT, classicAppPath, groupPath } from "@/components/control-center/paths";
+import { approvalPolicyPath, CC_ROOT, classicAppSummaryPath } from "@/components/control-center/paths";
 import { ClassicLink } from "@/components/control-center/classic-link";
 
 /**
@@ -52,6 +55,11 @@ export default function ControlCenterAppPage() {
   const { overview, error, isLoading, isValidating, lastUpdatedAt, pollMs, refresh } = useOverview();
   const located = useMemo(() => locateApp(overview, orgId, appId), [overview, orgId, appId]);
   const status = located.app;
+  // A missing application in an organisation whose read was cut short is unconfirmed, not gone.
+  const outcome = useMemo(
+    () => scopeOutcome(filterOverview(overview, { org: orgId, app: appId }), { org: orgId, app: appId }),
+    [overview, orgId, appId]
+  );
   const permissions = useReleasePermissions(orgId, appId);
   // The overview carries the policy too; this read is what a change refreshes first.
   const serving = useServingPolicy(orgId, appId);
@@ -78,17 +86,10 @@ export default function ControlCenterAppPage() {
     void device.refresh();
   };
 
-  const crumbs = [
-    { label: "Control Center", href: CC_ROOT },
-    ...(located.group ? [{ label: located.group.name, href: groupPath(orgId, located.group.id) }] : [{ label: orgId }]),
-    { label: appId },
-  ];
-
   return (
     <>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6">
         <CcPageHeader
-          crumbs={crumbs}
           title={
             <span className="inline-flex items-baseline gap-3">
               <span className="font-mono">{appId}</span>
@@ -140,15 +141,24 @@ export default function ControlCenterAppPage() {
         ) : error && !overview ? (
           <ErrorState title="Could not load this application" message={error.message} onRetry={refresh} />
         ) : !status ? (
-          <EmptyState
-            title={`${appId} is not readable in ${orgId}`}
-            message="It may not exist, or your role may not include it."
-            action={
-              <Button asChild variant="outline" size="sm">
-                <Link href={CC_ROOT}>Back to Control Center</Link>
-              </Button>
-            }
-          />
+          outcome === "unconfirmed" ? (
+            <>
+              {overview?.organisations.map((o) => (
+                <OrgReadNotice key={o.name} org={o} />
+              ))}
+              <ErrorState
+                title={`Could not confirm ${appId} in ${orgId}`}
+                message="The read that lists this organisation's applications did not finish, so this is not the same as the application being gone. Try again."
+                onRetry={refresh}
+              />
+            </>
+          ) : (
+            <EmptyState
+              title={`${appId} was not found, or you have no access`}
+              message={`Either ${orgId} has no application by that name, or your role cannot read it. This says nothing about whether anything is live.`}
+              action={<NotFoundActions org={orgId} base={CC_ROOT} />}
+            />
+          )
         ) : (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(19rem,1fr)]">
             <div className="min-w-0 space-y-4">
@@ -265,7 +275,7 @@ export default function ControlCenterAppPage() {
         )}
         {status && (
           <ClassicLink
-            href={classicAppPath(orgId, appId)}
+            href={classicAppSummaryPath(orgId, appId)}
             setUp={
               approvalKnown && !approvalOn
                 ? { href: approvalPolicyPath(orgId, appId), label: "Set up approvals" }

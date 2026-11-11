@@ -72,6 +72,10 @@ import {
   GetControlCenterDeploymentRequestCommandOutput,
 } from "../commands/GetControlCenterDeploymentRequestCommand";
 import {
+  GetControlCenterDeploymentsCommandInput,
+  GetControlCenterDeploymentsCommandOutput,
+} from "../commands/GetControlCenterDeploymentsCommand";
+import {
   GetControlCenterOverviewCommandInput,
   GetControlCenterOverviewCommandOutput,
 } from "../commands/GetControlCenterOverviewCommand";
@@ -216,6 +220,8 @@ import {
   CreateFileResponse,
   CreateReleaseRequestConfig,
   CreateReleaseRequestPackage,
+  DeploymentEvent,
+  DeploymentReadError,
   DeploymentRequestInputPayload,
   DeploymentRequestPayload,
   DimensionResponse,
@@ -716,6 +722,36 @@ export const se_GetControlCenterDeploymentRequestCommand = async(
 }
 
 /**
+ * serializeAws_restJson1GetControlCenterDeploymentsCommand
+ */
+export const se_GetControlCenterDeploymentsCommand = async(
+  input: GetControlCenterDeploymentsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = {
+  };
+  b.bp("/api/control-center/deployments");
+  const query: any = map({
+    [_or]: [,input[_or]!],
+    [_g]: [,input[_g]!],
+    [_ap]: [,input[_ap]!],
+    [_ac]: [() => input.action !== void 0, () => ((input[_ac]! || []))],
+    [_p]: [,input[_p]!],
+    [_act]: [,input[_act]!],
+    [_s]: [,input[_s]!],
+    [_c]: [,input[_c]!],
+    [_l]: [() => input.limit !== void 0, () => (input[_l]!.toString())],
+  });
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .q(query)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1GetControlCenterOverviewCommand
  */
 export const se_GetControlCenterOverviewCommand = async(
@@ -726,9 +762,15 @@ export const se_GetControlCenterOverviewCommand = async(
   const headers: any = {
   };
   b.bp("/api/control-center/overview");
+  const query: any = map({
+    [_or]: [,input[_or]!],
+    [_g]: [,input[_g]!],
+    [_ap]: [,input[_ap]!],
+  });
   let body: any;
   b.m("GET")
   .h(headers)
+  .q(query)
   .b(body);
   return b.build();
 }
@@ -892,7 +934,7 @@ export const se_ListControlCenterDeploymentRequestsCommand = async(
   });
   b.bp("/api/control-center/deployment-requests");
   const query: any = map({
-    [_s]: [,input[_s]!],
+    [_st]: [,input[_st]!],
   });
   let body: any;
   b.m("GET")
@@ -935,7 +977,7 @@ export const se_ListControlCenterOperationsCommand = async(
   });
   b.bp("/api/control-center/operations");
   const query: any = map({
-    [_s]: [,input[_s]!],
+    [_st]: [,input[_st]!],
   });
   let body: any;
   b.m("GET")
@@ -959,8 +1001,8 @@ export const se_ListDimensionsCommand = async(
   });
   b.bp("/api/organisations/applications/dimension/list");
   const query: any = map({
-    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
-    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_pa]: [() => input.page !== void 0, () => (input[_pa]!.toString())],
+    [_co]: [() => input.count !== void 0, () => (input[_co]!.toString())],
   });
   let body: any;
   b.m("GET")
@@ -984,8 +1026,8 @@ export const se_ListFileGroupsCommand = async(
   });
   b.bp("/api/file/groups");
   const query: any = map({
-    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
-    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_pa]: [() => input.page !== void 0, () => (input[_pa]!.toString())],
+    [_co]: [() => input.count !== void 0, () => (input[_co]!.toString())],
     [_se]: [,input[_se]!],
     [_t]: [,input[_t]!],
   });
@@ -1011,7 +1053,7 @@ export const se_ListFilesCommand = async(
   });
   b.bp("/api/file/list");
   const query: any = map({
-    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
+    [_pa]: [() => input.page !== void 0, () => (input[_pa]!.toString())],
     [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
     [_se]: [,input[_se]!],
     [_t]: [,input[_t]!],
@@ -1056,8 +1098,8 @@ export const se_ListPackagesCommand = async(
   });
   b.bp("/api/packages/list");
   const query: any = map({
-    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
-    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_pa]: [() => input.page !== void 0, () => (input[_pa]!.toString())],
+    [_co]: [() => input.count !== void 0, () => (input[_co]!.toString())],
     [_se]: [,input[_se]!],
     [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
   });
@@ -1084,10 +1126,10 @@ export const se_ListReleasesCommand = async(
   });
   b.bp("/api/releases/list");
   const query: any = map({
-    [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
-    [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
+    [_pa]: [() => input.page !== void 0, () => (input[_pa]!.toString())],
+    [_co]: [() => input.count !== void 0, () => (input[_co]!.toString())],
     [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
-    [_s]: [,input[_s]!],
+    [_st]: [,input[_st]!],
   });
   let body: any;
   b.m("GET")
@@ -1954,6 +1996,31 @@ export const de_GetControlCenterDeploymentRequestCommand = async(
     'result': _ => de_Document(_, context),
     'status': __expectString,
     'updated_at': _ => __expectNonNull(__parseEpochTimestamp(__expectNumber(_))),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetControlCenterDeploymentsCommand
+ */
+export const de_GetControlCenterDeploymentsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetControlCenterDeploymentsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'audit_completeness': _json,
+    'errors': _ => de_DeploymentReadErrorList(_, context),
+    'items': _ => de_DeploymentEventList(_, context),
+    'next_cursor': _ => de_Document(_, context),
+    'partial': __expectBoolean,
   });
   Object.assign(contents, doc);
   return contents;
@@ -3509,6 +3576,74 @@ const de_CommandError = async(
     }) as any;
   }
 
+  // de_DeploymentAuditCompleteness omitted.
+
+  /**
+   * deserializeAws_restJson1DeploymentEvent
+   */
+  const de_DeploymentEvent = (
+    output: any,
+    context: __SerdeContext
+  ): DeploymentEvent => {
+    return take(output, {
+      'action': __expectString,
+      'actor': (_: any) => de_Document(_, context),
+      'app': __expectString,
+      'at': __expectString,
+      'event_id': __expectString,
+      'from_target': (_: any) => de_Document(_, context),
+      'group': (_: any) => de_Document(_, context),
+      'org': __expectString,
+      'package_version': (_: any) => de_Document(_, context),
+      'platform': (_: any) => de_Document(_, context),
+      'recovered': __expectBoolean,
+      'release_id': (_: any) => de_Document(_, context),
+      'request_id': (_: any) => de_Document(_, context),
+      'summary': __expectString,
+      'to_target': (_: any) => de_Document(_, context),
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1DeploymentEventList
+   */
+  const de_DeploymentEventList = (
+    output: any,
+    context: __SerdeContext
+  ): (DeploymentEvent)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_DeploymentEvent(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1DeploymentReadError
+   */
+  const de_DeploymentReadError = (
+    output: any,
+    context: __SerdeContext
+  ): DeploymentReadError => {
+    return take(output, {
+      'app': (_: any) => de_Document(_, context),
+      'org': __expectString,
+      'reason': __expectString,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1DeploymentReadErrorList
+   */
+  const de_DeploymentReadErrorList = (
+    output: any,
+    context: __SerdeContext
+  ): (DeploymentReadError)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_DeploymentReadError(entry, context);
+    });
+    return retVal;
+  }
+
   /**
    * deserializeAws_restJson1DeploymentRequestPayload
    */
@@ -3769,17 +3904,26 @@ const de_CommandError = async(
   const collectBodyString = (streamBody: any, context: __SerdeContext): Promise<string> => collectBody(streamBody, context).then(body => context.utf8Encoder(body))
 
   const _a = "application";
+  const _ac = "action";
+  const _act = "actor";
   const _al = "all";
-  const _c = "count";
+  const _ap = "app";
+  const _c = "cursor";
   const _ch = "checksum";
+  const _co = "count";
   const _d = "dimension";
   const _fp = "file_path";
+  const _g = "group";
+  const _l = "limit";
   const _nv = "native_version";
   const _o = "organisation";
-  const _p = "page";
+  const _or = "org";
+  const _p = "platform";
+  const _pa = "page";
   const _pp = "per_page";
-  const _s = "status";
+  const _s = "since";
   const _se = "search";
+  const _st = "status";
   const _t = "tags";
   const _ta = "tag";
   const _tp = "telemetry_platform";

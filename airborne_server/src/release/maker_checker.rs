@@ -319,6 +319,11 @@ fn transition_allowed(from: &str, to: &str) -> bool {
             | ("failed", "executing" | "expired" | "stale")
     )
 }
+#[derive(QueryableByName)]
+struct ClosedRow {
+    #[diesel(sql_type=Bool)]
+    closed: bool,
+}
 async fn save_request(
     org: &str,
     app: &str,
@@ -341,6 +346,16 @@ async fn save_request(
     );
     let copy = data.clone();
     write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{
+        if status=="executing" {
+            // Shared with deletion's exclusive lock: either the delete saw this request
+            // executing (and refused), or this sees the organisation closed. A closure only
+            // blocks for 10 minutes: a process that died between closing and deleting must
+            // not freeze a live organisation, and a deleted one has no permissions anyway.
+            diesel::sql_query(format!("SELECT pg_advisory_xact_lock_shared({})",crate::organisation::cleanup::LOCK_SQL)).bind::<Text,_>(&org).execute(c)?;
+            if diesel::sql_query("SELECT EXISTS(SELECT 1 FROM hyperotaserver.organisation_epochs WHERE org_id=$1 AND closed_at > now() - interval '10 minutes') AS closed").bind::<Text,_>(&org).get_result::<ClosedRow>(c)?.closed {
+                return Err(coded(409,"organisation_deleted","The organisation was deleted; this request cannot run"));
+            }
+        }
         let changed = diesel::sql_query("UPDATE hyperotaserver.deployment_requests SET status=$1,data=$2,updated_at=now() WHERE id=$3 AND org_id=$4 AND app_id=$5 AND status=$6").bind::<Text,_>(&status).bind::<Jsonb,_>(&copy).bind::<SqlUuid,_>(Uuid::parse_str(copy["id"].as_str().unwrap()).unwrap()).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(&previous).execute(c)?;
         if changed != 1 { return Err(coded(409,"not_pending","Request status changed; refresh before deciding")); }
         diesel::sql_query("INSERT INTO hyperotaserver.release_events(id,org_id,app_id,release_id,action,actor,payload) VALUES($1,$2,$3,$4,$5,$6,$7)").bind::<SqlUuid,_>(Uuid::new_v4()).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(copy["payload"]["release_id"].as_str().unwrap_or("")).bind::<Text,_>(if status=="executing"{"approved"}else{&status}).bind::<Text,_>(&actor).bind::<Jsonb,_>(&copy).execute(c)?;Ok(())
@@ -599,23 +614,45 @@ async fn list_requests(
         .as_ref()
         .map(|a| a.name.as_str())
         .unwrap_or("");
+    // A reader of the organisation may act on every request in it; otherwise a request is
+    // listed only when the caller can read releases of *that* application. This is the
+    // same rule `#[authz]` applies to the single-request GET (organisation scope first,
+    // then application scope), so the queue never shows what the request page would refuse.
+    let org_read = state
+        .authz_provider
+        .enforce_permission(&state, &auth_response.sub, &org, None, "release", "read")
+        .await?;
+    let mut app_read: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
     let mut data = Vec::new();
     for r in request_queue(&state, &org, app, filter.status.as_deref()).await? {
         if filter.status.as_ref().is_some_and(|s| r["status"] != *s) {
             continue;
         }
-        if state
-            .authz_provider
-            .enforce_permission(
-                &state,
-                &auth_response.sub,
-                &org,
-                r["application"].as_str(),
-                "release",
-                "read",
-            )
-            .await?
-        {
+        let allowed = if org_read {
+            true
+        } else {
+            let request_app = r["application"].as_str().unwrap_or("").to_owned();
+            match app_read.get(&request_app) {
+                Some(allowed) => *allowed,
+                None => {
+                    let allowed = !request_app.is_empty()
+                        && state
+                            .authz_provider
+                            .enforce_permission(
+                                &state,
+                                &auth_response.sub,
+                                &org,
+                                Some(&request_app),
+                                "release",
+                                "read",
+                            )
+                            .await?;
+                    app_read.insert(request_app, allowed);
+                    allowed
+                }
+            }
+        };
+        if allowed {
             data.push(r)
         }
     }

@@ -50,6 +50,7 @@ pub fn purge_rows(c: &mut PgConnection, org: &str) -> QueryResult<()> {
     }
     Ok(())
 }
+#[cfg(test)]
 pub async fn reset(mut c: PgConnection, org: &str) -> Result<PgConnection> {
     let org = org.to_owned();
     web::block(move || {

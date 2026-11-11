@@ -228,6 +228,27 @@ export const RollbackSensitiveReason = {
     ONE_WAY_MIGRATION: "one_way_migration",
     SECURITY: "security",
 };
+export const DeploymentAction = {
+    APPROVED: "approved",
+    CACHE_FAILED: "cache_failed",
+    CACHE_RETRIED: "cache_retried",
+    CANCELLED: "cancelled",
+    CONCLUDED: "concluded",
+    CREATED: "created",
+    DISCARDED: "discarded",
+    EMERGENCY_ACKNOWLEDGED: "emergency_acknowledged",
+    EMERGENCY_ROLLBACK: "emergency_rollback",
+    EXECUTED: "executed",
+    EXPIRED: "expired",
+    FAILED: "failed",
+    POLICY_CHANGED: "policy_changed",
+    RAMPED: "ramped",
+    REJECTED: "rejected",
+    REQUESTED: "requested",
+    ROLLBACK_ABANDONED: "rollback_abandoned",
+    ROLLED_BACK: "rolled_back",
+    STALE: "stale",
+};
 export const ControlCenterReleaseEventAction = {
     APPROVED: "approved",
     CANCELLED: "cancelled",

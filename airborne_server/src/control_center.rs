@@ -29,6 +29,7 @@ use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
+mod deployments;
 type Result<T> = crate::types::Result<T>;
 /// Turn a unique-constraint violation into a message that says what clashed.
 fn on_unique(message: String) -> impl FnOnce(diesel::result::Error) -> ABError {
@@ -75,6 +76,7 @@ pub fn add_routes() -> Scope {
         .configure(crate::release::serving_policy::routes)
         .service(crate::telemetry::read)
         .service(overview)
+        .service(deployments::feed)
         .service(list_groups)
         .service(create_group)
         .service(update_group)
@@ -294,6 +296,7 @@ async fn delete_group(
 }
 #[get("/overview")]
 async fn overview(
+    query: web::Query<deployments::ScopeFilter>,
     auth_response: ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> Result<Json<Value>> {
@@ -313,9 +316,20 @@ async fn overview(
     let mut organisations = Vec::new();
     let mut queues = Vec::new();
     for org in access.organisations {
+        if !query.includes_org(&org.name) {
+            continue;
+        }
+        let scoped_apps = deployments::scope_apps(&state, &org.name, &query).await?;
         let mut allowed = Vec::new();
         let mut authorization_error = false;
         for app in org.applications {
+            if !query.includes_app(&app.application)
+                || scoped_apps
+                    .as_ref()
+                    .is_some_and(|apps| !apps.contains(&app.application))
+            {
+                continue;
+            }
             if tokio::time::timeout_at(deadline, async {
                 // Match app endpoints and enforce-batch: organisation permissions
                 // also authorize reads of applications inside that organisation.
@@ -499,6 +513,12 @@ async fn overview(
     }
     for (index, org) in organisations.iter_mut().enumerate() {
         let mut grouped = std::collections::HashSet::new();
+        org["groups"].as_array_mut().unwrap().retain(|g| {
+            query
+                .group
+                .as_ref()
+                .is_none_or(|id| g["id"].as_str() == Some(id.as_str()))
+        });
         for group in org["groups"].as_array_mut().unwrap() {
             let members = group["members"]
                 .as_array()

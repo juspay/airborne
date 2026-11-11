@@ -78,6 +78,10 @@ import {
   GetControlCenterDeploymentRequestCommandOutput,
 } from "./commands/GetControlCenterDeploymentRequestCommand";
 import {
+  GetControlCenterDeploymentsCommandInput,
+  GetControlCenterDeploymentsCommandOutput,
+} from "./commands/GetControlCenterDeploymentsCommand";
+import {
   GetControlCenterOverviewCommandInput,
   GetControlCenterOverviewCommandOutput,
 } from "./commands/GetControlCenterOverviewCommand";
@@ -289,6 +293,7 @@ export type ServiceInputTypes =
   | DiscardReleaseCommandInput
   | GetControlCenterApprovalPolicyCommandInput
   | GetControlCenterDeploymentRequestCommandInput
+  | GetControlCenterDeploymentsCommandInput
   | GetControlCenterOverviewCommandInput
   | GetControlCenterReleaseEventsCommandInput
   | GetControlCenterRollbackPreviewCommandInput
@@ -344,6 +349,7 @@ export type ServiceOutputTypes =
   | DiscardReleaseCommandOutput
   | GetControlCenterApprovalPolicyCommandOutput
   | GetControlCenterDeploymentRequestCommandOutput
+  | GetControlCenterDeploymentsCommandOutput
   | GetControlCenterOverviewCommandOutput
   | GetControlCenterReleaseEventsCommandOutput
   | GetControlCenterRollbackPreviewCommandOutput

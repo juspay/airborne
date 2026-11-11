@@ -48,7 +48,7 @@ const META: Record<ReleaseEventAction, { icon: ComponentType<{ className?: strin
   failed: { icon: AlertTriangle, tone: "danger", label: "Execution failed" },
   emergency_rollback: { icon: Siren, tone: "emergency", label: "Emergency rollback" },
   emergency_acknowledged: { icon: Eye, tone: "emergency", label: "Emergency rollback reviewed" },
-  policy_changed: { icon: ShieldCheck, tone: "approval", label: "Approval policy changed" },
+  policy_changed: { icon: ShieldCheck, tone: "approval", label: "Policy changed" },
   // App-wide CDN cache events. A failure means cached release answers can stay stale for up to a day.
   cache_invalidated: { icon: Cloud, tone: "muted", label: "CDN cache cleared" },
   cache_invalidation_failed: { icon: CloudOff, tone: "waiting", label: "CDN cache not cleared" },

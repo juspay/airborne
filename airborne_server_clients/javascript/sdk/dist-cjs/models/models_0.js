@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UploadFileRequestFilterSensitiveLog = exports.RollbackReplacementChangedError = exports.RollbackReleaseAction = exports.ReleaseSupersededError = exports.ResolvedOperationState = exports.OperationRecoveryFinding = exports.TooManyRequestsError = exports.ServiceUnavailableError = exports.ControlCenterReleaseOutcome = exports.ControlCenterReleaseEventAction = exports.RollbackSensitiveReason = exports.DimensionType = exports.ControlCenterPlatform = exports.ApprovalRequiredError = exports.UnresolvedOperationError = exports.RollbackUnprocessableError = exports.RollbackPartialFailureError = exports.RollbackFailureStage = exports.DeploymentRequestStatus = exports.DeploymentRequestAction = exports.Unauthorized = exports.NotFoundError = exports.InternalServerError = exports.ForbiddenError = exports.ConflictError = exports.BadRequestError = void 0;
+exports.UploadFileRequestFilterSensitiveLog = exports.RollbackReplacementChangedError = exports.RollbackReleaseAction = exports.ReleaseSupersededError = exports.ResolvedOperationState = exports.OperationRecoveryFinding = exports.TooManyRequestsError = exports.ServiceUnavailableError = exports.ControlCenterReleaseOutcome = exports.ControlCenterReleaseEventAction = exports.DeploymentAction = exports.RollbackSensitiveReason = exports.DimensionType = exports.ControlCenterPlatform = exports.ApprovalRequiredError = exports.UnresolvedOperationError = exports.RollbackUnprocessableError = exports.RollbackPartialFailureError = exports.RollbackFailureStage = exports.DeploymentRequestStatus = exports.DeploymentRequestAction = exports.Unauthorized = exports.NotFoundError = exports.InternalServerError = exports.ForbiddenError = exports.ConflictError = exports.BadRequestError = void 0;
 const AirborneServiceException_1 = require("./AirborneServiceException");
 class BadRequestError extends AirborneServiceException_1.AirborneServiceException {
     name = "BadRequestError";
@@ -240,6 +240,27 @@ exports.DimensionType = {
 exports.RollbackSensitiveReason = {
     ONE_WAY_MIGRATION: "one_way_migration",
     SECURITY: "security",
+};
+exports.DeploymentAction = {
+    APPROVED: "approved",
+    CACHE_FAILED: "cache_failed",
+    CACHE_RETRIED: "cache_retried",
+    CANCELLED: "cancelled",
+    CONCLUDED: "concluded",
+    CREATED: "created",
+    DISCARDED: "discarded",
+    EMERGENCY_ACKNOWLEDGED: "emergency_acknowledged",
+    EMERGENCY_ROLLBACK: "emergency_rollback",
+    EXECUTED: "executed",
+    EXPIRED: "expired",
+    FAILED: "failed",
+    POLICY_CHANGED: "policy_changed",
+    RAMPED: "ramped",
+    REJECTED: "rejected",
+    REQUESTED: "requested",
+    ROLLBACK_ABANDONED: "rollback_abandoned",
+    ROLLED_BACK: "rolled_back",
+    STALE: "stale",
 };
 exports.ControlCenterReleaseEventAction = {
     APPROVED: "approved",

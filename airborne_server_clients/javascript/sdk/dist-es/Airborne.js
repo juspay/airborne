@@ -17,6 +17,7 @@ import { DeleteDimensionCommand, } from "./commands/DeleteDimensionCommand";
 import { DiscardReleaseCommand, } from "./commands/DiscardReleaseCommand";
 import { GetControlCenterApprovalPolicyCommand, } from "./commands/GetControlCenterApprovalPolicyCommand";
 import { GetControlCenterDeploymentRequestCommand, } from "./commands/GetControlCenterDeploymentRequestCommand";
+import { GetControlCenterDeploymentsCommand, } from "./commands/GetControlCenterDeploymentsCommand";
 import { GetControlCenterOverviewCommand, } from "./commands/GetControlCenterOverviewCommand";
 import { GetControlCenterReleaseEventsCommand, } from "./commands/GetControlCenterReleaseEventsCommand";
 import { GetControlCenterRollbackPreviewCommand, } from "./commands/GetControlCenterRollbackPreviewCommand";
@@ -69,6 +70,7 @@ const commands = {
     DiscardReleaseCommand,
     GetControlCenterApprovalPolicyCommand,
     GetControlCenterDeploymentRequestCommand,
+    GetControlCenterDeploymentsCommand,
     GetControlCenterOverviewCommand,
     GetControlCenterReleaseEventsCommand,
     GetControlCenterRollbackPreviewCommand,

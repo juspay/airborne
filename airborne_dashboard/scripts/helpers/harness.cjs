@@ -22,7 +22,17 @@ function load(name) {
   const out = ts.transpileModule(fs.readFileSync(file, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  vm.runInNewContext(out, { exports: mod.exports, module: mod, require: requireFrom, Intl, Error, Date, Math, URL });
+  vm.runInNewContext(out, {
+    exports: mod.exports,
+    module: mod,
+    require: requireFrom,
+    Intl,
+    Error,
+    Date,
+    Math,
+    URL,
+    URLSearchParams,
+  });
   return mod.exports;
 }
 

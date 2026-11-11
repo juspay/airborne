@@ -94,6 +94,11 @@ import {
   GetControlCenterDeploymentRequestCommandOutput,
 } from "./commands/GetControlCenterDeploymentRequestCommand";
 import {
+  GetControlCenterDeploymentsCommand,
+  GetControlCenterDeploymentsCommandInput,
+  GetControlCenterDeploymentsCommandOutput,
+} from "./commands/GetControlCenterDeploymentsCommand";
+import {
   GetControlCenterOverviewCommand,
   GetControlCenterOverviewCommandInput,
   GetControlCenterOverviewCommandOutput,
@@ -275,6 +280,7 @@ const commands = {
   DiscardReleaseCommand,
   GetControlCenterApprovalPolicyCommand,
   GetControlCenterDeploymentRequestCommand,
+  GetControlCenterDeploymentsCommand,
   GetControlCenterOverviewCommand,
   GetControlCenterReleaseEventsCommand,
   GetControlCenterRollbackPreviewCommand,
@@ -614,6 +620,24 @@ export interface Airborne {
     args: GetControlCenterDeploymentRequestCommandInput,
     options: __HttpHandlerOptions,
     cb: (err: any, data?: GetControlCenterDeploymentRequestCommandOutput) => void
+  ): void;
+
+  /**
+   * @see {@link GetControlCenterDeploymentsCommand}
+   */
+  getControlCenterDeployments(): Promise<GetControlCenterDeploymentsCommandOutput>;
+  getControlCenterDeployments(
+    args: GetControlCenterDeploymentsCommandInput,
+    options?: __HttpHandlerOptions,
+  ): Promise<GetControlCenterDeploymentsCommandOutput>;
+  getControlCenterDeployments(
+    args: GetControlCenterDeploymentsCommandInput,
+    cb: (err: any, data?: GetControlCenterDeploymentsCommandOutput) => void
+  ): void;
+  getControlCenterDeployments(
+    args: GetControlCenterDeploymentsCommandInput,
+    options: __HttpHandlerOptions,
+    cb: (err: any, data?: GetControlCenterDeploymentsCommandOutput) => void
   ): void;
 
   /**

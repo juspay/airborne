@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Activity,
+  History,
   Package,
   Rocket,
   Plus,
@@ -30,9 +31,10 @@ import {
   Users,
   TowerControl,
   Menu,
+  UserCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAppContext } from "@/providers/app-context";
 import { FileCreationModal } from "@/components/file-creation-modal";
@@ -44,6 +46,23 @@ import { Label } from "./ui/label";
 import { OrganisationsList } from "@/app/dashboard/page";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { ScopePicker } from "@/components/scope/scope-picker";
+import { CreateChooser } from "@/components/scope/create-chooser";
+import { cn } from "@/lib/utils";
+import { QUIET_BUTTON } from "@/components/scope/quiet-focus";
+import { useScope } from "@/components/scope/use-scope";
+import { useRememberedScope } from "@/components/scope/use-remembered-scope";
+import { useScopeGroups } from "@/lib/control-center/hooks";
+import {
+  appChoices,
+  appKnown,
+  APPROVALS_BASE,
+  buildScopeTree,
+  CC_BASE,
+  DEPLOYMENTS_BASE,
+  overviewHref,
+  scopedHref,
+} from "@/lib/control-center/scope";
 
 interface SharedLayoutProps {
   children: React.ReactNode;
@@ -51,6 +70,16 @@ interface SharedLayoutProps {
 }
 
 type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
+/**
+ * A heading and its links. The heading names what the links belong to: Control Center, an organisation, an
+ * application. All headings look the same; the kind comes first so a name is never taken for another kind.
+ */
+type NavSection = { key: string; heading: string; items: NavItem[] };
+
+// One line, always: a long name is cut with an ellipsis and the full heading is the tooltip (title). A heading that
+// wraps makes one section taller than another for no reason a person can use.
+const HEADING_CLASS =
+  "truncate px-3 pb-1 text-[11px] font-semibold uppercase leading-snug tracking-wider text-muted-foreground";
 
 const LAYOUT_AUTHZ = definePagePermissions({
   create_file: permission("file", "create", "app"),
@@ -60,7 +89,7 @@ const LAYOUT_AUTHZ = definePagePermissions({
 });
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, logout, config } = useAppContext();
+  const { org, app, setOrg, setApp, user, token, logout, config } = useAppContext();
   const permissions = usePagePermissions(LAYOUT_AUTHZ);
   const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
@@ -75,11 +104,9 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   const requestOrgNameError = useMemo(() => validateOrgAppName(reqOrgName, "Organisation"), [reqOrgName]);
   const createOrgNameError = useMemo(() => validateOrgAppName(orgName, "Organisation"), [orgName]);
 
-  // pathname is used in the useIsActive function below
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const pathname = usePathname();
+  const scope = useScope();
 
-  const appIdPath = useParams().appId as string;
   const canReadTokens = permissions.can("read_tokens");
   const canCreateFile = permissions.can("create_file");
   const canCreatePackage = permissions.can("create_package");
@@ -89,12 +116,57 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   const { data: orgsData } = useSWR(token ? "/organisations" : null, (url) =>
     apiFetch<OrganisationsList>(url, {}, { token })
   );
-  const organisations: {
-    name: string;
-    applications: { application: string; organisation: string }[];
-  }[] = orgsData?.organisations || [];
+  const organisations = useMemo(
+    () =>
+      (orgsData?.organisations ?? []) as {
+        name: string;
+        applications: { application: string; organisation: string }[];
+      }[],
+    [orgsData]
+  );
 
-  const appsForOrg = organisations.find((o) => o.name === org)?.applications?.map((a) => a.application) || [];
+  // The scope in the URL is the truth. The context keeps following it for the places that still read it (Create, the
+  // file dialog): never an application the URL does not name, and never an organisation the caller does not have
+  // (a mistyped ?org= must not send permission checks to an organisation that is not theirs).
+  const orgKnown = organisations.some((o) => o.name === scope.org);
+  useRememberedScope(scope, organisations);
+  // An application the URL names but the caller does not have (mistyped, another organisation's, no access) is not
+  // offered a sidebar section or a Create: the page says it was not found.
+  const appIsKnown = appKnown(organisations, scope.org, scope.app) === true;
+  const scopedApp = scope.org && scope.app && orgKnown && appIsKnown ? { org: scope.org, app: scope.app } : null;
+  useEffect(() => {
+    if (scope.org && orgKnown && scope.org !== org) setOrg(scope.org);
+    if (!scope.app || (orgKnown && !appIsKnown)) {
+      if (app !== null) setApp(null);
+    } else if (orgKnown && appIsKnown && (pathname ?? "").startsWith(CC_BASE) && scope.app !== app) {
+      setApp(scope.app);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope.org, scope.app, pathname, orgKnown, appIsKnown]);
+
+  // "Which app?": Create is always in the top bar, and asks first when no application is in scope.
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [picked, setPicked] = useState<{ org: string; app: string } | null>(null);
+  const [fileFromChooser, setFileFromChooser] = useState(false);
+  const orgNames = useMemo(() => organisations.map((o) => o.name), [organisations]);
+  const { groupsByOrg } = useScopeGroups(chooserOpen ? orgNames : [], chooserOpen && Boolean(scope.group));
+  const choices = useMemo(
+    () => (chooserOpen ? appChoices(buildScopeTree(organisations, groupsByOrg), scope) : []),
+    [chooserOpen, organisations, groupsByOrg, scope]
+  );
+  // The chooser borrows the context (the permission checks and the file dialog read it); give it back to the URL.
+  const restoreContext = () => {
+    if (scope.org && orgKnown && scope.org !== org) setOrg(scope.org);
+    const wanted = scopedApp ? scopedApp.app : null;
+    if (wanted !== app) setApp(wanted);
+  };
+  const closeChooser = (keepContext = false) => {
+    setChooserOpen(false);
+    setPicked(null);
+    if (!keepContext) restoreContext();
+  };
+  const pickedReady = picked !== null && org === picked.org && app === picked.app && permissions.isReady;
+
   const resetOrgRequestForm = () => {
     setReqOrgName("");
     setName("");
@@ -145,90 +217,67 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
     }
   };
 
-  const controlCenterItem: NavItem = { href: "/dashboard/control-center", icon: TowerControl, label: "Control Center" };
+  const scopedLinks = (base: string) => scopedHref(base, scope);
+  const orgBase = "/dashboard/" + encodeURIComponent(scope.org || "");
+  const appBase = orgBase + "/" + encodeURIComponent(scope.app || "");
 
-  const navigationItems: NavItem[] = appIdPath
-    ? [
-        controlCenterItem,
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || ""),
-          icon: Activity,
-          label: "Overview",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/files",
-          icon: FileText,
-          label: "Files",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/packages",
-          icon: Package,
-          label: "Packages",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/releases",
-          icon: Rocket,
-          label: "Releases",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/views",
-          icon: Eye,
-          label: "Views",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/dimensions",
-          icon: Sliders,
-          label: "Dimensions",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/users",
-          icon: Users2,
-          label: "Users",
-        },
-        ...(canReadTokens
-          ? [
-              {
-                href: `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/token`,
-                icon: Lock,
-                label: "Tokens",
-              },
-            ]
-          : []),
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/remote-configs",
-          icon: Settings,
-          label: "Remote Configs",
-        },
-        {
-          href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || "") + "/cohorts",
-          icon: Users,
-          label: "Cohorts",
-        },
-      ]
-    : [
-        controlCenterItem,
-        { href: "/dashboard/" + encodeURIComponent(org || ""), icon: Activity, label: "Applications" },
-        { href: "/dashboard/" + encodeURIComponent(org || "") + "/users", icon: Users2, label: "Users" },
-      ];
+  // Control Center pages follow the scope; at application scope the Overview is that application's own page. The
+  // organisation's pages stay in view when an application is in scope, and the application's pages sit in their own
+  // section, named as the application's (so "App users" is never mistaken for the organisation's Users).
+  const navSections: NavSection[] = [
+    {
+      key: "cc",
+      heading: "Control Center",
+      items: [
+        { href: overviewHref(scope), icon: TowerControl, label: "Overview" },
+        { href: scopedLinks(DEPLOYMENTS_BASE), icon: History, label: "Deployments" },
+        { href: scopedLinks(APPROVALS_BASE), icon: UserCheck, label: "Approvals" },
+      ],
+    },
+    ...(scope.org && orgKnown
+      ? [
+          {
+            key: "org",
+            heading: `Organisation · ${scope.org}`,
+            items: [
+              { href: orgBase, icon: Activity, label: "Applications" },
+              { href: orgBase + "/users", icon: Users2, label: "Users" },
+            ],
+          },
+        ]
+      : []),
+    ...(scopedApp
+      ? [
+          {
+            key: "app",
+            heading: `Application · ${scopedApp.app}`,
+            items: [
+              { href: appBase + "/files", icon: FileText, label: "Files" },
+              { href: appBase + "/packages", icon: Package, label: "Packages" },
+              { href: appBase + "/releases", icon: Rocket, label: "Releases" },
+              { href: appBase + "/views", icon: Eye, label: "Views" },
+              { href: appBase + "/dimensions", icon: Sliders, label: "Dimensions" },
+              { href: appBase + "/users", icon: Users2, label: "App users" },
+              ...(canReadTokens ? [{ href: appBase + "/token", icon: Lock, label: "Tokens" }] : []),
+              { href: appBase + "/remote-configs", icon: Settings, label: "Remote Configs" },
+              { href: appBase + "/cohorts", icon: Users, label: "Cohorts" },
+            ],
+          },
+        ]
+      : []),
+  ];
 
-  function useIsActive(items: NavItem[]) {
-    const normalize = (s: string) => s.replace(/\/+$/, ""); // strip trailing slash
-    const match = (href: string) => {
-      const p = normalize(pathname);
-      const h = normalize(href);
-      return p === h || p.startsWith(h + "/");
-    };
-
-    const longestMatchHref = useMemo(() => {
-      const matches = items.filter((i) => match(i.href));
-      if (matches.length === 0) return null;
-      return matches.reduce((best, i) => (i.href.length > best.href.length ? i : best)).href;
-    }, [items]);
-
-    return (href: string) => normalize(href) === longestMatchHref;
-  }
-
-  const isActive = useIsActive(navigationItems);
+  // The link whose path is the longest prefix of where we are. Queries are not part of a link's identity.
+  const isActive = useMemo(() => {
+    const norm = (x: string) => x.split("?")[0].replace(/\/+$/, "");
+    const here = norm(pathname ?? "");
+    const hrefs = navSections.flatMap((sec) => sec.items.map((i) => norm(i.href)));
+    const best = hrefs
+      .filter((h) => here === h || here.startsWith(h + "/"))
+      .reduce<string | null>((x, h) => (x === null || h.length > x.length ? h : x), null);
+    return (href: string) => best !== null && norm(href) === best;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, scope.org, scope.app, canReadTokens, orgKnown, appIsKnown]);
   const onCreateOrg = async () => {
     if (createOrgNameError) return;
     await apiFetch("/organisations/create", { method: "POST", body: { name: orgName } }, { token, logout });
@@ -238,13 +287,69 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
     setIsOrgCreateModelOpen(false);
   };
 
+  const showSidebar = organisations.length > 0 && !(pathname ?? "").startsWith("/dashboard/onboarding");
+  // Create in the application the URL names, when the context has caught up with it.
+  const createTarget = scopedApp && org === scopedApp.org && app === scopedApp.app ? scopedApp : null;
+  const createRequest = Boolean(config?.organisation_creation_disabled && !user?.is_super_admin);
+
+  const navLinks = (section: NavSection) =>
+    section.items.map((item) => {
+      const Icon = item.icon;
+      const active = isActive(item.href);
+      return (
+        <Button
+          key={item.href}
+          variant="ghost"
+          className={`h-9 w-full justify-start gap-3 ${
+            active
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          }`}
+          asChild
+        >
+          <Link href={item.href} aria-current={active ? "page" : undefined}>
+            <Icon className="h-4 w-4" />
+            {item.label}
+          </Link>
+        </Button>
+      );
+    });
+
+  /** The three things Create offers, for the application in scope (or the one just picked in the chooser). */
+  const createItems = (target: { org: string; app: string } | null = createTarget) => {
+    const base = target
+      ? `/dashboard/${encodeURIComponent(target.org)}/${encodeURIComponent(target.app)}`
+      : "/dashboard";
+    return (
+      <>
+        <DropdownMenuItem disabled={!target || !canCreateFile} onClick={() => setCreateFileOpen(true)}>
+          <FileText className="mr-2 h-4 w-4" />
+          Create File
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild disabled={!target || !canCreatePackage}>
+          <Link href={`${base}/packages/create`}>
+            <Package className="mr-2 h-4 w-4" />
+            Create Package
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild disabled={!target || !canCreateRelease}>
+          <Link href={`${base}/releases/create`}>
+            <Rocket className="mr-2 h-4 w-4" />
+            New Release
+          </Link>
+        </DropdownMenuItem>
+      </>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background h-full">
       <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
-        <div className="flex h-20 items-center px-4 sm:px-6">
-          <div className="flex items-center gap-4">
+        {/* Below md the scope picker takes a row of its own, so the scope is as readable on a phone as on a desktop. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 sm:px-6 md:h-20 md:flex-nowrap md:py-0">
+          <div className="flex items-center gap-2">
             {/* The sidebar is hidden below md, so the same links (and Create) live in this menu. */}
-            {org && (
+            {showSidebar && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="md:hidden" aria-label="Open navigation">
@@ -252,70 +357,46 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-60">
-                  {app && <DropdownMenuLabel className="truncate font-mono text-xs">{app}</DropdownMenuLabel>}
-                  {navigationItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <DropdownMenuItem
-                        key={item.href}
-                        asChild
-                        className={isActive(item.href) ? "bg-accent" : undefined}
+                  {navSections.map((section, i) => (
+                    <div key={section.key}>
+                      {i > 0 && <DropdownMenuSeparator />}
+                      <DropdownMenuLabel
+                        title={section.heading}
+                        className="truncate text-[11px] uppercase tracking-wider text-muted-foreground"
                       >
-                        <Link href={item.href}>
-                          <Icon className="mr-2 h-4 w-4" />
-                          {item.label}
-                        </Link>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                  {canShowCreateMenu && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        disabled={!org || !app || !canCreateFile}
-                        onClick={() => setCreateFileOpen(true)}
-                      >
-                        <FileText className="mr-2 h-4 w-4" />
-                        Create File
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild disabled={!org || !app || !canCreatePackage}>
-                        <Link
-                          href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
-                        >
-                          <Package className="mr-2 h-4 w-4" />
-                          Create Package
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild disabled={!org || !app || !canCreateRelease}>
-                        <Link
-                          href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
-                        >
-                          <Rocket className="mr-2 h-4 w-4" />
-                          New Release
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {app && appsForOrg.length > 1 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-xs text-muted-foreground">
-                        Switch application
+                        {section.heading}
                       </DropdownMenuLabel>
-                      {appsForOrg
-                        .filter((a) => a !== app)
-                        .map((a) => (
-                          <DropdownMenuItem key={a} onClick={() => router.push("/dashboard/" + org + "/" + a)}>
-                            <span className="truncate font-mono text-xs">{a}</span>
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <DropdownMenuItem
+                            key={item.href}
+                            asChild
+                            className={isActive(item.href) ? "bg-accent" : undefined}
+                          >
+                            <Link href={item.href}>
+                              <Icon className="mr-2 h-4 w-4" />
+                              {item.label}
+                            </Link>
                           </DropdownMenuItem>
-                        ))}
-                    </>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  <DropdownMenuSeparator />
+                  {scopedApp ? (
+                    createItems()
+                  ) : (
+                    <DropdownMenuItem onClick={() => setChooserOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create…
+                    </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
             <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="h-20 rounded-lg flex items-center justify-center">
+              <div className="flex h-10 items-center justify-center rounded-lg md:h-20">
                 <Image
                   src="/airborne-logo-light.svg"
                   alt="Airborne Logo"
@@ -332,86 +413,48 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                 />
               </div>
             </Link>
-            {organisations.length > 0 && (
-              <div className="flex items-center gap-2 text-sm">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 px-2 text-muted-foreground hover:text-foreground">
-                      {org || "Select Org"} <ChevronDown className="ml-1 h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {config?.organisation_creation_disabled && !user?.is_super_admin ? (
-                      <DropdownMenuItem
-                        onClick={() => setIsOrgCreateModelOpen(true)}
-                        className="my-1 cursor-pointer rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 focus:bg-primary/90"
-                      >
-                        + Request Organisation
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem
-                        onClick={() => setIsOrgCreateModelOpen(true)}
-                        className="my-1 cursor-pointer rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 focus:bg-primary/90"
-                      >
-                        + Create Organisation
-                      </DropdownMenuItem>
-                    )}
-
-                    {organisations.map((o) => (
-                      <DropdownMenuItem
-                        key={o.name}
-                        onClick={() => {
-                          router.push("/dashboard/" + o.name);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        {o.name}
-                      </DropdownMenuItem>
-                    ))}
-                    {organisations.length === 0 && <DropdownMenuItem disabled>No organisations</DropdownMenuItem>}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
           </div>
+
+          {organisations.length > 0 && (
+            <div className="order-last w-full min-w-0 md:order-none md:w-auto md:max-w-[min(34rem,45vw)]">
+              <ScopePicker
+                onCreateOrg={() => setIsOrgCreateModelOpen(true)}
+                createOrgLabel={createRequest ? "Request an organisation" : "Create an organisation"}
+              />
+            </div>
+          )}
 
           <div className="flex items-center gap-3 ml-auto">
             <Badge variant="secondary" className="hidden text-xs sm:inline-flex">
               {user?.name || user?.user_id || "GUEST"}
             </Badge>
             <ThemeToggle />
-            {canShowCreateMenu && (
+            {scopedApp ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="hidden gap-2 md:inline-flex" disabled={!org || !app}>
+                  <Button
+                    size="sm"
+                    className="hidden gap-2 md:inline-flex"
+                    disabled={!createTarget || !permissions.isReady || !canShowCreateMenu}
+                    title={
+                      permissions.isReady && !canShowCreateMenu
+                        ? "Your role cannot create files, packages or releases in this application"
+                        : undefined
+                    }
+                  >
                     <Plus className="h-4 w-4" />
                     Create
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem disabled={!org || !app || !canCreateFile} onClick={() => setCreateFileOpen(true)}>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Create File
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild disabled={!org || !app || !canCreatePackage}>
-                    <Link
-                      href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
-                    >
-                      <Package className="mr-2 h-4 w-4" />
-                      Create Package
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild disabled={!org || !app || !canCreateRelease}>
-                    <Link
-                      href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
-                    >
-                      <Rocket className="mr-2 h-4 w-4" />
-                      New Release
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
+                <DropdownMenuContent align="end">{createItems()}</DropdownMenuContent>
               </DropdownMenu>
+            ) : (
+              // No application in scope: Create asks which one first.
+              <Button size="sm" className="hidden gap-2 md:inline-flex" onClick={() => setChooserOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create
+              </Button>
             )}
 
             <DropdownMenu>
@@ -431,61 +474,104 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
         </div>
       </header>
 
-      <div className="flex">
-        {org && (
-          <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 border-r md:block border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50 overflow-y-auto">
-            <nav className="p-4 space-y-2">
-              {app && (
-                <div className="flex items-center gap-2 text-sm">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                        disabled={!org}
-                      >
-                        {app || "Select App"} <ChevronDown className="ml-1 h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {appsForOrg.map((a) => (
-                        <DropdownMenuItem key={a} onClick={() => router.push("/dashboard/" + org + "/" + a)}>
-                          {a}
-                        </DropdownMenuItem>
-                      ))}
-                      {org && appsForOrg.length === 0 && <DropdownMenuItem disabled>No applications</DropdownMenuItem>}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+      {/* At least a window tall, so the sidebar reaches the bottom of the window on a short page too. */}
+      <div className="flex min-h-[calc(100vh-5rem)]">
+        {showSidebar && (
+          // The aside stretches the full height of the page, so its background and rule never stop partway down a long
+          // page; the links inside stick under the header and scroll on their own when they are taller than the window.
+          <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar md:block">
+            <nav aria-label="Primary" className="sticky top-20 max-h-[calc(100vh-5rem)] space-y-5 overflow-y-auto p-4">
+              {navSections.map((section) => (
+                <div key={section.key} className="space-y-1" role="group" aria-label={section.heading}>
+                  <p className={HEADING_CLASS} title={section.heading}>
+                    {section.heading}
+                  </p>
+                  {navLinks(section)}
                 </div>
-              )}
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Button
-                    key={item.href}
-                    variant="ghost"
-                    className={`w-full justify-start gap-3 ${
-                      active
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    }`}
-                    asChild
-                  >
-                    <Link href={item.href}>
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Link>
-                  </Button>
-                );
-              })}
+              ))}
             </nav>
           </aside>
         )}
         <main className="min-w-0 flex-1">{children}</main>
       </div>
 
-      <FileCreationModal open={createFileOpen} onOpenChange={setCreateFileOpen} />
+      <FileCreationModal
+        open={createFileOpen}
+        onOpenChange={(o) => {
+          setCreateFileOpen(o);
+          if (!o && fileFromChooser) {
+            setFileFromChooser(false);
+            restoreContext();
+          }
+        }}
+      />
+      <CreateChooser
+        open={chooserOpen}
+        onOpenChange={(o) => !o && closeChooser(false)}
+        choices={choices}
+        showOrg={!scope.org}
+        picked={picked}
+        onPick={(c) => {
+          setOrg(c.org);
+          setApp(c.app);
+          setPicked(c);
+        }}
+        onBack={() => {
+          setPicked(null);
+          restoreContext();
+        }}
+      >
+        {!pickedReady ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            Checking what you can create here…
+          </p>
+        ) : !canShowCreateMenu ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            Your role cannot create files, packages or releases in this application.
+          </p>
+        ) : (
+          <div className="grid gap-2">
+            <Button
+              variant="outline"
+              className={cn("justify-start gap-2", QUIET_BUTTON)}
+              disabled={!canCreateFile}
+              onClick={() => {
+                setFileFromChooser(true);
+                closeChooser(true);
+                setCreateFileOpen(true);
+              }}
+            >
+              <FileText className="h-4 w-4" /> Create File
+            </Button>
+            <Button
+              variant="outline"
+              className={cn("justify-start gap-2", QUIET_BUTTON)}
+              disabled={!canCreatePackage}
+              asChild
+            >
+              <Link
+                href={`/dashboard/${encodeURIComponent(picked?.org ?? "")}/${encodeURIComponent(picked?.app ?? "")}/packages/create`}
+                onClick={() => closeChooser(true)}
+              >
+                <Package className="h-4 w-4" /> Create Package
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              className={cn("justify-start gap-2", QUIET_BUTTON)}
+              disabled={!canCreateRelease}
+              asChild
+            >
+              <Link
+                href={`/dashboard/${encodeURIComponent(picked?.org ?? "")}/${encodeURIComponent(picked?.app ?? "")}/releases/create`}
+                onClick={() => closeChooser(true)}
+              >
+                <Rocket className="h-4 w-4" /> New Release
+              </Link>
+            </Button>
+          </div>
+        )}
+      </CreateChooser>
       {isOrgCreateModelOpen && (
         <Dialog open={isOrgCreateModelOpen} onOpenChange={setIsOrgCreateModelOpen}>
           <DialogContent className="sm:max-w-md">

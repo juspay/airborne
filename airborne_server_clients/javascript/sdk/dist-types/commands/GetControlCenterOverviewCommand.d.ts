@@ -34,7 +34,11 @@ declare const GetControlCenterOverviewCommand_base: {
  * import { AirborneClient, GetControlCenterOverviewCommand } from "airborne-server-sdk"; // ES Modules import
  * // const { AirborneClient, GetControlCenterOverviewCommand } = require("airborne-server-sdk"); // CommonJS import
  * const client = new AirborneClient(config);
- * const input = {};
+ * const input = { // GetControlCenterOverviewInput
+ *   org: "STRING_VALUE",
+ *   group: "STRING_VALUE",
+ *   app: "STRING_VALUE",
+ * };
  * const command = new GetControlCenterOverviewCommand(input);
  * const response = await client.send(command);
  * // { // GetControlCenterOverviewResponse
@@ -220,7 +224,7 @@ export declare class GetControlCenterOverviewCommand extends GetControlCenterOve
     /** @internal type navigation helper, not in runtime. */
     protected static __types: {
         api: {
-            input: {};
+            input: GetControlCenterOverviewInput;
             output: GetControlCenterOverviewResponse;
         };
         sdk: {

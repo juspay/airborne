@@ -47,6 +47,7 @@ service Airborne {
         DeleteDimension
         // Control Center overview, app groups, release history, and rollback
         GetControlCenterOverview
+        GetControlCenterDeployments
         ListControlCenterGroups
         ListControlCenterOperations
         ResolveControlCenterOperation

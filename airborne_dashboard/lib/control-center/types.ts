@@ -123,6 +123,10 @@ export interface OverviewOrganisation {
   name: string;
   groups: OverviewGroup[];
   ungrouped: AppStatus[];
+  /** The groups read failed or timed out: applications may be listed as ungrouped when they are not. */
+  groups_error?: boolean;
+  /** An authorisation check failed or timed out: some applications may be missing from this organisation. */
+  authorization_error?: boolean;
 }
 
 export interface Overview {
@@ -279,7 +283,102 @@ export interface OrgApplication {
 }
 
 /** Everything the UI needs from the server. Implemented by the API client. */
+// ---------------------------------------------------------------------------
+// Deployments feed: `GET /control-center/deployments`, release events across every application the caller can read.
+// ---------------------------------------------------------------------------
+
+export type DeploymentFeedAction =
+  | "created"
+  | "ramped"
+  | "concluded"
+  | "rolled_back"
+  | "discarded"
+  | "emergency_rollback"
+  | "requested"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "cache_failed"
+  | "cache_retried"
+  | "policy_changed"
+  // Outcomes of an approval request and of a rollback or emergency review, added by the server after the first cut.
+  | "executed"
+  | "failed"
+  | "stale"
+  | "cancelled"
+  | "rollback_abandoned"
+  | "emergency_acknowledged";
+
+/** An action the server sent. Names this dashboard does not know are shown generically, never dropped. */
+export type FeedActionName = DeploymentFeedAction | (string & {});
+
+export interface DeploymentFeedItem {
+  event_id: string;
+  at: ISO8601;
+  org: string;
+  group: string | null;
+  app: string;
+  platform: "web" | "android" | "ios" | null;
+  release_id: string | null;
+  package_version: string | null;
+  /**
+   * The approval request this event belongs to, when the server recorded one: the request's own events, and a release
+   * write an approved request made. Absent or null on older events and on writes made without a request.
+   */
+  request_id?: string | null;
+  action: FeedActionName;
+  /**
+   * True when an operator confirmed a write after an ambiguous upstream result. `action` is what it completed,
+   * `actor` is the operator, `summary` carries their reason, and `release_id` can be null for a recovered create.
+   */
+  recovered: boolean;
+  actor: string | null;
+  from_target: number | null;
+  to_target: number | null;
+  summary: string;
+}
+
+export interface DeploymentFeedError {
+  org: string;
+  app: string | null;
+  reason: string;
+}
+
+/**
+ * What the server says it cannot promise about the feed: `complete` is false while any recorded history may lack
+ * events, the two action lists say how each action's row reaches the audit table, `notes` are the limits in words.
+ * Read it with `completenessNote`, which also tolerates a short string or a missing field.
+ */
+export interface AuditCompleteness {
+  complete: boolean;
+  transactional_actions: string[];
+  best_effort_actions: string[];
+  notes: string[];
+}
+
+export interface DeploymentFeedPage {
+  items: DeploymentFeedItem[];
+  next_cursor: string | null;
+  /** True when some applications could not be read: the feed is incomplete, and must be shown as such. */
+  partial: boolean;
+  errors: DeploymentFeedError[];
+  audit_completeness: AuditCompleteness;
+}
+
+export interface DeploymentFeedQuery {
+  org?: string;
+  group?: string;
+  app?: string;
+  action?: FeedActionName[];
+  platform?: "web" | "android" | "ios";
+  actor?: string;
+  since?: ISO8601;
+  cursor?: string | null;
+  limit?: number;
+}
+
 export interface ControlCenterClient {
+  getDeploymentFeed(query: DeploymentFeedQuery): Promise<DeploymentFeedPage>;
   listOperations(org: string, app: string): Promise<{ operations: PendingOperation[] }>;
   resolveOperation(
     org: string,
@@ -288,7 +387,8 @@ export interface ControlCenterClient {
     finding: "applied" | "did_not_apply",
     reason: string
   ): Promise<void>;
-  getOverview(): Promise<Overview>;
+  /** The overview, optionally narrowed by `org`, `group` (id) and `app`; the server applies the filters. */
+  getOverview(scope?: { org?: string; group?: string; app?: string }): Promise<Overview>;
   listGroups(org: string): Promise<GroupsResponse>;
   createGroup(org: string, body: GroupRequest): Promise<AppGroup>;
   updateGroup(org: string, id: string, body: GroupRequest): Promise<AppGroup>;

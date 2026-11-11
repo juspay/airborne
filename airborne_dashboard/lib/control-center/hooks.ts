@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
+import useSWRInfinite from "swr/infinite";
 import { useAppContext } from "@/providers/app-context";
 import { enforcePermissionsBatch } from "@/lib/authz";
 import { getControlCenterClient } from "./data";
 import { hasActiveReleases } from "./format";
+import { mergeHead } from "./deployments";
 import type {
   ApprovalPolicy,
   ClientContext,
   ControlCenterClient,
+  DeploymentFeedPage,
+  DeploymentFeedQuery,
   DeploymentRequest,
   DeploymentRequestStatus,
   DeploymentRequestsResponse,
@@ -57,13 +61,14 @@ export function refreshControlCenter(): Promise<unknown> {
 // and it does not poll before the first data arrives. A function-valued interval is wrong here: SWR
 // calls it once before any data exists and re-arms on every render when its identity changes.
 
-export function useOverview() {
+export function useOverview(scope: { org?: string; group?: string; app?: string } = {}) {
   const ctx = useClientContext();
+  const { org, group, app } = scope;
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [pollMs, setPollMs] = useState(0);
   const swr = useSWR<Overview>(
-    ctx.token ? [KEY_PREFIX, "overview", ctx.token] : null,
-    () => withClient(ctx, (c) => c.getOverview()),
+    ctx.token ? [KEY_PREFIX, "overview", ctx.token, org ?? "", group ?? "", app ?? ""] : null,
+    () => withClient(ctx, (c) => c.getOverview({ org, group, app })),
     {
       refreshInterval: pollMs,
       revalidateOnFocus: true,
@@ -82,6 +87,112 @@ export function useOverview() {
     lastUpdatedAt,
     pollMs: pollMs || POLL_ACTIVE_MS,
     refresh: () => swr.mutate(),
+  };
+}
+
+type OrgGroups = GroupsResponse["groups"] | undefined;
+const GROUPS_TTL_MS = 60_000;
+/**
+ * One read of an organisation's groups at a time, shared by everything that asks (the picker, the page and the
+ * chooser) and kept for a minute. A refusal is kept too, so a person who cannot list groups does not send a refused
+ * request on every page. Keyed by token and organisation, so signing in as someone else starts clean.
+ */
+const groupReads = new Map<string, { at: number; read: Promise<OrgGroups> }>();
+
+function readGroups(token: string, org: string, read: () => Promise<GroupsResponse>): Promise<OrgGroups> {
+  const key = `${token}\u0000${org}`;
+  const hit = groupReads.get(key);
+  if (hit && Date.now() - hit.at < GROUPS_TTL_MS) return hit.read;
+  const fresh = read().then(
+    (r) => r.groups,
+    () => undefined
+  );
+  groupReads.set(key, { at: Date.now(), read: fresh });
+  return fresh;
+}
+
+/**
+ * Groups of the given organisations, for the scope picker and for naming the group in scope. Ask only for the
+ * organisations that are needed (the one in scope, or all while the picker is open). An organisation that refuses the
+ * read has no groups here.
+ */
+export function useScopeGroups(orgs: string[], enabled: boolean) {
+  const ctx = useClientContext();
+  const names = orgs.join("\u0000");
+  const swr = useSWR<Record<string, OrgGroups>>(
+    ctx.token && enabled && orgs.length > 0 ? [KEY_PREFIX, "scope-groups", names, ctx.token] : null,
+    async () => {
+      const client = await getControlCenterClient(ctx);
+      const token = ctx.token as string;
+      const settled = await Promise.all(orgs.map((o) => readGroups(token, o, () => client.listGroups(o))));
+      const out: Record<string, OrgGroups> = {};
+      settled.forEach((groups, i) => {
+        out[orgs[i]] = groups;
+      });
+      return out;
+    },
+    { keepPreviousData: true, revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
+  return { groupsByOrg: swr.data ?? {}, isLoading: swr.isLoading };
+}
+
+export const FEED_POLL_MS = 30_000;
+
+/**
+ * The deployments feed, one cursor page at a time. The pages already loaded are never refetched by polling: a poll
+ * reads only the first page and merges its newest events in front (see `mergeHead`), so a reader who has opened ten
+ * pages costs one request every 30 seconds, not ten. A failed later page keeps the pages already loaded.
+ */
+export function useDeploymentFeed(query: DeploymentFeedQuery, enabled = true) {
+  const ctx = useClientContext();
+  const base = JSON.stringify(query);
+  const swr = useSWRInfinite<DeploymentFeedPage>(
+    (index, previous) => {
+      if (!ctx.token || !enabled) return null;
+      if (index > 0 && !previous?.next_cursor) return null;
+      return [KEY_PREFIX, "feed", ctx.token, base, index === 0 ? "" : (previous?.next_cursor ?? "")];
+    },
+    (key) => {
+      const cursor = key[4] as string;
+      return withClient(ctx, (c) => c.getDeploymentFeed({ ...query, cursor: cursor || undefined }));
+    },
+    { revalidateFirstPage: false, revalidateAll: false, revalidateOnFocus: false, keepPreviousData: false }
+  );
+  const first = swr.data?.[0];
+  const head = useSWR<DeploymentFeedPage>(
+    ctx.token && enabled && first ? [KEY_PREFIX, "feed-head", ctx.token, base] : null,
+    () => withClient(ctx, (c) => c.getDeploymentFeed({ ...query, cursor: undefined })),
+    // Starts from the page just loaded (no second request at mount), then polls.
+    {
+      fallbackData: first,
+      revalidateOnMount: false,
+      refreshInterval: FEED_POLL_MS,
+      revalidateOnFocus: true,
+      keepPreviousData: false,
+    }
+  );
+  const merged = useMemo(
+    () => (swr.data ? mergeHead(swr.data, head.data) : { pages: undefined, newer: false }),
+    [swr.data, head.data]
+  );
+  const refresh = async () => {
+    // Back to the first page, read afresh; the poller restarts from it.
+    await swr.setSize(1);
+    const pages = await swr.mutate();
+    if (pages?.[0]) await head.mutate(pages[0], { revalidate: false });
+  };
+  return {
+    pages: merged.pages,
+    /** More new events arrived than a page holds: reload instead of showing a feed with a hole in it. */
+    newer: merged.newer,
+    error: swr.error as Error | undefined,
+    /** The last poll failed: what is shown is the last successful read. */
+    pollError: head.error as Error | undefined,
+    isLoading: swr.isLoading,
+    isValidating: swr.isValidating || head.isValidating,
+    loadingMore: swr.isValidating && swr.size > (swr.data?.length ?? 0),
+    loadMore: () => swr.setSize((n) => n + 1),
+    refresh,
   };
 }
 

@@ -11,16 +11,16 @@ An **organisation** is the top-level workspace in Airborne. It owns your [applic
 
 ## Selecting and switching organisations
 
-The current organisation is shown in the **organisation switcher** at the top-left of the header. Click it to:
+The **Scope** control at the top-left of the header shows where you are. Open it to:
 
-- Switch to another organisation you belong to, or
-- Choose **`+ Create Organisation`** to make a new one.
+- Pick an organisation you belong to (or a group or application inside it), or `All`, or
+- Choose **Create an organisation** (or **Request an organisation**) at the bottom.
 
-Selecting an organisation takes you to its overview.
+Selecting an organisation opens the Control Center overview for it; the organisation's **Applications** and **Users** pages are in the sidebar.
 
 ## Creating an organisation
 
-Choose **`+ Create Organisation`** from the switcher (or create your first one during [onboarding](/docs/dashboard/authentication-and-onboarding)). In the **Create Organisation** dialog, enter an **Organisation name** (up to 64 characters, for example `acme_corp`) and choose **Create**.
+Choose **`+ Create Organisation`** from the Scope control (or create your first one during [onboarding](/docs/dashboard/authentication-and-onboarding)). In the **Create Organisation** dialog, enter an **Organisation name** (up to 64 characters, for example `acme_corp`) and choose **Create**.
 
 :::note
 If your deployment restricts organisation creation, the option becomes **`+ Request Organisation`**. Fill in the form — organisation name, your name, email, and optional store links — and an administrator will provision the organisation for you.
@@ -48,3 +48,7 @@ Choose **Create Application** and the new app appears as a card. See [Applicatio
 :::tip
 Use a separate application per shippable target — for example one app per platform — since files, packages, releases, and tokens are all scoped to a single application.
 :::
+
+## Deleting an organisation
+
+Deleting an organisation removes access to it and everything in it. Its applications' data is **retired, not erased**: it stays in the database, and the Superposition workspaces and stored files stay in place, but a new organisation of the same name starts empty and cannot see any of it. Ask an operator if an organisation was deleted by mistake; recovery is manual. See [Organisation deletion and re-creation](/docs/server/control-center#organisation-deletion-and-re-creation).

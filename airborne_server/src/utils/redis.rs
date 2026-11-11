@@ -185,6 +185,64 @@ impl RedisCache {
         Ok(())
     }
 
+    /// Delete every key of an organisation (or of one of its applications). Used when an
+    /// organisation's data is retired: the cached workspace name outlives the database
+    /// row by up to a week and would send a recreated application of the same name to
+    /// the previous tenant's workspace. Returns how many keys were removed.
+    pub async fn purge_scope(
+        &self,
+        organisation: &str,
+        application: Option<&str>,
+    ) -> Result<usize, ABError> {
+        fn glob_escape(s: &str) -> String {
+            s.chars().fold(String::new(), |mut out, c| {
+                if matches!(c, '*' | '?' | '[' | ']' | '\\') {
+                    out.push('\\');
+                }
+                out.push(c);
+                out
+            })
+        }
+        let mut pattern = format!(
+            "{}:{}:",
+            glob_escape(&self.prefix),
+            glob_escape(organisation)
+        );
+        if let Some(app) = application {
+            pattern.push_str(&format!("{}:", glob_escape(app)));
+        }
+        pattern.push('*');
+        let fail = |e: redis::RedisError| {
+            error!("Failed to purge cache keys {pattern}: {e}");
+            ABError::InternalServerError("service error".to_string())
+        };
+        let mut r = (*self.conn).clone();
+        let (mut cursor, mut removed) = (0u64, 0usize);
+        loop {
+            let (next, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(&pattern)
+                .arg("COUNT")
+                .arg(500)
+                .query_async(&mut r)
+                .await
+                .map_err(fail)?;
+            if !keys.is_empty() {
+                let n: usize = redis::cmd("DEL")
+                    .arg(&keys)
+                    .query_async(&mut r)
+                    .await
+                    .map_err(fail)?;
+                removed += n;
+            }
+            if next == 0 {
+                return Ok(removed);
+            }
+            cursor = next;
+        }
+    }
+
     #[allow(unused)]
     pub async fn del(&self, redis_key: &RedisKey) -> Result<(), ABError> {
         let mut r = (*self.conn).clone();
@@ -222,5 +280,57 @@ impl RedisCache {
         let _ = self.set_ex(key, &val, ttl_secs).await;
 
         Ok(val)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // Needs a Redis; keys live under a throwaway prefix.
+    #[actix_web::test]
+    #[ignore = "requires TEST_REDIS_URL"]
+    async fn purge_scope_removes_one_organisation_or_application_only() {
+        let url = std::env::var("TEST_REDIS_URL").expect("TEST_REDIS_URL");
+        let prefix = format!("purge-test-{}", uuid::Uuid::new_v4().simple());
+        let cache = RedisCache::new(redis::Client::open(url.as_str()).unwrap(), prefix)
+            .await
+            .unwrap();
+        for (org, app, part) in [
+            ("o1", "a1", "workspace_name"),
+            ("o1", "a1", "package"),
+            ("o1", "a2", "workspace_name"),
+            ("o2", "a1", "workspace_name"),
+            ("o10", "a1", "workspace_name"),
+        ] {
+            cache
+                .set_ex(&cache.key(org, app, &[part]), &"value", 60)
+                .await
+                .unwrap();
+        }
+        let present = |org: &'static str, app: &'static str, part: &'static str| {
+            let (cache, key) = (cache.clone(), cache.key(org, app, &[part]));
+            async move { cache.get::<String>(&key).await.unwrap().is_some() }
+        };
+        assert_eq!(cache.purge_scope("o1", Some("a1")).await.unwrap(), 2);
+        assert!(
+            !present("o1", "a1", "workspace_name").await && !present("o1", "a1", "package").await
+        );
+        assert!(
+            present("o1", "a2", "workspace_name").await,
+            "another application of the organisation"
+        );
+        assert_eq!(cache.purge_scope("o1", None).await.unwrap(), 1);
+        assert!(!present("o1", "a2", "workspace_name").await);
+        assert!(
+            present("o2", "a1", "workspace_name").await,
+            "another organisation"
+        );
+        assert!(
+            present("o10", "a1", "workspace_name").await,
+            "an organisation whose name starts with the same text"
+        );
+        assert_eq!(cache.purge_scope("nobody", None).await.unwrap(), 0);
+        cache.purge_scope("o2", None).await.unwrap();
+        cache.purge_scope("o10", None).await.unwrap();
     }
 }

@@ -9,7 +9,7 @@ export declare const getRuntimeConfig: (config: AirborneClientConfig) => {
     bodyLengthChecker: import("@smithy/types").BodyLengthCalculator;
     defaultUserAgentProvider: (config?: import("@aws-sdk/util-user-agent-node").PreviouslyResolved | undefined) => Promise<import("@smithy/types").UserAgent>;
     maxAttempts: number | import("@smithy/types").Provider<number>;
-    requestHandler: import("@smithy/protocol-http").HttpHandler<any> | RequestHandler;
+    requestHandler: RequestHandler | import("@smithy/protocol-http").HttpHandler<any>;
     retryMode: string | import("@smithy/types").Provider<string>;
     sha256: import("@smithy/types").HashConstructor;
     streamCollector: import("@smithy/types").StreamCollector;

@@ -265,18 +265,17 @@ impl CasbinAuthzProvider {
         })
     }
 
-    async fn list_org_apps(&self, organisation: &str) -> Vec<String> {
+    async fn list_org_apps(&self, organisation: &str) -> airborne_types::Result<Vec<String>> {
         let policies = self
             .list_memberships(POLICY_SCOPE_APP, organisation, None)
-            .await
-            .unwrap_or_default();
+            .await?;
         let mut apps = BTreeSet::new();
         for policy in policies {
             if !policy.application.is_empty() {
                 apps.insert(policy.application);
             }
         }
-        apps.into_iter().collect()
+        Ok(apps.into_iter().collect())
     }
 
     async fn list_org_admin_owner_subjects(&self, organisation: &str) -> Vec<String> {
@@ -380,6 +379,27 @@ impl CasbinAuthzProvider {
                 authz_memberships::table
                     .filter(authz_memberships::subject.eq(&normalized_subject))
                     .filter(authz_memberships::organisation.eq(&organisation)),
+            )
+            .execute(&mut conn)?;
+            Ok(())
+        })?;
+        Ok(())
+    }
+
+    async fn remove_memberships_for_app(
+        &self,
+        organisation: &str,
+        application: &str,
+    ) -> airborne_types::Result<()> {
+        let (organisation, application) = (organisation.to_string(), application.to_string());
+        let pool = self.db_pool.clone();
+        run_blocking!({
+            let mut conn = pool.get()?;
+            diesel::delete(
+                authz_memberships::table
+                    .filter(authz_memberships::scope.eq(POLICY_SCOPE_APP))
+                    .filter(authz_memberships::organisation.eq(&organisation))
+                    .filter(authz_memberships::application.eq(&application)),
             )
             .execute(&mut conn)?;
             Ok(())
@@ -837,8 +857,50 @@ impl CasbinAuthzProvider {
         subject: &str,
         organisation: &str,
     ) -> airborne_types::Result<()> {
-        for app in self.list_org_apps(organisation).await {
+        for app in self.list_org_apps(organisation).await? {
             self.grant_application_role_if_missing(subject, organisation, &app, ROLE_ADMIN)
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// Undo `grant_admin_on_all_org_apps` for a user who is no longer an organisation
+    /// admin or owner: drop their application-level `admin` grants. Those grants were
+    /// created automatically by the promotion (or by the creation of an app after it), so
+    /// without this the downgrade would leave the user administering every application.
+    /// Grants below admin (read, write, custom roles) are explicit and are kept. A grant
+    /// that is the application's only admin is kept too: an application needs one.
+    async fn revoke_app_admin_granted_by_org_role(
+        &self,
+        subject: &str,
+        organisation: &str,
+    ) -> airborne_types::Result<()> {
+        for app in self.list_org_apps(organisation).await? {
+            if self
+                .application_user_role(subject, organisation, &app)
+                .await?
+                .as_deref()
+                != Some(ROLE_ADMIN)
+            {
+                continue;
+            }
+            if self.app_admin_count(organisation, &app).await <= 1 {
+                warn!(
+                    "Keeping {subject} as the only admin of {organisation}/{app} after an organisation role downgrade"
+                );
+                continue;
+            }
+            self.remove_policies_for_filter(
+                0,
+                vec![
+                    subject.to_string(),
+                    POLICY_SCOPE_APP.to_string(),
+                    organisation.to_string(),
+                    app.clone(),
+                ],
+            )
+            .await?;
+            self.remove_membership(subject, POLICY_SCOPE_APP, organisation, &app)
                 .await?;
         }
         Ok(())
@@ -1346,7 +1408,7 @@ impl AuthZProvider for CasbinAuthzProvider {
                 add_org_read_apps(
                     &mut applications,
                     &org_name,
-                    self.list_org_apps(&org_name).await,
+                    self.list_org_apps(&org_name).await?,
                 );
             }
             applications.sort_by(|left, right| left.application.cmp(&right.application));
@@ -1444,6 +1506,25 @@ impl AuthZProvider for CasbinAuthzProvider {
                 .await?;
         }
         Ok(())
+    }
+
+    async fn delete_application(
+        &self,
+        _state: &AppState,
+        organisation: &str,
+        application: &str,
+    ) -> airborne_types::Result<()> {
+        self.remove_policies_for_filter(
+            1,
+            vec![
+                POLICY_SCOPE_APP.to_string(),
+                organisation.to_string(),
+                application.to_string(),
+            ],
+        )
+        .await?;
+        self.remove_memberships_for_app(organisation, application)
+            .await
     }
 
     async fn list_organisation_users(
@@ -1590,6 +1671,15 @@ impl AuthZProvider for CasbinAuthzProvider {
 
         self.ensure_role_assignable(POLICY_SCOPE_ORG, organisation, "*", &normalized_role)
             .await?;
+
+        // Before the role changes, so that a failure here can be retried: afterwards the
+        // user is no longer an admin and the retry would not know to clean up.
+        if matches!(current_role.as_str(), ROLE_ADMIN | ROLE_OWNER)
+            && !matches!(normalized_role.as_str(), ROLE_ADMIN | ROLE_OWNER)
+        {
+            self.revoke_app_admin_granted_by_org_role(&normalized_target, organisation)
+                .await?;
+        }
 
         self.set_org_role(&normalized_target, organisation, &normalized_role)
             .await?;

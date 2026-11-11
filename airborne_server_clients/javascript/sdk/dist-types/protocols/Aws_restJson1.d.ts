@@ -16,6 +16,7 @@ import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "../co
 import { DiscardReleaseCommandInput, DiscardReleaseCommandOutput } from "../commands/DiscardReleaseCommand";
 import { GetControlCenterApprovalPolicyCommandInput, GetControlCenterApprovalPolicyCommandOutput } from "../commands/GetControlCenterApprovalPolicyCommand";
 import { GetControlCenterDeploymentRequestCommandInput, GetControlCenterDeploymentRequestCommandOutput } from "../commands/GetControlCenterDeploymentRequestCommand";
+import { GetControlCenterDeploymentsCommandInput, GetControlCenterDeploymentsCommandOutput } from "../commands/GetControlCenterDeploymentsCommand";
 import { GetControlCenterOverviewCommandInput, GetControlCenterOverviewCommandOutput } from "../commands/GetControlCenterOverviewCommand";
 import { GetControlCenterReleaseEventsCommandInput, GetControlCenterReleaseEventsCommandOutput } from "../commands/GetControlCenterReleaseEventsCommand";
 import { GetControlCenterRollbackPreviewCommandInput, GetControlCenterRollbackPreviewCommandOutput } from "../commands/GetControlCenterRollbackPreviewCommand";
@@ -122,6 +123,10 @@ export declare const se_GetControlCenterApprovalPolicyCommand: (input: GetContro
  * serializeAws_restJson1GetControlCenterDeploymentRequestCommand
  */
 export declare const se_GetControlCenterDeploymentRequestCommand: (input: GetControlCenterDeploymentRequestCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
+/**
+ * serializeAws_restJson1GetControlCenterDeploymentsCommand
+ */
+export declare const se_GetControlCenterDeploymentsCommand: (input: GetControlCenterDeploymentsCommandInput, context: __SerdeContext) => Promise<__HttpRequest>;
 /**
  * serializeAws_restJson1GetControlCenterOverviewCommand
  */
@@ -322,6 +327,10 @@ export declare const de_GetControlCenterApprovalPolicyCommand: (output: __HttpRe
  * deserializeAws_restJson1GetControlCenterDeploymentRequestCommand
  */
 export declare const de_GetControlCenterDeploymentRequestCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetControlCenterDeploymentRequestCommandOutput>;
+/**
+ * deserializeAws_restJson1GetControlCenterDeploymentsCommand
+ */
+export declare const de_GetControlCenterDeploymentsCommand: (output: __HttpResponse, context: __SerdeContext) => Promise<GetControlCenterDeploymentsCommandOutput>;
 /**
  * deserializeAws_restJson1GetControlCenterOverviewCommand
  */

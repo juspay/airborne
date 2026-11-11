@@ -28,9 +28,15 @@ Device counts are shown separately, as **reported boots** (for example, "12 devi
 Control Center does not change targets on its own, and no report changes anything either. It shows the target you set, the release state and, separately, what devices reported. Use the rest of this page to decide when to change them.
 :::
 
+## Scope
+
+The **Scope** control in the header decides what every Control Center page shows: `All` organisations you can read, one organisation, one group, or one application. The overview, **Deployments** and **Approvals** all follow it, and it is in the address (`?org=`, `?group=`, `?app=`), so a link or a refresh keeps it. Each page says in words which scope it shows. A scope that names nothing you can read says so, and never shows an empty page that reads as healthy; when the organisation in it is real, the main button is **Back to** that organisation.
+
 ## Reading the overview
 
-The overview is grouped by organisation. Each organisation section shows its name, how many groups and apps it has, and the **Applications** button for that organisation. Owners and admins also see **New group**.
+At **All** the overview is one row per organisation: its name, how many groups and apps it has, and what in it needs a person. On a phone the name and the counts are on the first line and the badges wrap under them. At one organisation the page is that organisation's section, with the **Applications** button; owners and admins also see **New group**.
+
+When the read of an organisation's applications was cut short and listed nothing, the page does not show "0 apps", an empty state or the first-OTA checklist. The organisation's row (or the whole page, at that organisation) says **Could not confirm** what is in it and offers **Retry**; the same holds on Deployments and Approvals.
 
 Each **group** is one product across platforms. Each **platform row** shows:
 
@@ -68,6 +74,16 @@ Select a chip to show only the matching apps. Select it again, or select **All**
 Under each app's name the row also shows its **serving policy** chip (**Strict serving**, **Strict serving · forced** or **Strict serving off**) and, where maker-checker is on, **Approval required**. The app name links to the [app page](#the-app-page).
 
 To narrow the list by name, use **Filter apps, groups, orgs** in the header.
+
+## Deployments
+
+**Deployments** has two parts, both for the current scope.
+
+**Needs attention** puts what needs a person first and says why each application is pinned: a failed lookup, **Writes paused**, a deployment that seems bad or has suspicious reports, an emergency rollback to review, a request awaiting approval, or a stale CDN cache. **Rolling out** follows. Each application is one line (its name, where it sits, the reason or the rollout, and when it last moved), so the feed starts on the first screen. Past six, only the first five are drawn and one line says how many more need attention or are rolling out (**Show all 12**); it opens the rest in place, and **Show fewer** folds them again. The name opens the application's page for the policies and recovery. What is simply live is on the Overview, not repeated here. An organisation whose read was cut short says so above the list.
+
+**Release events** are the release events recorded across those applications, newest first, under a heading per day. A row says what happened in words, from its application, package version and action: "kharcha-ios v3 rolled back", "nav-web v4 ramped to 50%", "nav-web v2 made live" (a short release id stands in only when there is no version). Consecutive events of one release share a row that opens into its steps; a row of more than five steps writes its chain as first → … (N more) → last. A policy change is **Policy changed**, and its sentence says which policy ("Approval policy turned on", "Serving policy: strict serving turned off"). An operator-confirmed write is marked **Recovered**; an approval that a later outcome of the same request (executed, failed, out of date, cancelled) overtook reads "Approved → …". The two are matched by the request's id, never by release, so two requests on one release each show their own outcome; an older event with no request id is left as "Approved". One row of filters: action chips (the only action filter), platform, and **More** for the actor (the exact recorded subject, usually an email) and the time range. A filter that is on looks the same whichever kind it is. Filters are in the address. **Show older events** loads the next page. The page refreshes only its first page and merges new events in front.
+
+A feed that could not read some applications says **This feed is incomplete**, names each application and why, and offers **Retry**; it never shows an empty or healthy feed in its place. If a later page fails, the events already loaded stay on screen. A target on a row is the rollout target, never adoption; when the event did not record one, none is shown. The foot of the feed says in plain words that events are shown as recorded and that an event that is not there is not proof that it did not happen, and links to how events are recorded; **Details** opens the server's own technical list of limits.
 
 ## Groups
 

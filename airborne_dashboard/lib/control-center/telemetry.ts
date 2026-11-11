@@ -247,6 +247,21 @@ export function sortRows(rows: TelemetryRelease[]): TelemetryRelease[] {
   );
 }
 
+/**
+ * Rows of releases being served now come first and stay on screen. Rows of releases not served now (an earlier release
+ * of a package that is live again, a discarded one) are kept apart, because they repeat the package versions above them
+ * and read as duplicates. Nothing is dropped: they open on request. With nothing served there is nothing to put them
+ * under, so they all stay.
+ */
+export function splitServedRows(
+  rows: TelemetryRelease[],
+  isServed: (releaseId: string) => boolean
+): { served: TelemetryRelease[]; earlier: TelemetryRelease[]; collapsible: boolean } {
+  const served = rows.filter((r) => isServed(r.release_id));
+  const earlier = rows.filter((r) => !isServed(r.release_id));
+  return { served, earlier, collapsible: served.length > 0 && earlier.length > 0 };
+}
+
 function compareVersions(a: string, b: string): number {
   const pa = a.split(".").map((x) => parseInt(x, 10));
   const pb = b.split(".").map((x) => parseInt(x, 10));

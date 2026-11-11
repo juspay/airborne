@@ -17,6 +17,7 @@ import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./com
 import { DiscardReleaseCommandInput, DiscardReleaseCommandOutput } from "./commands/DiscardReleaseCommand";
 import { GetControlCenterApprovalPolicyCommandInput, GetControlCenterApprovalPolicyCommandOutput } from "./commands/GetControlCenterApprovalPolicyCommand";
 import { GetControlCenterDeploymentRequestCommandInput, GetControlCenterDeploymentRequestCommandOutput } from "./commands/GetControlCenterDeploymentRequestCommand";
+import { GetControlCenterDeploymentsCommandInput, GetControlCenterDeploymentsCommandOutput } from "./commands/GetControlCenterDeploymentsCommand";
 import { GetControlCenterOverviewCommandInput, GetControlCenterOverviewCommandOutput } from "./commands/GetControlCenterOverviewCommand";
 import { GetControlCenterReleaseEventsCommandInput, GetControlCenterReleaseEventsCommandOutput } from "./commands/GetControlCenterReleaseEventsCommand";
 import { GetControlCenterRollbackPreviewCommandInput, GetControlCenterRollbackPreviewCommandOutput } from "./commands/GetControlCenterRollbackPreviewCommand";
@@ -159,6 +160,13 @@ export interface Airborne {
     getControlCenterDeploymentRequest(args: GetControlCenterDeploymentRequestCommandInput, options?: __HttpHandlerOptions): Promise<GetControlCenterDeploymentRequestCommandOutput>;
     getControlCenterDeploymentRequest(args: GetControlCenterDeploymentRequestCommandInput, cb: (err: any, data?: GetControlCenterDeploymentRequestCommandOutput) => void): void;
     getControlCenterDeploymentRequest(args: GetControlCenterDeploymentRequestCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetControlCenterDeploymentRequestCommandOutput) => void): void;
+    /**
+     * @see {@link GetControlCenterDeploymentsCommand}
+     */
+    getControlCenterDeployments(): Promise<GetControlCenterDeploymentsCommandOutput>;
+    getControlCenterDeployments(args: GetControlCenterDeploymentsCommandInput, options?: __HttpHandlerOptions): Promise<GetControlCenterDeploymentsCommandOutput>;
+    getControlCenterDeployments(args: GetControlCenterDeploymentsCommandInput, cb: (err: any, data?: GetControlCenterDeploymentsCommandOutput) => void): void;
+    getControlCenterDeployments(args: GetControlCenterDeploymentsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetControlCenterDeploymentsCommandOutput) => void): void;
     /**
      * @see {@link GetControlCenterOverviewCommand}
      */

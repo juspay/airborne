@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { ErrorName } from "@/lib/api";
+import { isReleaseNotFound } from "@/lib/control-center/not-found";
 import {
   isOngoingStatus,
   useApprovalPolicy,
@@ -72,7 +73,6 @@ import {
 import {
   appPath,
   approvalPolicyPath,
-  CC_ROOT,
   classicReleasePath,
   groupPath,
   releasePath,
@@ -201,19 +201,12 @@ export default function ControlCenterReleasePage() {
     />
   ) : null;
 
-  const crumbs = [
-    { label: "Control Center", href: CC_ROOT },
-    ...(located.group ? [{ label: located.group.name, href: groupPath(orgId, located.group.id) }] : [{ label: orgId }]),
-    { label: appId, href: appPath(orgId, appId) },
-    { label: release ? `v${release.package.version}` : "Release" },
-  ];
-
   return (
     <>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6">
         <OverviewStateNotice app={located.app} />
         <CcPageHeader
-          crumbs={crumbs}
+          back={{ label: appId, href: appPath(orgId, appId) }}
           title={
             release && !denied ? (
               <span className="inline-flex items-baseline gap-3">
@@ -275,6 +268,16 @@ export default function ControlCenterReleasePage() {
               <BlockSkeleton className="h-40" />
             </div>
           </div>
+        ) : releaseQuery.error && !release && isReleaseNotFound(releaseQuery.error) ? (
+          <EmptyState
+            title="Release not found"
+            message={`There is no release ${releaseId} in ${appId}. The link may be wrong, or the release may belong to another application.`}
+            action={
+              <Link href={appPath(orgId, appId)} className="text-sm underline">
+                Back to {appId}
+              </Link>
+            }
+          />
         ) : releaseQuery.error && !release ? (
           <ErrorState
             title="Could not load this release"

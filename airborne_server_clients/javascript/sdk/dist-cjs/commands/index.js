@@ -19,6 +19,7 @@ tslib_1.__exportStar(require("./DeleteDimensionCommand"), exports);
 tslib_1.__exportStar(require("./DiscardReleaseCommand"), exports);
 tslib_1.__exportStar(require("./GetControlCenterApprovalPolicyCommand"), exports);
 tslib_1.__exportStar(require("./GetControlCenterDeploymentRequestCommand"), exports);
+tslib_1.__exportStar(require("./GetControlCenterDeploymentsCommand"), exports);
 tslib_1.__exportStar(require("./GetControlCenterOverviewCommand"), exports);
 tslib_1.__exportStar(require("./GetControlCenterReleaseEventsCommand"), exports);
 tslib_1.__exportStar(require("./GetControlCenterRollbackPreviewCommand"), exports);

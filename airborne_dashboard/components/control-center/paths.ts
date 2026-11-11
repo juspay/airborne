@@ -17,6 +17,11 @@ export function classicAppPath(org: string, app: string): string {
   return `/dashboard/${encodeURIComponent(org)}/${encodeURIComponent(app)}/releases`;
 }
 
+/** The classic application overview: its summary page, reached from the footer of the application's own page. */
+export function classicAppSummaryPath(org: string, app: string): string {
+  return `/dashboard/${encodeURIComponent(org)}/${encodeURIComponent(app)}`;
+}
+
 export function classicReleasePath(org: string, app: string, releaseId: string): string {
   return `/dashboard/${encodeURIComponent(org)}/${encodeURIComponent(app)}/releases/${encodeURIComponent(releaseId)}`;
 }

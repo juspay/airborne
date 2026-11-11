@@ -165,44 +165,94 @@ async fn add_application(
         organisation, application
     );
 
-    state
-        .authz_provider
-        .create_application(state.get_ref(), &organisation, &application, sub)
-        .await?;
+    // Steps run cheapest-to-undo first and the unique workspace mapping goes first, so a
+    // name that is taken is refused before anything else is written. If a later step
+    // fails, the earlier ones are undone: a failed create leaves no application behind.
+    // The Superposition workspace is the one thing not undone (its name is never reused;
+    // the orphan is left for an operator, like those of a deleted organisation).
+    let mut progress = Provisioned::default();
+    if let Err(error) = provision(&state, &organisation, &application, sub, &mut progress).await {
+        compensate(&state, &organisation, &application, &progress).await;
+        return Err(error);
+    }
 
+    Ok(Json(Application {
+        application,
+        organisation,
+        access: vec!["read".to_string(), "write".to_string(), "admin".to_string()],
+    }))
+}
+
+/// What `provision` has written so far, for `compensate`.
+#[derive(Default)]
+struct Provisioned {
+    workspace_id: Option<i32>,
+    granted: bool,
+}
+
+async fn provision(
+    state: &web::Data<AppState>,
+    organisation: &str,
+    application: &str,
+    sub: &str,
+    progress: &mut Provisioned,
+) -> airborne_types::Result<()> {
     let mut conn = state.db_pool.get()?;
     let new_workspace_name = NewWorkspaceName {
-        organization_id: &organisation,
-        application_id: &application,
+        organization_id: organisation,
+        application_id: application,
         workspace_name: "pending",
     };
-
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
     let mut inserted_workspace: WorkspaceName = conn.transaction::<_, ABError, _>(|conn| {
-    let workspace = insert_workspace(conn, &new_workspace_name)
-        .map_err(|e| ABError::InternalServerError(format!("Failed to store workspace name: {}", e)))?;
-
-    diesel::sql_query("INSERT INTO hyperotaserver.serving_policies(org_id,app_id,strict) VALUES($1,$2,true) ON CONFLICT DO NOTHING")
-        .bind::<diesel::sql_types::Text,_>(&organisation)
-        .bind::<diesel::sql_types::Text,_>(&application).execute(conn)?;
+        let workspace = insert_workspace(conn, &new_workspace_name).map_err(|e| match e {
+            diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::UniqueViolation, _) => {
+                ABError::Conflict(format!(
+                    "Application '{application}' already exists in organisation '{organisation}'"
+                ))
+            }
+            e => ABError::InternalServerError(format!("Failed to store workspace name: {e}")),
+        })?;
+        diesel::sql_query("INSERT INTO hyperotaserver.serving_policies(org_id,app_id,strict) VALUES($1,$2,true) ON CONFLICT DO NOTHING")
+            .bind::<diesel::sql_types::Text, _>(organisation)
+            .bind::<diesel::sql_types::Text, _>(application)
+            .execute(conn)?;
         Ok(workspace)
     })?;
-    let generated_id = inserted_workspace.id;
-    let generated_workspace_name = format!("workspace{}", generated_id);
+    progress.workspace_id = Some(inserted_workspace.id);
+    let generated_workspace_name = format!("workspace{}", inserted_workspace.id);
     inserted_workspace.workspace_name = generated_workspace_name.clone();
-
-    diesel::update(workspace_names::table.filter(workspace_names::id.eq(generated_id)))
+    diesel::update(workspace_names::table.filter(workspace_names::id.eq(inserted_workspace.id)))
         .set(workspace_names::workspace_name.eq(&generated_workspace_name))
         .execute(&mut conn)
         .map_err(|e| {
             ABError::InternalServerError(format!("Failed to update workspace name: {}", e))
         })?;
+    drop(conn);
+
+    // Entries cached for an earlier application of this name (a deleted organisation's,
+    // kept for up to a week) would send the new one to that application's workspace.
+    if let Some(cache) = &state.redis_cache {
+        cache.purge_scope(organisation, Some(application)).await?;
+    }
+
+    if let Err(error) = state
+        .authz_provider
+        .create_application(state.get_ref(), organisation, application, sub)
+        .await
+    {
+        // "Already exists" means these grants are not ours to remove; any other failure
+        // may have written some of them.
+        progress.granted =
+            !matches!(&error, ABError::BadRequest(m) if m.contains("already exists"));
+        return Err(error);
+    }
+    progress.granted = true;
 
     state
         .superposition_client
         .create_workspace()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_name(generated_workspace_name.clone())
+        .org_id(state.env.superposition_org_id.clone())
+        .workspace_name(generated_workspace_name)
         .workspace_status(WorkspaceStatus::Enabled)
         .allow_experiment_self_approval(true)
         .workspace_admin_email("pp-sdk@juspay.in".to_string())
@@ -217,17 +267,54 @@ async fn add_application(
 
     migrate_superposition_workspace(
         &inserted_workspace,
-        &state,
+        state,
         &SuperpositionMigrationStrategy::Patch,
     )
     .await
     .map_err(|e| ABError::InternalServerError(format!("Workspace migration error: {}", e)))?;
+    Ok(())
+}
 
-    Ok(Json(Application {
-        application,
-        organisation,
-        access: vec!["read".to_string(), "write".to_string(), "admin".to_string()],
-    }))
+/// Undo what `provision` wrote. Failures here are logged, not returned: the caller is
+/// already reporting the original error.
+async fn compensate(
+    state: &web::Data<AppState>,
+    organisation: &str,
+    application: &str,
+    progress: &Provisioned,
+) {
+    if progress.granted {
+        if let Err(e) = state
+            .authz_provider
+            .delete_application(state.get_ref(), organisation, application)
+            .await
+        {
+            log::error!("Could not remove grants of half-created application {organisation}/{application}: {e}");
+        }
+    }
+    let Some(id) = progress.workspace_id else {
+        return;
+    };
+    let result = state
+        .db_pool
+        .get()
+        .map_err(ABError::from)
+        .and_then(|mut conn| {
+            conn.transaction::<_, ABError, _>(|conn| {
+                diesel::sql_query(
+                    "DELETE FROM hyperotaserver.serving_policies WHERE org_id=$1 AND app_id=$2",
+                )
+                .bind::<diesel::sql_types::Text, _>(organisation)
+                .bind::<diesel::sql_types::Text, _>(application)
+                .execute(conn)?;
+                diesel::delete(workspace_names::table.filter(workspace_names::id.eq(id)))
+                    .execute(conn)?;
+                Ok(())
+            })
+        });
+    if let Err(e) = result {
+        log::error!("Could not remove workspace mapping of half-created application {organisation}/{application}: {e}");
+    }
 }
 
 fn validate_application_name(name: &str) -> airborne_types::Result<()> {

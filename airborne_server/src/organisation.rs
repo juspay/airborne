@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 pub mod application;
+pub(crate) mod cleanup;
 pub(crate) mod journal_lifecycle;
 pub mod user;
 
@@ -184,8 +185,9 @@ async fn create_organisation(
     {
         return Err(ABError::BadRequest("Organisation name is taken".into()));
     }
-    let _lifecycle = journal_lifecycle::reset(lifecycle, &organisation).await?;
-
+    let started_at = crate::utils::db::db_now(state.db_pool.clone()).await?;
+    let _lifecycle = record_epoch(lifecycle, &organisation, started_at).await?;
+    forget_cached(&state, &organisation).await;
     state
         .authz_provider
         .create_organisation(state.get_ref(), &organisation, sub)
@@ -201,6 +203,37 @@ async fn create_organisation(
             "read".to_string(),
         ],
     }))
+}
+
+/// The cache outlives the rows it was filled from (workspace names for up to a week):
+/// drop an organisation's entries when its data is retired. Best effort here; application
+/// creation purges its own scope again and treats a failure there as fatal.
+async fn forget_cached(state: &web::Data<AppState>, organisation: &str) {
+    if let Some(cache) = &state.redis_cache {
+        if let Err(error) = cache.purge_scope(organisation, None).await {
+            log::error!("Could not drop cached entries of organisation {organisation}: {error}");
+        }
+    }
+}
+
+async fn record_epoch(
+    mut c: diesel::PgConnection,
+    organisation: &str,
+    started_at: chrono::DateTime<chrono::Utc>,
+) -> airborne_types::Result<diesel::PgConnection> {
+    use diesel::prelude::*;
+    use diesel::sql_types::{Text, Timestamptz};
+    let organisation = organisation.to_owned();
+    web::block(move || {
+        // The physical session already owns the exclusive lifecycle lock.
+        c.transaction::<_, ABError, _>(|c| {
+            cleanup::purge_rows(c, &organisation)?;
+            diesel::sql_query("INSERT INTO hyperotaserver.organisation_epochs (org_id,started_at,closed_at) VALUES ($1,$2,NULL) ON CONFLICT (org_id) DO UPDATE SET started_at=excluded.started_at, closed_at=NULL")
+                .bind::<Text, _>(&organisation).bind::<Timestamptz, _>(started_at).execute(c)?;
+            Ok(())
+        })?;
+        Ok(c)
+    }).await.map_err(|_| ABError::InternalServerError("Organisation cleanup unavailable".into()))?
 }
 
 #[delete("/{org_name}")]
@@ -237,12 +270,28 @@ async fn delete_organisation(
         .as_ref()
         .is_some_and(|org| org.name == organisation && org.is_admin_or_higher())
     {
-        let lifecycle = journal_lifecycle::exclusive(&state, &organisation).await?;
-        state
+        // Close first (refused while a request executes), then delete, then purge. See
+        // `cleanup` for why this order and what a failure at each step leaves behind.
+        cleanup::close(&state, &organisation).await?;
+        if let Err(error) = state
             .authz_provider
             .delete_organisation(state.get_ref(), &organisation)
-            .await?;
-        let _lifecycle = journal_lifecycle::reset(lifecycle, &organisation).await?;
+            .await
+        {
+            if let Err(reopen) = cleanup::reopen(&state, &organisation).await {
+                log::error!(
+                    "Organisation {organisation} stays closed after a failed delete: {reopen}"
+                );
+            }
+            return Err(error);
+        }
+        if let Err(error) = cleanup::purge(&state, &organisation).await {
+            // The rows are inert: the organisation is closed and the next creation of
+            // this name purges them again before opening.
+            log::error!("Organisation {organisation} deleted but its release control rows were not purged: {error}");
+        } else {
+            forget_cached(&state, &organisation).await;
+        }
 
         Ok(Json(
             json!({"Success" : "Organisation deleted successfully"}),

@@ -97,17 +97,10 @@ export default function GroupPage() {
   const attention = useMemo(() => summariseAttention(members), [members]);
   const approvalOn = members.filter((m) => m.approval_required).length;
 
-  const crumbs = [
-    { label: "Control Center", href: CC_ROOT },
-    { label: orgId, href: `${CC_ROOT}` },
-    { label: group?.name ?? "Group" },
-  ];
-
   return (
     <>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6">
         <CcPageHeader
-          crumbs={crumbs}
           title={group?.name ?? (isLoading ? "Loading…" : "Group")}
           titleAdornment={group ? <AttentionChips summary={attention} /> : undefined}
           subtitle={

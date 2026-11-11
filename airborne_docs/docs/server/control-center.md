@@ -63,7 +63,7 @@ Create a request with only `action`, `payload`, and `reason`; unknown top-level 
 
 Responses preserve `payload.snapshot` and `base_state` as JSON documents; clients should display them as frozen evidence and must not reserialize them as an editable approval body. The response includes a 64-character lowercase SHA-256 payload hash, canonical requester, expiry, decision fields, timestamps, status, and result. Approval revalidates current membership, ordinary permissions, expiry and freshness, then executes immediately. Competing decisions return `409`. Expired/stale approval returns `409` and records the terminal status. Failed requests may be approved again only after recovery and all current-state/eligibility checks; an interrupted `executing` request is never automatically replayed.
 
-Freshness is app-wide and includes release/config/protection revisions, so unrelated app changes can make a request stale. Queue status filtering runs before its 1,000 newest-row limit. Omit `x-application` to list across the organisation, with per-app read filtering. Overview pending counts are not capped by the list limit. UUID lookup requires both scope headers and is independent of pagination. Wrong org/app is `404`; a caller without the header scope is `403`.
+Freshness is app-wide and includes release/config/protection revisions, so unrelated app changes can make a request stale. Queue status filtering runs before its 1,000 newest-row limit. Omit `x-application` to list across the organisation. A caller who can read releases at organisation scope (any organisation role with release read, including `read`) sees every request; otherwise a request is listed only if the caller can read releases of that application, the same rule as the single-request `GET`. Overview pending counts are not capped by the list limit. UUID lookup requires both scope headers and is independent of pagination. Wrong org/app is `404`; a caller without the header scope is `403`.
 
 ## Emergency rollback controls
 
@@ -108,7 +108,7 @@ Group metadata is only returned to callers who may read groups in the organisati
 
 ## Release history and persistence
 
-`GET /api/control-center/releases/{release_id}/events` returns `{ "events": [...], "outcome": "..." }`. Events have `action`, `actor`, `created_at`, `payload`, and `synthetic`. Existing actions include `created`, `ramped`, `concluded`, `discarded`, `rolled_back`, and `operation_resolved`; maker-checker adds `requested`, `approved`, `rejected`, `cancelled`, `expired`, `stale`, `executed`, `failed`, `emergency_rollback`, `emergency_acknowledged`, and `policy_changed`. Request and policy events use the same audit table, but may have an empty release ID, so inspect request and queue endpoints for request history rather than expecting every policy event on a release timeline. Policy event payloads contain `before` and `after`; decision events contain the request object. Recovery event payloads include the operation ID, finding, reason, request-termination attestation, and upstream verification. The server may synthesize missing `created` or terminal events for older releases that predate the audit log; those entries have `synthetic: true`.
+`GET /api/control-center/releases/{release_id}/events` returns `{ "events": [...], "outcome": "..." }`. Events have `action`, `actor`, `created_at`, `payload`, and `synthetic`. Existing actions include `created`, `ramped`, `concluded`, `discarded`, `rolled_back`, and `operation_resolved`; maker-checker adds `requested`, `approved`, `rejected`, `cancelled`, `expired`, `stale`, `executed`, `failed`, `emergency_rollback`, `emergency_acknowledged`, and `policy_changed`. `created`, `ramped`, `concluded`, `discarded`, `rolled_back` and `emergency_rollback` events record the `package_version` they concern in their payload (and `ramped` the `from_target`), and the Deployments feed reports it as `package_version`. For rows written before that, the feed takes the version from another event of the same release in the same application (a request or approval records it) and leaves it empty when there is none. The feed also reports `request_id`, the approval request an event belongs to: a request's own events (`requested`, `approved`, `rejected`, `cancelled`, `expired`, `stale`, `failed`, `executed`) and a release write an approved request made carry it, taken from the event's payload; it is `null` for writes made without a request and for older events that recorded none. Pair an approval with its outcome by `request_id`, never by release. A `policy_changed` item's `summary` says which policy changed ("Approval policy turned on", "Serving policy: strict serving turned off"). Request and policy events use the same audit table, but may have an empty release ID, so inspect request and queue endpoints for request history rather than expecting every policy event on a release timeline. Policy event payloads contain `before` and `after`; decision events contain the request object. Recovery event payloads include the operation ID, finding, reason, request-termination attestation, and upstream verification. The server may synthesize missing `created` or terminal events for older releases that predate the audit log; those entries have `synthetic: true`.
 
 `outcome` is computed by the server from the release's real state; clients should display it and not infer it from the events. It is one of:
 
@@ -259,6 +259,63 @@ a check passes when either the application binding or the organisation role gran
 the permission, which is how application routes themselves are enforced. The
 dashboard's classic application pages rely on this, so an organisation `write`
 member with no application membership no longer gets a 404 there.
+
+### Organisation role downgrades
+
+Making someone an organisation `admin` or `owner` (and creating an application while they
+are one) grants them application-level `admin` on every application. These grants are
+automatic, so moving the member to a lower organisation role removes their
+application-level `admin` grants again. Grants below admin (read, write, custom roles)
+are kept, and so is the grant on an application where the member is its only admin (an
+application needs one). The server does not record whether an application `admin` grant
+was automatic or made by hand, so a hand-made one is removed with the rest: grant it
+again after the downgrade. Grants made before this behaviour existed are not revisited;
+remove stale ones with `applications/user/remove`.
+
+### Organisation deletion and re-creation
+
+Organisation names are reusable, so deleting an organisation must not hand its data to
+a later organisation of the same name. When an organisation is deleted (and again when a
+name is created, in case a delete was interrupted) the server does three different
+things, in one transaction under a per-name lock:
+
+| What | Treatment |
+| --- | --- |
+| Release control state: approval policies, deployment requests, release protections, emergency reviews, release operations, application groups, first-device requests | **Deleted.** It only means something while the organisation lives. |
+| Application data: workspace mappings (`workspace_names`), `packages`, `packages_v2`, `files`, `configs`, `releases`, `release_views`, `builds`, `blocked_packages`, `serving_policies`, `device_reports`, `user_credentials` | **Retired, not deleted.** The organisation key of every row is renamed to a unique tombstone `<org>~retired~<uuid>`, and `organisation_retirements(tombstone, org_id, retired_at)` records it. |
+| Audit history (`release_events`) | **Kept.** Hidden from the new organisation by `organisation_epochs.started_at`. |
+
+The Superposition workspaces and the S3 objects behind the old applications are not
+touched. The decision this encodes: a recreated organisation, and an application of
+the same name inside it, always start empty with a **fresh workspace** (`workspace<n>`
+comes from a sequence that is never reused), and can never serve, list or roll back to
+the previous tenant's releases and packages or authenticate with its API credentials.
+
+Trade-offs:
+
+- Nothing is lost by a mistaken delete, and deleting stays cheap, but **nothing is
+  reclaimed either**: rows, Superposition workspaces and S3 objects stay until an
+  operator removes them. Deleting an organisation is therefore not a way to erase a
+  customer's data.
+- Recovery is manual. Recreate the organisation, then, for each of the twelve tables
+  above, `UPDATE hyperotaserver.<table> SET <org column> = '<org>' WHERE <org column> =
+  '<tombstone>'` in one transaction (the tombstone is in `organisation_retirements`),
+  and re-grant users. Restore only while the name has no applications of its own: the
+  unique indexes on application name apply. Casbin grants, approval policies, groups and
+  requests are not recoverable.
+- Redis caches workspace names for up to a week. Deleting or creating an organisation
+  drops every cached entry of that name, and creating an application drops the entries
+  of its own name first (and fails if Redis cannot be reached), so a recreated
+  application cannot be sent to the previous tenant's workspace by a stale entry.
+- A retired application keeps its `workspaceNNN` mapping under the tombstone, so the
+  unique workspace name is never handed out again.
+
+Creating an application is ordered so that a failure leaves nothing behind: the unique
+workspace mapping is written first (a taken name is refused with HTTP 409 before any
+grant exists), then the application's grants, then the Superposition workspace and its
+migration. If a later step fails the earlier ones are undone. The one thing not undone
+is a Superposition workspace that was already created; its name is never reused, and it
+is left for an operator like those of a deleted organisation.
 
 ### Release cache failures
 

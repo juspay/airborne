@@ -48,7 +48,7 @@ export function RowHeader({ className }: { className?: string }) {
   );
 }
 
-function accentFor(app: AppStatus): string {
+export function accentFor(app: AppStatus): string {
   // Red means flagged: a failed lookup, paused writes, or a deployment the telemetry says seems bad.
   if (app.error || app.unresolved_operations?.length) return "border-l-red-500";
   if (appTelemetryState(app) === "seems_bad") return "border-l-red-500";
@@ -68,6 +68,7 @@ export function AppStatusRow({
   showPlatform = true,
   showChips = true,
   showCacheNotice = true,
+  context,
 }: {
   org: string;
   app: AppStatus;
@@ -78,6 +79,8 @@ export function AppStatusRow({
   showChips?: boolean;
   /** Off where the group already shows one line for every stale CDN cache in it. */
   showCacheNotice?: boolean;
+  /** Where the application sits (organisation, group), for lists that mix organisations. */
+  context?: string;
 }) {
   const active = primaryActive(app);
   const extraActive = app.active.length - (active ? 1 : 0);
@@ -112,6 +115,11 @@ export function AppStatusRow({
           >
             {app.application}
           </Link>
+          {context && (
+            <span className="block truncate text-[11px] text-muted-foreground/80" title={context}>
+              {context}
+            </span>
+          )}
           {showChips && flagged && (
             // The one thing on the row that asks to be read first: the flag, with its percentage, alone on its line.
             <div className="mt-1.5">

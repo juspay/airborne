@@ -44,7 +44,7 @@ import {
   PanelTitle,
   PermissionDenied,
 } from "@/components/control-center/states";
-import { APPROVALS_PATH, appPath, CC_ROOT, groupPath, releasePath } from "@/components/control-center/paths";
+import { APPROVALS_PATH, releasePath } from "@/components/control-center/paths";
 
 export default function DeploymentRequestPage() {
   const params = useParams<{ orgId: string; appId: string; requestId: string }>();
@@ -79,22 +79,14 @@ export default function DeploymentRequestPage() {
     void events.refresh();
   };
 
-  const crumbs = [
-    { label: "Control Center", href: CC_ROOT },
-    { label: "Approvals", href: APPROVALS_PATH },
-    ...(located.group ? [{ label: located.group.name, href: groupPath(orgId, located.group.id) }] : [{ label: orgId }]),
-    { label: appId, href: appPath(orgId, appId) },
-    { label: request ? actionLabel(request.action) : "Request" },
-  ];
-
   return (
     <>
       <div className="mx-auto max-w-[1400px] space-y-6 p-6">
         <CcPageHeader
-          crumbs={crumbs}
+          back={{ label: "Approvals", href: APPROVALS_PATH }}
           title={
             request && !denied ? (
-              <span className="inline-flex items-baseline gap-3">
+              <span className="inline-flex flex-wrap items-baseline gap-x-3">
                 <span>{actionLabel(request.action)} request</span>
                 <span className="text-muted-foreground">on</span>
                 <PlatformMark platform={located.app?.platform ?? null} size="md" className="text-2xl" />

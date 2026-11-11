@@ -1,22 +1,26 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface Crumb {
+/**
+ * The scope picker is the only breadcrumb, so pages carry none. A page below an application's own page names its
+ * parent once, as a way back: it is a link, not a trail.
+ */
+export interface BackLink {
   label: string;
-  href?: string;
+  href: string;
 }
 
 export function CcPageHeader({
-  crumbs,
+  back,
   title,
   titleAdornment,
   subtitle,
   actions,
   className,
 }: {
-  crumbs?: Crumb[];
+  back?: BackLink;
   title: ReactNode;
   titleAdornment?: ReactNode;
   subtitle?: ReactNode;
@@ -25,26 +29,19 @@ export function CcPageHeader({
 }) {
   return (
     <header className={cn("flex flex-col gap-3", className)}>
-      {crumbs && crumbs.length > 0 && (
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-          {crumbs.map((c, i) => (
-            <span key={`${c.href ?? ""}:${c.label}`} className="flex min-w-0 items-center gap-1">
-              {i > 0 && <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />}
-              {c.href ? (
-                <Link href={c.href} className="truncate hover:text-foreground hover:underline">
-                  {c.label}
-                </Link>
-              ) : (
-                <span className="truncate text-foreground">{c.label}</span>
-              )}
-            </span>
-          ))}
-        </nav>
+      {back && (
+        <Link
+          href={back.href}
+          className="inline-flex w-fit min-w-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+        >
+          <ArrowLeft className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">{back.label}</span>
+        </Link>
       )}
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="truncate text-2xl font-semibold tracking-tight font-[family-name:var(--font-space-grotesk)]">
+            <h1 className="min-w-0 max-w-full break-words text-2xl md:truncate font-semibold tracking-tight font-[family-name:var(--font-space-grotesk)]">
               {title}
             </h1>
             {titleAdornment}

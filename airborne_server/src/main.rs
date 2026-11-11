@@ -454,11 +454,13 @@ async fn main() -> std::io::Result<()> {
         });
     }
 
+    let feed_read_permits = utils::db::feed_read_permits(&pool);
     let app_state = Arc::new(types::AppState {
         env: env.clone(),
         authn_provider: build_authn_provider(authn_provider_kind),
         authz_provider,
         db_pool: pool,
+        feed_read_permits,
         release_write_db_url,
         redis_cache,
         s3_client: aws_s3_client,

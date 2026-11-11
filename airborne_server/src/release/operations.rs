@@ -140,6 +140,92 @@ pub async fn has_confirmed(
         Ok(r.found)
     })
 }
+/// The audit event a mutation will produce when (and only when) its journal entry
+/// reaches `confirmed`. It is recorded on the unresolved journal row before dispatch, so
+/// every later confirmation path (own response, next-write reconcile) can write the
+/// same event with the original actor, in the same transaction as the state change.
+#[derive(Clone, Debug)]
+pub struct Audit {
+    pub actor: String,
+    pub action: String,
+    pub payload: Value,
+}
+impl Audit {
+    pub fn new(auth: &AuthResponse, action: &str, payload: Value) -> Self {
+        Self {
+            actor: auth.sub.clone(),
+            action: action.into(),
+            payload: super::control_center::decorate(payload),
+        }
+    }
+    pub fn journal(&self) -> Value {
+        serde_json::json!({"actor":self.actor,"action":self.action,"payload":self.payload})
+    }
+    fn from_journal(op: &Operation) -> Option<Self> {
+        let a = op.data.get("audit")?;
+        Some(Self {
+            actor: a["actor"].as_str()?.to_owned(),
+            action: a["action"].as_str()?.to_owned(),
+            payload: a["payload"].clone(),
+        })
+    }
+}
+pub struct NewEvent {
+    id: Uuid,
+    release_id: String,
+    action: String,
+    actor: String,
+    payload: Value,
+}
+// Same derivation as `required_event`, keyed by the journal operation: replays dedupe.
+pub fn event_id(org: &str, app: &str, release: &str, action: &str, op: Uuid) -> Uuid {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(format!("{org}/{app}/{release}/{action}/{op}"));
+    Uuid::from_bytes(digest[..16].try_into().unwrap())
+}
+pub fn new_event(
+    org: &str,
+    app: &str,
+    op: &Operation,
+    audit: Audit,
+    release: &str,
+    reconciled: bool,
+) -> NewEvent {
+    let mut payload = audit.payload;
+    payload["journal_operation_id"] = serde_json::json!(op.id);
+    if reconciled {
+        // The upstream result was ambiguous; the event is written when it is later confirmed.
+        payload["reconciled_after_ambiguous_result"] = serde_json::json!(true);
+    }
+    NewEvent {
+        id: event_id(org, app, release, &audit.action, op.id),
+        release_id: release.to_owned(),
+        action: audit.action,
+        actor: audit.actor,
+        payload,
+    }
+}
+/// Event for an unresolved journal entry that is now known to have been applied, if the
+/// entry recorded its audit intent (journals written before this change did not).
+pub fn reconciled_event(org: &str, app: &str, op: &Operation, release: &str) -> Option<NewEvent> {
+    Audit::from_journal(op).map(|a| new_event(org, app, op, a, release, true))
+}
+/// The deployment action an operation represents, for operator recovery rows.
+pub fn resolved_action(op: &Operation) -> Option<String> {
+    if let Some(a) = op.data["audit"]["action"].as_str() {
+        return Some(a.to_owned());
+    }
+    let e = &op.data["expected"];
+    match e["status"].as_str()? {
+        "CREATED" if e["id"].is_null() => Some("created"),
+        "INPROGRESS" => Some("ramped"),
+        "CONCLUDED" => Some("concluded"),
+        "DISCARDED" => Some("discarded"),
+        _ => None,
+    }
+    .map(str::to_owned)
+}
+
 pub async fn save(
     state: &web::Data<AppState>,
     org: &str,
@@ -147,6 +233,19 @@ pub async fn save(
     kind: &str,
     source: &str,
     op: &Operation,
+) -> airborne_types::Result<()> {
+    save_with_event(state, org, app, kind, source, op, None).await
+}
+/// Journal write and audit row commit or fail together (one transaction on the
+/// advisory-lock session), so a confirmed mutation cannot exist without its event.
+pub async fn save_with_event(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    kind: &str,
+    source: &str,
+    op: &Operation,
+    event: Option<NewEvent>,
 ) -> airborne_types::Result<()> {
     let _ = state;
     let mut op = op.clone();
@@ -161,9 +260,15 @@ pub async fn save(
         op.clone(),
     );
     super::write_lock::store(move |c| {
-        diesel::sql_query("INSERT INTO hyperotaserver.release_operations (id,org_id,app_id,kind,source_release_id,state,data) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET state=excluded.state,data=excluded.data,updated_at=now()")
-            .bind::<SqlUuid,_>(op.id).bind::<Text,_>(org).bind::<Text,_>(app).bind::<Text,_>(kind).bind::<Text,_>(source).bind::<Text,_>(op.state).bind::<Jsonb,_>(op.data).execute(c)?;
-        Ok(())
+        c.transaction::<_, ABError, _>(|c| {
+            diesel::sql_query("INSERT INTO hyperotaserver.release_operations (id,org_id,app_id,kind,source_release_id,state,data) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET state=excluded.state,data=excluded.data,updated_at=now()")
+                .bind::<SqlUuid,_>(op.id).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(kind).bind::<Text,_>(source).bind::<Text,_>(op.state).bind::<Jsonb,_>(op.data).execute(c)?;
+            if let Some(ev) = event {
+                diesel::sql_query("INSERT INTO hyperotaserver.release_events (id,org_id,app_id,release_id,action,actor,payload) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING")
+                    .bind::<SqlUuid,_>(ev.id).bind::<Text,_>(&org).bind::<Text,_>(&app).bind::<Text,_>(ev.release_id).bind::<Text,_>(ev.action).bind::<Text,_>(ev.actor).bind::<Jsonb,_>(ev.payload).execute(c)?;
+            }
+            Ok(())
+        })
     }).await
 }
 

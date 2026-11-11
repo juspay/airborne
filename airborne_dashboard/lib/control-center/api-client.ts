@@ -1,9 +1,11 @@
 import { apiFetch } from "@/lib/api";
+import { feedSearch } from "./deployments";
 import type {
   AppGroup,
   ApprovalPolicy,
   ClientContext,
   ControlCenterClient,
+  DeploymentFeedPage,
   DeploymentRequest,
   DeploymentRequestsResponse,
   GroupsResponse,
@@ -39,7 +41,19 @@ export function createApiClient(ctx: ClientContext): ControlCenterClient {
         { ...base, org, app }
       );
     },
-    getOverview: () => apiFetch<Overview>("/control-center/overview", { showErrorToast: false }, base),
+    getDeploymentFeed: (q) =>
+      apiFetch<DeploymentFeedPage>(
+        // `action` repeats, which the plain query helper cannot express: build the query string here.
+        `/control-center/deployments${feedSearch(q)}`,
+        { showErrorToast: false },
+        base
+      ),
+    getOverview: (scope) =>
+      apiFetch<Overview>(
+        "/control-center/overview",
+        { query: { org: scope?.org, group: scope?.group, app: scope?.app }, showErrorToast: false },
+        base
+      ),
 
     listGroups: (org) =>
       apiFetch<GroupsResponse>("/control-center/groups", { showErrorToast: false }, { ...base, org }),

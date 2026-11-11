@@ -107,8 +107,12 @@ pub async fn resolve(
             Finding::DidNotApply if req.request_terminated && !applied && unchanged(&op,&exps) => ("rejected","did_not_apply"),
             _ => return Err(ABError::Conflict("Upstream does not verify this finding. Applied requires the marked expected state; did_not_apply requires unchanged upstream state and confirmation that the original request has terminated. Inspect history before retrying.".into())),
         };
-        let payload=json!({"operation_id":id,"finding":finding,"reason":req.reason.trim(),"request_terminated":req.request_terminated,"upstream_verified":true});
-        let release=op.data["expected"]["id"].as_str().or(op.data["before"]["id"].as_str()).map(str::to_owned).unwrap_or_default();
+        // `resolved_action` lets the deployments feed show an operator-confirmed write as the
+        // action it completed (created, ramped, concluded, discarded).
+        let payload=json!({"operation_id":id,"finding":finding,"reason":req.reason.trim(),"request_terminated":req.request_terminated,"upstream_verified":true,"resolved_action":operations::resolved_action(&op)});
+        let release=op.data["expected"]["id"].as_str().or(op.data["before"]["id"].as_str()).map(str::to_owned)
+            .or_else(|| exps.iter().find(|e| write_lock::experiment_matches(&control_center::snapshot(e), &op.data["expected"])).map(|e| e.id.clone()))
+            .unwrap_or_default();
         let (org,app,actor)=(org.clone(),app.clone(),auth_response.sub.clone());
         // Recovery is privileged: journal update and audit must commit together.
         write_lock::store(move |c| c.transaction::<_,ABError,_>(|c| {

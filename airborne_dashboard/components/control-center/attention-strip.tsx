@@ -99,13 +99,20 @@ export function AttentionStrip({
   focus,
   onFocus,
   totals,
+  scoped = false,
+  partial = false,
 }: {
   summary: AttentionSummary;
   focus: Focus;
   onFocus: (f: Focus) => void;
   totals: { orgs: number; groups: number; apps: number };
+  /** A scope is narrowing the page: "All" would read as the scope picker's All. */
+  scoped?: boolean;
+  /** An organisation's read was cut short: the counts are what could be read, so they are "at least", and never "quiet". */
+  partial?: boolean;
 }) {
   const quiet =
+    !partial &&
     summary.stateUnknown === 0 &&
     summary.seemsBad === 0 &&
     summary.suspicious === 0 &&
@@ -127,7 +134,9 @@ export function AttentionStrip({
           focus === "all" ? "border-foreground/40 bg-foreground/5" : "text-muted-foreground hover:text-foreground"
         )}
       >
-        All · {totals.apps} app{totals.apps === 1 ? "" : "s"} in {totals.groups} group{totals.groups === 1 ? "" : "s"}
+        {scoped ? "In scope" : "All"} · {partial ? "at least " : ""}
+        {totals.apps} app{totals.apps === 1 ? "" : "s"} in {totals.groups} group
+        {totals.groups === 1 ? "" : "s"}
         {totals.orgs > 1 ? ` across ${totals.orgs} orgs` : ""}
       </button>
       {ITEMS.map((i) => {

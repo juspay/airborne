@@ -706,20 +706,29 @@ pub async fn run(
             let description = format!("Rollback operation {}", op.id);
             let expected = json!({"description":description,"context":context(&source),"variants":op.data["preview"]["overrides"],"status":"CREATED","traffic_percentage":0});
             transition(state, org, app, id, &mut op, expected.clone(), "create").await?;
-            let created = Box::pin(write_lock::mutate(
+            let call = client
+                .create_experiment()
+                .org_id(sporg)
+                .workspace_id(&workspace)
+                .name(&source.name)
+                .experiment_type(ExperimentType::Default)
+                .description(&description)
+                .change_reason(write_lock::user_reason(reason)?)
+                .idempotency_key(op.id.to_string())
+                .set_context(Some(source.context.clone()))
+                .set_variants(Some(variants))
+                .send();
+            // The replacement's "created" row commits with the journal's confirmed step.
+            let audit = operations::Audit::new(
+                auth,
+                "created",
+                json!({"package_version":op.data["preview"]["resulting_package_version"],"rollback_of":id,"operation_id":op.id,"reconciled_keys":op.data["preview"]["reconciled_keys"],"reason":reason}),
+            );
+            let created = Box::pin(write_lock::mutate_created(
                 expected,
-                client
-                    .create_experiment()
-                    .org_id(sporg)
-                    .workspace_id(&workspace)
-                    .name(&source.name)
-                    .experiment_type(ExperimentType::Default)
-                    .description(&description)
-                    .change_reason(write_lock::user_reason(reason)?)
-                    .idempotency_key(op.id.to_string())
-                    .set_context(Some(source.context.clone()))
-                    .set_variants(Some(variants))
-                    .send(),
+                audit,
+                |r| r.id.to_string(),
+                call,
             ))
             .await?;
             op.data["replacement_release_id"] = json!(created.id);
@@ -736,39 +745,32 @@ pub async fn run(
         op.data["observed"] = snapshot(&r);
         op.data["transition_expected"] = Value::Null;
         save(state, org, app, id, &op).await?;
-        event(state,auth,&r.id,"created",json!({"rollback_of":id,"operation_id":op.id,"reconciled_keys":op.data["preview"]["reconciled_keys"],"reason":reason})).await;
         if r.status == ExperimentStatusType::Created {
             let mut expected = snapshot(&r);
             expected.as_object_mut().unwrap().remove("revision");
             expected["status"] = json!("INPROGRESS");
             expected["traffic_percentage"] = json!(50);
             transition(state, org, app, id, &mut op, expected.clone(), "ramp").await?;
-            Box::pin(write_lock::mutate(
-                expected,
-                client
-                    .ramp_experiment()
-                    .org_id(sporg)
-                    .workspace_id(&workspace)
-                    .id(&r.id)
-                    .traffic_percentage(50)
-                    .change_reason(write_lock::user_reason(reason)?)
-                    .send(),
-            ))
-            .await?;
+            let call = client
+                .ramp_experiment()
+                .org_id(sporg)
+                .workspace_id(&workspace)
+                .id(&r.id)
+                .traffic_percentage(50)
+                .change_reason(write_lock::user_reason(reason)?)
+                .send();
+            let audit = operations::Audit::new(
+                auth,
+                "ramped",
+                json!({"traffic_percentage":50,"from_target":0,"package_version":super::control_center::package_version_of(&r.variants),"reason":reason}),
+            );
+            Box::pin(write_lock::mutate(expected, Some(audit), call)).await?;
             exps = experiments(state, org, app).await?.1;
             validate(&op, &exps)?;
             r = replacement(&op, &exps).unwrap().clone();
             op.data["observed"] = snapshot(&r);
             op.data["transition_expected"] = Value::Null;
             save(state, org, app, id, &op).await?;
-            event(
-                state,
-                auth,
-                &r.id,
-                "ramped",
-                json!({"traffic_percentage":50,"reason":reason}),
-            )
-            .await;
         }
         if !live(&r) {
             let chosen = experimental(&r)
@@ -780,26 +782,20 @@ pub async fn run(
             expected["status"] = json!("CONCLUDED");
             expected["chosen_variant"] = json!(chosen);
             transition(state, org, app, id, &mut op, expected.clone(), "conclude").await?;
-            Box::pin(write_lock::mutate(
-                expected,
-                client
-                    .conclude_experiment()
-                    .org_id(sporg)
-                    .workspace_id(&workspace)
-                    .id(&r.id)
-                    .chosen_variant(&chosen)
-                    .change_reason(write_lock::user_reason(reason)?)
-                    .send(),
-            ))
-            .await?;
-            event(
-                state,
+            let call = client
+                .conclude_experiment()
+                .org_id(sporg)
+                .workspace_id(&workspace)
+                .id(&r.id)
+                .chosen_variant(&chosen)
+                .change_reason(write_lock::user_reason(reason)?)
+                .send();
+            let audit = operations::Audit::new(
                 auth,
-                &r.id,
                 "concluded",
-                json!({"chosen_variant":chosen,"reason":reason}),
-            )
-            .await;
+                json!({"chosen_variant":chosen,"package_version":super::control_center::package_version_of(&r.variants),"reason":reason}),
+            );
+            Box::pin(write_lock::mutate(expected, Some(audit), call)).await?;
         }
         // Confirm authoritative state and the effective config, including retained
         // current keys, before recording a completed rollback.
@@ -832,48 +828,40 @@ pub async fn run(
             }
             transition(state, org, app, id, &mut op, expected.clone(), &action).await?;
             if action == "discarded" {
-                Box::pin(write_lock::mutate(
-                    expected,
-                    client
-                        .discard_experiment()
-                        .org_id(sporg)
-                        .workspace_id(&workspace)
-                        .id(id)
-                        .change_reason(write_lock::user_reason(reason)?)
-                        .send(),
-                ))
-                .await?;
+                let call = client
+                    .discard_experiment()
+                    .org_id(sporg)
+                    .workspace_id(&workspace)
+                    .id(id)
+                    .change_reason(write_lock::user_reason(reason)?)
+                    .send();
+                let audit = operations::Audit::new(
+                    auth,
+                    "discarded",
+                    json!({"package_version":super::control_center::package_version_of(&source.variants),"reason":reason}),
+                );
+                Box::pin(write_lock::mutate(expected, Some(audit), call)).await?;
             } else {
-                Box::pin(write_lock::mutate(
-                    expected,
-                    client
-                        .conclude_experiment()
-                        .org_id(sporg)
-                        .workspace_id(&workspace)
-                        .id(id)
-                        .chosen_variant(
-                            op.data["transition_expected"]["chosen_variant"]
-                                .as_str()
-                                .unwrap(),
-                        )
-                        .change_reason(write_lock::user_reason(reason)?)
-                        .send(),
-                ))
-                .await?;
+                let call = client
+                    .conclude_experiment()
+                    .org_id(sporg)
+                    .workspace_id(&workspace)
+                    .id(id)
+                    .chosen_variant(
+                        op.data["transition_expected"]["chosen_variant"]
+                            .as_str()
+                            .unwrap(),
+                    )
+                    .change_reason(write_lock::user_reason(reason)?)
+                    .send();
+                let audit = operations::Audit::new(
+                    auth,
+                    "concluded",
+                    json!({"package_version":super::control_center::package_version_of(&source.variants),"reason":reason}),
+                );
+                Box::pin(write_lock::mutate(expected, Some(audit), call)).await?;
             }
         }
-        event(
-            state,
-            auth,
-            id,
-            if action == "discarded" {
-                "discarded"
-            } else {
-                "concluded"
-            },
-            json!({"reason":reason}),
-        )
-        .await;
     }
     let result = json!({"action":action,"release_id":id,"rolled_back_to_package_version":op.data["preview"]["resulting_package_version"],"new_release_id":op.data["replacement_release_id"],"reconciled_keys":op.data["preview"]["reconciled_keys"]});
     op.advance("completed")?;
@@ -881,7 +869,7 @@ pub async fn run(
     op.data["stage"] = json!("completed");
     // Terminal event is durable before completion. Retry deduplicates by operation/action.
     required_event(state, auth, id, "rolled_back",
-        json!({"reason":reason,"operation_id":op.id,"result":result,"approval":super::maker_checker::audit_context()})).await?;
+        json!({"reason":reason,"operation_id":op.id,"package_version":super::control_center::package_version_of(&source.variants),"result":result,"approval":super::maker_checker::audit_context()})).await?;
     save(state, org, app, id, &op).await?;
     Ok(actix_web::HttpResponse::Ok().json(result))
 }

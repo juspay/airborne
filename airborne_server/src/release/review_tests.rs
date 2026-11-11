@@ -147,6 +147,7 @@ async fn fixture_with_pool(
         env,
         authn_provider: std::sync::Arc::new(Directory),
         authz_provider: std::sync::Arc::new(authz),
+        feed_read_permits: crate::utils::db::feed_read_permits(&pool),
         db_pool: pool,
         release_write_db_url: url,
         redis_cache: None,

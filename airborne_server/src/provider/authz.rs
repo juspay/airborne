@@ -145,6 +145,14 @@ pub trait AuthZProvider: Send + Sync {
         creator_subject: &str,
     ) -> airborne_types::Result<()>;
 
+    /// Remove an application's grants. Used only to undo a half-finished creation.
+    async fn delete_application(
+        &self,
+        state: &AppState,
+        organisation: &str,
+        application: &str,
+    ) -> airborne_types::Result<()>;
+
     async fn list_organisation_users(
         &self,
         state: &AppState,
