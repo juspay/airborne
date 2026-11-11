@@ -15,6 +15,8 @@ import Foundation
     // MARK: - Properties
 
     /// The application configuration (version, timeouts, properties).
+    public var blockedPackageVersions: [String] = []
+    public var telemetry: [String: Any]?
     public var config: AJPApplicationConfig
 
     /// The package descriptor (index, important splits, lazy splits).
@@ -59,6 +61,8 @@ import Foundation
             )
         }
 
+        self.blockedPackageVersions = dict["blocked_package_versions"] as? [String] ?? []
+        self.telemetry = dict["telemetry"] as? [String: Any]
         self.config = (try? AJPApplicationConfig(dictionary: (dict["config"] as? NSDictionary) ?? NSDictionary())) ?? AJPApplicationConfig()
 
         self.package = (try? AJPApplicationPackage(dictionary: (dict["package"] as? NSDictionary) ?? NSDictionary())) ?? AJPApplicationPackage()
@@ -77,6 +81,8 @@ import Foundation
     /// Serializes the manifest back to a dictionary, mirroring the server JSON shape.
     public func toDictionary() -> NSDictionary {
         return [
+            "blocked_package_versions": blockedPackageVersions,
+            "telemetry": telemetry ?? [:],
             "config": config.toDictionary(),
             "package": package.toDictionary(),
             "resources": resources.toDictionary()
@@ -88,6 +94,8 @@ import Foundation
     @objc public class var supportsSecureCoding: Bool { true }
 
     public required init?(coder: NSCoder) {
+        self.blockedPackageVersions = coder.decodeObject(of: [NSArray.self, NSString.self], forKey: "blocked_package_versions") as? [String] ?? []
+        self.telemetry = coder.decodeObject(of: [NSDictionary.self, NSString.self, NSNumber.self], forKey: "telemetry") as? [String: Any]
         self.config = coder.decodeObject(of: AJPApplicationConfig.self, forKey: "config") ?? AJPApplicationConfig()
         self.package = coder.decodeObject(of: AJPApplicationPackage.self, forKey: "package") ?? AJPApplicationPackage()
         self.resources = coder.decodeObject(of: AJPApplicationResources.self, forKey: "resources") ?? AJPApplicationResources()
@@ -95,6 +103,8 @@ import Foundation
     }
 
     public func encode(with coder: NSCoder) {
+        coder.encode(blockedPackageVersions, forKey: "blocked_package_versions")
+        coder.encode(telemetry, forKey: "telemetry")
         coder.encode(config, forKey: "config")
         coder.encode(package, forKey: "package")
         coder.encode(resources, forKey: "resources")

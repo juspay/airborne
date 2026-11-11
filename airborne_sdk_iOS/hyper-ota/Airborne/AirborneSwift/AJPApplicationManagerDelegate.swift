@@ -26,6 +26,7 @@ import AirborneSwiftCore
      *       implementation, it takes full responsibility for the release configuration
      *       retrieval process.
      */
+    @objc optional func telemetryEnabled() -> Bool
     @objc func getReleaseConfigURL() -> String
     
     /**

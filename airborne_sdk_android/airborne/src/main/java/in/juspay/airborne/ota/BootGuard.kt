@@ -239,7 +239,7 @@ internal class BootGuard(
      * from the same source (snapshot, APK assets or package dir) even when a manager is
      * re-created after [onPackageInstalled] cleared the block.
      */
-    fun select(installedVersion: String, isUsable: (LastGood) -> Boolean = { true }): Selection {
+    fun select(installedVersion: String, isForbidden: (String) -> Boolean = { false }, isUsable: (LastGood) -> Boolean = { true }): Selection {
         val events = Events()
         val result = synchronized(lock) {
             if (selected) {
@@ -248,7 +248,7 @@ internal class BootGuard(
             selected = true
             selectedGeneration = installGeneration
             selection = when {
-                !active || state.blocked.isEmpty() || installedVersion != state.blocked -> Selection.Installed
+                !isForbidden(installedVersion) && (!active || state.blocked.isEmpty() || installedVersion != state.blocked) -> Selection.Installed
                 else -> {
                     events.add { listener.onBlockedPackage(installedVersion) }
                     val lastGood = usableLastGood(isUsable, events)

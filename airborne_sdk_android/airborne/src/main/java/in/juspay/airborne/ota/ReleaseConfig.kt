@@ -28,7 +28,9 @@ internal data class ReleaseConfig(
     val version: String,
     val config: Config,
     val pkg: PackageManifest,
-    val resources: ResourceManifest
+    val resources: ResourceManifest,
+    val blockedPackageVersions: List<String> = emptyList(),
+    val telemetry: JSONObject? = null
 ) {
     companion object {
         private fun JSONObject.getURL(key: String) =
@@ -53,7 +55,9 @@ internal data class ReleaseConfig(
                     json.getString("version"),
                     configFromJSON(json.getJSONObject("config")),
                     packageFromJSON(json.getJSONObject("package")),
-                    resourcesFromJSON(json.getJSONArray("resources"))
+                    resourcesFromJSON(json.getJSONArray("resources")),
+                    json.optJSONArray("blocked_package_versions")?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList(),
+                    json.optJSONObject("telemetry")
                 )
                 Result.success(releaseConfig)
             } catch (e: JSONException) {
@@ -124,6 +128,8 @@ internal data class ReleaseConfig(
             .put("config", config.toJSON())
             .put("package", pkg.toJSON())
             .put("resources", resources.toJSON())
+            .put("blocked_package_versions", JSONArray(blockedPackageVersions))
+            .put("telemetry", telemetry)
             .toString()
 
     data class Config(

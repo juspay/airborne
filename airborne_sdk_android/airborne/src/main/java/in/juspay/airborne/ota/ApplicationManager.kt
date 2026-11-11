@@ -66,6 +66,81 @@ class ApplicationManager(
      */
     var bootGuardEnabled = false
 
+    var telemetryEnabled = false
+    private val telemetryExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val sending = java.util.concurrent.atomic.AtomicBoolean(false)
+    private fun forbidden(version: String) = synchronized(bootLock) {
+        val a = bootState.optJSONArray("securityBlocked") ?: JSONArray()
+        (0 until a.length()).any { a.optString(it) == version }
+    }
+    private fun received(rc: ReleaseConfig) = synchronized(bootLock) {
+        val a = bootState.optJSONArray("securityBlocked") ?: JSONArray()
+        val all = (0 until a.length()).map { a.getString(it) }.toMutableSet()
+        all.addAll(rc.blockedPackageVersions)
+        if (all.isNotEmpty()) bootState.put("securityBlocked", JSONArray(all.toList()))
+        if (telemetryEnabled && rc.telemetry != null) {
+            val receipts = bootState.optJSONObject("receipts") ?: JSONObject()
+            receipts.put(rc.pkg.version, rc.telemetry); bootState.put("receipts", receipts)
+        }
+        if (all.isNotEmpty() || telemetryEnabled) saveBootState()
+    }
+    private fun report(version: String?, kind: String) {
+        if (!telemetryEnabled || version == null) return
+        try { synchronized(bootLock) {
+            val receipt = bootState.optJSONObject("receipts")?.optJSONObject(version) ?: return
+            val q = bootState.optJSONArray("queue") ?: JSONArray()
+            q.put(JSONObject().put("meta", receipt).put("event", JSONObject().put("id", java.util.UUID.randomUUID().toString()).put("kind", kind)))
+            while(q.length() > 128) q.remove(0)
+            bootState.put("queue", q)
+            if (!bootState.has("install")) bootState.put("install", java.util.UUID.randomUUID().toString())
+            saveBootState()
+        }; flushReports() } catch (_: Exception) { }
+    }
+    private fun reportEndpoint(meta: JSONObject): java.net.URL {
+        val base = releaseConfigTemplateUrl.ifEmpty { rcCallback?.getReleaseConfig(false) ?: "" }
+        return java.net.URL(java.net.URL(base), meta.getString("ingest_path"))
+    }
+    private fun flushReports() {
+        if (!telemetryEnabled || !sending.compareAndSet(false,true)) return
+        telemetryExecutor.execute {
+            var accepted = false
+            try {
+                val batch = synchronized(bootLock) {
+                    val q = bootState.optJSONArray("queue") ?: JSONArray()
+                    val valid = (0 until q.length()).map { q.getJSONObject(it) }.filter { it.getJSONObject("meta").optLong("expires_at") > System.currentTimeMillis()/1000 }
+                    bootState.put("queue", JSONArray(valid)); saveBootState()
+                    val first = valid.firstOrNull() ?: return@execute
+                    valid.filter { it.getJSONObject("meta").getString("receipt") == first.getJSONObject("meta").getString("receipt") }.take(32)
+                }
+                val meta = batch[0].getJSONObject("meta")
+                val endpoint = reportEndpoint(meta)
+                val conn = endpoint.openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout=5000; conn.readTimeout=5000; conn.requestMethod="POST"; conn.doOutput=true; conn.setRequestProperty("Content-Type","application/json")
+                val body = JSONObject().put("receipt",meta.getString("receipt")).put("install_id",synchronized(bootLock) { bootState.getString("install") }).put("events",JSONArray(batch.map { it.getJSONObject("event") }))
+                conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                val code=conn.responseCode; conn.disconnect(); accepted = code in 200..299 || code == 400
+                if (code in 200..299 || code==400) synchronized(bootLock) {
+                    val ids=batch.map { it.getJSONObject("event").getString("id") }.toSet()
+                    val q=bootState.optJSONArray("queue") ?: JSONArray()
+                    bootState.put("queue",JSONArray((0 until q.length()).map { q.getJSONObject(it) }.filter { it.getJSONObject("event").getString("id") !in ids })); saveBootState()
+                }
+            } catch (_: Exception) { } finally { sending.set(false); if (accepted) flushReports() }
+        }
+    }
+    private val bootPrefs by lazy { ctx.applicationContext.getSharedPreferences("airborne-telemetry-${bootGuardKey()}", Context.MODE_PRIVATE) }
+    private val bootLock = Any()
+    private var bootState = try { JSONObject(bootPrefs.getString("state", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
+    private fun saveBootState() {
+        if (!bootPrefs.edit().putString("state", bootState.toString()).commit())
+            trackError(LogLabel.BOOT_GUARD_ERROR, JSONObject().put("message", "Cannot persist telemetry/exclusions"))
+    }
+    private fun allowPackage(version: String): Boolean {
+        if (forbidden(version)) { report(version, "blocked_package"); return false }
+        return bootGuard?.allowPackage(version) ?: true
+    }
+    private var securityFallback = false
+
+
     /** Shared by every manager of this workspace in this process (see [BOOT_GUARDS]). */
     @Volatile
     private var bootGuard: BootGuard? = null
@@ -107,6 +182,11 @@ class ApplicationManager(
             val startTime = System.currentTimeMillis()
             try {
                 initBootGuard()
+                flushReports()
+                if (telemetryEnabled) synchronized(bootLock) {
+                    report(bootState.optString("telemetryPending").takeIf { it.isNotEmpty() }, "boot_failed")
+                    bootState.remove("telemetryPending"); saveBootState()
+                }
                 if (releaseConfig == null) {
                     val newRef = WeakReference(ctx)
                     val currentRef = CONTEXT_MAP[clientId]
@@ -188,6 +268,12 @@ class ApplicationManager(
      */
     fun prepareBoot() {
         getIndexBundlePath()
+        val version = bootConfig?.pkg?.version
+        if (version != null && BootFiles.trackedVersion(version, indexFolderPath) != null && telemetryEnabled) synchronized(bootLock) {
+            if (bootState.optString("telemetryPending") != version) {
+                report(version, "boot_started"); bootState.put("telemetryPending", version); saveBootState()
+            }
+        }
         val guard = bootGuard ?: return
         guard.prepareBoot(bootedPackage(guard))
     }
@@ -227,6 +313,8 @@ class ApplicationManager(
      * Never throws; the pending attempt is always cleared even if the snapshot fails.
      */
     fun markBootSuccess() {
+        report(bootConfig?.pkg?.version?.takeIf { BootFiles.trackedVersion(it, indexFolderPath) != null }, "boot_success")
+        if (telemetryEnabled) synchronized(bootLock) { bootState.remove("telemetryPending"); saveBootState() }
         val guard = bootGuard ?: BOOT_GUARDS.find(bootGuardKey()) ?: return
         try {
             // The copy can take a while: keep it off the caller's (native modules) thread.
@@ -273,10 +361,12 @@ class ApplicationManager(
 
     private val bootGuardListener = object : BootGuard.Listener {
         override fun onRollback(version: String) {
+            report(version, "rollback")
             trackInfo(LogLabel.ROLLBACK, JSONObject().put("packageVersion", version))
         }
 
         override fun onBlockedPackage(version: String) {
+            report(version, "blocked_package")
             trackInfo(LogLabel.BLOCKED_PACKAGE, JSONObject().put("packageVersion", version))
         }
 
@@ -299,9 +389,14 @@ class ApplicationManager(
      */
     private fun selectBootConfig(installed: ReleaseConfig): ReleaseConfig {
         installedConfig = installed
-        val guard = bootGuard ?: return installed
-        val selection = guard.select(installed.pkg.version) { lastGood ->
-            ReleaseConfig.deSerialize(lastGood.config).isSuccess
+        val guard = bootGuard
+        if (guard == null) {
+            if (!forbidden(installed.pkg.version)) return installed
+            securityFallback = true
+            return (bundledConfig ?: installed).also { releaseConfig = it }
+        }
+        val selection = guard.select(installed.pkg.version, this::forbidden) { lastGood ->
+            !forbidden(lastGood.version) && ReleaseConfig.deSerialize(lastGood.config).isSuccess
         }
         val selected = when (selection) {
             BootGuard.Selection.Installed -> return installed
@@ -315,7 +410,7 @@ class ApplicationManager(
     }
 
     /** What the boot guard chose for this process; null when the guard is unavailable. */
-    private fun bootSelection(): BootGuard.Selection? = bootGuard?.currentSelection()
+    private fun bootSelection(): BootGuard.Selection? = if (securityFallback) BootGuard.Selection.Bundled else bootGuard?.currentSelection()
 
     /** UpdateTask callback: package files are about to be written into the package dir. */
     private fun onPackageInstallStarting() {
@@ -324,14 +419,15 @@ class ApplicationManager(
 
     /** UpdateTask callback: a server-delivered package was committed to the package dir. */
     private fun onPackageInstalled(pkg: ReleaseConfig.PackageManifest) {
-        val guard = bootGuard?.takeIf { it.enabled } ?: return
+        val guard = bootGuard
         val complete = pkg.importantSplits.all { split ->
             otaServices.fileProviderService
                 .getFileFromInternalStorage("app/$PACKAGE_DIR_NAME/${split.filePath}")
                 .isFile
         }
         if (complete) {
-            guard.onPackageInstalled(pkg.version)
+            report(pkg.version, "package_downloaded")
+            guard?.onPackageInstalled(pkg.version)
         }
     }
 
@@ -350,8 +446,9 @@ class ApplicationManager(
         lazyDownloadCallback: LazyDownloadCallback? = null
     ): ReleaseConfig? {
         val startTime = System.currentTimeMillis()
-        val url =
-            if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
+        val originalUrl = if (releaseConfigTemplateUrl == "") rcCallback?.getReleaseConfig(false) else releaseConfigTemplateUrl
+        val nativeVersion = ctx.packageManager.getPackageInfo(ctx.packageName,0).versionName ?: "unknown"
+        val url = if (telemetryEnabled && originalUrl != null) android.net.Uri.parse(originalUrl).buildUpon().appendQueryParameter("telemetry_platform","android").appendQueryParameter("native_version",nativeVersion).build().toString() else originalUrl
         initNetUtils(clientId)
         netUtils.setTrackMetrics(metricsEndPoint != null)
         val newTask =
@@ -367,9 +464,10 @@ class ApplicationManager(
                 fromAirborne,
                 ctx,
                 onPackageDownloaded,
-                { version -> bootGuard?.allowPackage(version) ?: true },
+                this::allowPackage,
                 this::onPackageInstallStarting,
-                this::onPackageInstalled
+                this::onPackageInstalled,
+                this::received
             )
         val runningTask = RUNNING_UPDATE_TASKS.putIfAbsent(clientId, newTask) ?: newTask
         if (runningTask == newTask) {
@@ -698,7 +796,10 @@ class ApplicationManager(
                 )
 
                 Log.d(TAG, "Local release config loaded.")
-                return ReleaseConfig(rcVersion, config, pkg, resources)
+                return synchronized(bootLock) {
+                    val blocked = bootState.optJSONArray("securityBlocked") ?: JSONArray()
+                    ReleaseConfig(rcVersion, config, pkg, resources, (0 until blocked.length()).map { blocked.getString(it) }, bootState.optJSONObject("receipts")?.optJSONObject(pkg.version))
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to read local release config. $e")
                 trackReadReleaseConfigError(e)
