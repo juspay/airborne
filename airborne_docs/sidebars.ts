@@ -23,6 +23,8 @@ const sidebars: SidebarsConfig = {
         "guides/integrate-react-native",
         "guides/integrate-react-native-expo",
         "guides/create-and-target-a-release",
+        "guides/maker-checker",
+        "guides/maker-checker-tradeoffs",
       ],
     },
     {
@@ -44,6 +46,7 @@ const sidebars: SidebarsConfig = {
                 "react-native-sdk/integration/install",
                 "react-native-sdk/integration/android-setup",
                 "react-native-sdk/integration/ios-setup",
+                "react-native-sdk/integration/web-setup",
                 "react-native-sdk/integration/bundling-release-config",
                 "react-native-sdk/integration/verify",
               ],
@@ -90,6 +93,7 @@ const sidebars: SidebarsConfig = {
             "react-native-cli/authentication",
             "react-native-cli/local-configuration",
             "react-native-cli/remote-files-and-packages",
+            "react-native-cli/release-lifecycle",
             "react-native-cli/command-reference",
           ],
         },
@@ -109,8 +113,10 @@ const sidebars: SidebarsConfig = {
           link: { type: "doc", id: "server/overview" },
           items: [
             "server/overview",
+            "server/control-center",
             "server/configuration",
             "server/running-locally",
+            "server/superposition-backup",
             "server/deploy-ecs",
             "server/deploy-eks",
           ],
@@ -132,6 +138,7 @@ const sidebars: SidebarsConfig = {
           link: { type: "doc", id: "dashboard/overview" },
           items: [
             "dashboard/overview",
+            "dashboard/control-center",
             "dashboard/authentication-and-onboarding",
             "dashboard/organisations",
             "dashboard/users-and-roles",

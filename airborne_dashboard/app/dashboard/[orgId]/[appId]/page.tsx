@@ -50,7 +50,8 @@ const GETTING_STARTED_STEPS = [
     key: "release",
     icon: Rocket,
     title: "Create a release",
-    description: "Pick a package, target it by dimension or app version, then ramp the rollout.",
+    description:
+      "Pick a package and target it. A new release starts at zero traffic: start its rollout, then make it live.",
     links: [{ label: "Releasing guide", href: DOCS.createRelease }],
   },
 ];

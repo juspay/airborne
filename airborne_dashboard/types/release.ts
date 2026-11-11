@@ -65,6 +65,11 @@ export interface ReleaseFormState {
   releaseId?: string;
 
   hasExistingReleases: boolean;
+  /**
+   * True when the server will refuse a release without a targeting rule: a new release on an application that serves
+   * strictly. Unknown (overview not loaded, older server) reads as false and the server decides.
+   */
+  targetingRequired?: boolean;
 
   // Navigation
   currentStep: number;
@@ -105,7 +110,7 @@ export interface ReleaseFormActions {
   setConfigProperties: (properties: string) => void;
 
   // Targeting
-  setTargetingRules: (rules: TargetingRule[]) => void;
+  setTargetingRules: React.Dispatch<React.SetStateAction<TargetingRule[]>>;
   addTargetingRule: () => void;
   removeTargetingRule: (index: number) => void;
   updateTargetingRule: (index: number, patch: Partial<TargetingRule>) => void;

@@ -23,6 +23,8 @@ Each row shows a release's `ID`, its `Package` version, its `Status`, and when i
 
 A release that is ramping shows its current traffic in the status — for example `Ramping to 25%`.
 
+This page works on one application at a time. For every app and platform in your organisation on one screen, use [Control Center](/docs/dashboard/control-center), the cross-platform view of live and rolling-out releases.
+
 To start a new one, choose **New Release**.
 
 :::tip
@@ -46,12 +48,16 @@ Set the timeouts the SDK uses when applying this release:
 
 <Screenshot name="release-wizard-2-targeting" caption="Step 2 targets the release at a slice of users with dimension rules." />
 
-Targeting decides **who** gets the release. Choose **Add Rule** to add a rule made of a **Dimension**, an **Operator** (`Equals`), and a **Value**. Add as many rules as you need, and remove any with **Remove**. A release with no rules goes to all users.
+Targeting decides **who** gets the release. Choose **Add Rule** to add a rule made of a **Dimension** and a **Value**; the operator is always **Equals**, because a release matches a device when every rule's value is exactly what the device sends. For a version range or comparison, target a [cohort](/docs/dashboard/cohorts) (checkpoints and ranges) instead; the step links there. Add as many rules as you need, and remove any with **Remove**. Strict apps reject releases with no rules. Legacy apps with strict serving disabled can still create untargeted defaults.
+
+If the application has a live release targeted at a `locale`, the step shows **One locale audience stays behind**: a general release does not replace it, because Superposition ranks contexts by specificity. The server repeats this as a warning when the release is created.
 
 If the dimension is a [cohort](/docs/dashboard/cohorts) dimension, the value field becomes a **dropdown** of that cohort's values (rather than a free-text box), and the dimension is tagged **Cohort** in the picker.
 
 :::note
-**Your first release cannot be targeted** — it always goes to all users. The **Add Rule** option only appears once the application already has at least one release. Targeting also can't be changed when *editing* an existing release; create a new release to change targeting.
+**Target your first release too.** Strict applications reject untargeted creation. Select a compatible version cohort; the wizard prefills `version_cohort` when available (and its value only when there is one non-`otherwise` choice). If no dimensions exist, open **Dimensions** to create standard `app_version` and cohort `version_cohort` depending on it, then define a compatible range under **Cohorts**, then return. Creation starts at zero traffic: explicitly ramp, then conclude with the experimental variant. Targeting also can't be changed when *editing* an existing release; create a new release to change targeting.
+
+Every release, including the first, is created at a **0% rollout target** and serves nothing until you start its rollout and make it live. After creating one, the dashboard opens its page and says so.
 :::
 
 See [Dimensions](/docs/dashboard/dimensions) to define the attributes you target on.
@@ -135,11 +141,17 @@ Enter a new **traffic percentage** and confirm. Ramping is **capped at 50%** —
 
 ### Conclude
 
-When you are confident, choose **Conclude** (available while `In Progress`). This rolls the release out to **100%** of users and finalises it — the experimental arm becomes the experience for everyone.
+When you are confident, choose **Conclude** (available while `In Progress`). This rolls the release out to **100%** of matching users and finalises it — the experimental arm becomes the experience for the targeted audience.
 
 ### Revert
 
 If something looks wrong, choose **Revert Release** (also available while `In Progress`). This concludes the experiment on the **control** arm instead — effectively rolling back to the pre-release experience. This cannot be undone.
+
+:::note[With approval on]
+When an organisation turns on a [maker-checker policy](/docs/guides/maker-checker) for the application, a conclude (and so **Revert Release**) and a raised target are requests, and the server refuses them if sent directly. This page then replaces **Ramp**, **Conclude** and **Revert Release** with a link to the release in [Control Center](/docs/dashboard/control-center#with-approval-on), where they are requests or a guarded rollback (rolling back a ramping release is direct there unless it is marked rollback-sensitive). **Discard** stays here.
+:::
+
+In the release wizard, an application that serves strictly requires at least one targeting rule, including for the first release; **Next** stays disabled on the Targeting step until you add one. Dimensions and cohorts cannot be changed while approval is on.
 
 ### Discard
 

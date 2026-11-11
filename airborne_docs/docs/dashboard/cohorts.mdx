@@ -32,9 +32,19 @@ Choose **Add Checkpoint** and fill in the dialog:
 
 Choose **Create Checkpoint** to add it.
 
+### Ranges
+
+A **range** is a closed, inclusive band of versions, for example `2.0.0` to `2.9.9`, that stands on its own. Unlike a checkpoint, adding a range never closes or rewrites another band. Choose **Add Range** and fill in:
+
+- **Range Name** — an identifier, e.g. `v2_only`.
+- **From** and **To** — stable `major.minor.patch` versions, both inclusive. Pre-release and build suffixes are refused because the version comparator does not order them correctly.
+- **Priority** — where the range sits in the evaluation order, from `0` (checked first) to the position of `otherwise`. When bands overlap, the first match wins.
+
+The dialog lists any problem the server would refuse before you submit. The timeline tags each entry **Checkpoint** or **Range** and shows the comparison it encodes, for example `≥ 2.0.0 and ≤ 2.9.9`.
+
 ### Evaluation order
 
-Checkpoints are evaluated **top to bottom, and the first match wins** — each user is assigned to the first checkpoint they satisfy. The page shows this as a numbered timeline and notes: *"Checkpoints are evaluated in the order shown below. Users are assigned to the first matching checkpoint from top to bottom."* New checkpoints are added at the top (highest priority). Each checkpoint also lists any releases currently targeting it, with their status and traffic.
+Checkpoints and ranges are evaluated **top to bottom, and the first match wins** — each user is assigned to the first entry they satisfy. The page shows this as a numbered timeline and notes that adding a checkpoint closes the previous checkpoint band while adding a range changes nothing else. New checkpoints are added at the top (highest priority). Each entry also lists any releases currently targeting it, with their status and traffic.
 
 :::tip
 Order checkpoints from most specific or newest to most general. Because the first match wins, a broad checkpoint placed above a narrow one would swallow users before the narrow rule gets a chance.

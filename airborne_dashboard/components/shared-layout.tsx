@@ -10,6 +10,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -26,6 +28,8 @@ import {
   Users2,
   Settings,
   Users,
+  TowerControl,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -141,8 +145,11 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
     }
   };
 
+  const controlCenterItem: NavItem = { href: "/dashboard/control-center", icon: TowerControl, label: "Control Center" };
+
   const navigationItems: NavItem[] = appIdPath
     ? [
+        controlCenterItem,
         {
           href: "/dashboard/" + encodeURIComponent(org || "") + "/" + encodeURIComponent(app || ""),
           icon: Activity,
@@ -199,7 +206,8 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
         },
       ]
     : [
-        { href: "/dashboard/" + encodeURIComponent(org || ""), icon: Activity, label: "Overview" },
+        controlCenterItem,
+        { href: "/dashboard/" + encodeURIComponent(org || ""), icon: Activity, label: "Applications" },
         { href: "/dashboard/" + encodeURIComponent(org || "") + "/users", icon: Users2, label: "Users" },
       ];
 
@@ -233,8 +241,79 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
   return (
     <div className="min-h-screen bg-background h-full">
       <header className="border-b border-border bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 sticky top-0 z-50">
-        <div className="flex h-20 items-center px-6">
+        <div className="flex h-20 items-center px-4 sm:px-6">
           <div className="flex items-center gap-4">
+            {/* The sidebar is hidden below md, so the same links (and Create) live in this menu. */}
+            {org && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="md:hidden" aria-label="Open navigation">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-60">
+                  {app && <DropdownMenuLabel className="truncate font-mono text-xs">{app}</DropdownMenuLabel>}
+                  {navigationItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <DropdownMenuItem
+                        key={item.href}
+                        asChild
+                        className={isActive(item.href) ? "bg-accent" : undefined}
+                      >
+                        <Link href={item.href}>
+                          <Icon className="mr-2 h-4 w-4" />
+                          {item.label}
+                        </Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  {canShowCreateMenu && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        disabled={!org || !app || !canCreateFile}
+                        onClick={() => setCreateFileOpen(true)}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        Create File
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild disabled={!org || !app || !canCreatePackage}>
+                        <Link
+                          href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/packages/create`}
+                        >
+                          <Package className="mr-2 h-4 w-4" />
+                          Create Package
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild disabled={!org || !app || !canCreateRelease}>
+                        <Link
+                          href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/releases/create`}
+                        >
+                          <Rocket className="mr-2 h-4 w-4" />
+                          New Release
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {app && appsForOrg.length > 1 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">
+                        Switch application
+                      </DropdownMenuLabel>
+                      {appsForOrg
+                        .filter((a) => a !== app)
+                        .map((a) => (
+                          <DropdownMenuItem key={a} onClick={() => router.push("/dashboard/" + org + "/" + a)}>
+                            <span className="truncate font-mono text-xs">{a}</span>
+                          </DropdownMenuItem>
+                        ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Link href="/dashboard" className="flex items-center gap-2">
               <div className="h-20 rounded-lg flex items-center justify-center">
                 <Image
@@ -297,14 +376,14 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="hidden text-xs sm:inline-flex">
               {user?.name || user?.user_id || "GUEST"}
             </Badge>
             <ThemeToggle />
             {canShowCreateMenu && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" className="gap-2" disabled={!org || !app}>
+                  <Button size="sm" className="hidden gap-2 md:inline-flex" disabled={!org || !app}>
                     <Plus className="h-4 w-4" />
                     Create
                     <ChevronDown className="h-3 w-3" />
@@ -354,7 +433,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
 
       <div className="flex">
         {org && (
-          <aside className="sticky top-16 h-[calc(100vh-4rem)] w-64 border-r border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50 overflow-y-auto">
+          <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 border-r md:block border-border bg-sidebar/50 backdrop-blur supports-[backdrop-filter]:bg-sidebar/50 overflow-y-auto">
             <nav className="p-4 space-y-2">
               {app && (
                 <div className="flex items-center gap-2 text-sm">
@@ -403,7 +482,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
             </nav>
           </aside>
         )}
-        <main className="flex-1">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
 
       <FileCreationModal open={createFileOpen} onOpenChange={setCreateFileOpen} />

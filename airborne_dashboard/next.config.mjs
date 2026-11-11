@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const backend = (process.env.BACKEND_URL ?? "http://localhost:8081").replace(/\/$/, "");
 const s3URL = (process.env.S3_URL ?? "http://localhost:4566/hyper-ota-bucket").replace(/\/$/, "");
+const analyticsBackend = (process.env.ANALYTICS_BACKEND_URL ?? "http://localhost:6400").replace(/\/$/, "");
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig = {
@@ -12,10 +13,11 @@ const nextConfig = {
     return [
       {
         source: "/analytics/:path*",
-        destination: `https://airborne.juspay.in/analytics/:path*`,
+        destination: `${analyticsBackend}/analytics/:path*`,
       },
       {
-        source: "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz)/:path*",
+        source:
+          "/api/:api(releases|file|organisations|applications|users|packages|dashboard|token|authz|control-center)/:path*",
         destination: `${backend}/api/:api/:path*`,
       },
       {

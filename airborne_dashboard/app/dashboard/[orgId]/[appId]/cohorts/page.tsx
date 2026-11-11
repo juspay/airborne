@@ -9,13 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Users, Target, X, GitBranch } from "lucide-react";
+import { Plus, Users, Target, X, GitBranch, ArrowLeftRight } from "lucide-react";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { classifyCacheError } from "@/lib/control-center/rollback-error";
+import { frozenWriteNotice } from "@/lib/control-center/approval";
+import { overlappingCohorts } from "@/lib/cohort-overlap";
 
 const PAGE_AUTHZ = definePagePermissions({
   read_dimensions: permission("dimension", "read", "app"),
@@ -61,11 +64,96 @@ type CheckpointForm = {
   includeValue: boolean; // true = >= or <=, false = > or <
 };
 
+/**
+ * A cohort write also clears the CDN's cached release answers. When only that part fails, the server answers
+ * 502 cache_invalidation_failed and the cohort is saved: say so instead of inviting a repeat.
+ */
+function cacheWarning(error: unknown): { title: string; description: string } | null {
+  const cache = classifyCacheError(error);
+  if (!cache) return null;
+  return {
+    title: "Saved, but the CDN cache was not cleared",
+    description:
+      "The change is recorded on the server. Devices behind the CDN may keep the previous release answer until the cache expires; retry the cache clear from Control Center. Do not repeat the change.",
+  };
+}
+
 type GroupForm = {
   name: string;
   members: string[];
   newMember: string;
 };
+
+/** A closed, inclusive semantic-version range. Independent of the checkpoint chain. */
+type RangeForm = {
+  name: string;
+  lower: string;
+  upper: string;
+  priority: number;
+};
+
+const STABLE_SEMVER = /^\d+\.\d+\.\d+$/;
+
+/** Problems the server would refuse, stated before the request is sent. */
+function rangeProblems(form: RangeForm, existing: string[], otherwiseIndex: number): string[] {
+  const problems: string[] = [];
+  if (!form.name.trim()) problems.push("Give the range a name.");
+  else if (form.name === "otherwise") problems.push("“otherwise” is reserved.");
+  else if (existing.includes(form.name)) problems.push(`A cohort named “${form.name}” already exists.`);
+  if (!STABLE_SEMVER.test(form.lower)) problems.push("Lower bound must be a stable version like 2.0.0.");
+  if (!STABLE_SEMVER.test(form.upper)) problems.push("Upper bound must be a stable version like 2.9.9.");
+  if (STABLE_SEMVER.test(form.lower) && STABLE_SEMVER.test(form.upper)) {
+    const a = form.lower.split(".").map(Number);
+    const b = form.upper.split(".").map(Number);
+    const gt = a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])));
+    if (gt) problems.push("Lower bound must not be above the upper bound.");
+  }
+  if (!Number.isInteger(form.priority) || form.priority < 0 || form.priority > otherwiseIndex) {
+    problems.push(`Priority must be between 0 and ${otherwiseIndex}.`);
+  }
+  return problems;
+}
+
+type Definition = unknown;
+const asRecord = (v: unknown): Record<string, unknown> | null =>
+  v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+
+/** The comparison a cohort definition encodes, in words. */
+function describeDefinition(definition: Definition): string | null {
+  const d = asRecord(definition);
+  if (!d) return null;
+  const label = (key: string, v: string) =>
+    ({
+      jp_ver_ge: `≥ ${v}`,
+      jp_ver_gt: `> ${v}`,
+      jp_ver_le: `≤ ${v}`,
+      jp_ver_lt: `< ${v}`,
+      str_ge: `≥ ${v} (text)`,
+      str_gt: `> ${v} (text)`,
+      str_le: `≤ ${v} (text)`,
+      str_lt: `< ${v} (text)`,
+    })[key] ?? null;
+  const one = (node: unknown): string | null => {
+    const n = asRecord(node);
+    if (!n) return null;
+    const [key] = Object.keys(n);
+    const args = n[key];
+    const value = Array.isArray(args) ? args.find((a) => typeof a === "string") : undefined;
+    return typeof value === "string" ? label(key, value) : null;
+  };
+  if (Array.isArray(d.and)) {
+    const parts = d.and.map(one).filter(Boolean);
+    return parts.length > 0 ? parts.join(" and ") : null;
+  }
+  return one(d);
+}
+
+/** A closed range created by the range API: exactly `≥ lower and ≤ upper`. */
+function isClosedRange(definition: Definition): boolean {
+  const and = asRecord(definition)?.and;
+  const has = (key: string) => Array.isArray(and) && and.some((n) => asRecord(n)?.[key] !== undefined);
+  return Array.isArray(and) && and.length === 2 && has("jp_ver_ge") && has("jp_ver_le");
+}
 
 export default function CohortsPage() {
   const { token, org, app } = useAppContext();
@@ -100,8 +188,11 @@ export default function CohortsPage() {
     newMember: "",
   });
 
+  const [showRangeForm, setShowRangeForm] = useState(false);
+  const [rangeForm, setRangeForm] = useState<RangeForm>({ name: "", lower: "", upper: "", priority: 0 });
+
   const [priorityMap, setPriorityMap] = useState<Record<string, number>>({});
-  const [creating, setCreating] = useState<"checkpoint" | "group" | "priority" | null>(null);
+  const [creating, setCreating] = useState<"checkpoint" | "group" | "priority" | "range" | null>(null);
 
   // Load dimensions on mount
   useEffect(() => {
@@ -251,10 +342,73 @@ export default function CohortsPage() {
         description: `Successfully created checkpoint "${checkpointForm.name}"`,
       });
     } catch (error: any) {
+      const frozen = frozenWriteNotice(error);
+      if (frozen) {
+        toast({ ...frozen, variant: "destructive" });
+        return;
+      }
+      const saved = cacheWarning(error);
+      if (saved) {
+        setCheckpointForm({ name: "", value: "", valueType: "semver", includeValue: true });
+        setShowCheckpointForm(false);
+        loadCohortSchema();
+        toast({ ...saved, variant: "destructive" });
+        return;
+      }
       console.error("Failed to create checkpoint:", error);
       toast({
         title: "Error",
         description: error?.message || error?.error || "Failed to create checkpoint. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(null);
+    }
+  };
+
+  const handleCreateRange = async () => {
+    if (!selectedDimension) return;
+    setCreating("range");
+    try {
+      await apiFetch(
+        `/organisations/applications/dimension/${encodeURIComponent(selectedDimension)}/cohort/range`,
+        {
+          method: "POST",
+          body: {
+            name: rangeForm.name.trim(),
+            lower: rangeForm.lower.trim(),
+            upper: rangeForm.upper.trim(),
+            priority: rangeForm.priority,
+          },
+          showErrorToast: false,
+        },
+        { token, org, app }
+      );
+      setRangeForm({ name: "", lower: "", upper: "", priority: 0 });
+      setShowRangeForm(false);
+      loadCohortSchema();
+      toast({
+        title: "Range created",
+        description: `“${rangeForm.name.trim()}” covers ${rangeForm.lower.trim()} to ${rangeForm.upper.trim()}, inclusive. Existing checkpoints are unchanged.`,
+      });
+    } catch (error: any) {
+      const frozen = frozenWriteNotice(error);
+      if (frozen) {
+        toast({ ...frozen, variant: "destructive" });
+        return;
+      }
+      const saved = cacheWarning(error);
+      if (saved) {
+        setRangeForm({ name: "", lower: "", upper: "", priority: 0 });
+        setShowRangeForm(false);
+        loadCohortSchema();
+        toast({ ...saved, variant: "destructive" });
+        return;
+      }
+      console.error("Failed to create range:", error);
+      toast({
+        title: "Could not create the range",
+        description: error?.message || "The server refused the range.",
         variant: "destructive",
       });
     } finally {
@@ -275,6 +429,7 @@ export default function CohortsPage() {
             name: groupForm.name,
             members: groupForm.members,
           },
+          showErrorToast: false,
         },
         { token, org, app }
       );
@@ -288,10 +443,15 @@ export default function CohortsPage() {
         description: `Successfully created group "${groupForm.name}" with ${groupForm.members.length} members`,
       });
     } catch (error) {
+      const frozen = frozenWriteNotice(error);
+      if (frozen) {
+        toast({ ...frozen, variant: "destructive" });
+        return;
+      }
       console.error("Failed to create group:", error);
       toast({
         title: "Error",
-        description: "Failed to create group. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create group. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -309,6 +469,7 @@ export default function CohortsPage() {
         {
           method: "PUT",
           body: { priority_map: priorityMap },
+          showErrorToast: false,
         },
         { token, org, app }
       );
@@ -318,10 +479,15 @@ export default function CohortsPage() {
         description: "Successfully updated cohort group priorities",
       });
     } catch (error) {
+      const frozen = frozenWriteNotice(error);
+      if (frozen) {
+        toast({ ...frozen, variant: "destructive" });
+        return;
+      }
       console.error("Failed to update priority:", error);
       toast({
         title: "Error",
-        description: "Failed to update priorities. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update priorities. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -369,7 +535,13 @@ export default function CohortsPage() {
           <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h2 className="text-xl font-semibold mb-2">No Cohort Dimensions Found</h2>
           <p className="text-muted-foreground mb-4">Create a cohort dimension first to start managing user segments.</p>
-          <Button onClick={() => window.history.back()}>Go Back to Dimensions</Button>
+          <Button
+            onClick={() => {
+              window.location.href = `/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/dimensions`;
+            }}
+          >
+            Open Dimensions
+          </Button>
         </div>
       </div>
     );
@@ -432,10 +604,23 @@ export default function CohortsPage() {
                     <CardDescription>Segment users based on version comparisons</CardDescription>
                   </div>
                   {canManageCohorts && (
-                    <Button onClick={() => setShowCheckpointForm(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Checkpoint
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setRangeForm({ name: "", lower: "", upper: "", priority: 0 });
+                          setShowRangeForm(true);
+                        }}
+                        title="A closed version range that does not change existing checkpoints"
+                      >
+                        <ArrowLeftRight className="h-4 w-4 mr-2" />
+                        Add Range
+                      </Button>
+                      <Button onClick={() => setShowCheckpointForm(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Checkpoint
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardHeader>
@@ -447,6 +632,7 @@ export default function CohortsPage() {
                 ) : (
                   <CheckpointTimeline
                     checkpoints={getCheckpointCohorts()}
+                    definitions={cohortSchema?.definitions ?? {}}
                     releases={releases}
                     onAddCheckpoint={() => setShowCheckpointForm(true)}
                     canManageCohorts={canManageCohorts}
@@ -575,6 +761,129 @@ export default function CohortsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Range Form Dialog */}
+      <Dialog open={showRangeForm} onOpenChange={setShowRangeForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Range</DialogTitle>
+            <DialogDescription>
+              A closed version range, inclusive at both ends. Unlike a checkpoint, adding a range never closes or
+              rewrites another band.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const names = cohortSchema?.enum ?? [];
+            const otherwiseIndex = names.indexOf("otherwise") === -1 ? names.length : names.indexOf("otherwise");
+            const problems = rangeProblems(rangeForm, names, otherwiseIndex);
+            // Existing bands that share a version with this range. The server allows it; the first match wins.
+            const bothVersions = STABLE_SEMVER.test(rangeForm.lower) && STABLE_SEMVER.test(rangeForm.upper);
+            const overlapping = bothVersions
+              ? overlappingCohorts(
+                  names,
+                  cohortSchema?.definitions ?? {},
+                  rangeForm.lower,
+                  rangeForm.upper,
+                  rangeForm.priority
+                )
+              : [];
+            return (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="range-name">Range Name</Label>
+                  <Input
+                    id="range-name"
+                    value={rangeForm.name}
+                    onChange={(e) => setRangeForm({ ...rangeForm, name: e.target.value })}
+                    placeholder="e.g., v2_only"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="range-lower">From (inclusive)</Label>
+                    <Input
+                      id="range-lower"
+                      value={rangeForm.lower}
+                      onChange={(e) => setRangeForm({ ...rangeForm, lower: e.target.value })}
+                      placeholder="2.0.0"
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="range-upper">To (inclusive)</Label>
+                    <Input
+                      id="range-upper"
+                      value={rangeForm.upper}
+                      onChange={(e) => setRangeForm({ ...rangeForm, upper: e.target.value })}
+                      placeholder="2.9.9"
+                      className="font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="range-priority">Priority (0 is checked first)</Label>
+                  <Input
+                    id="range-priority"
+                    type="number"
+                    min={0}
+                    max={otherwiseIndex}
+                    value={rangeForm.priority}
+                    onChange={(e) => setRangeForm({ ...rangeForm, priority: Number(e.target.value) })}
+                    className="w-28 font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Where the range sits in the evaluation order, from 0 to {otherwiseIndex}. When ranges overlap, the
+                    first match wins.
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Stable versions only (major.minor.patch). Pre-release and build suffixes are refused because the
+                  version comparator does not order them correctly.
+                </p>
+                {overlapping.length > 0 && (
+                  <div
+                    role="alert"
+                    className="space-y-1 rounded-md border border-amber-500/50 bg-amber-500/5 p-3 text-xs text-amber-900 dark:text-amber-200"
+                  >
+                    <p className="font-medium">
+                      This range overlaps {overlapping.length} existing cohort{overlapping.length === 1 ? "" : "s"}.
+                    </p>
+                    <ul className="list-disc space-y-0.5 pl-5">
+                      {overlapping.map((o) => (
+                        <li key={o.name}>
+                          <span className="font-mono">{o.name}</span>
+                          {describeDefinition(cohortSchema?.definitions?.[o.name]) && (
+                            <> ({describeDefinition(cohortSchema?.definitions?.[o.name])})</>
+                          )}
+                          :{" "}
+                          {o.takenByNewRange
+                            ? `at priority ${rangeForm.priority} the new range is checked first, so devices in the overlap stop matching “${o.name}” on their next check and lose any release targeted at it.`
+                            : `“${o.name}” is checked first and keeps the devices in the overlap.`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {problems.length > 0 && (rangeForm.name || rangeForm.lower || rangeForm.upper) && (
+                  <ul className="list-disc space-y-0.5 pl-5 text-xs text-amber-700 dark:text-amber-300">
+                    {problems.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowRangeForm(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateRange} disabled={problems.length > 0 || creating === "range"}>
+                    {creating === "range" ? "Creating..." : "Create Range"}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* Group Form Dialog */}
       <Dialog open={showGroupForm} onOpenChange={setShowGroupForm}>
         <DialogContent>
@@ -639,6 +948,7 @@ export default function CohortsPage() {
 // Checkpoint Timeline Component
 interface CheckpointTimelineProps {
   checkpoints: string[];
+  definitions: Record<string, unknown>;
   releases: Record<string, Release[]>;
   onAddCheckpoint: () => void;
   canManageCohorts: boolean;
@@ -648,6 +958,7 @@ interface CheckpointTimelineProps {
 
 function CheckpointTimeline({
   checkpoints,
+  definitions,
   releases,
   onAddCheckpoint,
   canManageCohorts,
@@ -675,8 +986,9 @@ function CheckpointTimeline({
       {/* Info box */}
       <div className="p-3 bg-muted rounded border-l-4 border-primary">
         <p className="text-sm text-muted-foreground">
-          <strong>Timeline Order:</strong> Checkpoints are evaluated in the order shown below. Users are assigned to the
-          first matching checkpoint from top to bottom.
+          <strong>Timeline Order:</strong> Checkpoints and ranges are evaluated in the order shown below. Users are
+          assigned to the first matching entry from top to bottom. Adding a checkpoint closes the previous checkpoint
+          band; adding a range changes nothing else.
         </p>
       </div>
 
@@ -712,10 +1024,15 @@ function CheckpointTimeline({
 
               {/* Content */}
               <div className="ml-6 flex-1">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
                   <h4 className="font-semibold">{checkpoint}</h4>
-                  <Badge variant="secondary">Checkpoint</Badge>
-                  <span className="text-xs text-muted-foreground">(Priority {index + 1})</span>
+                  <Badge variant="secondary">{isClosedRange(definitions[checkpoint]) ? "Range" : "Checkpoint"}</Badge>
+                  {describeDefinition(definitions[checkpoint]) && (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {describeDefinition(definitions[checkpoint])}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">(Checkpoint position {index}, excluding groups)</span>
                 </div>
 
                 {/* Releases */}

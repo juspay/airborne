@@ -31,8 +31,8 @@ The **header** (across the top) stays visible everywhere and contains:
 
 The **left sidebar** changes depending on where you are:
 
-- **At the organisation level** it shows `Overview` and `Users`.
-- **At the application level** it shows, in order: `Overview`, `Files`, `Packages`, `Releases`, `Views`, `Dimensions`, `Users`, `Tokens`, `Remote Configs`, and `Cohorts`.
+- **At the organisation level** it shows, in order: `Control Center`, `Applications`, and `Users`.
+- **At the application level** it shows, in order: `Control Center`, `Overview`, `Files`, `Packages`, `Releases`, `Views`, `Dimensions`, `Users`, `Tokens`, `Remote Configs`, and `Cohorts`.
 
 ## Feature tour
 
@@ -43,6 +43,7 @@ Use these pages to go deeper on each area of the dashboard:
 | [Authentication & onboarding](/docs/dashboard/authentication-and-onboarding) | Signing in, registering, OIDC, and creating your first organisation. |
 | [Organisations](/docs/dashboard/organisations) | Creating and switching organisations and the org overview. |
 | [Applications](/docs/dashboard/applications) | Creating an application and reading the app overview. |
+| [Control Center](/docs/dashboard/control-center) | The cross-platform view of live and rolling-out releases across your apps, with groups and attention filters. |
 | [Users & roles](/docs/dashboard/users-and-roles) | Inviting users and the RBAC permission model. |
 | [Files](/docs/dashboard/files) | Registering files, version history, and tags. |
 | [Packages](/docs/dashboard/packages) | Bundling an index file plus other files into a package. |
@@ -56,3 +57,15 @@ Use these pages to go deeper on each area of the dashboard:
 :::tip
 If you just want to ship something end to end, follow the [Create & target a release guide](/docs/guides/create-and-target-a-release). It walks through files → package → release in one sitting.
 :::
+
+## Running the dashboard locally
+
+`npm run dev` in `airborne_dashboard` serves the dashboard and proxies the API through Next.js rewrites. The rewrites exist only outside production. A production build defines none, so whatever serves it has to route `/api` and the other server paths itself.
+
+| Variable | Default | What it points at |
+| --- | --- | --- |
+| `BACKEND_URL` | `http://localhost:8081` | The Airborne server (`/api`, `/release`, `/build`). |
+| `S3_URL` | `http://localhost:4566/hyper-ota-bucket` | The bucket that serves `/assets` and `/builds` (LocalStack by default). |
+| `ANALYTICS_BACKEND_URL` | `http://localhost:6400` | The [analytics server](/docs/server/configuration#analytics-server), for the `/analytics` routes. The default is a local analytics server; without one the analytics views show connection errors instead of data. Point it elsewhere to read a shared one. |
+
+`npm run check` runs the type check, lint, the Prettier check and `npm run test:helpers`, the plain-node checks for the Control Center helpers.

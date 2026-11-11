@@ -1,0 +1,328 @@
+---
+title: Control Center
+description: One cross-platform view of every release in your organisation. See what is live, what is rolling out, what needs attention, and change a target, make a release live, or roll back from one screen.
+---
+
+The **Control Center** is a single screen for the releases across all of your organisation's apps and platforms. The [Releases](/docs/dashboard/releases) page works on one application at a time. Control Center answers four questions at a glance:
+
+- What is **live** on each platform of each app?
+- What is **rolling out**, and how far along is it?
+- What **needs attention**: a rollout that has not started, an app whose lookup failed, an app with nothing live?
+- How do I **change the target**, **make a release live**, or **roll back** without leaving the page?
+
+If you belong to an organisation, Airborne opens the Control Center after you sign in, so it is usually the first screen you see. On a narrow screen the sidebar collapses into the menu button at the left of the header, which holds the same links and the **Create** actions.
+
+:::info[Same releases, same permissions]
+Control Center is a view over the releases you already have. Changing a target, making a release live, or rolling back here acts on the release itself, and the [release page](#the-release-page) shows the result.
+:::
+
+## Targets, not adoption
+
+Every percentage in Control Center is a **rollout target**. A target is the share of traffic that Airborne is set to serve a release, and it is set on the server. A 25% target means the release is configured to be served to a quarter of the eligible traffic.
+
+A target is **not** a count of devices. It does not tell you how many devices have downloaded or are running the release. Do not read a 25% target as 25% of your users.
+
+Device counts are shown separately, as **reported boots** (for example, "12 devices booted this release · 7d"). They come from anonymous, opt-in reports sent by the SDK, they are unverified, and they only count devices that reported. They are never a percentage of anything and never the installed population. A release with no reports shows **no device reports · 7d**, which means nothing came back, not that nobody has it. See [Device reports](#device-reports).
+
+:::caution[A target is not adoption]
+Control Center does not change targets on its own, and no report changes anything either. It shows the target you set, the release state and, separately, what devices reported. Use the rest of this page to decide when to change them.
+:::
+
+## Reading the overview
+
+The overview is grouped by organisation. Each organisation section shows its name, how many groups and apps it has, and the **Applications** button for that organisation. Owners and admins also see **New group**.
+
+Each **group** is one product across platforms. Each **platform row** shows:
+
+| Column | What it shows |
+| --- | --- |
+| **Platform** | The platform and the application name. |
+| **Live** | The live package version (for example `v3`), how long it has been live, and the devices that reported booting it. When only a release targeted at a locale or other context is live, the cell says **Only locale = kn** (or the context) so it is not read as what every device gets. |
+| **Rolling out** | The rolling-out package version and a target bar, or **Nothing rolling out**. |
+| **Activity** | When the application last had a release change. |
+
+A release counts as **live** only when it concluded with the experimental variant chosen. A discarded release, or one that concluded on the control variant, is not live. An app with no live release shows **Nothing live**. If several releases are rolling out for one app, the row shows the most recent one and notes how many more there are.
+
+Applications that are not in any group appear under **Ungrouped** at the bottom of their organisation's section.
+
+### Attention filters
+
+The strip under the page title filters the overview. Each chip shows a count and only appears when its count is above zero:
+
+| Chip | What the count is | Shows apps with |
+| --- | --- | --- |
+| **N Deployment seems bad** | Apps | A release being served whose device reports crossed the "seems bad" rule. Advice only; see [Device reports](#device-reports). |
+| **N Suspicious reports** | Apps | Boot failures rose, but without enough evidence to call the deployment bad. |
+| **N Writes paused** | Apps with unresolved upstream writes | Every release mutation for the app is paused until the outcome is verified. The app's row shows a **Writes paused** panel with **Review recovery** for organisation admins. |
+| **N CDN cache stale** | Apps whose latest CDN cache invalidation failed | The last release change was saved, but the CDN kept its cached answer. The row shows **CDN cache not cleared** with **Retry**; see [CDN cache](#cdn-cache). |
+| **N Needs review** | Emergency rollbacks | An [emergency rollback](#with-approval-on) that a different checker has not acknowledged yet. |
+| **N Awaiting approval** | Requests | Requests waiting for a checker. |
+| **N rolling out** | Releases in progress | A release currently rolling out. |
+| **N not started** | Releases created but not started | A release waiting for its first target. |
+| **N lookup failed** | Apps | A release lookup that failed. |
+| **N nothing live** | Apps | Neither a live release nor an active one. |
+| **N not enough data** | Apps | Devices reported, but too few, or with no earlier release to compare with (including "reports without comparison"). Unknown, not healthy. |
+
+Select a chip to show only the matching apps. Select it again, or select **All**, to clear the filter. When none of these applies, the strip says the view is quiet.
+
+Under each app's name the row also shows its **serving policy** chip (**Strict serving**, **Strict serving · forced** or **Strict serving off**) and, where maker-checker is on, **Approval required**. The app name links to the [app page](#the-app-page).
+
+To narrow the list by name, use **Filter apps, groups, orgs** in the header.
+
+## Groups
+
+A **group** puts related apps side by side, for example `example-android` and `example-ios`. Grouping only changes how the overview is laid out. Each app's releases stay its own, and nothing is shared between the apps in a group.
+
+- An application belongs to at most one group.
+- A group belongs to one organisation.
+- Each member has a platform: Android, iOS, Web, or Other.
+
+### Create a group
+
+Owners and admins can create groups. Select **New group** in the organisation section, or **Add to group** on an ungrouped app to start the dialog with that app selected. If the organisation has apps but no groups, the overview shows a prompt with **Create the first group**.
+
+In the **New group** dialog:
+
+1. Enter a **Group name**.
+2. Under **Members**, select the applications to include. Each one gets a platform, guessed from its name (for example `-android` or `-ios`). Change it in the dropdown if the guess is wrong.
+3. Select **Create group**.
+
+### Edit a group
+
+Open the **⋯** menu on a group card and choose **Edit group**, or select **Edit group** on the [group page](#the-group-page). The dialog is titled **Edit group** with the group name, and its button reads **Save changes**. Saving replaces the whole member list, so an application you deselect leaves the group.
+
+### Delete a group
+
+Open the **⋯** menu on a group card and choose **Delete group**, or select **Delete** on the group page. The confirmation says what happens before you confirm:
+
+> Only the grouping is removed. No release, rollout or package changes. The applications move to the Ungrouped section.
+
+Select **Delete group** to confirm. Nothing about the applications' releases changes.
+
+## The app page
+
+Selecting an app's name on the overview or a group page opens its own page: **Live and rolling out** (the same row as the overview), anything that needs attention (an emergency rollback to review, **Writes paused**, **CDN cache not cleared**), the **Strict serving** panel, and the approval policy summary with its open requests.
+
+### Strict serving
+
+Each application has a stored serving policy with three states, always shown with an icon and a label, never colour alone:
+
+| Chip | What devices get |
+| --- | --- |
+| **Strict serving** | Only releases targeted at their version. A device with no targeted release gets no update (the server answers 404) and keeps the code it shipped with. |
+| **Strict serving · forced** | The same, forced by the server's `STRICT_RELEASE_APPLICATIONS` setting. The page shows no control; only a deployment change can turn it off. |
+| **Strict serving off** | A device with no release targeted at its version is served the untargeted default release, so a new binary can receive JavaScript built for an older one. New applications start strict; existing ones were migrated with it off. |
+
+**Turn strict serving on** opens a dialog that states what changes, lists what is live today, and includes **What would stop being served**. Enter the dimensions a real device sends (`app_version` plus optional `key=value` lines) and a `toss`, then select **Preview this device**. Each answer shows what the device gets **now** and what it would get with the opposite setting; a device that would lose its update is outlined in amber. Confirm stays disabled until at least one device has been previewed. **Turn strict serving off** opens the same dialog with the opposite warning. The preview is read-only and answers for one context and toss at a time: it is not a count of affected devices.
+
+The **Check one device** form on the panel runs the same preview at any time. Changing the policy needs permission to update releases. When maker-checker is on, both directions are raised as a **Request strict serving on** or **Request strict serving off** with a reason, because both change who is served; a different checker approves it and the change applies immediately.
+
+### CDN cache
+
+After every release change, Airborne asks the CDN to drop its cached release answers. When that fails, the change is still saved on the server, but devices behind the CDN may keep getting the previous answer until the cache expires. The overview and the app page show **CDN cache not cleared** with the failed paths and **Retry cache clear**, which repeats only the invalidation, never the deployment. An organisation owner or admin, or an application admin, can retry. A dialog that hits this failure right after a change says **Saved, but the CDN cache was not cleared** and offers the same retry; do not repeat the change. **Retry all** on a group repeats the invalidation for each stale app you may retry. If only some succeed it says so and names the apps that are still failing, and it says how many it skipped because you are not an admin of them. The release timeline records **CDN cache cleared** and **CDN cache not cleared** events with the actor `system:cache`.
+
+## The group page
+
+Select a group's name to open its page. It has one column per platform, and each column has these panels:
+
+- **Live**: the live release, or **Nothing live**.
+- **Rolling out**: the active release with its target bar and actions, or **Nothing rolling out.**
+- **Awaiting approval**: the open requests for that application, when approval is on.
+
+Anything that needs attention (a deployment flag, **Writes paused**, an emergency rollback to review) sits above the panels. Select a platform's live or rolling-out release to open its release page.
+
+Owners and admins can also edit and delete the group here. **Approval policy** writes one policy to every member application, one application at a time, and is shown only to people who hold the organisation owner or admin role (a super admin without the role is refused by the server). Before it writes, it reads each member's current policy and names the makers and checkers it would remove.
+
+## The release page
+
+The release page shows one release on one platform. Its header carries the status chips, for example **Concluded** and **Live**, and a **Full release page** link to the standard [release detail](/docs/dashboard/releases#the-release-detail-page).
+
+The page has these panels:
+
+- **Rollout**: the current traffic against the target, with the release's actions. For a release that is not started or rolling out, the bar is labelled **rollout target**, and a marker shows the 50% cap on **Change target**. For a live release it reads **live for everyone in reach**.
+- **Reach**: who the release is for. With no dimensions, it is every native version the app serves.
+- **Live before this** or **Live for this reach**: the release that was live before this one, or the release that is live now for the same reach.
+- **Timeline**: the history, newest first. Each entry shows the action, who did it, and when. A rollback shows the reason you gave. Entries tagged **RECONSTRUCTED** come from the release's own data because they predate Airborne's audit log.
+- **Facts**: package, config, status, the application's serving policy, creation time, and group.
+
+### A rollout in progress
+
+In words, the **Rollout** panel shows the target as a percentage and a bar labelled **rollout target**, with a marker at 50%. The text reads that a given share of the platform's traffic in reach is served the release, and then says that the share is a target set on the server, not a count of devices that have updated. The actions are **Change target**, **Make live**, and **Roll back**.
+
+## Changing a target and making a release live
+
+The actions depend on the release's state:
+
+Buttons below are the direct ones. With approval on, several become requests; see [With approval on](#with-approval-on).
+
+| State | Buttons | What they do |
+| --- | --- | --- |
+| Not started | **Start rollout**, **Discard** | **Start rollout** sets the first target. **Discard** abandons the release before it starts. |
+| Rolling out | **Change target**, **Make live**, **Roll back** | **Change target** sets a new target. **Make live** concludes the release at 100%. **Roll back** concludes it on the control variant. |
+| Live | **Roll back** | Returns this reach to the release that was live before it. See [Roll back](#roll-back). |
+| Anything else | None | The page says so, for example **Discarded. No action is possible.** |
+
+**Change target** (or **Start rollout**) opens a dialog titled with the release, for example **Change rollout target · v4**. Choose a new target and select **Set target to X%**. The target is capped at **50%**. To go higher, use **Make live**.
+
+Lowering a target **can downgrade devices**. A device that falls outside the new target is offered the live package on its next update check, so it can move from the rolling release back to the live one. Whether an installed app applies that downgrade depends on its SDK and local state. The dialog says so, and warns in red when the release is marked rollback-sensitive, because moving devices off it can restore a vulnerable version or strand migrated data. To return everyone to the live package deliberately, use **Roll back**.
+
+**Locale exceptions.** A general release does not replace an older release targeted at a `locale`: Superposition ranks contexts by specificity, not by age. When an app has such releases, the release page and the **Make live** dialog show **One locale audience stays behind** (or how many), naming each locale and the package it keeps. To move that audience too, create a release targeted at that locale and make it live. The release wizard's Targeting step shows the same notice, and the server adds a warning to the create response.
+
+**Make live** opens **Make vN live**. The target becomes 100% and the release concludes. It cannot be ramped again. To go back afterwards, roll back, which re-releases the previous package. Devices pick up the new package on their next update check.
+
+Every dialog shows the platform and the package. The dialogs that replace a live release also show what it replaces and the reach, so you can confirm the outcome before you act.
+
+## Roll back
+
+Roll back does one of three things, depending on the release's state. The dialog shows the **Outcome** once it has run.
+
+| Release state | Button | What happens | Outcome |
+| --- | --- | --- | --- |
+| Not started | **Discard** | The release is discarded before it starts. Nothing changes for devices. | `discarded` |
+| Rolling out | **Roll back** | The release concludes on the control variant, so all traffic returns to the live package. It cannot be resumed; create a new release to try again. | `concluded_control` |
+| Live | **Roll back** | Airborne finds the release that was live before this one for the same reach, then creates and concludes a new release of that package and config. | `rereleased` |
+
+Every roll back needs a reason. The field is labelled **Reason (required, recorded in the timeline)**, and the button stays disabled until you enter one. The reason appears in the release's timeline.
+
+Airborne preserves the full reason and appends an operation marker for upstream reconciliation. Superposition limits the combined value to 255 bytes; the marker leaves at most **197 bytes** for your reason. Longer values are rejected before dispatch. The text `Airborne operation` is reserved for those markers, so a reason that contains it exactly as written (the match is case-sensitive) is rejected with a **400** before anything is sent. Rephrase the reason without it.
+
+### Preview before you confirm
+
+Select **Roll back** (or **Discard**) and the dialog asks the server what the roll back will do. Looking changes nothing. The dialog shows four rows:
+
+- **Platform**: the platform and the application.
+- **Live now**, or **Current** for a release that is not live: the package in place now.
+- **Result**: the package that will be live afterwards, and what happens to it. For a live release it reads **v3 re-released as a new release**. For a rollout it reads **v3 returns to 100%**. For a discard it reads **v3 stays live, unchanged**.
+- **Reach**: who the roll back applies to.
+
+The button (**Roll back v8**, or **Discard v8**) stays disabled until the preview has loaded, while the preview reports a block, and until you enter a reason.
+
+#### Config keys will be reconciled
+
+When a live release is rolled back, Airborne re-releases the previous package and config, reconciled with the keys registered now. The amber **Config keys will be reconciled** box lists:
+
+- **Kept current**: keys registered since the previous release. They keep today's value.
+- **Dropped**: keys no longer registered. They are not restored.
+
+Every other key gets its previous value back. The box says that this keeps the config valid, but does not prove that the older package works with it, so check it on a device. If no key changes, the dialog says **No config keys change** and gives the same warning.
+
+### Blocked rollbacks
+
+A blocked roll back changes nothing. The dialog says why, and the button stays disabled. If the server refuses the roll back when you confirm, the same explanation appears.
+
+| Reason | What it means |
+| --- | --- |
+| **A newer release is live** | The release is no longer the live one for its reach. The dialog links the release that is live now. |
+| **Another release is in progress for this reach** | Airborne allows one ongoing release per reach. Conclude or discard that release first. |
+| **There is no earlier release to roll back to** | No earlier live release exists for this reach. Publish a corrected release instead. |
+| **The earlier package cannot be restored automatically** | Airborne cannot reconcile the earlier config with the registered keys, so it does not guess. Nothing is created. Someone has to review the keys or publish a new release. |
+| **Files of the earlier package are missing or unreachable** | Before restoring, Airborne checks every file the earlier package needs against the file records and the file host. At least one is missing, incomplete or unreachable, so restoring would ship a broken bundle. Restore the files or publish a reviewed replacement. |
+| **This release is itself a rollback** | It was created by rolling back an earlier release (linked in the dialog). Rolling it back again would restore the rejected release, so Airborne refuses. Create a new release with a reviewed package instead. |
+| **This release can no longer be rolled back** | It was discarded, or concluded on the control variant, after the page loaded. Reload the release. |
+
+Any other refusal shows as **Rollback refused** with the server's message. For example, a write already running for the same app. Wait, refresh, and try again.
+
+### After you confirm
+
+- **Rolled back v8** or **Discarded v8**: the dialog shows the **Outcome**, the package now live, and a link to the **New release**. If a later release is live, the dialog says so and that release was not touched.
+- **Already rolled back v8**: the server returned the recorded result of an earlier, completed roll back. Nothing ran again.
+- **Rollback of v8 did not finish**, with **Rollback stopped at the “ramp” step** (or `create` or `conclude`): a step after the replacement release started failed. The dialog links the replacement, if one was recorded, and shows the operation ID. Select **Retry rollback**. It resumes that replacement instead of creating a second one. This does not apply to an emergency rollback; see [Emergency rollback](#emergency-rollback).
+- **No clear answer from the server**: the roll back may or may not have been applied. **Retry rollback** is safe: if it already completed, the server returns the recorded result.
+- **The replacement release was changed outside this rollback**: someone changed the replacement, or the reach's state, after the roll back began. Airborne will not resume it, so there is no **Retry**. Open the replacement, check its variants, target, chosen variant and change history, and decide by hand what the reach should serve.
+
+### Release writes paused
+
+Ramp percentages outside 0–50 are rejected before dispatch, and explicit upstream `400`/`422` ramp validation errors are recorded as not applied, so writes stay available. For other release writes, a failure known to have stopped before reaching Superposition (the request was never built, or the connection could not be made) also leaves writes available. Other failures pause every release write for that app, including upstream error responses that may follow configuration changes. The pause covers: **Start rollout**, **Change target**, **Make live**, **Discard**, and **Roll back**. The **Writes paused** attention filter finds affected apps. The release page says **Writes paused** and explains that the upstream outcome is unconfirmed. Time passing does not clear the pause. If the page cannot read the operation journal (for example the request fails), it says **Could not check whether writes are paused** and keeps the last pause it knew about; an unknown state is never shown as "not paused". If another admin resolved the operation while **Review recovery** was open, the dialog says it is no longer listed as unresolved instead of loading forever.
+
+The pause is app-wide because Superposition contexts can overlap: a broad/default context and a more-specific context may affect the same devices and config keys. Airborne cannot safely establish independence from the context maps alone.
+
+An organisation **owner** or **admin**, or a super admin, can select **Review recovery** in the app's **Writes paused** panel. The dialog title starts **Resolve paused writes for** and includes the app name. It shows the operation details, an **Operator finding** selector, a **Reason (required, audited)** field, and an acknowledgement. Choose **Applied — marked expected state is present** only when the expected state is in Superposition or its audit history. Choose **Did not apply — request ended, upstream is unchanged** only after checking server/proxy logs and confirming the original request has terminated and cannot execute later. Airborne re-reads current state, refuses a finding it cannot verify (see [Recovery checks](#recovery-checks)), and writes the resolution and `operation_resolved` audit event together when you select **Verify and resolve operation**. The operator's reason and finding are retained with the actor and verification details.
+
+### Recovery checks
+
+Airborne checks more than the release itself before it accepts **Did not apply**. A write that failed part-way can leave the release untouched while the app's configuration (default values, contexts or overrides) has already changed. So the server also compares the app's workspace configuration with a copy it saved before the write. If anything differs, recovery is refused with a message that names the changed keys, shown as `defaults:<key>`, and the changed contexts. You then have two ways forward:
+
+- Restore the named values in Superposition, then resolve as **Did not apply** again.
+- Finish the change that was intended and resolve as **Applied** once the expected state is present.
+
+The comparison covers the whole app, so an unrelated manual edit to that app's config in Superposition also blocks **Did not apply**. Writes that were left unresolved before this check existed have no saved copy, and **Did not apply** is refused for them. Resolve them as **Applied** if the change is present, or ask an administrator.
+
+:::caution[Markers are not proof of who wrote]
+Airborne recognises its own writes by a marker in the change reason. It stops people using the API from injecting one, but the marker is not signed. Anyone who can write to Superposition directly can forge a matching marker and expected change, and Airborne would then accept it as evidence. Keep direct Superposition write access to trusted operators and services. See [Trust limit](/docs/server/control-center#trust-limit-direct-superposition-writers).
+:::
+
+The dashboard recovery flow replaces manual SQL as the normal path. If Airborne cannot establish either finding, leave writes paused and investigate the upstream history; use an exact, audited DBA procedure only as a last resort. Recovery resolves the write intent; it does not finish a partial rollback. Retry that rollback afterwards.
+
+Server side: [Control Center API](/docs/server/control-center#durable-operations-and-errors).
+
+:::caution[Make live and roll back are final]
+Making a release live cannot be ramped back down, and a roll back that concluded or discarded a release cannot be resumed. Check the target, the reach, and the release it replaces before you confirm.
+:::
+
+## Device reports
+
+When apps send the SDK's opt-in anonymous telemetry, Control Center shows what devices reported over the last seven days: how many distinct devices started and finished booting each release, per native version and platform. Three things are always true of these numbers:
+
+- They are **unverified**. Anyone who can reach the ingest endpoint can forge reports.
+- They are a **sample** of the devices that reported, never a population estimate and never the installed base.
+- **Airborne changes nothing because of them.** A flag only changes emphasis and wording. Rolling back, ramping down or pausing is always a person's decision.
+
+A release is flagged **Deployment seems bad** or **Suspicious reports** by a fixed rule on the server (a minimum number of devices, and failures that rose against the previous release; the thresholds are in the server reference). The release page leads with the flag and puts **Roll back** first, and Make live asks you to confirm that you have read the failure rate. With no earlier release to compare with, the headline says "Failures reported", not "up". If a refresh of the reports fails, the panel says so and the numbers shown are from an earlier read. The server side is in [Anonymous device telemetry](/docs/server/control-center#anonymous-device-telemetry).
+
+## With approval on
+
+When an organisation owner or admin turns on a [maker-checker policy](/docs/guides/maker-checker) for an application, the page shows it with an **Approval required** chip, and these actions become requests that a different checker approves:
+
+| Action | With approval on |
+| --- | --- |
+| **Start rollout**, **Change target** (raising) | **Request rollout start** / **Request target change**. Lowering a target stays direct, unless the release is marked rollback-sensitive. A person who is not a maker can still lower a target; only a target that needs a request is closed to them. |
+| **Make live** | **Request make live** (always a request). |
+| **Roll back** of a live release | **Request rollback**. Rolling back a ramping release stays direct unless it is marked rollback-sensitive. |
+| **Mark rollback-sensitive** / **Change marker** | A request, and it needs the permission to update releases. |
+| Strict serving on or off | **Request strict serving on** / **off**. |
+| Create a release | The wizard raises a request. On a strict application it requires a targeting rule first, because the server refuses an untargeted release when the request is approved. |
+| **Discard** | Direct. |
+
+A **Needs review** card, **Awaiting approval** requests and a link to the **Approvals** screen (the queue across your organisations) appear on the app, group and release pages. A request page shows what is being changed now against when it was raised, who may decide it, and its result. **Approve**, **Reject** and **Cancel** are enabled only when you hold the release permission the action needs (the same one the server checks): create for a release, ramp for a target, update for an override edit, the marker or strict serving, discard for a discard, and conclude for everything else.
+
+If an approve call comes back with an error the page cannot place (a 5xx, a timeout), it says **Outcome not confirmed**, re-reads the request and tells you what it now says. It reports **Approved, but the action failed** only when the request reads `failed`.
+
+### Emergency rollback
+
+A checker with a policy that allows it can run an **Emergency rollback** of the live release without a second approval. The server records it once the rollback has finished and flags it **Needs review** until a *different checker* acknowledges it; until then it refuses another emergency rollback. The review card says "restored vN" when the server states the finished rollback (`rollback_finished`). A review from an older server does not, so its card says "planned to restore vN" and that the outcome is not recorded; open the release to see what is live. If the attempt stops part-way or the answer is lost, the dialog does not offer a retry that the server would refuse: ask another checker to acknowledge it from the Approvals screen or the release page, or raise a normal rollback request.
+
+Acknowledging needs only membership of the policy's checker list. It does not depend on approval still being on, and it needs no other permission.
+
+### Changes that are frozen while approval is on
+
+Dimension, cohort, file-tag, property and build changes cannot be raised as requests. While approval is on, the Dimensions and Cohorts pages say they are frozen; an organisation owner or admin has to turn approval off to change them, and back on afterwards. Adding a cohort range that overlaps an existing cohort is allowed; the dialog lists the cohorts it overlaps and whether the new range or the existing one wins the shared versions (the first in the order matches).
+
+The classic release page keeps **Discard**; **Ramp**, **Conclude** and **Revert** are replaced by a link to the Control Center release page, because they are requests or guarded rollbacks there.
+
+## Permissions
+
+Control Center follows the same role-based access as the rest of the dashboard. For the roles themselves, see [Users & roles](/docs/dashboard/users-and-roles).
+
+- **Viewing**: you see the organisations and applications you can read. Releases you cannot read do not appear. If you open one anyway, the page says **You do not have permission to read releases in** that application.
+- **Groups**: only organisation **owners** and **admins** can create, edit, or delete groups. Everyone else sees the groups read-only.
+- **Release actions**: **Start rollout** and **Change target** need permission to ramp releases, and **Make live** and **Roll back** need permission to conclude them. The release page and the group page check the same permissions for the application they act on. With approval on, whether you can raise a request also depends on being a maker in the application's policy, and deciding one on being a checker.
+
+When you lack a permission, the button is disabled and shows a lock. Hover over it to see why, for example that you do not have permission to ramp releases in that application.
+
+## Refresh
+
+The overview refreshes every **15 seconds** while any release in your view is not started or rolling out, and every **60 seconds** otherwise. The header shows when the data was last updated and how often it refreshes. Select the **Updated** indicator to refresh now.
+
+The release page refreshes its details and its timeline every **15 seconds** while the release is not started or rolling out, and every **60 seconds** once it has finished.
+
+## When something is missing
+
+- **Lookup failed**: Airborne could not read that application's release data. The other applications still load. The overview has a five-second deadline for all lookups together, so an application that has not answered by then is shown as a failed lookup, even if it is only slow. Wait a moment and refresh. If it persists, ask an administrator to check the Airborne server. The server side of this is covered in [Control Center API](/docs/server/control-center).
+- **Nothing matches**: the attention filter or the search box excludes everything. Select **All** or clear the search.
+- **No groups yet**: every application is listed under **Ungrouped** until you create a group.
+- **No applications yet**: create an application first; it appears here once it exists.
+- **No release has been made live on this platform**: a new release starts at zero traffic, including the first one. Create it, then start its rollout and make it live from its release page; nothing is served until then.
+
+When no app has a release yet, the overview shows a first-OTA checklist: create a platform app, wire the SDK and rebuild, then upload a package and create a targeted release. Ramp and conclude explicitly; the checklist disappears once release state exists.
+
+Telemetry can show “Reports without comparison” when current boot reports meet the sample threshold but no baseline exists. This never implies health or triggers actions. Release adoption totals deduplicate installs across native versions. Group policy apply stops on error and reports partial or unconfirmed outcomes; re-read policies before retrying.

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,18 +8,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Target, Lock } from "lucide-react";
+import Link from "next/link";
 import { useReleaseForm } from "../ReleaseFormContext";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { Dimension } from "@/types/release";
+import { useOverview } from "@/lib/control-center/hooks";
+import { localeExceptions, locateApp } from "@/lib/control-center/format";
+import { LocaleExceptionsNotice } from "@/components/control-center/locale-notice";
 
 export function TargetingStep() {
   const { token, org, app } = useAppContext();
-  const { mode, hasExistingReleases, targetingRules, addTargetingRule, removeTargetingRule, updateTargetingRule } =
-    useReleaseForm();
+  const {
+    mode,
+    hasExistingReleases,
+    targetingRequired,
+    targetingRules,
+    addTargetingRule,
+    removeTargetingRule,
+    updateTargetingRule,
+    setTargetingRules,
+  } = useReleaseForm();
 
+  const prefilled = useRef(false);
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
   const [cohorts, setCohorts] = useState<Record<string, string[]>>({});
+  // Live locale-targeted releases that a general release would leave behind (Superposition specificity).
+  const { overview } = useOverview();
+  const appStatus = locateApp(overview, org ?? "", app ?? "").app;
+  const proposed = Object.fromEntries(
+    targetingRules.filter((r) => r.dimension && r.values).map((r) => [r.dimension, r.values])
+  );
+  const exceptions = localeExceptions(appStatus, proposed);
 
   useEffect(() => {
     if (!targetingRules.length) return;
@@ -39,7 +59,23 @@ export function TargetingStep() {
           { method: "GET" },
           { token, org, app }
         );
-        setDimensions(data);
+        setDimensions(data.filter((d) => d.dimension !== "variantIds"));
+        const version = data.find((d) => d.dimension === "version_cohort" && d.dimension_type === "cohort");
+        if (mode === "create" && !hasExistingReleases && !prefilled.current && version) {
+          prefilled.current = true;
+          const cohort = await apiFetch<{ enum: string[] }>(
+            `/organisations/applications/dimension/${version.dimension}/cohort`,
+            { method: "GET" },
+            { token, org, app }
+          );
+          const choices = (cohort.enum || []).filter((value) => value !== "otherwise");
+          setCohorts((prev) => ({ ...prev, [version.dimension]: cohort.enum || [] }));
+          setTargetingRules((rules) =>
+            rules.length
+              ? rules
+              : [{ dimension: version.dimension, operator: "equals", values: choices.length === 1 ? choices[0] : "" }]
+          );
+        }
       } catch (err) {
         console.error("Error fetching dimensions:", err);
       }
@@ -82,13 +118,37 @@ export function TargetingStep() {
             </div>
           )}
 
+          {!isEditMode && dimensions.length === 0 && appStatus?.approval_required && (
+            <p role="status" className="text-sm">
+              No dimensions yet, and this application requires approval, which freezes dimension and cohort changes
+              (they cannot be raised as requests). An organisation owner or admin has to turn approval off to create
+              them, then back on.
+            </p>
+          )}
+          {!isEditMode && dimensions.length === 0 && !appStatus?.approval_required && (
+            <p role="status" className="text-sm">
+              No dimensions yet.{" "}
+              <Link
+                className="underline"
+                href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/dimensions`}
+              >
+                Open Dimensions
+              </Link>{" "}
+              to create app_version (standard) and version_cohort (cohort depending on app_version). Then open Cohorts
+              to add a compatible version range, then return here.
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">
+            Review the version range before creating. Ramp accepts up to 50% because Superposition retains a control
+            variant; conclude with the experimental variant to serve all matching devices.
+          </p>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-medium">Targeting Rules</h4>
                 <p className="text-sm text-muted-foreground">Add rules to target specific user segments</p>
               </div>
-              {hasExistingReleases && !isEditMode && (
+              {!isEditMode && (
                 <Button variant="outline" onClick={addTargetingRule}>
                   Add Rule
                 </Button>
@@ -98,10 +158,22 @@ export function TargetingStep() {
             {targetingRules.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Target className="mx-auto h-8 w-8 mb-2" />
-                {hasExistingReleases ? (
-                  <p className="text-sm">No targeting rules set - release will go to all users</p>
+                {targetingRequired ? (
+                  <>
+                    <p className="text-sm font-medium text-foreground">
+                      Add a targeting rule to continue. This application serves strictly, so a release needs one,
+                      including the first.
+                    </p>
+                    <p className="mt-1 text-xs">
+                      Select a compatible version cohort. Creation starts at zero traffic; ramp, then conclude
+                      explicitly.
+                    </p>
+                  </>
                 ) : (
-                  <p className="text-sm">You can&apos;t target your first release. It goes to all users.</p>
+                  <>
+                    <p className="text-sm">No targeting rule: this release is for every device in reach.</p>
+                    <p className="mt-1 text-xs">Creation starts at zero traffic; ramp, then conclude explicitly.</p>
+                  </>
                 )}
               </div>
             ) : (
@@ -148,18 +220,24 @@ export function TargetingStep() {
                         </div>
                         <div className="space-y-2">
                           <Label>Operator</Label>
-                          <Select
-                            value={rule.operator}
-                            disabled={isEditMode}
-                            onValueChange={(v: any) => updateTargetingRule(idx, { operator: v })}
+                          {/* A release context is an exact match per dimension; there is no other operator.
+                              Ranges and comparisons are expressed as cohort checkpoints and version ranges. */}
+                          <div
+                            className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm"
+                            title="A release matches a device when every rule's value is exactly what the device sends."
                           >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="equals">Equals</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            Equals
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            For a version range or comparison, target a{" "}
+                            <Link
+                              href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(app || "")}/cohorts`}
+                              className="underline"
+                            >
+                              cohort
+                            </Link>
+                            .
+                          </p>
                         </div>
                         <div className="space-y-2">
                           <Label>{isCohortDimension ? "Cohort" : "Value"}</Label>
@@ -209,6 +287,14 @@ export function TargetingStep() {
               </div>
             )}
           </div>
+          {!isEditMode && (
+            <LocaleExceptionsNotice
+              org={org ?? ""}
+              app={app ?? ""}
+              exceptions={exceptions}
+              verb="Making this release live"
+            />
+          )}
         </CardContent>
       </Card>
     </div>

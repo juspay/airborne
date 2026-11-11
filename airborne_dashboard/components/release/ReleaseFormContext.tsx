@@ -17,6 +17,8 @@ import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { validateAllRemoteConfigValues } from "@/components/remote-config/utils/helpers";
 import { parseFileRef } from "@/lib/utils";
+import { useOverview } from "@/lib/control-center/hooks";
+import { locateApp } from "@/lib/control-center/format";
 
 const defaultState: ReleaseFormState = {
   mode: "create",
@@ -47,6 +49,11 @@ interface ReleaseFormProviderProps {
 
 export function ReleaseFormProvider({ children, mode, releaseId, initialData }: ReleaseFormProviderProps) {
   const { token, org, app } = useAppContext();
+  // The server refuses an untargeted create on a strict app, but only when the request is executed, which on an
+  // approval-gated app is after a checker has spent an approval. Ask for the rule up front.
+  const { overview } = useOverview();
+  const targetingRequired =
+    mode === "create" && locateApp(overview, org ?? "", app ?? "").app?.serving_policy?.effective_strict === true;
 
   const getInitialState = (): ReleaseFormState => {
     const state = { ...defaultState, mode, releaseId };
@@ -208,7 +215,8 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
         case 1:
           return true;
         case 2:
-          return true;
+          if (targetingRequired && targetingRules.length === 0) return false;
+          return targetingRules.every((rule) => Boolean(rule.dimension && rule.values.trim()));
         case 3:
           if (schemaFields.length > 0) {
             const validation = validateAllRemoteConfigValues(remoteConfigValues, schemaFields);
@@ -225,7 +233,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
           return false;
       }
     },
-    [schemaFields, remoteConfigValues, selectedPackage]
+    [schemaFields, remoteConfigValues, selectedPackage, targetingRules, targetingRequired]
   );
 
   const createReleaseConfig = useCallback((): ReleaseConfigRequest | undefined => {
@@ -234,7 +242,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     const dimensionsObj: Record<string, any> = {};
     targetingRules.forEach((r) => {
       if (!r.dimension || r.values.length === 0) return;
-      dimensionsObj[r.dimension] = r.values.length === 1 ? r.values[0] : r.values;
+      dimensionsObj[r.dimension] = r.values;
     });
 
     const importantFiles = Object.entries(filePriority)
@@ -275,6 +283,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
       mode,
       releaseId,
       hasExistingReleases,
+      targetingRequired,
       currentStep,
       totalSteps: defaultState.totalSteps,
       bootTimeout,
@@ -313,6 +322,7 @@ export function ReleaseFormProvider({ children, mode, releaseId, initialData }: 
     [
       mode,
       releaseId,
+      targetingRequired,
       currentStep,
       bootTimeout,
       releaseConfigTimeout,

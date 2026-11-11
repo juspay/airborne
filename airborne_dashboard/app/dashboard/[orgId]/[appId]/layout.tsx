@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { notFound, useParams } from "next/navigation";
 import { useAppContext } from "@/providers/app-context";
 import useSWR from "swr";
@@ -20,10 +20,16 @@ export default function ApplicationLayout({ children }: { children: ReactNode })
     apiFetch<any>("/releases/list", { query: queryParams }, { token, org, app: appId })
   );
 
+  // Set the app in context after render, not during it (React warns about setState while rendering).
+  useEffect(() => {
+    if (!isLoading && !error) setApp(appId);
+  }, [isLoading, error, appId, setApp]);
+
+  // A 403 from the release list means this user cannot read the application at all. An organisation
+  // `write` member with no application membership is allowed by the server (organisation read floor).
   if (error && error.name === ErrorName.Forbidden) {
     notFound();
   } else if (!isLoading) {
-    setApp(appId);
     return <>{children}</>;
   }
 }

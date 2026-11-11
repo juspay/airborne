@@ -82,17 +82,9 @@ export default function DashboardHome() {
       return;
     }
 
-    if (org && apps.length === 0) {
-      // If org selected but no apps in that org → prompt to create app
-      router.replace("/dashboard/" + org);
-      return;
-    }
-
-    // When both selected, go to Files by default
-    if (org && app) {
-      router.replace("/dashboard/" + org + "/" + app);
-    }
-  }, [orgList, org, apps, app, router]);
+    // Anyone with an organisation lands on the Control Center: what is live, what is rolling out.
+    router.replace("/dashboard/control-center");
+  }, [orgList, router]);
 
   const onCreateOrg = async () => {
     if (createOrgNameError) return;

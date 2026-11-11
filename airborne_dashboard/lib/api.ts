@@ -71,9 +71,21 @@ export async function apiFetch<T>(
     }
 
     if (res.status === 403) {
-      // Handle forbidden access
-      const error = new Error("You do not have permission to access this resource");
+      // Handle forbidden access. The body is kept: some refusals carry a structured reason
+      // (for example the Control Center's `approval_required`), which callers read from `error.body`.
+      const error = new Error("You do not have permission to access this resource") as Error & {
+        status?: number;
+        body?: unknown;
+      };
       error.name = ErrorName.Forbidden;
+      error.status = 403;
+      try {
+        const text = await res.text();
+        const parsed: unknown = text ? JSON.parse(text) : undefined;
+        if (parsed && typeof parsed === "object") error.body = parsed;
+      } catch {
+        // Not JSON: nothing structured to keep.
+      }
       if (showErrorToast) {
         toastError("Access Denied", "You do not have permission to access this resource");
       }
@@ -92,8 +104,10 @@ export async function apiFetch<T>(
     // Handle non-2xx status codes
     if (!res.ok) {
       const errorMessage = responseData?.message || responseData?.error || `HTTP ${res.status}: ${res.statusText}`;
-      const error = new Error(errorMessage);
+      const error = new Error(errorMessage) as Error & { status?: number; body?: unknown };
       error.name = ErrorName.Unknown;
+      error.status = res.status;
+      if (responseData && typeof responseData === "object") error.body = responseData;
 
       if (showErrorToast) {
         toastError("Request Failed", errorMessage);

@@ -26,6 +26,7 @@ import { useParams } from "next/navigation";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
+import { frozenWriteNotice } from "@/lib/control-center/approval";
 
 const PAGE_AUTHZ = definePagePermissions({
   read_dimensions: permission("dimension", "read", "app"),
@@ -114,7 +115,7 @@ export default function DimensionsPage() {
     try {
       await apiFetch(
         "/organisations/applications/dimension/create",
-        { method: "POST", body: payload },
+        { method: "POST", body: payload, showErrorToast: false },
         { token, org, app }
       );
       setIsCreateModalOpen(false);
@@ -125,10 +126,15 @@ export default function DimensionsPage() {
         description: `Successfully created ${formData.dimensionType} dimension "${formData.key}"`,
       });
     } catch (error) {
+      const frozen = frozenWriteNotice(error);
+      if (frozen) {
+        toast({ ...frozen, variant: "destructive" });
+        return;
+      }
       console.error("Failed to create dimension:", error);
       toast({
         title: "Error",
-        description: "Failed to create dimension. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to create dimension. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -140,7 +146,7 @@ export default function DimensionsPage() {
     try {
       await apiFetch(
         `/organisations/applications/dimension/${encodeURIComponent(name)}`,
-        { method: "PUT", body: { position: to, change_reason: "Reorder via UI" } },
+        { method: "PUT", body: { position: to, change_reason: "Reorder via UI" }, showErrorToast: false },
         { token, org, app }
       );
       load();
@@ -149,10 +155,15 @@ export default function DimensionsPage() {
         description: `Updated priority for dimension "${name}"`,
       });
     } catch (error) {
+      const frozen = frozenWriteNotice(error);
+      if (frozen) {
+        toast({ ...frozen, variant: "destructive" });
+        return;
+      }
       console.error("Failed to update priority:", error);
       toast({
         title: "Error",
-        description: "Failed to update dimension priority. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update dimension priority. Please try again.",
         variant: "destructive",
       });
     }

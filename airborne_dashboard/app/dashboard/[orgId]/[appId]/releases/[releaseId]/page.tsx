@@ -41,7 +41,11 @@ import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import json from "highlight.js/lib/languages/json";
 import hljs from "highlight.js";
-import { toastWarning } from "@/hooks/use-toast";
+import { toastError, toastWarning } from "@/hooks/use-toast";
+import { useOverview } from "@/lib/control-center/hooks";
+import { locateApp } from "@/lib/control-center/format";
+import { classifyApprovalError } from "@/lib/control-center/approval";
+import { releasePath } from "@/components/control-center/paths";
 import "highlight.js/styles/vs2015.css";
 import Analytics from "@/components/analytics/Analytics";
 import { Input } from "@/components/ui/input";
@@ -128,6 +132,10 @@ export default function ReleaseDetailPage() {
 
   const { token, org, app, setOrg, setApp } = useAppContext();
   const permissions = usePagePermissions(PAGE_AUTHZ);
+  // With approval on the server turns a conclude (and so Revert) and a raised target into requests, and Revert on a
+  // ramping release would be refused here although Roll back is direct in Control Center. Those actions live there.
+  const { overview } = useOverview();
+  const approvalOn = Boolean(locateApp(overview, orgId, appId).app?.approval_required);
 
   // Keep context in sync (avoids blank org/app in provider)
   useEffect(() => {
@@ -207,24 +215,47 @@ export default function ReleaseDetailPage() {
     return num.toString();
   };
 
+  // The server accepts whole numbers from 0 to 50 and refuses anything else with a 400. Never clamp silently:
+  // an operator who typed 70 must see that 70 is not possible, not have 50 sent in its place.
+  const rampProblem = (() => {
+    const n = Number(trafficPct);
+    if (!Number.isInteger(n)) return "Enter a whole number.";
+    if (n < 0 || n > 50) return `${n}% is outside 0 to 50.`;
+    return null;
+  })();
+
+  /** A refused action says why. Approval refusals point at Control Center, where the request or the rollback is. */
+  const reportFailure = (what: string, error: unknown) => {
+    console.error(`Failed to ${what}:`, error);
+    const failure = classifyApprovalError(error, "direct");
+    if (failure.kind === "approval_required") {
+      toastError(
+        "Approval required",
+        `This application requires approval to ${what}. Open the release in Control Center to raise a request, or to roll back.`
+      );
+    } else {
+      toastError(`Could not ${what}`, failure.message);
+    }
+  };
+
   const handleRampRelease = async () => {
-    const pct = Math.min(50, Math.max(0, Number(trafficPct)));
-    if (pct > 50) {
-      toastWarning("Invalid Traffic Percentage", "Traffic percentage cannot exceed 50%");
+    if (rampProblem) {
+      toastWarning("Invalid traffic percentage", rampProblem);
       return;
     }
+    const pct = Number(trafficPct);
 
     setIsRamping(true);
     try {
       await apiFetch(
         `/releases/${encodeURIComponent(releaseId)}/ramp`,
-        { method: "POST", body: { traffic_percentage: pct } },
+        { method: "POST", body: { traffic_percentage: pct }, showErrorToast: false },
         { token, org, app }
       );
       mutate();
       setRampDialogOpen(false);
     } catch (error) {
-      console.error("Failed to ramp release:", error);
+      reportFailure("ramp the release", error);
     } finally {
       setIsRamping(false);
     }
@@ -238,32 +269,35 @@ export default function ReleaseDetailPage() {
         {
           method: "POST",
           body: { chosen_variant: release.experiment.experiment_variants.experimentals[0] },
+          showErrorToast: false,
         },
         { token, org, app }
       );
       mutate();
       setConcludeDialogOpen(false);
     } catch (error) {
-      console.error("Failed to conclude release:", error);
+      reportFailure("conclude the release", error);
     } finally {
       setIsConcluding(false);
     }
   };
 
   const revertRelease = async () => {
+    setIsReverting(true);
     try {
       await apiFetch(
         `/releases/${encodeURIComponent(releaseId)}/conclude`,
         {
           method: "POST",
           body: { chosen_variant: release.experiment.experiment_variants.control },
+          showErrorToast: false,
         },
         { token, org, app }
       );
       mutate();
       setIsRevertDialogOpen(false);
     } catch (err) {
-      console.log(err);
+      reportFailure("revert the release", err);
     } finally {
       setIsReverting(false);
     }
@@ -277,13 +311,14 @@ export default function ReleaseDetailPage() {
         {
           method: "POST",
           body: {},
+          showErrorToast: false,
         },
         { token, org, app }
       );
       mutate();
       setIsDiscardDialogOpen(false);
     } catch (error) {
-      console.error("Failed to discard release:", error);
+      reportFailure("discard the release", error);
     } finally {
       setIsDiscarding(false);
     }
@@ -387,8 +422,22 @@ export default function ReleaseDetailPage() {
                 </Button>
               )}
 
+              {approvalOn &&
+                (release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={releasePath(orgId, appId, releaseId)}
+                      title="Approval is on for this application: target changes, Make live and Roll back are requests or guarded rollbacks, and are done there."
+                    >
+                      <TrendingUp className="h-4 w-4 mr-2" />
+                      Ramp, make live or roll back in Control Center
+                    </Link>
+                  </Button>
+                )}
+
               {(release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") &&
-                canRampRelease && (
+                canRampRelease &&
+                !approvalOn && (
                   <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" disabled={isRamping}>
@@ -399,21 +448,36 @@ export default function ReleaseDetailPage() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Ramp Release</DialogTitle>
-                        <DialogDescription>Enter new traffic percentage (0-50%):</DialogDescription>
+                        <DialogDescription>
+                          Enter the new traffic percentage, from 0 to 50. A target stops at 50% because a rollout splits
+                          traffic between the new release and the live one, and the server refuses a larger share.
+                          Conclude is the step that reaches everyone.
+                        </DialogDescription>
                       </DialogHeader>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         value={trafficPct}
                         min={0}
                         max={50}
+                        step={1}
+                        aria-invalid={Boolean(rampProblem)}
                         onChange={(e) => setTrafficPct(Number(e.target.value))}
-                        className="mb-4"
                       />
+                      {rampProblem && (
+                        <p role="alert" className="text-xs text-destructive">
+                          {rampProblem}
+                        </p>
+                      )}
                       <DialogFooter className="justify-end gap-2">
                         <Button variant="outline" onClick={() => setRampDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button variant="default" onClick={handleRampRelease} disabled={isRamping}>
+                        <Button
+                          variant="default"
+                          onClick={handleRampRelease}
+                          disabled={isRamping || Boolean(rampProblem)}
+                        >
                           {isRamping ? "Ramping..." : "Ramp"}
                         </Button>
                       </DialogFooter>
@@ -421,7 +485,7 @@ export default function ReleaseDetailPage() {
                   </Dialog>
                 )}
 
-              {release.experiment.status === "INPROGRESS" && canConcludeRelease && (
+              {release.experiment.status === "INPROGRESS" && canConcludeRelease && !approvalOn && (
                 <>
                   <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
                     <DialogTrigger asChild>

@@ -25,10 +25,10 @@ export default function ApplicationLayout({ children }: { children: ReactNode })
     }
   }, [orgId, setOrg, setApp, pathname]);
 
+  // The effect above sets the organisation; calling setOrg here would update the provider during render.
   if (!isLoading && data?.organisations.find((o) => o.name === orgId) === undefined) {
     notFound();
   } else if (!isLoading) {
-    setOrg(orgId);
     return <>{children}</>;
   }
 }
