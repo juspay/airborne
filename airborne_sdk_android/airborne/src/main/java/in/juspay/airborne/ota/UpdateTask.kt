@@ -78,7 +78,12 @@ internal class UpdateTask(
     private val lazyDownloadCallback: LazyDownloadCallback?,
     private val fromAirborne: Boolean = true,
     private val ctx: Context,
-    private val onPackageDownloaded: ((oldVersion: String, newVersion: String) -> Unit)? = null
+    private val onPackageDownloaded: ((oldVersion: String, newVersion: String) -> Unit)? = null,
+    // Boot guard hooks: refuse a blocked package version (fetched or staged), and report a
+    // package about to be written to / committed to the package dir.
+    private val allowPackage: (version: String) -> Boolean = { true },
+    private val onPackageInstallStarting: () -> Unit = {},
+    private val onPackageInstalled: (Package) -> Unit = {}
 ) {
     val updateUUID = UUID.randomUUID().toString()
 
@@ -386,7 +391,12 @@ internal class UpdateTask(
                 try {
                     val releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
                     trackReleaseConfigFetchResult(fr, startTime)
-                    releaseConfig
+                    if (allowPackage(releaseConfig.pkg.version)) {
+                        releaseConfig
+                    } else {
+                        Log.d(TAG, "Package ${releaseConfig.pkg.version} is blocked, keeping the local release config.")
+                        localReleaseConfig
+                    }
                 } catch (e: Exception) {
                     Log.e(
                         TAG,
@@ -411,6 +421,11 @@ internal class UpdateTask(
                 val pkg = ReleaseConfig.packageFromJSON(
                     it.getJSONObject("package_manifest")
                 )
+                if (!allowPackage(pkg.version)) {
+                    // Discard the staged copy of a blocked package; clean-up removes its dir.
+                    removeFromPersistentState(StateKey.SAVED_PACKAGE_UPDATE)
+                    return null
+                }
                 val tw = fileProviderService.reOpenTempWriter(it.getString("dir"))
                 val result = movePackageUpdate(tw, pkg, System.currentTimeMillis())
                 if (result) {
@@ -474,6 +489,11 @@ internal class UpdateTask(
         pkg: ReleaseConfig.PackageManifest,
         startTime: Long
     ): Boolean {
+        try {
+            onPackageInstallStarting()
+        } catch (e: Exception) {
+            trackException("package_install_starting_callback_failed", e)
+        }
         val didCopy = copyFilesAsync(tw, "$APP_DIR/$PACKAGE_DIR_NAME")
         if (didCopy) {
             Log.d(TAG, "Copied important splits.")
@@ -495,6 +515,7 @@ internal class UpdateTask(
         if (didInstall) {
             Log.d(TAG, "Installed new important package version: ${pkg.version}")
             trackPackageUpdateResult(Result.Ok(pkg.version), startTime)
+            notifyPackageInstalled(pkg)
         } else {
             Log.e(TAG, "An error occurred while installing the important package splits.")
             val msg = if (!didCopy) {
@@ -505,6 +526,14 @@ internal class UpdateTask(
             trackPackageUpdateResult(Result.Error.CustomError(msg), startTime)
         }
         return didInstall
+    }
+
+    private fun notifyPackageInstalled(pkg: Package) {
+        try {
+            onPackageInstalled(pkg)
+        } catch (e: Exception) {
+            trackException("package_installed_callback_failed", e)
+        }
     }
 
     private fun saveDownloadedPackages(

@@ -141,4 +141,14 @@ import AirborneSwiftCore
      * @note Called on a background queue. Dispatch UI updates to the main queue.
      */
     @objc optional func onPackageDownloaded(oldVersion: String, newVersion: String)
+
+    /**
+     * Opts in to the boot guard (default: off).
+     *
+     * When enabled, the manager blocks a package whose JS boots twice without `markBootSuccess()`
+     * and falls back to the last acknowledged package, else the bundled one.
+     *
+     * @note Read once when the application manager is created; later changes have no effect.
+     */
+    @objc optional func bootGuardEnabled() -> Bool
 }

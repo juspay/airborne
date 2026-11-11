@@ -136,6 +136,16 @@ import AirborneSwiftModel
      * @note To get individual package results, use `onLazyPackageDownloadComplete` callback.
      */
     @objc optional func onAllLazyPackageDownloadsComplete() -> Void
+
+    /**
+     * Opts in to the boot guard (default: off).
+     *
+     * When enabled, an OTA package whose JS boots twice without `AirborneServices.markBootSuccess()`
+     * is blocked, and the app falls back to the last acknowledged package, else the bundled one.
+     *
+     * @note Read once when the application manager for this namespace is created.
+     */
+    @objc optional func bootGuardEnabled() -> Bool
 }
 
 // MARK: - AirborneServices Class
@@ -282,13 +292,24 @@ extension AirborneServices {
      *
      * @note The path is guaranteed to be valid, falling back to bundled assets if needed.
      * @note Call this method after `startApp` for the most up-to-date bundle.
-     * @note Resolved by `AJPApplicationManager.getIndexBundleURL()`.
+     * @note Resolved by `AJPApplicationManager.getIndexBundleURL()`, which also records the boot
+     *       when the boot guard is enabled; call it to load the bundle (as `startApp` does).
      */
     @objc public func getIndexBundlePath() -> URL {
         guard let applicationManager = self.applicationManager else {
             return AJPApplicationManager.hostIndexBundleURL(indexBundleName: indexBundleName(), in: bundlePath)
         }
         return applicationManager.getIndexBundleURL()
+    }
+
+    /**
+     * Acknowledges that the JS loaded from `getIndexBundlePath()` booted successfully.
+     *
+     * Only meaningful when the delegate opts in via `bootGuardEnabled()`: call it once the first
+     * screen has rendered. Without it, a package that boots twice is blocked and rolled back.
+     */
+    @objc public func markBootSuccess() {
+        applicationManager?.markBootSuccess()
     }
     
     /**
@@ -331,6 +352,13 @@ extension AirborneServices: AJPApplicationManagerDelegate {
      */
     public func getReleaseConfigHeaders() -> [String : String] {
         self.dimensions
+    }
+
+    /**
+     * Forwards the delegate's boot guard opt-in (default: off) to the application manager.
+     */
+    public func bootGuardEnabled() -> Bool {
+        delegate?.bootGuardEnabled?() ?? false
     }
 
     /**

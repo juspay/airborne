@@ -121,7 +121,33 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     private var forceUpdate: Bool
     /// Host-shipped index used when the release config has no index; read from the delegate once at init.
     private let indexBundleName: String
-    
+
+    // MARK: - Boot Guard State
+
+    /// Process-wide opt-in boot guard for this workspace. Its `enabled` flag is fixed when the
+    /// first manager for the workspace is created and never re-read from the delegate.
+    private let bootGuard: AJPBootGuard
+    /// Package from the bundled release_config.json (nil when the app ships none).
+    private var bundledPackage: AJPApplicationPackage?
+    private var _bootSource: AJPBootSource = .installed
+    private var _displacedPackage: AJPApplicationPackage?
+    /// Set (under `collectionsLock`) once this manager hands `package` to the JS runtime.
+    private var _bootStarted = false
+
+    /// Where the files of `package` are read from in this launch.
+    private var bootSource: AJPBootSource {
+        get { collectionsLock.withLock { _bootSource } }
+        set { collectionsLock.withLock { _bootSource = newValue } }
+    }
+
+    /// The installed package whose files are in the package directory while this launch runs a
+    /// boot guard fallback instead: the blocked package, or one installed after the fallback booted.
+    /// Downloads diff against it, cleanup keeps its files and lazy-split status is recorded on it.
+    private var displacedPackage: AJPApplicationPackage? {
+        get { collectionsLock.withLock { _displacedPackage } }
+        set { collectionsLock.withLock { _displacedPackage = newValue } }
+    }
+
     private weak var delegate: AJPApplicationManagerDelegate?
     
     // Retain these ObjC types until swapped natively
@@ -230,11 +256,28 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         self.indexBundleName = delegate?.indexBundleName?() ?? AJPApplicationManager.defaultIndexBundleName
         
         self.startTime = Date().timeIntervalSince1970 * 1000
-        self.managerId = UUID().uuidString.lowercased()
-        
-        self.tracker = AJPApplicationTracker(managerId: self.managerId, workspace: workspace)
-        self.tracker.addLogger(logger)
-        
+        let managerId = UUID().uuidString.lowercased()
+        self.managerId = managerId
+
+        let tracker = AJPApplicationTracker(managerId: managerId, workspace: workspace)
+        tracker.addLogger(logger)
+        self.tracker = tracker
+
+        // Read the opt-in flag once, here; later delegate changes (or a released delegate) do not matter.
+        self.bootGuard = AJPBootGuard.shared(
+            workspace: workspace,
+            enabled: delegate?.bootGuardEnabled?() ?? false,
+            binaryIdentity: AJPApplicationManager.currentBinaryIdentity(),
+            onEvent: { key, value, isError in
+                let payload = NSMutableDictionary(dictionary: value)
+                if isError {
+                    tracker.trackError(key, value: payload)
+                } else {
+                    tracker.trackInfo(key, value: payload)
+                }
+            }
+        )
+
         super.init()
         
         // Let's fire up initialization
@@ -284,9 +327,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.utils = AJPApplicationManagerUtils(fileUtil: self.fileUtil, tracker: self.tracker, remoteFileUtil: self.remoteFileUtil)
 
-        let majorVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        let minorVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
-        let appVersion = "\(majorVersion).\(minorVersion)"
+        let appVersion = AJPApplicationManager.currentBinaryIdentity()
 
         let storedVersion = UserDefaults.standard.string(forKey: AJPApplicationConstants.APP_VERSION_USER_DEFAULTS_KEY)
         let storedVersionLog = NSMutableDictionary()
@@ -306,10 +347,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
 
         UserDefaults.standard.set(appVersion, forKey: AJPApplicationConstants.APP_VERSION_USER_DEFAULTS_KEY)
         
+        if bootGuard.enabled {
+            self.bundledPackage = self.readBundledPackage()
+        }
+
         // Handle if any previously downloaded packages are available.
         self.handleTempPackageInstallation()
         
         self.package = self.readApplicationPackage()
+        self.selectBootPackage()
         self.resources = self.readApplicationResources()
         
         // Handle if any previously downloaded resources are available.
@@ -404,7 +450,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 return
             }
             
+            // A staged package naming the blocked version must never be installed.
+            if bootGuard.refusePackage(tempPackage.version, source: "staged") {
+                try? fileUtil.deleteFile(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                utils.cleanupTempDirectory()
+                return
+            }
+            
             // Move all files from temp to main
+            bootGuard.packageInstallStarted()
             let tempFiles = utils.getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR, subFolder: AJPApplicationConstants.JUSPAY_TEMP_DIR, includeSubfolders: true)
             var allMoveSuccessful = true
             
@@ -430,6 +484,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                     let sMap = NSMutableDictionary()
                     sMap["version"] = tempPackage.version
                     tracker.trackInfo("temp_package_installed", value: sMap)
+                    self.notifyBootGuardOfInstall(tempPackage)
                 } catch {
                     let fMap = NSMutableDictionary()
                     fMap["error"] = error.localizedDescription
@@ -604,6 +659,19 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             tracker.trackError("read_package_file", value: map)
             return nil
         }
+        if bootSource != .installed {
+            // The boot guard substituted a snapshot or the bundled package for a blocked one
+            // (release config resources are still read from the package directory).
+            let path = getPathForPackageFile(fileName)
+            if !path.isEmpty, let content = try? String(contentsOfFile: path, encoding: .utf8) {
+                return content
+            }
+            let map = NSMutableDictionary()
+            map["fileName"] = fileName.isEmpty ? "nil" : fileName
+            map["error"] = "file not found in boot guard fallback"
+            tracker.trackError("read_package_file", value: map)
+            return nil
+        }
         let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
         do {
             let fileContent = try fileUtil.loadFile(filePath, folder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, withLocalAssets: self.isLocalAssets)
@@ -618,6 +686,8 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     }
 
     /// Whether `path` is relative and has no ".." component, so it cannot leave the package directory.
+    /// The one path rule for package files: `AJPBootGuard.containedURL` (snapshot and fallback
+    /// paths) applies it too.
     static func isPackageRelativePath(_ path: String) -> Bool {
         // Split on code points, not Characters: a combining mark after "/" would merge with it
         // into one Character and hide the separator from a Character-based split.
@@ -705,9 +775,21 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
      *
      * Resolution order: the current package's index file on disk, then a file of the same name in
      * the base bundle, then the host's `indexBundleName` when the release config has no index.
-     * `AirborneServices.getIndexBundlePath()` and the React Native bridge both resolve through here.
+     * `AirborneServices.getIndexBundlePath()` (and so `startApp`) resolves through here.
+     *
+     * The first call in a process also records the boot for the opt-in boot guard (`prepareBoot()`),
+     * so call it only to load the bundle. To merely report the path, use `currentIndexBundleURL()`.
      */
     @objc public func getIndexBundleURL() -> URL {
+        prepareBoot()
+        return currentIndexBundleURL()
+    }
+
+    /**
+     * Same resolution as `getIndexBundleURL()`, without recording a boot for the boot guard.
+     * Used by the React Native bridge's `getBundlePath`, which JS may call at any time.
+     */
+    @objc public func currentIndexBundleURL() -> URL {
         let indexFilePath = package.index.filePath
         if indexFilePath.isEmpty {
             return hostIndexBundleURL()
@@ -724,8 +806,73 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         return baseBundle.bundleURL.appendingPathComponent(indexFilePath)
     }
 
-    /// Default host index name when neither the release config nor the delegate names one.
-    static let defaultIndexBundleName = "main.jsbundle"
+    /**
+     * Returns the absolute path of a file of the package selected for this launch.
+     *
+     * Normally this is the OTA package directory. When the boot guard replaced a blocked package,
+     * it is the last-good snapshot or the app bundle instead; release config resources missing
+     * there are still read from the package directory (snapshots hold package files only). Returns
+     * "" when the file cannot be located (callers must check before building a file URL).
+     */
+    @objc public func getPathForPackageFile(_ fileName: String) -> String {
+        let fallbackPath: String
+        switch bootSource {
+        case .snapshot(let directory):
+            fallbackPath = AJPBootGuard.containedURL(fileName, in: directory)?.path ?? ""
+        case .appBundle:
+            let bundledFileName = (fileName as NSString).lastPathComponent
+            fallbackPath = fileUtil.filePathInBundleForFileName(bundledFileName) ?? ""
+        case .installed:
+            return installedFilePath(fileName)
+        }
+        if !fallbackPath.isEmpty && FileManager.default.fileExists(atPath: fallbackPath) {
+            return fallbackPath
+        }
+        if isInstalledResourceOutsidePackages(fileName) {
+            return installedFilePath(fileName)
+        }
+        return fallbackPath
+    }
+
+    /**
+     * Whether `fileName` may be read from the package directory while a boot guard fallback runs:
+     * it names a resource of the release config (resources are downloaded into the package
+     * directory and are not part of a snapshot) and no file of the running or the installed
+     * (displaced, possibly blocked) package, so a blocked package's files are never served.
+     */
+    private func isInstalledResourceOutsidePackages(_ fileName: String) -> Bool {
+        guard AJPApplicationManager.isPackageRelativePath(fileName) else {
+            return false
+        }
+        let names = { (path: String) -> [String] in [path, self.utils.jsFileName(for: path)] }
+        return collectionsLock.withLock { () -> Bool in
+            var resourcePaths = self._availableResources.allKeys.compactMap { $0 as? String }
+            if let resources = self._resources {
+                resourcePaths += Array(resources.resources.keys)
+            }
+            guard resourcePaths.contains(where: { names($0).contains(fileName) }) else {
+                return false
+            }
+            let packages = [self._package, self._displacedPackage].compactMap { $0 }
+            for package in packages {
+                if package.allSplits().contains(where: { names($0.filePath).contains(fileName) }) {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    private func installedFilePath(_ fileName: String) -> String {
+        let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
+        return fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+    }
+
+    /// Directory holding installed package files (`<package dir>/<workspace>/main`).
+    private func installedPackageDirectory() -> URL {
+        let path = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.JUSPAY_MAIN_DIR, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
 
     private func hostIndexBundleURL() -> URL {
         return AJPApplicationManager.hostIndexBundleURL(indexBundleName: indexBundleName, in: baseBundle)
@@ -749,9 +896,146 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         return baseBundle.path(forResource: name, ofType: fileExtension)
     }
 
-    @objc public func getPathForPackageFile(_ fileName: String) -> String {
-        let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
-        return fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+    // MARK: - Boot Guard
+
+    /// Default host index name when neither the release config nor the delegate names one.
+    static let defaultIndexBundleName = "main.jsbundle"
+
+    /// App binary identity (`CFBundleShortVersionString.CFBundleVersion`).
+    static func currentBinaryIdentity() -> String {
+        let majorVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        let minorVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        return "\(majorVersion).\(minorVersion)"
+    }
+
+    /**
+     * Records that the current package is being handed to the JS runtime (opt-in boot guard).
+     *
+     * Called by `getIndexBundleURL()`. Only the first call in a process counts, so repeated
+     * bundle-path lookups and background launches that never load JS do not count against a
+     * release. Boots of the bundled package, or of a package whose index file is missing, are not
+     * tracked. No-op when the boot guard is off.
+     */
+    @objc public func prepareBoot() {
+        guard bootGuard.enabled, !bootGuard.hasBootSession else { return }
+        bootGuard.beginBoot(makeBootSession())
+    }
+
+    /**
+     * Acknowledges that the JS booted by this process rendered successfully (opt-in boot guard).
+     *
+     * Clears the unacknowledged-boot count on the calling thread. Keeping a snapshot of the booted
+     * package's files as the last-good fallback (first acknowledgement of a package, or lazy files
+     * downloaded since its snapshot) runs on a background queue. Never throws or crashes; snapshot
+     * failures are reported through the tracker. No-op when the boot guard is off.
+     */
+    @objc public func markBootSuccess() {
+        bootGuard.markBootSuccess()
+    }
+
+    /// Blocks until a snapshot started by `markBootSuccess()` has finished. For tests only.
+    func waitForBootGuardSnapshotForTesting() {
+        bootGuard.waitForSnapshotForTesting()
+    }
+
+    /// Lets the next manager run the once-per-process package directory cleanup again. For tests only.
+    static func resetFirstRunAfterAppLaunchForTesting() {
+        isFirstRunAfterAppLaunch = true
+    }
+
+    /// Where this launch reads package files from. For tests only.
+    var bootSourceForTesting: AJPBootSource {
+        bootSource
+    }
+
+    private func makeBootSession() -> AJPBootSession {
+        let (bootPackage, source) = collectionsLock.withLock { () -> (AJPApplicationPackage, AJPBootSource) in
+            self._bootStarted = true
+            return (self._package!, self._bootSource)
+        }
+        let indexFilePath = bootPackage.index.filePath
+
+        switch source {
+        case .appBundle:
+            return AJPBootSession(package: bootPackage, tracked: false, source: source, sourceDirectory: nil)
+
+        case .snapshot(let directory):
+            let indexURL = indexFilePath.isEmpty ? nil : AJPBootGuard.containedURL(indexFilePath, in: directory)
+            let indexExists = indexURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+            return AJPBootSession(package: bootPackage, tracked: indexExists, source: source, sourceDirectory: nil)
+
+        case .installed:
+            // Mirrors Android: only a package whose index file is on disk is an OTA boot.
+            let indexExists = !indexFilePath.isEmpty
+                && FileManager.default.fileExists(atPath: installedFilePath(indexFilePath))
+            return AJPBootSession(
+                package: bootPackage,
+                tracked: indexExists,
+                source: source,
+                sourceDirectory: installedPackageDirectory()
+            )
+        }
+    }
+
+    private func readBundledPackage() -> AJPApplicationPackage? {
+        guard let data = try? fileUtil.getFileDataFromBundle("release_config.json"),
+              let manifest = try? AJPApplicationManifest(data: data as NSData) else {
+            return nil
+        }
+        return manifest.package
+    }
+
+    /**
+     * Chooses the package this manager serves, after `package` was read from the package directory.
+     *
+     * `getSharedInstance` replaces a manager whose downloads finished, and the JS booted by this
+     * process is then served by the new manager (`existingInstance(withWorkspace:)`). So once this
+     * process booted a boot guard fallback, every later manager adopts that boot's package and
+     * source instead of re-deriving them: an install since the boot may have lifted the block, but
+     * the running JS must keep reading the files it booted with. The installed package becomes the
+     * displaced one, as in the manager that booted.
+     *
+     * A boot from the package directory needs no adoption: installs replace that package in place
+     * (as with the guard off), and re-deriving cannot pick a fallback, since a block is only set at
+     * launch and installs of the blocked version are refused.
+     */
+    private func selectBootPackage() {
+        guard let session = bootGuard.bootSession, session.source != .installed else {
+            substituteBlockedPackage()
+            return
+        }
+        let installed: AJPApplicationPackage? = self.package
+        self.package = session.package
+        self.bootSource = session.source
+        // An empty package (no version, no splits) when nothing is installed: downloads diff
+        // against no files rather than against the fallback's.
+        self.displacedPackage = installed ?? AJPApplicationPackage()
+    }
+
+    /// Replaces a blocked installed package with the last-good snapshot, else the bundled package.
+    private func substituteBlockedPackage() {
+        guard let installed = self.package, bootGuard.isBlocked(installed.version) else { return }
+        bootGuard.reportBlockedPackage(installed.version, source: "installed")
+
+        if let fallback = bootGuard.lastGoodFallback() {
+            self.package = fallback.package
+            self.bootSource = .snapshot(fallback.directory)
+        } else {
+            self.package = bundledPackage ?? AJPApplicationPackage()
+            self.bootSource = .appBundle
+        }
+        self.displacedPackage = installed
+    }
+
+    /// Lets the guard clear its block once a server-delivered package is installed with its index on disk.
+    private func notifyBootGuardOfInstall(_ package: AJPApplicationPackage) {
+        guard bootGuard.enabled else { return }
+        let indexFilePath = package.index.filePath
+        guard !indexFilePath.isEmpty,
+              FileManager.default.fileExists(atPath: installedFilePath(indexFilePath)) else {
+            return
+        }
+        bootGuard.packageInstalled(package.version)
     }
     
     @objc public func getPathForAssetsInReleaseConfig(_ resourcePath: String?) -> String? {
@@ -803,19 +1087,39 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         return try? fileUtil.getDecodedInstanceForClass(AJPApplicationConfig.self, withContentOfFileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationConfig
     }
     
-    private func updatePackage(_ package: AJPApplicationPackage, didDownloadImportant: Bool, startTime: TimeInterval) {
+    // Internal (not private) so tests can install a package while a boot guard fallback runs.
+    func updatePackage(_ package: AJPApplicationPackage, didDownloadImportant: Bool, startTime: TimeInterval) {
         let logVal = NSMutableDictionary()
         logVal["trying_to_install_package"] = "New app version downloaded, installing to disk. \(package.version)"
         tracker.trackInfo("app_update_result", value: logVal)
         
+        // Release configs naming the blocked version are already refused; this guards any other path.
+        if bootGuard.refusePackage(package.version, source: "download") {
+            return
+        }
+
         // Only write to disk if no important downloads happened OR if all files are successfully downloaded & moved to main
         if !didDownloadImportant || utils.isAppInstalled(withPackage: package, inSubFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR) {
             do {
+                bootGuard.packageInstallStarted()
                 // Save the new package data to disk
                 try fileUtil.writeInstance(package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
-                
-                // Update current package state
-                self.package = package
+
+                // Read outside collectionsLock: the guard's lock is never taken inside it.
+                let bootedInThisProcess = bootGuard.hasBootSession
+                collectionsLock.withLock {
+                    if (bootedInThisProcess || self._bootStarted) && self._bootSource != .installed {
+                        // The JS of this launch already runs a boot guard fallback; keep serving its
+                        // files. The new package is in the package directory for the next launch.
+                        self._displacedPackage = package
+                    } else {
+                        // Update current package state (it is read from the package directory from now on)
+                        self._package = package
+                        self._bootSource = .installed
+                        self._displacedPackage = nil
+                    }
+                }
+                self.notifyBootGuardOfInstall(package)
                 
                 let resultLog = NSMutableDictionary()
                 resultLog["package_version"] = package.version
@@ -929,7 +1233,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             for resource in self.package.allSplits() {
                 requiredFiles.insert(utils.jsFileName(for: resource.filePath))
             }
-            
+
+            // Boot guard snapshots live outside the package directory, but the blocked package
+            // still installed there is the baseline for the next download, so keep its files.
+            if let displaced = self.displacedPackage {
+                for resource in displaced.allSplits() {
+                    requiredFiles.insert(utils.jsFileName(for: resource.filePath))
+                }
+            }
+
             if let downloadedManifest = self.downloadedApplicationManifest {
                 let dlPackage = downloadedManifest.package
                 for resource in dlPackage.allSplits() {
@@ -968,6 +1280,11 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         self.fetchReleaseConfigWithCompletionHandler { [weak self] manifest, error, didTimeout in
             guard let self = self else { return }
             
+            if let manifest = manifest, self.bootGuard.refusePackage(manifest.package.version, source: "release_config") {
+                // Name the installed package instead (so nothing is downloaded or installed, and the
+                // block stays); the config and resources of this release config still apply.
+                manifest.package = self.displacedPackage ?? self.package
+            }
             if !didTimeout && error == nil && manifest != nil {
                 self.downloadedApplicationManifest = manifest
                 self.releaseConfigDownloadStatus = .completed
@@ -1023,11 +1340,16 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         // Package download
         Task { [weak self] in
             guard let self = self else { return }
+            // Compare and diff against the package actually in the package directory. When the boot
+            // guard replaced a blocked package, that is the blocked (displaced) package, not the
+            // fallback this launch runs: a server rolling back to the fallback's version must get
+            // it installed (which lifts the block) for the next launch.
+            let installedPackage: AJPApplicationPackage = self.displacedPackage ?? self.package
             // Download important packages first
-            if !(self.package.version == downloadedManifest.package.version && self.package.name == downloadedManifest.package.name) {
+            if !(installedPackage.version == downloadedManifest.package.version && installedPackage.name == downloadedManifest.package.name) {
                 self.startBootTimeoutTimer()
-                
-                let currentLazy = self.package.lazy
+
+                let currentLazy = installedPackage.lazy
                 self.collectionsLock.withLock {
                     self.downloadedLazy = downloadedManifest.package.lazy
                 }
@@ -1036,7 +1358,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 // overwrites self.package) when the boot timeout has not elapsed.
                 let currentPackageVersion = self.package.version
 
-                let (downloadFailed, timedOut) = await self.downloadImportantPackagesWithNewManifest(downloadedManifest.package, currentManifest: self.package)
+                let (downloadFailed, timedOut) = await self.downloadImportantPackagesWithNewManifest(downloadedManifest.package, currentManifest: installedPackage, runningVersion: currentPackageVersion)
 
                 if !downloadFailed { // Important packages downloaded successfully/No updates.
                     self.didFinishImportantPackageWithLazyDownloadComplete(timedOut)
@@ -1270,7 +1592,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     
     // MARK: - Downloads & Moving
     
-    private func downloadImportantPackagesWithNewManifest(_ newManifest: AJPApplicationPackage, currentManifest: AJPApplicationPackage) async -> (downloadFailed: Bool, timedOut: Bool) {
+    private func downloadImportantPackagesWithNewManifest(_ newManifest: AJPApplicationPackage, currentManifest: AJPApplicationPackage, runningVersion: String) async -> (downloadFailed: Bool, timedOut: Bool) {
         let startTime = Date().timeIntervalSince1970 * 1000
         let downloadLock = NSLock()
         var timeoutOccurred = false
@@ -1369,11 +1691,11 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 // The package is on disk but was not installed this boot; it is staged for the next
                 // Airborne init. Integrators prompt for a reload on this event.
                 map["package_version"] = newManifest.version
-                map["current_package_version"] = currentManifest.version
+                map["current_package_version"] = runningVersion
                 self.tracker.trackInfo("downloads_completed_after_timeout", value: map)
 
                 self.notifyPackageDownloaded(
-                    oldVersion: currentManifest.version,
+                    oldVersion: runningVersion,
                     newVersion: newManifest.version
                 )
                 
@@ -1386,7 +1708,9 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 map["boot_timeout"] = self.getPackageTimeout()
                 map["time_taken"] = NSNumber(value: (Date().timeIntervalSince1970 * 1000) - startTime)
                 self.tracker.trackInfo("important_package_download_result", value: map)
-                
+
+                // The package directory stops matching the package booted in this process.
+                bootGuard.packageInstallStarted()
                 utils.moveAllPackagesFromTempToMain()
                 self.updatePackage(newManifest, didDownloadImportant: true, startTime: startTime)
                 
@@ -1487,6 +1811,12 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     }
     
     private func retryFailedLazyDownloadsAsync() async {
+        // A boot-guard fallback package is not installed in the package directory; downloading its
+        // lazy splits there would mix them with the blocked package's files and rewrite package.json.
+        if self.bootSource != .installed {
+            return
+        }
+
         var failedDownloads = [AJPLazyResource]()
         collectionsLock.withLock {
             for resource in self.package.lazy {
@@ -1516,9 +1846,13 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         }
     }
     
-    private func updateLazyPackageDownloadStatus(_ resource: AJPLazyResource, withStatus isDownloaded: Bool) {
+    // Internal (not private) so tests can record a lazy split while a boot guard fallback runs.
+    func updateLazyPackageDownloadStatus(_ resource: AJPLazyResource, withStatus isDownloaded: Bool) {
         collectionsLock.withLock {
-            let updatedLazy = self.package.lazy
+            // Lazy splits are downloaded into the package directory, so record them on the package
+            // installed there (not on a boot guard fallback that this launch runs instead).
+            let installedPackage: AJPApplicationPackage = self._displacedPackage ?? self._package
+            let updatedLazy = installedPackage.lazy
             var found = false
             for i in 0..<updatedLazy.count {
                 if updatedLazy[i].filePath == resource.filePath {
@@ -1529,9 +1863,9 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             }
             
             if found {
-                self.package.lazy = updatedLazy
+                installedPackage.lazy = updatedLazy
                 do {
-                    try fileUtil.writeInstance(self.package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                    try fileUtil.writeInstance(installedPackage, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
                     let map = NSMutableDictionary()
                     map["filePath"] = resource.filePath
                     map["isDownloaded"] = isDownloaded
@@ -1701,5 +2035,602 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                 tracker.trackError("temp_resource_save_failed", value: map)
             }
         }
+    }
+}
+
+// MARK: - Boot Guard
+
+/// Where the files of the package selected for a launch are read from.
+enum AJPBootSource: Equatable {
+    /// The installed OTA package in the package directory (the normal case).
+    case installed
+    /// The last-good snapshot, used because the installed package is blocked.
+    case snapshot(URL)
+    /// The package shipped in the app bundle, used because the installed package is blocked
+    /// and no usable last-good snapshot exists.
+    case appBundle
+}
+
+/// The JS boot started by this process, recorded on the first bundle-path request.
+struct AJPBootSession {
+    /// The package whose index was handed to the JS runtime.
+    let package: AJPApplicationPackage
+    /// Whether this boot counts towards `AJPBootGuard.maxUnacknowledgedBoots`.
+    let tracked: Bool
+    /// Where the files of `package` are read from for the rest of the process.
+    let source: AJPBootSource
+    /// Directory holding the booted package's files; copied into a snapshot on acknowledgement.
+    let sourceDirectory: URL?
+
+    /// Whether `package` is the last-good snapshot substituted for a blocked package.
+    var fromSnapshot: Bool {
+        if case .snapshot = source {
+            return true
+        }
+        return false
+    }
+}
+
+/**
+ * Opt-in boot guard: blocks an OTA package whose JS boots are never acknowledged and falls back to
+ * the last acknowledged (last-good) package, else to the bundled package.
+ *
+ * One guard exists per workspace per process. It owns the persisted state (pending, attempts,
+ * blocked, lastGood, snapshot, binary identity) and the last-good snapshot directories, all under
+ * `directory`. Every state read and write happens under `lock`; snapshot copies run outside it on
+ * `snapshotQueue`. Failures to persist or snapshot are reported through `onEvent` and never crash
+ * the app.
+ */
+final class AJPBootGuard: @unchecked Sendable {
+
+    typealias EventHandler = (_ key: String, _ value: [String: Any], _ isError: Bool) -> Void
+
+    /// Unacknowledged boots of one package version before that version is blocked.
+    /// Web, Android and iOS must use the same value.
+    static let maxUnacknowledgedBoots = 2
+    /// Name prefix of last-good snapshot directories inside `directory`.
+    static let snapshotPrefix = "airborne-good-"
+    static let stateFileName = "state.json"
+
+    /// Keys of the persisted state dictionary.
+    private enum Key {
+        static let binaryIdentity = "binary"
+        static let pending = "pending"
+        static let attempts = "attempts"
+        static let blocked = "blocked"
+        static let lastGood = "lastGood"
+        /// Snapshot directory name, relative to `directory` (container paths change across restores).
+        static let snapshot = "snapshot"
+    }
+
+    let enabled: Bool
+    let directory: URL
+    var stateURL: URL { directory.appendingPathComponent(AJPBootGuard.stateFileName) }
+
+    private let lock = NSRecursiveLock()
+    private let fileManager = FileManager.default
+    private var state: [String: Any] = [:]
+    private var session: AJPBootSession?
+    private var onEvent: EventHandler?
+
+    /// Snapshots copy package files, so they run here rather than on the acknowledging thread
+    /// (often the main thread or the React Native bridge queue). Serial: one snapshot at a time.
+    private let snapshotQueue = DispatchQueue(label: "in.juspay.airborne.bootguard.snapshot", qos: .utility)
+    private var snapshotInProgress = false
+    /// Package installs started in this process (see `packageInstallStarted()`).
+    private var installCount = 0
+    /// `installCount` when this process's boot was recorded.
+    private var installCountAtBoot = 0
+
+    // MARK: Process-wide registry
+
+    private static let registryLock = NSLock()
+    private static var registry: [String: AJPBootGuard] = [:]
+
+    /**
+     * Returns this process's guard for `workspace`, creating it on first use.
+     *
+     * The opt-in flag and the launch checks (binary identity, rollback, orphan sweep) are evaluated
+     * once per process, by the first manager created for the workspace. Later managers share that
+     * guard and its boot session; only their event handler replaces the previous one.
+     */
+    static func shared(workspace: String, enabled: Bool, binaryIdentity: String, onEvent: @escaping EventHandler) -> AJPBootGuard {
+        registryLock.lock()
+        defer { registryLock.unlock() }
+
+        if let existing = registry[workspace] {
+            existing.setEventHandler(onEvent)
+            return existing
+        }
+        let created = AJPBootGuard(
+            directory: directory(forWorkspace: workspace),
+            enabled: enabled,
+            binaryIdentity: binaryIdentity,
+            onEvent: onEvent
+        )
+        registry[workspace] = created
+        return created
+    }
+
+    /// Per-workspace guard directory: `Application Support/airborne-boot/<base64 workspace>/`.
+    static func directory(forWorkspace workspace: String) -> URL {
+        let key = Data(workspace.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_")
+        let supportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return supportDirectory
+            .appendingPathComponent("airborne-boot", isDirectory: true)
+            .appendingPathComponent(key, isDirectory: true)
+    }
+
+    /// Forgets the process-wide guard of `workspace`, so the next manager behaves like a new launch.
+    /// For tests only.
+    static func forgetForTesting(workspace: String) {
+        registryLock.lock()
+        defer { registryLock.unlock() }
+        registry.removeValue(forKey: workspace)
+    }
+
+    // MARK: Launch
+
+    /// Creates a guard and runs the launch checks. Use `shared(...)` outside tests.
+    init(directory: URL, enabled: Bool, binaryIdentity: String, onEvent: EventHandler? = nil) {
+        self.directory = directory
+        self.enabled = enabled
+        self.onEvent = onEvent
+
+        if enabled {
+            startLaunch(binaryIdentity: binaryIdentity)
+        } else {
+            discardEverything(reason: "guard_disabled")
+        }
+    }
+
+    private func setEventHandler(_ handler: @escaping EventHandler) {
+        lock.lock()
+        defer { lock.unlock() }
+        onEvent = handler
+    }
+
+    private func startLaunch(binaryIdentity: String) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        state = loadState()
+        var changed = false
+
+        // A last-good package from another app binary must never be used.
+        if !state.isEmpty && state[Key.binaryIdentity] as? String != binaryIdentity {
+            state = [:]
+            deleteSnapshots(keeping: nil)
+            emit("boot_guard_reset", ["reason": "binary_changed"])
+            changed = true
+        }
+        if state[Key.binaryIdentity] as? String != binaryIdentity {
+            state[Key.binaryIdentity] = binaryIdentity
+            changed = true
+        }
+
+        // Forget a snapshot reference whose directory is gone (for example after a device restore).
+        if state[Key.snapshot] != nil && currentSnapshotDirectory() == nil {
+            state.removeValue(forKey: Key.snapshot)
+            changed = true
+        }
+
+        if rollBackIfNeeded() {
+            changed = true
+        }
+
+        deleteSnapshots(keeping: state[Key.snapshot] as? String)
+
+        if changed {
+            persist()
+        }
+    }
+
+    /// Blocks a package that reached `maxUnacknowledgedBoots`. Returns whether the state changed.
+    private func rollBackIfNeeded() -> Bool {
+        guard let pending = state[Key.pending] as? String,
+              attempts >= AJPBootGuard.maxUnacknowledgedBoots else {
+            return false
+        }
+
+        if pending == lastGoodVersion {
+            // The last-good fallback failed too. Drop it so the next launch uses the bundled package
+            // instead of alternating between two broken packages; keep the original block.
+            dropLastGood()
+            if state[Key.blocked] == nil {
+                state[Key.blocked] = pending
+            }
+        } else {
+            state[Key.blocked] = pending
+        }
+
+        state.removeValue(forKey: Key.pending)
+        state[Key.attempts] = 0
+        emit("rollback", ["packageVersion": pending])
+        return true
+    }
+
+    private func discardEverything(reason: String) {
+        guard fileManager.fileExists(atPath: directory.path) else { return }
+        do {
+            try fileManager.removeItem(at: directory)
+            emit("boot_guard_reset", ["reason": reason])
+        } catch {
+            emit("boot_guard_reset_failed", ["reason": reason, "error": error.localizedDescription], isError: true)
+        }
+    }
+
+    // MARK: Selection
+
+    func isBlocked(_ version: String) -> Bool {
+        guard enabled else { return false }
+        lock.lock()
+        defer { lock.unlock() }
+        return blockedVersion == version
+    }
+
+    /// Reports that the blocked `version` was found (`source`: installed, staged, release_config, download).
+    func reportBlockedPackage(_ version: String, source: String) {
+        emit("blocked-package", ["packageVersion": version, "source": source])
+    }
+
+    /// Returns true (and reports it) when `version` is blocked and must not be installed.
+    func refusePackage(_ version: String, source: String) -> Bool {
+        guard isBlocked(version) else { return false }
+        reportBlockedPackage(version, source: source)
+        return true
+    }
+
+    /// The last-good package and its snapshot directory, when usable in place of a blocked package:
+    /// it must differ from the blocked version and its snapshot must contain its index file.
+    func lastGoodFallback() -> (package: AJPApplicationPackage, directory: URL)? {
+        guard enabled else { return nil }
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let dictionary = state[Key.lastGood] as? NSDictionary,
+              let package = try? AJPApplicationPackage(dictionary: dictionary),
+              package.version != blockedVersion,
+              !package.index.filePath.isEmpty,
+              let snapshotDirectory = currentSnapshotDirectory(),
+              let indexURL = AJPBootGuard.containedURL(package.index.filePath, in: snapshotDirectory),
+              fileManager.fileExists(atPath: indexURL.path) else {
+            return nil
+        }
+        return (package, snapshotDirectory)
+    }
+
+    /// Clears the block once a server-delivered package with another version has been installed.
+    /// Only call this after the package is committed to disk, never for SDK-substituted packages.
+    func packageInstalled(_ version: String) {
+        guard enabled else { return }
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let blocked = blockedVersion, blocked != version else { return }
+        state.removeValue(forKey: Key.blocked)
+        persist()
+        emit("boot_guard_unblocked", ["blockedVersion": blocked, "packageVersion": version])
+    }
+
+    // MARK: Boot and acknowledgement
+
+    var hasBootSession: Bool {
+        bootSession != nil
+    }
+
+    /// The JS boot of this process (its package and where its files are read from), shared by
+    /// every manager of the workspace; nil until a manager hands a bundle to the JS runtime.
+    var bootSession: AJPBootSession? {
+        lock.lock()
+        defer { lock.unlock() }
+        return session
+    }
+
+    /// Records the boot of this process. Only the first call per process has any effect.
+    func beginBoot(_ newSession: AJPBootSession) {
+        guard enabled else { return }
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard session == nil else { return }
+        session = newSession
+        installCountAtBoot = installCount
+
+        let version = newSession.package.version
+        guard newSession.tracked, !version.isEmpty else { return }
+
+        let previousAttempts = state[Key.pending] as? String == version ? attempts : 0
+        state[Key.pending] = version
+        state[Key.attempts] = previousAttempts + 1
+        persist()
+    }
+
+    /**
+     * Records that a package install started in this process: files in the package directory may
+     * no longer belong to the package booted by this process, so it must not be snapshotted.
+     * Call before moving a new package's files into the package directory or recording it as installed.
+     */
+    func packageInstallStarted() {
+        guard enabled else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        installCount += 1
+    }
+
+    /**
+     * Acknowledges this process's boot. Clears pending/attempts on the calling thread, then
+     * schedules `refreshSnapshot` on `snapshotQueue` (unless the boot ran from the last-good
+     * snapshot or a snapshot is already running). A failed snapshot keeps the previous last-good.
+     */
+    func markBootSuccess() {
+        guard enabled else { return }
+
+        lock.lock()
+        guard let session = session,
+              session.tracked,
+              state[Key.pending] as? String == session.package.version else {
+            lock.unlock()
+            return
+        }
+        state.removeValue(forKey: Key.pending)
+        state[Key.attempts] = 0
+        persist()
+
+        let startSnapshot = !session.fromSnapshot && session.sourceDirectory != nil && !snapshotInProgress
+        if startSnapshot {
+            snapshotInProgress = true
+        }
+        lock.unlock()
+
+        guard startSnapshot else { return }
+        snapshotQueue.async {
+            self.refreshSnapshot(of: session)
+            self.lock.lock()
+            self.snapshotInProgress = false
+            self.lock.unlock()
+        }
+    }
+
+    /// Blocks until a snapshot scheduled by `markBootSuccess()` has finished. For tests only.
+    func waitForSnapshotForTesting() {
+        snapshotQueue.sync {}
+    }
+
+    /// Takes a snapshot of the booted package unless an up-to-date one exists: the last-good
+    /// package is this version and its snapshot holds every file now present in the package
+    /// directory (lazy splits may arrive after the first snapshot). Runs on `snapshotQueue`.
+    private func refreshSnapshot(of session: AJPBootSession) {
+        guard let sourceDirectory = session.sourceDirectory else { return }
+        let package = session.package
+
+        if !bootedFilesAreInstalled() {
+            reportSnapshotSkipped(package.version)
+            return
+        }
+
+        lock.lock()
+        let existingSnapshot = lastGoodVersion == package.version ? currentSnapshotDirectory() : nil
+        lock.unlock()
+
+        if let existingSnapshot = existingSnapshot,
+           !snapshotLacksFiles(of: package, from: sourceDirectory, snapshot: existingSnapshot) {
+            return
+        }
+        saveSnapshot(of: package, from: sourceDirectory)
+    }
+
+    /// Whether the package directory still holds the package booted by this process (no install
+    /// started since the boot). Otherwise its files may belong to a newer package.
+    private func bootedFilesAreInstalled() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return installCount == installCountAtBoot
+    }
+
+    private func reportSnapshotSkipped(_ version: String) {
+        emit("boot_guard_snapshot_skipped", [
+            "packageVersion": version,
+            "reason": "another package was installed after this boot"
+        ])
+    }
+
+    /// Whether a file of `package` exists in `source` but not in `snapshot`.
+    private func snapshotLacksFiles(of package: AJPApplicationPackage, from source: URL, snapshot: URL) -> Bool {
+        for split in package.allSplits() where !split.filePath.isEmpty {
+            guard let sourceURL = AJPBootGuard.containedURL(split.filePath, in: source),
+                  let snapshotURL = AJPBootGuard.containedURL(split.filePath, in: snapshot) else {
+                continue
+            }
+            if fileManager.fileExists(atPath: sourceURL.path) && !fileManager.fileExists(atPath: snapshotURL.path) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func saveSnapshot(of package: AJPApplicationPackage, from sourceDirectory: URL) {
+        let name = AJPBootGuard.snapshotPrefix + UUID().uuidString
+        let newSnapshot = directory.appendingPathComponent(name, isDirectory: true)
+
+        do {
+            try copyPackageFiles(of: package, from: sourceDirectory, to: newSnapshot)
+        } catch {
+            try? fileManager.removeItem(at: newSnapshot)
+            emit("boot_guard_snapshot_failed", [
+                "packageVersion": package.version,
+                "error": error.localizedDescription
+            ], isError: true)
+            return
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        // A package installed while copying may have replaced some of the copied files.
+        if !bootedFilesAreInstalled() {
+            try? fileManager.removeItem(at: newSnapshot)
+            reportSnapshotSkipped(package.version)
+            return
+        }
+
+        let previousName = state[Key.snapshot] as? String
+        let previousLastGood = state[Key.lastGood]
+        state[Key.lastGood] = package.toDictionary()
+        state[Key.snapshot] = name
+
+        if persist() {
+            if let previousName = previousName, let previous = snapshotDirectory(named: previousName) {
+                try? fileManager.removeItem(at: previous)
+            }
+        } else {
+            // The state on disk still names the previous snapshot; keep it and drop the new one.
+            state[Key.snapshot] = previousName
+            state[Key.lastGood] = previousLastGood
+            try? fileManager.removeItem(at: newSnapshot)
+        }
+    }
+
+    /// Copies the package's files (index required, other splits when present) into `target`.
+    private func copyPackageFiles(of package: AJPApplicationPackage, from source: URL, to target: URL) throws {
+        if package.index.filePath.isEmpty {
+            throw AJPBootGuard.makeError("Package has no index file")
+        }
+        try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
+        var targetURL = target
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        try? targetURL.setResourceValues(resourceValues)
+
+        var copiedPaths = Set<String>()
+        for split in package.allSplits() {
+            let relativePath = split.filePath
+            if relativePath.isEmpty {
+                continue
+            }
+            guard let sourceURL = AJPBootGuard.containedURL(relativePath, in: source),
+                  let destinationURL = AJPBootGuard.containedURL(relativePath, in: target) else {
+                throw AJPBootGuard.makeError("Package file path escapes its directory: \(relativePath)")
+            }
+            // The same file can be listed more than once (for example the index also in important).
+            if !copiedPaths.insert(destinationURL.path).inserted {
+                continue
+            }
+            if !fileManager.fileExists(atPath: sourceURL.path) {
+                if relativePath == package.index.filePath {
+                    throw AJPBootGuard.makeError("Index file missing: \(relativePath)")
+                }
+                continue
+            }
+            try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        }
+    }
+
+    // MARK: Paths
+
+    /**
+     * Resolves `relativePath` inside `root`, with the same rule as `readPackageFile`
+     * (`AJPApplicationManager.isPackageRelativePath`): absolute paths and paths with any ".."
+     * component are rejected, never resolved. "." and empty components are dropped by
+     * standardizing, and the result must still be strictly inside `root` (so "" and "." are nil).
+     */
+    static func containedURL(_ relativePath: String, in root: URL) -> URL? {
+        guard AJPApplicationManager.isPackageRelativePath(relativePath) else {
+            return nil
+        }
+        let base = root.standardizedFileURL
+        let url = base.appendingPathComponent(relativePath).standardizedFileURL
+        let basePath = base.path.hasSuffix("/") ? base.path : base.path + "/"
+        guard url.path.hasPrefix(basePath), url.path.count > basePath.count else {
+            return nil
+        }
+        return url
+    }
+
+    private func snapshotDirectory(named name: String) -> URL? {
+        guard name.hasPrefix(AJPBootGuard.snapshotPrefix), !name.contains("/") else { return nil }
+        return directory.appendingPathComponent(name, isDirectory: true)
+    }
+
+    /// The referenced snapshot directory, if the reference is valid and the directory exists.
+    private func currentSnapshotDirectory() -> URL? {
+        guard let name = state[Key.snapshot] as? String,
+              let url = snapshotDirectory(named: name) else {
+            return nil
+        }
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return nil
+        }
+        return url
+    }
+
+    /// Deletes every snapshot directory except `kept` (orphans from failed or superseded snapshots).
+    private func deleteSnapshots(keeping kept: String?) {
+        guard let names = try? fileManager.contentsOfDirectory(atPath: directory.path) else { return }
+        for name in names where name.hasPrefix(AJPBootGuard.snapshotPrefix) && name != kept {
+            try? fileManager.removeItem(at: directory.appendingPathComponent(name))
+        }
+    }
+
+    private func dropLastGood() {
+        if let name = state[Key.snapshot] as? String, let url = snapshotDirectory(named: name) {
+            try? fileManager.removeItem(at: url)
+        }
+        state.removeValue(forKey: Key.snapshot)
+        state.removeValue(forKey: Key.lastGood)
+    }
+
+    // MARK: State
+
+    private var attempts: Int {
+        state[Key.attempts] as? Int ?? 0
+    }
+
+    private var blockedVersion: String? {
+        state[Key.blocked] as? String
+    }
+
+    private var lastGoodVersion: String? {
+        (state[Key.lastGood] as? NSDictionary)?["version"] as? String
+    }
+
+    private func loadState() -> [String: Any] {
+        guard let data = try? Data(contentsOf: stateURL),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let loaded = object as? [String: Any] else {
+            return [:]
+        }
+        return loaded
+    }
+
+    /// Writes the state. A failure is reported and the guard continues best effort for this session.
+    @discardableResult
+    private func persist() -> Bool {
+        guard JSONSerialization.isValidJSONObject(state) else {
+            emit("boot_guard_persist_failed", ["error": "state is not valid JSON"], isError: true)
+            return false
+        }
+        do {
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+            let data = try JSONSerialization.data(withJSONObject: state)
+            try data.write(to: stateURL, options: .atomic)
+            return true
+        } catch {
+            emit("boot_guard_persist_failed", ["error": error.localizedDescription], isError: true)
+            return false
+        }
+    }
+
+    private func emit(_ key: String, _ value: [String: Any], isError: Bool = false) {
+        lock.lock()
+        let handler = onEvent
+        lock.unlock()
+        handler?(key, value, isError)
+    }
+
+    private static func makeError(_ message: String) -> NSError {
+        NSError(domain: "in.juspay.Airborne.BootGuard", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
