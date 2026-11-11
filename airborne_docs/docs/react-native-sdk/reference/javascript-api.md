@@ -78,7 +78,7 @@ function getFileContent(nameSpace: string, filePath: string): Promise<string>
 | `nameSpace` | `string` | The application/namespace identifier the file belongs to. |
 | `filePath` | `string` | The relative path of the file within the downloaded package. |
 
-**Returns:** `Promise<string>` — the file content as a string. Reject if the file cannot be read or does not exist.
+**Returns:** `Promise<string>` — the file content as a string. Reject if the file cannot be read or does not exist, or if `filePath` is absolute or has a `..` component.
 
 ```typescript
 import { getFileContent } from 'airborne-react-native';

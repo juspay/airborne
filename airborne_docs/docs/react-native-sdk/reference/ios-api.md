@@ -29,7 +29,7 @@ init(releaseConfigURL: String, delegate: AirborneDelegate? = nil)
 | Method | Signature | Description |
 | --- | --- | --- |
 | `getBundlePath` | `func getBundlePath() -> String` | Returns the file system path to the current index bundle (the OTA-updated version, or the bundled fallback). Exposed through the `Airborne.h` bridge. |
-| `getFileContent` | `func getFileContent(_ filePath: String) -> String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. |
+| `getFileContent` | `func getFileContent(_ filePath: String) -> String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. An absolute path or one with a `..` component is not read. |
 | `getReleaseConfig` | `func getReleaseConfig() -> String` | Returns the current release config as a stringified JSON. |
 
 ## AirborneDelegate

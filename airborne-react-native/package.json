@@ -170,6 +170,11 @@
     "jsSrcsDir": "src",
     "android": {
       "javaPackageName": "in.juspay.airborneplugin"
+    },
+    "ios": {
+      "modulesProvider": {
+        "Airborne": "AirborneReact"
+      }
     }
   },
   "create-react-native-library": {

@@ -7,6 +7,7 @@ import androidx.annotation.Keep
 import `in`.juspay.airborne.HyperOTAServices
 import `in`.juspay.airborne.LazyDownloadCallback
 import `in`.juspay.airborne.TrackerCallback
+import `in`.juspay.airborne.ota.PackagePaths
 import `in`.juspay.hyperutil.constants.LogLevel
 import org.json.JSONObject
 import javax.net.ssl.SSLSocketFactory
@@ -96,11 +97,15 @@ class Airborne(
 
     /**
      * Reads the content of the given file.
-     * @param filePath The relative path of the file.
+     * @param filePath The relative path of the file, inside the package.
      * @return The content of the file as String.
+     * @throws IllegalArgumentException if [filePath] is empty, absolute or has a '..' component
+     *   (see [PackagePaths.isPackageRelativePath]).
      */
     @Keep
     fun getFileContent(filePath: String): String {
+        // The path comes from JS and is resolved against the package dir: keep it inside.
+        require(PackagePaths.isPackageRelativePath(filePath)) { "File path must be relative to the package: $filePath" }
         return applicationManager.readSplit(filePath)
     }
 

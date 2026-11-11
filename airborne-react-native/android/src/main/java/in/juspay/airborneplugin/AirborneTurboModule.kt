@@ -27,6 +27,6 @@ class AirborneTurboModule(reactContext: ReactApplicationContext) :
   }
 
   companion object {
-    const val NAME = "AirborneReact"
+    const val NAME = "Airborne"
   }
 }
