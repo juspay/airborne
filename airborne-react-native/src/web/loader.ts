@@ -107,6 +107,7 @@ interface PersistedState {
   current: ReleaseConfig | null;
   /** The last copy of each resource that reached the cache, by file_path. */
   resources?: Record<string, ReleaseFile>;
+  guard?: GuardState;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +181,10 @@ function sanitizeState(value: unknown): PersistedState {
     }
     state.resources = resources;
   }
+  const guard = sanitizeGuard(value.guard);
+  if (guard) {
+    state.guard = guard;
+  }
   return state;
 }
 
@@ -232,14 +237,20 @@ function updateState(
 /**
  * The persisted state as this page may use it. State another host deploy owns
  * (this page's adoption failed to save, or a newer deploy took over while it
- * booted) holds nothing for this page: no package and no resources.
+ * booted) holds nothing for this page: no package and no resources. With the
+ * guard off, a guard left in state (discarding it failed) is ignored too, as
+ * is a guard of another host deploy.
  */
 function ownState(
   state: PersistedState,
-  bundledVersion: string
+  bundledVersion: string,
+  guardEnabled: boolean
 ): PersistedState {
   if (state.bundledVersion !== bundledVersion) {
     return { current: null };
+  }
+  if (!guardEnabled || state.guard?.binary !== bundledVersion) {
+    return { ...state, guard: undefined };
   }
   return state;
 }
@@ -298,7 +309,7 @@ class BootReporter {
     if (!saved && !this.reportedSaveFailure) {
       this.reportedSaveFailure = true;
       this.error(
-        'Airborne: could not save loader state (storage full or blocked); downloads are not remembered'
+        'Airborne: could not save loader state (storage full or blocked); downloads and the boot guard are not remembered'
       );
     }
     return saved;
@@ -648,7 +659,11 @@ function commitPackage(
   state: PersistedState,
   releaseConfig: ReleaseConfig
 ): PersistedState {
-  return { ...state, current: releaseConfig };
+  return {
+    ...state,
+    current: releaseConfig,
+    guard: liftBlock(state.guard, releaseConfig.package.version),
+  };
 }
 
 /**
@@ -755,6 +770,10 @@ function keptPackageVersions(state: PersistedState): Set<string> {
   if (state.current) {
     versions.add(state.current.package.version);
   }
+  const lastGood = state.guard?.lastGood;
+  if (lastGood) {
+    versions.add(lastGood.package.version);
+  }
   return versions;
 }
 
@@ -805,7 +824,8 @@ async function pruneCaches(namespace: string): Promise<void> {
 /**
  * Packages and resources cached under an older host deploy must never run
  * over the files a newer deploy ships with (an offline launch would otherwise
- * boot the older cached package). A new bundled package version drops them.
+ * boot the older cached package). A new bundled package version drops them,
+ * and the guard state with them.
  */
 async function adoptHostDeploy(
   namespace: string,
@@ -1307,6 +1327,403 @@ function injectScript(src: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Boot guard (opt-in). Rolls back packages that keep booting without ever
+// reaching markBootSuccess().
+
+/** Unacknowledged boots before a package is blocked. Web, Android and iOS must agree. */
+const MAX_UNACKNOWLEDGED_BOOTS = 2;
+
+/**
+ * How long a tab's boot keeps other tabs from counting a boot of the same
+ * package (see joinBoot). Ample for a healthy bundle to reach
+ * markBootSuccess(); after it, a tab left open on a blank or crashed page no
+ * longer suppresses counting. Acknowledging later still works.
+ */
+const BOOT_WINDOW_MS = 30_000;
+
+const guardLockName = (namespace: string) => `airborne:${namespace}:guard`;
+const bootingLockName = (namespace: string, version: string) =>
+  `airborne:${namespace}:booting:${version}`;
+
+/**
+ * Window property holding this page's unacknowledged boot per namespace. The
+ * host page and the OTA bundle each carry their own copy of this module, so
+ * the session lives on the window where both copies find it.
+ */
+const BOOT_SESSIONS_KEY = '__AIRBORNE_BOOT__';
+
+interface GuardState {
+  /** The host deploy (bundled package version) this state belongs to. */
+  binary: string;
+  /** Package version booted and not yet acknowledged. */
+  pending?: string;
+  /** Unacknowledged boots of `pending`. */
+  attempts: number;
+  /** Package version that must not boot. */
+  blocked?: string;
+  /** Release config of the package last acknowledged by markBootSuccess. */
+  lastGood?: ReleaseConfig;
+}
+
+/**
+ * Shared between module copies that may come from different SDK releases, so
+ * the behaviour sits in closures made by the copy that booted, and the shape
+ * stays minimal.
+ */
+interface BootSession {
+  /** Package version this page booted. */
+  version: string;
+  /**
+   * Ends the session and records the acknowledgement. Copies from older SDK
+   * releases return nothing.
+   */
+  acknowledge: () => Promise<void> | void;
+  /** Ends the session without acknowledging. Idempotent. */
+  end: () => void;
+}
+
+/** This page's boot sessions, if any boot was tracked. */
+function existingBootSessions(): Record<string, BootSession> | undefined {
+  const host = window as unknown as Record<
+    string,
+    Record<string, BootSession> | undefined
+  >;
+  return host[BOOT_SESSIONS_KEY];
+}
+
+function bootSessions(): Record<string, BootSession> {
+  const existing = existingBootSessions();
+  if (existing) {
+    return existing;
+  }
+  const sessions = emptyRecord<BootSession>();
+  Object.defineProperty(window, BOOT_SESSIONS_KEY, {
+    value: sessions,
+    configurable: true,
+    enumerable: false,
+    writable: false,
+  });
+  return sessions;
+}
+
+/** This page's unacknowledged boot of `namespace`, if any. */
+function bootSessionOf(namespace: string): BootSession | undefined {
+  return ownEntry(existingBootSessions(), namespace);
+}
+
+/** Forgets this page's earlier boot of the namespace, if any. */
+function endBootSession(namespace: string): void {
+  bootSessionOf(namespace)?.end();
+}
+
+function sanitizeGuard(value: unknown): GuardState | undefined {
+  if (!isObject(value) || typeof value.binary !== 'string') {
+    return undefined;
+  }
+  const guard: GuardState = {
+    binary: value.binary,
+    attempts: isFiniteNumber(value.attempts) ? value.attempts : 0,
+  };
+  if (typeof value.pending === 'string') {
+    guard.pending = value.pending;
+  }
+  if (typeof value.blocked === 'string') {
+    guard.blocked = value.blocked;
+  }
+  if (isReleaseConfig(value.lastGood)) {
+    guard.lastGood = value.lastGood;
+  }
+  return guard;
+}
+
+/** A newly installed package that is not the blocked one lifts the block. */
+function liftBlock(
+  guard: GuardState | undefined,
+  installedVersion: string
+): GuardState | undefined {
+  if (!guard?.blocked || guard.blocked === installedVersion) {
+    return guard;
+  }
+  return { ...guard, blocked: undefined };
+}
+
+/** Too many unacknowledged boots of `pending`: block it. */
+function rollBack(guard: GuardState): GuardState {
+  const failed = guard.pending;
+  const next: GuardState = { ...guard, pending: undefined, attempts: 0 };
+  if (failed !== undefined && failed === guard.lastGood?.package.version) {
+    // The fallback itself failed. Dropping it sends the next boot to the
+    // bundled package instead of bouncing between two broken ones.
+    next.lastGood = undefined;
+    next.blocked = guard.blocked ?? failed;
+  } else {
+    next.blocked = failed;
+  }
+  return next;
+}
+
+async function isLockHeld(locks: LockManager, name: string): Promise<boolean> {
+  const snapshot = await locks.query();
+  return (snapshot.held ?? []).some((lock) => lock.name === name);
+}
+
+/** Whether this page or another live tab is still inside a boot of `version`. */
+async function isBooting(namespace: string, version: string): Promise<boolean> {
+  if (bootSessionOf(namespace)?.version === version) {
+    return true;
+  }
+  const locks = navigatorLocks();
+  if (!locks) {
+    return false;
+  }
+  try {
+    return await isLockHeld(locks, bootingLockName(namespace, version));
+  } catch {
+    return false;
+  }
+}
+
+function hasTooManyAttempts(guard: GuardState): boolean {
+  return (
+    guard.pending !== undefined && guard.attempts >= MAX_UNACKNOWLEDGED_BOOTS
+  );
+}
+
+/**
+ * Loads the guard state for this boot. State from another host deploy is
+ * dropped, and a package with too many unacknowledged boots is blocked, unless
+ * a boot of it is still live and may yet acknowledge it: then the rollback
+ * waits for a later launch.
+ */
+async function openBootGuard(
+  options: AirborneWebOptions,
+  reporter: BootReporter
+): Promise<void> {
+  const { namespace } = options;
+  const binary = options.bundled.releaseConfig.package.version;
+  const guardOf = (state: PersistedState): GuardState =>
+    state.guard?.binary === binary ? state.guard : { binary, attempts: 0 };
+  const rolledBack = await withExclusiveLock(
+    guardLockName(namespace),
+    async () => {
+      const before = guardOf(readState(namespace));
+      const failed = before.pending;
+      let rollBackDue = false;
+      if (failed !== undefined && hasTooManyAttempts(before)) {
+        rollBackDue = !(await isBooting(namespace, failed));
+      }
+      // A commit, a resource update or an acknowledgement may have landed
+      // meanwhile: decide on the fresh state, and change only the guard.
+      let rollBackNow = false;
+      const saved = await updateState(namespace, (state) => {
+        // Another host deploy took over meanwhile: its guard is not ours.
+        if (state.bundledVersion !== binary) {
+          return null;
+        }
+        let guard = guardOf(state);
+        rollBackNow =
+          rollBackDue && guard.pending === failed && hasTooManyAttempts(guard);
+        if (rollBackNow) {
+          guard = rollBack(guard);
+        }
+        return { ...state, guard };
+      });
+      return reporter.saved(saved) && rollBackNow ? failed : undefined;
+    }
+  );
+  if (rolledBack !== undefined) {
+    emit(options, { type: 'rollback', packageVersion: rolledBack });
+  }
+}
+
+/** With the guard off, leftover state must not block anything if it is re-enabled. */
+async function discardBootGuard(
+  namespace: string,
+  bundledVersion: string,
+  reporter: BootReporter
+): Promise<void> {
+  const saved = await updateState(namespace, (state) =>
+    state.guard && state.bundledVersion === bundledVersion
+      ? { ...state, guard: undefined }
+      : null
+  );
+  reporter.saved(saved);
+}
+
+/** The package to boot, substituting lastGood (or nothing) for a blocked one. */
+function selectPackage(state: PersistedState): ReleaseConfig | null {
+  const { current, guard } = state;
+  if (
+    !current ||
+    !guard?.blocked ||
+    current.package.version !== guard.blocked
+  ) {
+    return current;
+  }
+  const lastGood = guard.lastGood;
+  if (lastGood && lastGood.package.version !== guard.blocked) {
+    return lastGood;
+  }
+  return null;
+}
+
+/**
+ * Takes this tab's shared `booting` lock for `version` and, still inside the
+ * guard lock, calls `count` with whether another live tab was already booting
+ * it (then this boot is the same attempt and must not count against the
+ * release). Resolves to the release of the booting lock.
+ */
+async function joinBoot(
+  namespace: string,
+  version: string,
+  count: (othersBooting: boolean) => Promise<void>
+): Promise<() => void> {
+  const locks = navigatorLocks();
+  if (!locks) {
+    await count(false);
+    return () => {};
+  }
+  const name = bootingLockName(namespace, version);
+  let counted = false;
+  try {
+    return await locks.request(guardLockName(namespace), async () => {
+      const othersBooting = await isLockHeld(locks, name);
+      const release = await holdSharedLock(locks, name);
+      counted = true;
+      await count(othersBooting);
+      return release;
+    });
+  } catch {
+    if (!counted) {
+      await count(false);
+    }
+    return () => {};
+  }
+}
+
+/** Counts an OTA boot right before its bundle runs. */
+async function trackBoot(
+  options: AirborneWebOptions,
+  releaseConfig: ReleaseConfig,
+  reporter: BootReporter
+): Promise<void> {
+  const { namespace } = options;
+  const version = releaseConfig.package.version;
+  const sessions = bootSessions();
+  // Native counts once per process: booting the same package again in this
+  // page is the same attempt.
+  if (ownEntry(sessions, namespace)?.version === version) {
+    return;
+  }
+  endBootSession(namespace);
+  const binary = options.bundled.releaseConfig.package.version;
+  const release = await joinBoot(namespace, version, async (othersBooting) => {
+    const saved = await updateState(namespace, (state) => {
+      const guard = state.guard ?? { binary, attempts: 0 };
+      // Nothing is counted into another host deploy's state.
+      if (state.bundledVersion !== binary || guard.binary !== binary) {
+        return null;
+      }
+      // Blocked by another tab since this one selected it: the block stands,
+      // and is not to be undone by an acknowledgement either.
+      if (guard.blocked === version) {
+        return null;
+      }
+      if (othersBooting && guard.pending === version) {
+        return null;
+      }
+      const attempts = guard.pending === version ? guard.attempts + 1 : 1;
+      return { ...state, guard: { ...guard, pending: version, attempts } };
+    });
+    reporter.saved(saved);
+  });
+  const timer = setTimeout(release, BOOT_WINDOW_MS);
+  const end = () => {
+    clearTimeout(timer);
+    release();
+    if (sessions[namespace] === session) {
+      delete sessions[namespace];
+    }
+  };
+  const session: BootSession = {
+    version,
+    end,
+    acknowledge: async () => {
+      // The booting lock is released only once the acknowledgement landed: a
+      // launch that no longer sees this boot must see the acknowledgement.
+      try {
+        await acknowledgeBoot(namespace, binary, releaseConfig, reporter);
+      } finally {
+        end();
+      }
+    },
+  };
+  sessions[namespace] = session;
+}
+
+/**
+ * Clears `pending` if it names this package, and records the package as
+ * lastGood. A `pending` naming another package belongs to another tab's boot
+ * and stays. lastGood is not recorded for a blocked package (another tab
+ * rolled it back meanwhile), nor when the package's cache lost files: then a
+ * rollback would boot a package that is not there, so the previous lastGood
+ * stays.
+ */
+async function acknowledgeBoot(
+  namespace: string,
+  binary: string,
+  releaseConfig: ReleaseConfig,
+  reporter: BootReporter
+): Promise<void> {
+  const version = releaseConfig.package.version;
+  // Read before taking any lock. This page holds the package's `using` lock,
+  // so no tab prunes it from here on.
+  const cached = await hasPackageFiles(namespace, releaseConfig);
+  let lostFiles = false;
+  // Inside the guard lock, so that the acknowledgement is ordered with the
+  // boot counting and rollback decisions of other launches.
+  const saved = await withExclusiveLock(guardLockName(namespace), () =>
+    updateState(namespace, (state) => {
+      const guard = state.guard;
+      // Another host deploy's guard, adopted since this boot, is not ours.
+      if (
+        !guard ||
+        state.bundledVersion !== binary ||
+        guard.binary !== binary
+      ) {
+        return null;
+      }
+      const next: GuardState = { ...guard };
+      let changed = false;
+      if (guard.pending === version) {
+        // A healthy boot never counts against its release.
+        next.pending = undefined;
+        next.attempts = 0;
+        changed = true;
+      }
+      // A substituted lastGood is already lastGood, so this only records new ones.
+      const recordable =
+        guard.blocked !== version &&
+        guard.lastGood?.package.version !== version;
+      if (recordable && cached) {
+        next.lastGood = releaseConfig;
+        changed = true;
+      } else if (recordable) {
+        lostFiles = true;
+      }
+      return changed ? { ...state, guard: next } : null;
+    })
+  );
+  reporter.saved(saved);
+  if (lostFiles) {
+    reporter.error(
+      `Airborne: package ${version} was acknowledged, but its cached files are gone; the previous last good package is kept`,
+      version
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * Web counterpart of the native boot flow: resolves the release config, races
@@ -1322,29 +1739,54 @@ export async function bootAirborne(
   // boot goes on downloading.
   const bundledVersion = bundled.releaseConfig.package.version;
   // What this page selects from: only state its own host deploy owns.
-  const readOwnState = () => ownState(readState(namespace), bundledVersion);
+  const readOwnState = () =>
+    ownState(
+      readState(namespace),
+      bundledVersion,
+      options.bootGuardEnabled === true
+    );
   await adoptHostDeploy(namespace, bundledVersion, reporter);
+  if (options.bootGuardEnabled) {
+    await openBootGuard(options, reporter).catch((error) => {
+      console.warn('Airborne: boot guard unavailable', error);
+    });
+  } else {
+    await discardBootGuard(namespace, bundledVersion, reporter);
+  }
   const known = readOwnState().current;
   const timeouts = (known ?? bundled.releaseConfig).config;
 
-  let latest = await fetchReleaseConfig(
+  let fetched = await fetchReleaseConfig(
     options,
     sanitizeTimeout(timeouts.release_config_timeout)
   );
   // An OTA package whose index or important files cannot be verified is not
   // run. It is treated as if no release had been served: the cached package,
   // or else the bundled one, boots. The bundled package itself is exempt.
-  if (latest && latest.package.version !== bundledVersion) {
-    const unverifiable = unverifiableRequiredFiles(latest);
+  if (fetched && fetched.package.version !== bundledVersion) {
+    const unverifiable = unverifiableRequiredFiles(fetched);
     if (unverifiable.length > 0) {
       const names = unverifiable.map((file) => file.file_path).join(', ');
       reporter.error(
-        `Airborne: refusing package ${latest.package.version}: no SHA-256 checksum for ${names}; booting the cached or bundled package instead`,
-        latest.package.version
+        `Airborne: refusing package ${fetched.package.version}: no SHA-256 checksum for ${names}; booting the cached or bundled package instead`,
+        fetched.package.version
       );
-      latest = null;
+      fetched = null;
     }
   }
+
+  // A release naming the blocked package is refused outright.
+  const refused =
+    options.bootGuardEnabled === true &&
+    fetched !== null &&
+    readOwnState().guard?.blocked === fetched.package.version;
+  if (refused && fetched) {
+    emit(options, {
+      type: 'blocked-package',
+      packageVersion: fetched.package.version,
+    });
+  }
+  const latest = refused ? null : fetched;
 
   const live = new LiveRuntime(namespace);
   let pendingPackageVersion: string | undefined;
@@ -1419,7 +1861,7 @@ export async function bootAirborne(
   }
 
   let state = readOwnState();
-  let selected = state.current;
+  let selected = selectPackage(state);
   // The server rolled back to, or never moved past, what the page shipped with.
   const servesBundled = latest?.package.version === bundledVersion;
   /** The runtime of `candidate` and this page's hold on it, if it can run. */
@@ -1459,7 +1901,7 @@ export async function bootAirborne(
     // Another tab may have committed a newer package and pruned this one
     // before this page held it. Select once more.
     const fresh = readOwnState();
-    const reselected = fresh.current;
+    const reselected = selectPackage(fresh);
     if (reselected?.package.version !== selected.package.version) {
       state = fresh;
       selected = reselected;
@@ -1504,8 +1946,8 @@ export async function bootAirborne(
     );
   }
   // The package running may be another one: the latest did not make it in
-  // time, or the server could not be reached. Its lazy files that are still
-  // missing are fetched as well.
+  // time, is blocked, or the server could not be reached. Its lazy files that
+  // are still missing are fetched as well.
   if (
     runtime !== null &&
     runtime.releaseConfig.package.version !== latest?.package.version
@@ -1515,6 +1957,12 @@ export async function bootAirborne(
     );
   }
 
+  // Bundled boots are never tracked.
+  if (options.bootGuardEnabled && resolved.source === 'ota') {
+    await trackBoot(options, resolved.releaseConfig, reporter);
+  } else {
+    endBootSession(namespace);
+  }
   try {
     await injectScript(resolved.bundlePath);
   } catch (error) {
@@ -1522,7 +1970,8 @@ export async function bootAirborne(
       throw error;
     }
     // For example a Content-Security-Policy whose script-src lacks blob:.
-    // The bundled package runs instead.
+    // The bundled package runs instead, and must not acknowledge this one.
+    endBootSession(namespace);
     const failedVersion = resolved.releaseConfig.package.version;
     reporter.error(
       `Airborne: could not run package ${failedVersion}, booting the bundled package instead: ${String(error)}`,
@@ -1541,6 +1990,17 @@ export async function bootAirborne(
 }
 
 /**
+ * Acknowledges the running OTA package once the app is usable (e.g. after its
+ * first render). Works from the OTA bundle's copy of this module as well as
+ * the host page's. Rejects when the namespace has not booted; a no-op unless
+ * the boot guard is on and an OTA package booted.
+ */
+export async function markBootSuccess(namespace: string): Promise<void> {
+  requireRuntime(namespace);
+  await bootSessionOf(namespace)?.acknowledge();
+}
+
+/**
  * @internal Test hooks. Not exported from the package entry points and not
  * part of the public API.
  */
@@ -1551,4 +2011,5 @@ export const __testing = {
       await Promise.all([...backgroundWork]);
     }
   },
+  bootWindowMs: BOOT_WINDOW_MS,
 };

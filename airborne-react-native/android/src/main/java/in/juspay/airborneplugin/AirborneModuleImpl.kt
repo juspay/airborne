@@ -60,9 +60,25 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
         }
     }
 
+    fun markBootSuccess(namespace: String, promise: Promise) {
+        val airborne = Airborne.airborneObjectMap[namespace]
+        if (airborne == null) {
+            promise.reject("AIRBORNE_ERROR", "Unknown Airborne namespace: $namespace")
+            return
+        }
+        try {
+            // Never throws for boot guard failures; those are reported through onEvent.
+            airborne.markBootSuccess()
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("AIRBORNE_ERROR", "Failed to mark boot success: ${e.message}", e)
+        }
+    }
+
     fun getBundlePath(namespace: String, promise: Promise) {
         try {
-            val path = Airborne.airborneObjectMap[namespace]?.getBundlePath()
+            // A query from running JS: must not count as a boot attempt.
+            val path = Airborne.airborneObjectMap[namespace]?.currentBundlePath()
             promise.resolve(path)
         } catch (e: Exception) {
             promise.reject("AIRBORNE_ERROR", "Failed to get bundle path: ${e.message}", e)

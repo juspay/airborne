@@ -28,8 +28,9 @@ init(releaseConfigURL: String, delegate: AirborneDelegate? = nil)
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `getBundlePath` | `func getBundlePath() -> String` | Returns the file system path to the current index bundle (the OTA-updated version, or the bundled fallback). Exposed through the `Airborne.h` bridge. |
+| `getBundlePath` | `func getBundlePath() -> String` | Returns the `file://` URL string of the current index bundle (the OTA-updated version, or the bundled fallback). Exposed through the `Airborne.h` bridge. With `bootGuardEnabled()`, the first call per process records a boot attempt, so call it only to load the bundle. |
 | `getFileContent` | `func getFileContent(_ filePath: String) -> String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. An absolute path or one with a `..` component is not read. |
+| `markBootSuccess` | `func markBootSuccess()` | Boot guard: acknowledges that the JS loaded from `getIndexBundlePath()` booted healthily. Call it once the first screen has rendered. No-op when the guard is off. The JS `markBootSuccess(namespace)` does the same through the bridge. |
 | `getReleaseConfig` | `func getReleaseConfig() -> String` | Returns the current release config as a stringified JSON. |
 
 ## AirborneDelegate
@@ -46,6 +47,7 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
     @objc optional func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String) -> Void
     @objc optional func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String) -> Void
     @objc optional func onAllLazyPackageDownloadsComplete() -> Void
+    @objc optional func bootGuardEnabled() -> Bool
 }
 ```
 
@@ -60,6 +62,7 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 | `startApp` | `func startApp(indexBundleURL: URL?)` | Called when the OTA boot completes successfully. `indexBundleURL` is the file URL of the index bundle to boot from. Start React Native here. Invoked on a background queue — dispatch UI work to the main queue. Boot completion occurs even if some downloads failed or timed out. |
 | `onEvent` | `func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String)` | Receives lifecycle and error events. See the [callbacks & events reference](/docs/react-native-sdk/reference/callbacks-and-events) for the full catalogue. |
 | `onLazyPackageDownloadComplete` | `func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String)` | Called when an individual lazy package download completes (success or failure). |
+| `bootGuardEnabled` | `func bootGuardEnabled() -> Bool` | Opts in to the [boot guard](/docs/react-native-sdk/reference/javascript-api#boot-guard). Defaults to `false`. Read once, when the application manager for the namespace is created. |
 | `onAllLazyPackageDownloadsComplete` | `func onAllLazyPackageDownloadsComplete()` | Called when all lazy package downloads have completed. Use `onLazyPackageDownloadComplete` for individual results. |
 
 #### startApp parameters

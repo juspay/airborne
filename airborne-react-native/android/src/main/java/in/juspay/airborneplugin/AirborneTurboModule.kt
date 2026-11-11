@@ -22,6 +22,10 @@ class AirborneTurboModule(reactContext: ReactApplicationContext) :
     implementation.getFileContent(nameSpace, filePath, promise)
   }
 
+  override fun markBootSuccess(namespace: String, promise: Promise) {
+    implementation.markBootSuccess(namespace, promise)
+  }
+
   override fun getBundlePath(nameSpace: String, promise: Promise) {
     implementation.getBundlePath(nameSpace, promise)
   }

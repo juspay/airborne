@@ -70,6 +70,10 @@
     return [self.airborne getReleaseConfig];
 }
 
+- (void)markBootSuccess {
+    [self.airborne markBootSuccess];
+}
+
 #pragma mark - AirborneDelegate
 
 - (NSString *)namespace {

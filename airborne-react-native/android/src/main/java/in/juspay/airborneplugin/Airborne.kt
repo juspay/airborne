@@ -79,6 +79,8 @@ class Airborne(
 
     init {
         airborneObjectMap.put(airborneInterface.getNamespace(), this)
+        // Read once; the SDK caches it when the boot guard initialises.
+        applicationManager.bootGuardEnabled = airborneInterface.bootGuardEnabled()
         applicationManager.loadApplication(airborneInterface.getNamespace(), airborneInterface.getLazyDownloadCallback())
     }
 
@@ -87,10 +89,35 @@ class Airborne(
     }
 
     /**
+     * Boot guard: acknowledges that the running OTA package started healthily.
+     * No-op when the boot guard is off. Never throws.
+     */
+    @Keep
+    fun markBootSuccess() = applicationManager.markBootSuccess()
+
+    /**
+     * Boot guard: records that the JS bundle is about to be handed to React Native.
+     * [getBundlePath] calls this. Hosts that load the path received in
+     * [AirborneInterface.startApp] instead should call it right before loading the bundle
+     * (not from Application.onCreate, which also runs for background process starts).
+     * Only the first call per process counts.
+     */
+    @Keep
+    fun prepareBoot() = applicationManager.prepareBoot()
+
+    /**
+     * Called by the React Native host when it loads the JS bundle (counts a boot attempt when
+     * the boot guard is on).
      * @return The path of the index bundle, or asset path fallback if empty.
      */
     @Keep
     fun getBundlePath(): String {
+        applicationManager.prepareBoot()
+        return currentBundlePath()
+    }
+
+    /** The bundle path without counting a boot attempt (for queries from JS). */
+    internal fun currentBundlePath(): String {
         val filePath = applicationManager.getIndexBundlePath()
         return filePath.ifEmpty { "assets://${applicationManager.getBundledIndexPath().ifEmpty { "index.android.bundle" }}" }
     }

@@ -1,7 +1,7 @@
 /**
  * In-memory stand-ins for the browser APIs the web loader uses: localStorage,
  * Cache Storage, fetch, crypto.subtle, <script> injection, blob URLs and
- * navigator.locks. Shared by the web loader tests.
+ * navigator.locks. Shared by the web loader and boot guard tests.
  */
 import { createHash, webcrypto } from 'node:crypto';
 

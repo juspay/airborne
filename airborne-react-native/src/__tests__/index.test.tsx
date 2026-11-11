@@ -27,6 +27,7 @@ describe('with the native module linked', () => {
     readReleaseConfig: jest.fn(async () => '{"version":"1"}'),
     getFileContent: jest.fn(async () => 'content'),
     getBundlePath: jest.fn(async () => '/data/index.bundle'),
+    markBootSuccess: jest.fn(async () => undefined),
   };
   const registry = { get: jest.fn(() => native) };
   let api: Api;
@@ -53,6 +54,11 @@ describe('with the native module linked', () => {
     await expect(api.getBundlePath('shop')).resolves.toBe('/data/index.bundle');
     expect(native.getBundlePath).toHaveBeenCalledWith('shop');
   });
+
+  it('forwards markBootSuccess with the namespace', async () => {
+    await expect(api.markBootSuccess('shop')).resolves.toBeUndefined();
+    expect(native.markBootSuccess).toHaveBeenCalledWith('shop');
+  });
 });
 
 describe('without the native module', () => {
@@ -60,6 +66,19 @@ describe('without the native module', () => {
     const api = loadWith({ get: () => null });
     expect(() => api.readReleaseConfig('shop')).toThrow(LINKING_ERROR);
     expect(() => api.getBundlePath('shop')).toThrow(LINKING_ERROR);
+  });
+
+  it('rejects markBootSuccess instead of throwing', async () => {
+    const unlinked = loadWith({ get: () => null });
+    let call: Promise<void> | undefined;
+    expect(() => {
+      call = unlinked.markBootSuccess('shop');
+    }).not.toThrow();
+    await expect(call).rejects.toThrow(LINKING_ERROR);
+
+    // A native SDK from before markBootSuccess existed.
+    const older = loadWith({ get: () => ({ getBundlePath: jest.fn() }) });
+    await expect(older.markBootSuccess('shop')).rejects.toThrow(TypeError);
   });
 
   it('throws the linking error when TurboModuleRegistry is undefined', () => {

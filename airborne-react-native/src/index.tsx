@@ -46,3 +46,11 @@ export function getBundlePath(nameSpace: string): Promise<string> {
 }
 
 export default Airborne;
+
+/**
+ * Async, so that an unlinked native module or one without this method (an
+ * older native SDK) rejects the promise instead of throwing.
+ */
+export async function markBootSuccess(namespace: string): Promise<void> {
+  return Airborne.markBootSuccess(namespace);
+}

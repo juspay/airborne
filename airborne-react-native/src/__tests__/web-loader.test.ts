@@ -1558,7 +1558,10 @@ describe('releases without checksums', () => {
 describe('web entry', () => {
   it('exposes only the public API', () => {
     const entry = require('../web');
-    expect(Object.keys(entry)).toEqual(['bootAirborne']);
+    expect(Object.keys(entry).sort()).toEqual([
+      'bootAirborne',
+      'markBootSuccess',
+    ]);
     const manifest = require('../../package.json');
     expect(manifest.exports['./web']).toEqual({
       types: './lib/typescript/src/web/index.d.ts',

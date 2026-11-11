@@ -289,6 +289,15 @@ The `reactStarted` guard in `bootReactNative` means a **second** `startApp` call
 `namespace()` must match the `<application/namespace-name>` segment of your release URL and your bundled config location.
 :::
 
+## Optional: boot guard
+
+The [boot guard](/docs/react-native-sdk/reference/javascript-api#boot-guard) is off by default. In the bare flow you wire it yourself:
+
+- **Android:** set `appManager.bootGuardEnabled = true` before `loadApplication(...)`. In `resolveBundlePath()`, call `appManager.prepareBoot()` right before returning the bundle path, because `getIndexBundlePath()` alone does not count a boot. Call `appManager.markBootSuccess()` once the first screen has rendered.
+- **iOS:** return `true` from `bootGuardEnabled()` in your `AirborneDelegate`. Boots are counted when the SDK delivers the URL to `startApp(indexBundleURL:)`. Call `markBootSuccess()` on `AirborneServices` once the first screen has rendered.
+
+From JavaScript, `markBootSuccess(namespace)` from `airborne-react-native` does the same if the RN bridge module is linked.
+
 ## Verify
 
 1. Ship a build with a bundled `release_config.json` and note the marker text visible on screen.

@@ -230,6 +230,39 @@ Fired on triggering the boot callback.
 }
 ```
 
+## Boot guard events
+
+Emitted only when the host opts in to the [boot guard](/docs/react-native-sdk/reference/javascript-api#boot-guard). The other payload fields follow the standard shape above.
+
+### rollback
+
+A package booted twice without `markBootSuccess` and is now blocked. This launch runs the last acknowledged package, or the bundled one.
+
+```typescript
+{ level: "info", key: "rollback", value: { packageVersion: "v7" } }
+```
+
+### blocked-package
+
+The server still serves a blocked package. It is not installed. On iOS, `value.source` says where it was refused: `installed`, `staged`, `release_config` or `download`.
+
+```typescript
+{ level: "info", key: "blocked-package", value: { packageVersion: "v7" } }
+```
+
+### Guard diagnostics
+
+The guard reports its own state changes and failures. None of them stop the app from booting.
+
+| Platform | Key | Level | Meaning |
+| --- | --- | --- | --- |
+| Android | `boot_guard_error` | error | State could not be read or written, or a snapshot or last-good file failed. |
+| Android | `boot_guard_info` | info | Informational, for example a snapshot skipped because a newer package was installed during the session. |
+| iOS | `boot_guard_reset` | info | State discarded (`reason`: binary changed or guard turned off). |
+| iOS | `boot_guard_unblocked` | info | A different server-delivered package was installed, so the block was lifted. |
+| iOS | `boot_guard_snapshot_skipped` | info | No snapshot taken because a newer package was installed during the session. |
+| iOS | `boot_guard_snapshot_failed`, `boot_guard_persist_failed`, `boot_guard_reset_failed` | error | Snapshot, state write or reset failed. The previous last-good package is kept. |
+
 ## Error events
 
 ### read_release_config_error

@@ -37,6 +37,23 @@ static AJPApplicationManager *ExistingManager(NSString *ns, RCTPromiseRejectBloc
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED
+- (void)markBootSuccess:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
+#else
+RCT_EXPORT_METHOD(markBootSuccess:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+#endif
+    @try {
+        AJPApplicationManager *manager = ExistingManager(ns, reject);
+        if (!manager) {
+            return;
+        }
+        [manager markBootSuccess];
+        resolve(nil);
+    } @catch (NSException *exception) {
+        reject(AirborneErrorCode, exception.reason, nil);
+    }
+}
+
+#ifdef RCT_NEW_ARCH_ENABLED
 - (void)readReleaseConfig:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
 #else
 RCT_EXPORT_METHOD(readReleaseConfig:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
@@ -90,7 +107,8 @@ RCT_EXPORT_METHOD(getBundlePath:(NSString *)ns resolve:(RCTPromiseResolveBlock)r
         }
         // Same resolution as AirborneServices.getIndexBundlePath(); the host index name comes from
         // the manager's delegate (AirborneServices forwards AirborneDelegate.indexBundleName).
-        resolve([manager getIndexBundleURL].absoluteString);
+        // JS only reads the path here, so this does not record a boot for the boot guard.
+        resolve([manager currentIndexBundleURL].absoluteString);
     } @catch (NSException *exception) {
         reject(AirborneErrorCode, exception.reason, nil);
     }

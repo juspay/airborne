@@ -24,18 +24,30 @@ export interface ReleaseConfig {
   resources: ReleaseFile[];
 }
 
-export interface AirborneBootEvent {
-  /**
-   * Something failed without stopping the boot: an OTA bundle that could not
-   * run (the bundled package ran instead), a package whose files failed to
-   * download in the background (once per package and boot), or state that
-   * could not be saved, which leaves downloads unremembered.
-   */
-  type: 'error';
-  message: string;
-  /** The package concerned, when there is one. */
-  packageVersion?: string;
-}
+export type AirborneBootEvent =
+  | {
+      /**
+       * `rollback`: a package failed to acknowledge its boot too many times
+       * and is now blocked. `blocked-package`: the server still serves a
+       * blocked package.
+       */
+      type: 'rollback' | 'blocked-package';
+      packageVersion: string;
+    }
+  | {
+      /**
+       * Something failed without stopping the boot: an OTA bundle that could
+       * not run (the bundled package ran instead), a package whose files
+       * failed to download in the background (once per package and boot), an
+       * acknowledged package whose cached files were gone (not kept as the
+       * last good package), or state that could not be saved, which leaves
+       * downloads and the boot guard unremembered.
+       */
+      type: 'error';
+      message: string;
+      /** The package concerned, when there is one. */
+      packageVersion?: string;
+    };
 
 export interface AirborneWebOptions {
   /** `https://host/release/<organisation>/<application>` */
@@ -53,6 +65,12 @@ export interface AirborneWebOptions {
     /** Base URL that `file_path`s in `releaseConfig` resolve against. */
     baseUrl: string;
   };
+  /**
+   * Opt-in boot guard. OTA packages that boot without a `markBootSuccess()`
+   * call too many times are blocked, and the last acknowledged package (or the
+   * bundled one) runs instead.
+   */
+  bootGuardEnabled?: boolean;
   onEvent?: (event: AirborneBootEvent) => void;
 }
 

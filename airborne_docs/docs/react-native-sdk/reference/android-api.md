@@ -32,6 +32,8 @@ class Airborne(
 | `getBundlePath` | `fun getBundlePath(): String` | Returns the path of the index JS bundle. Falls back to the bundled asset path (`assets://...`, defaulting to `index.android.bundle`) when no downloaded bundle exists. Used by the React Native host's `getJSBundleFile()`. |
 | `getFileContent` | `fun getFileContent(filePath: String): String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. Throws `IllegalArgumentException` for an empty or absolute path or one with a `..` component. |
 | `getReleaseConfig` | `fun getReleaseConfig(): String` | Returns the current release config as a stringified JSON. |
+| `markBootSuccess` | `fun markBootSuccess()` | Boot guard: acknowledges that the running OTA package started healthily. No-op when the guard is off. The JS `markBootSuccess(namespace)` calls this. |
+| `prepareBoot` | `fun prepareBoot()` | Boot guard: records that the bundle is about to be handed to React Native. `getBundlePath()` calls it. Hosts that load the path received in `startApp` should call it right before loading the bundle (not from `Application.onCreate`). Only the first call per process counts. |
 | `setSslConfig` | `fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager)` | Sets a custom SSL configuration for mTLS. Call before any network requests are made to enable client-certificate authentication. |
 
 ## AirborneInterface
@@ -43,6 +45,7 @@ abstract class AirborneInterface {
     open fun getNamespace(): String
     open fun getDimensions(): HashMap<String, String>
     open fun startApp(indexPath: String)
+    open fun bootGuardEnabled(): Boolean
     open fun onEvent(level: String, label: String, key: String, value: JSONObject, category: String, subCategory: String)
     open fun getLazyDownloadCallback(): LazyDownloadCallback
 }
@@ -55,6 +58,7 @@ abstract class AirborneInterface {
 | `getNamespace` | `fun getNamespace(): String` | Returns the application namespace. Must match the namespace segment of your release URL; the SDK uses it to identify and store the correct bundle. Defaults to `"airborne-example"`. |
 | `getDimensions` | `fun getDimensions(): HashMap<String, String>` | Returns custom dimensions sent with the release config request (the `x-dimension` header) for targeting — e.g. app version or user segment. Defaults to an empty map. |
 | `startApp` | `fun startApp(indexPath: String)` | Called when the boot completes and the bundle is ready. `indexPath` is the path to the index bundle to boot from. Store it and trigger your boot-complete logic. |
+| `bootGuardEnabled` | `fun bootGuardEnabled(): Boolean` | Opts in to the [boot guard](/docs/react-native-sdk/reference/javascript-api#boot-guard). Defaults to `false`. Read once, when `Airborne` is constructed. |
 | `onEvent` | `fun onEvent(level: String, label: String, key: String, value: JSONObject, category: String, subCategory: String)` | Receives lifecycle and error events for logging/analytics. See the [callbacks & events reference](/docs/react-native-sdk/reference/callbacks-and-events) for the full catalogue and field meanings. |
 | `getLazyDownloadCallback` | `fun getLazyDownloadCallback(): LazyDownloadCallback` | Returns a `LazyDownloadCallback` (`in.juspay.airborne`) notified as lazy files install. Defaults to a no-op implementation that logs install status. |
 

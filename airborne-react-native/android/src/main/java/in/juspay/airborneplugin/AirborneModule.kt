@@ -27,6 +27,11 @@ class AirborneModule(reactContext: ReactApplicationContext) :
   }
 
   @ReactMethod
+  fun markBootSuccess(namespace: String, promise: Promise) {
+    implementation.markBootSuccess(namespace, promise)
+  }
+
+  @ReactMethod
   fun getBundlePath(namespace: String, promise: Promise) {
     implementation.getBundlePath(namespace, promise)
   }

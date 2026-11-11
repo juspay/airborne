@@ -56,6 +56,9 @@ This implementation provides a React Native module for Airborne that:
 1. **readReleaseConfig(namespace/appId)** - Returns the release configuration as a stringified JSON
 2. **getFileContent(namespace/appId, filePath)** - Reads content from a file in the OTA bundle
 3. **getBundlePath(namespace/appId)** - Returns the path to the JavaScript bundle
+4. **markBootSuccess(namespace/appId)** - Acknowledges a healthy OTA boot when the opt-in boot guard is enabled natively (`bootGuardEnabled()` on `AirborneInterface` / `AirborneDelegate`)
+
+On web, the package's `browser` build exports `bootAirborne(options)` for the host page to load the OTA bundle, plus the same functions above and a web-only `getFileUrl`. See the [JavaScript API docs](https://airborne.juspay.in/docs/react-native-sdk/reference/javascript-api).
 
 ## Usage
 

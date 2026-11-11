@@ -93,9 +93,51 @@ const handleGetFileContent = async () => {
 };
 ```
 
+## markBootSuccess
+
+Acknowledges that the running OTA package booted healthily. Only needed when the host app has opted in to the [boot guard](#boot-guard); otherwise it is a no-op.
+
+```typescript
+function markBootSuccess(namespace: string): Promise<void>
+```
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `namespace` | `string` | The application/namespace identifier the native SDK was initialized with. |
+
+**Returns:** `Promise<void>`. Rejects if the namespace is unknown: on native, no SDK instance exists for it; on web, `bootAirborne` has not run for it. Resolves without doing anything when the guard is off or the launch booted the bundled package. On web it works from the OTA bundle even though that bundle carries its own copy of the package.
+
+Call it once, after your first screen has rendered:
+
+```typescript
+import { useEffect } from 'react';
+import { markBootSuccess } from 'airborne-react-native';
+
+export default function App() {
+  useEffect(() => {
+    markBootSuccess('airborne-example').catch(console.error);
+  }, []);
+  // ...
+}
+```
+
+### Boot guard
+
+The boot guard is **off by default**. Turn it on natively: on Android, return `true` from `AirborneInterface.bootGuardEnabled()`; on iOS, from `AirborneDelegate.bootGuardEnabled()`. On web, pass `bootGuardEnabled: true` to `bootAirborne`. When it is on:
+
+- A launch counts as an attempt when an OTA package's bundle is handed over for execution. On Android this is `Airborne.getBundlePath()` (the React Native host's `getJSBundleFile`) or `Airborne.prepareBoot()`. On iOS it is the bundle URL delivered to `startApp(indexBundleURL:)` or returned by `getIndexBundlePath()`. On web it is `bootAirborne`. Only the first such call per process (on web, per page) counts. The JS `getBundlePath()` never counts, and bundled boots are never counted.
+- Android process starts that never load the bundle, such as a push wake-up without headless JS, do not count. On iOS, the SDK cannot tell whether the host loads the URL it delivers to `startApp`, so a launch where `startApp` fires but the host does not run JS, such as a background launch, still counts.
+- On web, a tab that is still starting the same package does not count against it for up to 30 seconds, so opening several tabs at once is safe.
+- `markBootSuccess` clears the attempt count and records the package as the last good one.
+- If a package has two unacknowledged boots, the next launch blocks it. The app then runs the last acknowledged package if there is one, otherwise the bundled package, and emits a `rollback` event.
+- The block is lifted only once the server delivers a different package and it has been fully installed. A blocked version that is still being served emits `blocked-package` and is not installed.
+- Guard state is discarded when the app binary changes (on web, when the bundled package version changes) or when the guard is turned off.
+- Two launches that end before `markBootSuccess` runs are treated as failed boots, including quick kills or reloads. The threshold is fixed at two on every platform.
+- If the guard cannot save its state, for example because storage is full, it stays inactive for that launch and reports an error event (`boot_guard_error` / `boot_guard_persist_failed` on native, an `error` event on web). It never stops the app from booting.
+
 ## Web
 
-On web, the package resolves to a browser build (the `browser` export condition). There is no native module: the host page boots the OTA bundle itself with `bootAirborne`, and the functions above read what it loaded. `readReleaseConfig`, `getFileContent` and `getBundlePath` keep the same signatures. `getFileContent` fetches the file and rejects on HTTP errors or unknown paths.
+On web, the package resolves to a browser build (the `browser` export condition). There is no native module: the host page boots the OTA bundle itself with `bootAirborne`, and the functions above read what it loaded. `readReleaseConfig`, `getFileContent`, `getBundlePath` and `markBootSuccess` keep the same signatures. `getFileContent` fetches the file and rejects on HTTP errors or unknown paths.
 
 ```typescript
 // Host page
@@ -107,6 +149,7 @@ await bootAirborne({
   namespace: 'MyApp',
   dimensions: { app_version: '1.0.0' },
   bundled: { releaseConfig: bundledReleaseConfig, baseUrl: '/ota/' },
+  bootGuardEnabled: true,
   onEvent: (event) => console.log(event),
 });
 ```
@@ -120,7 +163,10 @@ Import `bootAirborne` from `airborne-react-native/web` in the host page. App cod
 - an OTA bundle could not run, so the bundled package runs instead;
 - a release was refused because its index or an important file lists no checksum, so the cached or bundled package runs instead;
 - state could not be saved to `localStorage`;
-- a package or its lazy files failed to download in the background (reported once per package per load).
+- a package or its lazy files failed to download in the background (reported once per package per load);
+- an acknowledged package's cached files were gone, so it was not recorded as last good.
+
+With the boot guard on, it also receives `{ type: 'rollback' | 'blocked-package', packageVersion }`, with the same meaning as the native [boot guard events](/docs/react-native-sdk/reference/callbacks-and-events#boot-guard-events).
 
 The OTA bundle runs from a `blob:` URL, so a Content Security Policy must allow `blob:` in `script-src`. Allow it in `connect-src` too if the app reads files with `getFileContent`.
 
@@ -133,7 +179,7 @@ All requests are cross-origin from the page, so two servers need CORS:
 
 ## Default export
 
-On native, the package's default export is the underlying native module. Prefer the named functions above; they are thin wrappers over `Airborne.readReleaseConfig`, `Airborne.getFileContent`, and `Airborne.getBundlePath`. On web, the default export is a plain object with the same functions plus `getFileUrl`.
+On native, the package's default export is the underlying native module. Prefer the named functions above; they are thin wrappers over `Airborne.readReleaseConfig`, `Airborne.getFileContent`, `Airborne.getBundlePath` and `Airborne.markBootSuccess`. On web, the default export is a plain object with the same functions plus `getFileUrl`.
 
 ```typescript
 import Airborne from 'airborne-react-native';

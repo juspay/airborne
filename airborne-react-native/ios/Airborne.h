@@ -13,6 +13,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)getFileContent:(NSString *)filePath;
 - (NSString *)getReleaseConfig;
 
+/// Acknowledges that the JS loaded from `getBundlePath` booted successfully (opt-in boot guard,
+/// see `AirborneDelegate.bootGuardEnabled`). Call once the first screen has rendered.
+- (void)markBootSuccess;
+
 @end
 
 NS_ASSUME_NONNULL_END

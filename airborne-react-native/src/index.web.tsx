@@ -1,6 +1,6 @@
-import { bootAirborne, requireRuntime } from './web/loader';
+import { bootAirborne, markBootSuccess, requireRuntime } from './web/loader';
 
-export { bootAirborne };
+export { bootAirborne, markBootSuccess };
 export type {
   AirborneBootEvent,
   AirborneWebOptions,
@@ -52,6 +52,7 @@ export async function getFileUrl(
 }
 
 const Airborne = {
+  markBootSuccess,
   readReleaseConfig,
   getFileContent,
   getBundlePath,
