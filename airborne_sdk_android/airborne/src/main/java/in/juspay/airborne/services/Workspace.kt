@@ -28,13 +28,17 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 
 @Keep
 open class Workspace {
     val path: String
     var root: File
     val cacheRoot: File
+    private val sharedPrefsName: String
     private val sharedPrefsList: List<SharedPreferences>
+    private val scopedSharedPrefs: ConcurrentHashMap<String, SharedPreferences>
+    private val appContext: Context
     private val assetManager: AssetManager
     private val fromAirborne: Boolean
 
@@ -43,7 +47,7 @@ open class Workspace {
         this.fromAirborne = fromAirborne
         root = mkRoot(ctx, this.path)
         cacheRoot = mkCacheRoot(ctx, this.path)
-        val sharedPrefsName = this.path.replace('/', '_')
+        sharedPrefsName = this.path.replace('/', '_')
         assetManager = ctx.assets
         val spl = ArrayList<SharedPreferences>()
         if (fallbackSharedPreferencesJuspay == null) {
@@ -63,6 +67,8 @@ open class Workspace {
             fallbackSharedPreferencesGodel?.let { spl.add(it) }
         }
         sharedPrefsList = spl
+        scopedSharedPrefs = ConcurrentHashMap()
+        appContext = ctx.applicationContext ?: ctx
     }
 
     protected constructor(workspace: Workspace) {
@@ -70,7 +76,10 @@ open class Workspace {
         fromAirborne = workspace.fromAirborne
         root = workspace.root
         cacheRoot = workspace.cacheRoot
+        sharedPrefsName = workspace.sharedPrefsName
         sharedPrefsList = workspace.sharedPrefsList
+        scopedSharedPrefs = workspace.scopedSharedPrefs
+        appContext = workspace.appContext
         assetManager = workspace.assetManager
     }
 
@@ -138,6 +147,27 @@ open class Workspace {
         }
     }
 
+    // Each scope is its own prefs file, so keys kept there neither grow nor force a load of the main file.
+    fun getFromSharedPreference(key: String?, default: String?, scope: String): String? =
+        scopedSharedPreference(scope).getString(key, default)
+
+    fun writeToSharedPreference(key: String?, value: String?, scope: String): Unit? = key?.let {
+        scopedSharedPreference(scope).edit()
+            .putString(it, value)
+            .apply()
+    }
+
+    fun removeFromSharedPreference(key: String?, scope: String): Unit? = key?.let {
+        scopedSharedPreference(scope).edit().remove(it).apply()
+    }
+
+    private fun scopedSharedPreference(scope: String): SharedPreferences {
+        require(SCOPE_PATTERN.matches(scope)) { "Invalid shared preference scope: $scope" }
+        return scopedSharedPrefs.getOrPut(scope) {
+            appContext.getSharedPreferences("$sharedPrefsName.$scope", Context.MODE_PRIVATE)
+        }
+    }
+
     fun getKeysInSharedPreference(): Set<String> {
         val keysSet = HashSet<String>()
         for (sharedPref in sharedPrefsList) {
@@ -180,8 +210,12 @@ open class Workspace {
     }
 
     companion object {
+        // Keys read while the SDK boots; keep it small, it is loaded on every startup.
+        const val BOOTUP_PREFS_SCOPE = "bootup_prefs"
+
         private const val TAG = "Workspace"
         private const val FALLBACK_WORKSPACE = "juspay"
+        private val SCOPE_PATTERN = Regex("[A-Za-z0-9_]{1,32}")
 
         private var fallbackSharedPreferencesJuspay: SharedPreferences? = null
         private var fallbackSharedPreferencesGodel: SharedPreferences? = null
