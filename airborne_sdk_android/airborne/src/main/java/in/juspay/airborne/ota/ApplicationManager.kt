@@ -14,7 +14,11 @@
 
 package `in`.juspay.airborne.ota
 
+import android.app.ActivityManager
+import android.app.Application
 import android.content.Context
+import android.os.Build
+import android.os.Process
 import android.util.Log
 import `in`.juspay.airborne.LazyDownloadCallback
 import `in`.juspay.airborne.network.NetUtils
@@ -55,6 +59,30 @@ class ApplicationManager(
     private val fromAirborne: Boolean = true,
     private val onPackageDownloaded: ((oldVersion: String, newVersion: String) -> Unit)? = null
 ) {
+    /**
+     * Opt-in boot guard. Set before [loadApplication]: the value is read once per process, when
+     * the first manager of this workspace initialises the guard; later changes (and the value of
+     * later managers) are ignored. Off by default (behaviour unchanged).
+     */
+    var bootGuardEnabled = false
+
+    /** Shared by every manager of this workspace in this process (see [BOOT_GUARDS]). */
+    @Volatile
+    private var bootGuard: BootGuard? = null
+
+    /** The config handed to JS in this process (may be a last-good or bundled substitute). */
+    @Volatile
+    private var bootConfig: ReleaseConfig? = null
+
+    /** The config installed on disk, before any boot guard substitution. */
+    @Volatile
+    private var installedConfig: ReleaseConfig? = null
+
+    private val bundledConfig: ReleaseConfig? by lazy {
+        ReleaseConfig.deSerialize(otaServices.fileProviderService.readFromAssets("release_config.json")).getOrNull()
+            ?: ReleaseConfig.deSerialize(readFromAssets("release_config.json")).getOrNull()
+    }
+
     var shouldUpdate = true
     private lateinit var netUtils: NetUtils
     private var releaseConfig: ReleaseConfig? = null
@@ -78,6 +106,7 @@ class ApplicationManager(
             trackInfo("init", JSONObject().put("client_id", clientId))
             val startTime = System.currentTimeMillis()
             try {
+                initBootGuard()
                 if (releaseConfig == null) {
                     val newRef = WeakReference(ctx)
                     val currentRef = CONTEXT_MAP[clientId]
@@ -97,7 +126,8 @@ class ApplicationManager(
                         Log.d(TAG, "Updates disabled, running w/o updating.")
                     }
                 }
-                val rc = releaseConfig!!
+                val rc = selectBootConfig(releaseConfig!!)
+                bootConfig = rc
                 indexFolderPath = getIndexFilePath(rc.pkg.index?.filePath ?: "")
                 indexPathWaitTask.complete()
                 val js = readSplit(rc.pkg.index?.filePath ?: "")
@@ -151,6 +181,160 @@ class ApplicationManager(
         return indexFolderPath
     }
 
+    /**
+     * Boot guard: records that the JS bundle is being handed to the JS runtime. Call it where
+     * the host loads the bundle (not from Application.onCreate), so background process starts
+     * are not counted. Only the first call per process counts; bundled boots are never counted.
+     */
+    fun prepareBoot() {
+        getIndexBundlePath()
+        val guard = bootGuard ?: return
+        guard.prepareBoot(bootedPackage(guard))
+    }
+
+    /**
+     * What [prepareBoot] hands to the guard: the package booted in this process, or null when
+     * the boot is never tracked (guard off, bundled package, missing index).
+     */
+    private fun bootedPackage(guard: BootGuard): BootGuard.BootedPackage? {
+        val rc = bootConfig ?: return null
+        val version = BootFiles.trackedVersion(rc.pkg.version, indexFolderPath)
+        if (!guard.enabled || version == null) {
+            return null
+        }
+        return try {
+            val snapshotFiles = if (fromAirborne) {
+                rc.pkg.filePaths + rc.resources.filePaths
+            } else {
+                rc.pkg.filePaths
+            }
+            BootGuard.BootedPackage(
+                version = version,
+                indexPath = rc.pkg.index?.filePath ?: "",
+                config = rc.serialize(),
+                files = snapshotFiles
+            )
+        } catch (e: Exception) {
+            trackError(LogLabel.BOOT_GUARD_ERROR, "Cannot describe the booted package.", e)
+            null
+        }
+    }
+
+    /**
+     * Boot guard: acknowledges that the package booted in this process started healthily.
+     * The guard acknowledges the package it recorded in [prepareBoot], so this works from any
+     * manager of the workspace, including one re-created after a newer package was installed.
+     * Never throws; the pending attempt is always cleared even if the snapshot fails.
+     */
+    fun markBootSuccess() {
+        val guard = bootGuard ?: BOOT_GUARDS.find(bootGuardKey()) ?: return
+        try {
+            // The copy can take a while: keep it off the caller's (native modules) thread.
+            guard.markBootSuccess { snapshot -> doAsync { snapshot() } }
+        } catch (e: Exception) {
+            trackError(LogLabel.BOOT_GUARD_ERROR, "markBootSuccess failed.", e)
+        }
+    }
+
+    /**
+     * Attaches this manager to the process-wide guard of its workspace, creating it on first
+     * use. Re-created managers share the guard and its once-per-process boot session, so they
+     * cannot count more than one boot attempt per process.
+     */
+    private fun initBootGuard() {
+        if (bootGuard != null) {
+            return
+        }
+        val name = bootGuardKey()
+        val guard = try {
+            // Only process-scoped values reach the guard: the registry keeps it for the whole
+            // process and must not keep this manager (or an Activity context) alive.
+            val options = BootGuardOptions(
+                key = name,
+                enabled = bootGuardEnabled,
+                appContext = ctx.applicationContext ?: ctx,
+                packageDir = otaServices.fileProviderService.getFileFromInternalStorage("app/$PACKAGE_DIR_NAME"),
+                manifestFile = otaServices.fileProviderService.getFileFromInternalStorage("app/$PACKAGE_MANIFEST_FILE_NAME"),
+                useBundledAssets = otaServices.useBundledAssets
+            )
+            // Events go to the tracker of the manager that attached last (held weakly).
+            BOOT_GUARDS.attach(name, bootGuardListener) { listener -> createBootGuard(options, listener) }
+        } catch (e: Exception) {
+            // Best effort: without a guard the app boots exactly as with the guard off.
+            trackError(LogLabel.BOOT_GUARD_ERROR, "Boot guard unavailable.", e)
+            return
+        }
+        guard.initialize()
+        bootGuard = guard
+    }
+
+    /** SharedPreferences names cannot contain '/'; sanitise like Workspace does. */
+    private fun bootGuardKey(): String = otaServices.workspace.path.replace('/', '_')
+
+    private val bootGuardListener = object : BootGuard.Listener {
+        override fun onRollback(version: String) {
+            trackInfo(LogLabel.ROLLBACK, JSONObject().put("packageVersion", version))
+        }
+
+        override fun onBlockedPackage(version: String) {
+            trackInfo(LogLabel.BLOCKED_PACKAGE, JSONObject().put("packageVersion", version))
+        }
+
+        override fun onError(message: String, error: Throwable?) {
+            Log.e(TAG, "Boot guard: $message", error)
+            val value = JSONObject().put("message", message)
+            error?.let { value.put("stack_trace", Log.getStackTraceString(it)) }
+            trackError(LogLabel.BOOT_GUARD_ERROR, value)
+        }
+
+        override fun onInfo(message: String) {
+            Log.d(TAG, "Boot guard: $message")
+            trackInfo(LogLabel.BOOT_GUARD_INFO, JSONObject().put("message", message))
+        }
+    }
+
+    /**
+     * Applies the boot guard selection to the config that would boot. The installed config is
+     * kept for clean-up; the substitute becomes [releaseConfig] so JS sees what it runs.
+     */
+    private fun selectBootConfig(installed: ReleaseConfig): ReleaseConfig {
+        installedConfig = installed
+        val guard = bootGuard ?: return installed
+        val selection = guard.select(installed.pkg.version) { lastGood ->
+            ReleaseConfig.deSerialize(lastGood.config).isSuccess
+        }
+        val selected = when (selection) {
+            BootGuard.Selection.Installed -> return installed
+            is BootGuard.Selection.LastGoodSnapshot ->
+                ReleaseConfig.deSerialize(selection.lastGood.config).getOrNull() ?: installed
+            BootGuard.Selection.Bundled -> bundledConfig ?: installed
+        }
+        Log.d(TAG, "Boot guard: ${installed.pkg.version} is blocked, booting ${selected.pkg.version}")
+        releaseConfig = selected
+        return selected
+    }
+
+    /** What the boot guard chose for this process; null when the guard is unavailable. */
+    private fun bootSelection(): BootGuard.Selection? = bootGuard?.currentSelection()
+
+    /** UpdateTask callback: package files are about to be written into the package dir. */
+    private fun onPackageInstallStarting() {
+        bootGuard?.onPackageInstallStarting()
+    }
+
+    /** UpdateTask callback: a server-delivered package was committed to the package dir. */
+    private fun onPackageInstalled(pkg: ReleaseConfig.PackageManifest) {
+        val guard = bootGuard?.takeIf { it.enabled } ?: return
+        val complete = pkg.importantSplits.all { split ->
+            otaServices.fileProviderService
+                .getFileFromInternalStorage("app/$PACKAGE_DIR_NAME/${split.filePath}")
+                .isFile
+        }
+        if (complete) {
+            guard.onPackageInstalled(pkg.version)
+        }
+    }
+
     fun setReleaseConfigCallback(rcCallback: ReleaseConfigCallback) {
         this.rcCallback = rcCallback
     }
@@ -182,7 +366,10 @@ class ApplicationManager(
                 lazyDownloadCallback,
                 fromAirborne,
                 ctx,
-                onPackageDownloaded
+                onPackageDownloaded,
+                { version -> bootGuard?.allowPackage(version) ?: true },
+                this::onPackageInstallStarting,
+                this::onPackageInstalled
             )
         val runningTask = RUNNING_UPDATE_TASKS.putIfAbsent(clientId, newTask) ?: newTask
         if (runningTask == newTask) {
@@ -345,24 +532,19 @@ class ApplicationManager(
             is UpdateResult.Ok -> updateResult.releaseConfig
             else -> null
         }
-        val pkgSplits = releaseConfig?.pkg?.filePaths ?: emptyList()
-        Log.d(TAG, "runCleanUp: Current splits: $pkgSplits")
-        val newPkgSplits = updatedRc?.pkg?.filePaths ?: emptyList()
-        Log.d(TAG, "runCleanUp: New splits: $newPkgSplits")
-        val pkgDir = "app/$PACKAGE_DIR_NAME"
-        val resourceFiles =
-            releaseConfig?.resources?.filePaths ?: emptyList()
-        val newResourceFiles =
-            updatedRc?.resources?.filePaths ?: emptyList()
-        val splits = if (fromAirborne) {
-            pkgSplits + newPkgSplits + resourceFiles + newResourceFiles
-        } else {
-            (pkgSplits + newPkgSplits)
-        }
-        cleanUpDir(pkgDir, splits)
+        // Boot guard snapshots live outside the package dir, so clean-up stays enabled. Keep the
+        // installed package's splits and resources too when a substitute is booting.
+        val keep = BootFiles.cleanUpKeepSet(
+            fromAirborne,
+            booting = releaseConfig?.let(::configFiles),
+            installed = installedConfig?.let(::configFiles),
+            updated = updatedRc?.let(::configFiles)
+        )
+        Log.d(TAG, "runCleanUp: Keeping: $keep")
+        cleanUpDir("app/$PACKAGE_DIR_NAME", keep.packageDir)
 
         if (!fromAirborne) {
-            cleanUpDir("app/$RESOURCES_DIR_NAME", resourceFiles + newResourceFiles)
+            cleanUpDir("app/$RESOURCES_DIR_NAME", keep.resourcesDir)
         }
 
         val savedPkgDir = persistentState.optJSONObject(StateKey.SAVED_PACKAGE_UPDATE.name)
@@ -395,6 +577,9 @@ class ApplicationManager(
             )
         }
     }
+
+    private fun configFiles(rc: ReleaseConfig) =
+        BootFiles.ConfigFiles(rc.pkg.filePaths, rc.resources.filePaths)
 
     private fun cleanUpDir(dir: String, requiredFiles: List<String>) {
         Log.d(TAG, "requiredFiles for $dir $requiredFiles")
@@ -568,14 +753,22 @@ class ApplicationManager(
     private fun readFileAsStream(filePath: String): BufferedInputStream =
         otaServices.fileProviderService.readFromFileAsStream("app/$filePath")
 
-    fun readSplit(fileName: String): String {
-        return readSplitAsStream(fileName).use { stream ->
-            String(stream.readBytes(), Charsets.UTF_8)
+    fun readSplit(fileName: String): String =
+        when (val source = BootFiles.splitSource(bootSelection(), fileName, ::snapshotFile)) {
+            is BootFiles.Source.Snapshot -> readFallbackFile(source.file)
+            is BootFiles.Source.Asset ->
+                otaServices.fileProviderService.readFromAssets("app/$PACKAGE_DIR_NAME/${source.path}") ?: ""
+            is BootFiles.Source.Installed -> readFile("$PACKAGE_DIR_NAME/${source.path}")
         }
-    }
 
     fun readSplitAsStream(fileName: String): BufferedInputStream {
-        return readFileAsStream("$PACKAGE_DIR_NAME/$fileName")
+        return when (val source = BootFiles.splitSource(bootSelection(), fileName, ::snapshotFile)) {
+            is BootFiles.Source.Snapshot -> source.file?.takeIf { it.isFile }?.inputStream()?.buffered()
+                ?: java.io.ByteArrayInputStream(byteArrayOf()).buffered()
+            is BootFiles.Source.Asset -> otaServices.fileProviderService.readFromAssetsAsStream("app/$PACKAGE_DIR_NAME/${source.path}")
+                ?: java.io.ByteArrayInputStream(byteArrayOf()).buffered()
+            is BootFiles.Source.Installed -> readFileAsStream("$PACKAGE_DIR_NAME/${source.path}")
+        }
     }
 
     fun readSplitAsFile(fileName: String): File {
@@ -595,6 +788,15 @@ class ApplicationManager(
         }
 
         return tempFile
+    }
+
+    private fun snapshotFile(path: String): File? = bootGuard?.fallbackFile(path)
+
+    private fun readFallbackFile(file: File?): String = try {
+        if (file != null && file.isFile) file.readText() else ""
+    } catch (e: Exception) {
+        trackError(LogLabel.BOOT_GUARD_ERROR, "Cannot read last-good file.", e)
+        ""
     }
 
     fun readReleaseConfig(): String {
@@ -673,27 +875,136 @@ class ApplicationManager(
     private object LogLabel {
         const val APP_LOAD_EXCEPTION = "app_load_exception"
         const val CLEAN_UP_ERROR = "clean_up_error"
+        const val ROLLBACK = "rollback"
+        const val BLOCKED_PACKAGE = "blocked-package"
+        const val BOOT_GUARD_ERROR = "boot_guard_error"
+        const val BOOT_GUARD_INFO = "boot_guard_info"
     }
 
-    private fun getIndexFilePath(fileName: String): String {
-        // An empty index path would resolve to the package directory itself.
-        if (fileName.isEmpty()) {
-            return ""
+    private fun getIndexFilePath(fileName: String): String =
+        BootFiles.indexFilePath(bootSelection(), fileName, ::snapshotFile) { path ->
+            otaServices.fileProviderService.getFileFromInternalStorage("app/$PACKAGE_DIR_NAME/$path")
         }
-        val file =
-            otaServices.fileProviderService.getFileFromInternalStorage("app/$PACKAGE_DIR_NAME/$fileName")
-        if (file.isFile) {
-            return file.absolutePath
-        }
-        return ""
-    }
 
     companion object {
         const val TAG = "ApplicationManager"
+        private const val BOOT_GUARD_PREFS_PREFIX = "airborne-boot-"
+        private const val BOOT_GUARD_DIR_PREFIX = "airborne-boot-"
         private val CONTEXT_MAP:
             ConcurrentMap<String, WeakReference<Context>> = ConcurrentHashMap()
         private val RUNNING_UPDATE_TASKS:
             ConcurrentMap<String, UpdateTask> = ConcurrentHashMap()
+
+        /** One boot guard per sanitised workspace per process. */
+        private val BOOT_GUARDS = BootGuardRegistry()
+
+        /** Process-scoped inputs of a workspace's boot guard; nothing here refers to a manager. */
+        private class BootGuardOptions(
+            val key: String,
+            val enabled: Boolean,
+            val appContext: Context,
+            val packageDir: File,
+            val manifestFile: File,
+            val useBundledAssets: Boolean
+        )
+
+        /**
+         * Builds the guard kept by [BOOT_GUARDS]. Defined on the companion so it cannot capture a
+         * manager. With the guard off, leftover state is discarded once and an inert guard is kept.
+         */
+        private fun createBootGuard(options: BootGuardOptions, listener: BootGuard.Listener): BootGuard {
+            val appContext = options.appContext
+            val prefs = appContext.getSharedPreferences(
+                "$BOOT_GUARD_PREFS_PREFIX${options.key}",
+                Context.MODE_PRIVATE
+            )
+            val snapshotDir = File(appContext.filesDir, "$BOOT_GUARD_DIR_PREFIX${options.key}")
+            val manifestFile = options.manifestFile
+            val useBundledAssets = options.useBundledAssets
+            return BootGuard.create(
+                enabled = options.enabled,
+                binaryIdentity = binaryIdentity(appContext),
+                storage = SharedPreferencesBootGuardStorage(prefs),
+                snapshots = FileSnapshotStore(snapshotDir, options.packageDir),
+                installedVersion = { installedPackageVersion(manifestFile, useBundledAssets) },
+                listener = listener,
+                primaryProcess = isMainProcess(appContext)
+            )
+        }
+
+        /**
+         * Version named by the package manifest on disk; null when unknown. Reads the file
+         * directly (like the snapshot store reads the package dir) so the guard needs no manager.
+         */
+        private fun installedPackageVersion(manifestFile: File, useBundledAssets: Boolean): String? {
+            if (useBundledAssets || !manifestFile.isFile) {
+                return null
+            }
+            val manifest = manifestFile.readText()
+            if (manifest.isEmpty()) {
+                return null
+            }
+            return ReleaseConfig.deSerializePackage(manifest).getOrNull()?.version
+        }
+
+        /** versionName + versionCode: a last-good package is only valid for the binary it ran on. */
+        private fun binaryIdentity(ctx: Context): String = try {
+            @Suppress("DEPRECATION")
+            val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
+            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                info.versionCode.toLong()
+            }
+            "${info.versionName}+$versionCode"
+        } catch (e: Exception) {
+            Log.e(TAG, "Cannot read app version for the boot guard", e)
+            ""
+        }
+
+        @Volatile
+        private var mainProcess: Boolean? = null
+
+        /**
+         * True in the app's main process. Secondary processes (android:process services,
+         * providers) may also construct Airborne, but must not write the guard state the main
+         * process owns. When the process name cannot be determined the guard stays passive.
+         */
+        private fun isMainProcess(ctx: Context): Boolean {
+            mainProcess?.let { return it }
+            val mainName = ctx.applicationInfo?.processName ?: ctx.packageName
+            val current = currentProcessName(ctx)
+            if (current == null) {
+                Log.w(TAG, "Boot guard: cannot determine the process name, guard inactive.")
+            }
+            return (current != null && current == mainName).also { mainProcess = it }
+        }
+
+        private fun currentProcessName(ctx: Context): String? {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                return Application.getProcessName()
+            }
+            val fromActivityManager = try {
+                val manager = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                val pid = Process.myPid()
+                manager?.runningAppProcesses?.firstOrNull { it.pid == pid }?.processName
+            } catch (e: Exception) {
+                Log.w(TAG, "Cannot read running processes", e)
+                null
+            }
+            if (!fromActivityManager.isNullOrEmpty()) {
+                return fromActivityManager
+            }
+            return try {
+                File("/proc/self/cmdline").readText()
+                    .substringBefore('\u0000')
+                    .trim()
+                    .ifEmpty { null }
+            } catch (e: Exception) {
+                null
+            }
+        }
 
         private fun <V> doAsync(callable: Callable<V>): Future<V> =
             OTAUtils.doAsync(callable)
