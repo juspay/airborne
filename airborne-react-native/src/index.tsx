@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { NativeModules, Platform } from 'react-native';
+import { TurboModuleRegistry, Platform } from 'react-native';
+import type { Spec } from './NativeAirborne';
 
 const LINKING_ERROR =
   `The package 'airborne-react-native' doesn't seem to be linked. Make sure: \n\n` +
@@ -20,23 +21,17 @@ const LINKING_ERROR =
   '- You rebuilt the app after installing the package\n' +
   '- You are not using Expo Go\n';
 
-// @ts-expect-error
-const isTurboModuleEnabled = global.__turboModuleProxy != null;
+// TurboModuleRegistry also supports RN bridgeless mode and legacy modules. It
+// is undefined under react-native-web and SSR, which get the linking error.
+const AirborneModule = TurboModuleRegistry?.get<Spec>('Airborne');
 
-const AirborneModule = isTurboModuleEnabled
-  ? require('./NativeAirborne').default
-  : NativeModules.Airborne;
-
-const Airborne = AirborneModule
+const Airborne: Spec = AirborneModule
   ? AirborneModule
-  : new Proxy(
-      {},
-      {
-        get() {
-          throw new Error(LINKING_ERROR);
-        },
-      }
-    );
+  : new Proxy({} as Spec, {
+      get() {
+        throw new Error(LINKING_ERROR);
+      },
+    });
 
 export function readReleaseConfig(nameSpace: string): Promise<string> {
   return Airborne.readReleaseConfig(nameSpace);

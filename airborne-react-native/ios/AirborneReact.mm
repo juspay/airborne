@@ -25,69 +25,76 @@ static NSString * const defaultNamespace = @"default";
     AJPApplicationManager* manager = [AJPApplicationManager getSharedInstanceWithWorkspace:ns delegate:delegate logger:nil];
 }
 
+static NSString * const AirborneErrorCode = @"AIRBORNE_ERROR";
+
+/// Manager already created for `ns`; rejects the promise and returns nil when there is none.
+static AJPApplicationManager *ExistingManager(NSString *ns, RCTPromiseRejectBlock reject) {
+    AJPApplicationManager *manager = [AJPApplicationManager existingInstanceWithWorkspace:ns];
+    if (!manager) {
+        reject(AirborneErrorCode, @"Unknown Airborne namespace", nil);
+    }
+    return manager;
+}
+
 #ifdef RCT_NEW_ARCH_ENABLED
-- (void)readReleaseConfig:(RCTPromiseResolveBlock)resolve
-                   reject:(RCTPromiseRejectBlock)reject {
-    @try {
-        NSString *config = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getReleaseConfig];
-        resolve(config);
-    } @catch (NSException *exception) {
-        reject(@"AIRBORNE_ERROR", exception.reason, nil);
-    }
-}
-
-- (void)getFileContent:(NSString *)filePath
-               resolve:(RCTPromiseResolveBlock)resolve
-                reject:(RCTPromiseRejectBlock)reject {
-    @try {
-        NSString *content = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getFileContent:filePath];
-        resolve(content);
-    } @catch (NSException *exception) {
-        reject(@"AIRBORNE_ERROR", exception.reason, nil);
-    }
-}
-
-- (void)getBundlePath:(RCTPromiseResolveBlock)resolve
-               reject:(RCTPromiseRejectBlock)reject {
-    @try {
-        NSString *bundlePath = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
-        resolve(bundlePath);
-    } @catch (NSException *exception) {
-        reject(@"AIRBORNE_ERROR", exception.reason, nil);
-    }
-}
+- (void)readReleaseConfig:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
 #else
-RCT_EXPORT_METHOD(readReleaseConfig:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject) {
+RCT_EXPORT_METHOD(readReleaseConfig:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+#endif
     @try {
-        NSString *config = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getReleaseConfig];
-        resolve(config);
+        AJPApplicationManager *manager = ExistingManager(ns, reject);
+        if (!manager) {
+            return;
+        }
+        NSString *releaseConfig = [manager currentReleaseConfigJSONPrettyPrinted:NO];
+        if (!releaseConfig) {
+            reject(AirborneErrorCode, @"Cannot serialize release config", nil);
+            return;
+        }
+        resolve(releaseConfig);
     } @catch (NSException *exception) {
-        reject(@"AIRBORNE_ERROR", exception.reason, nil);
+        reject(AirborneErrorCode, exception.reason, nil);
     }
 }
 
-RCT_EXPORT_METHOD(getFileContent:(NSString *)filePath
-                  resolver:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject) {
+#ifdef RCT_NEW_ARCH_ENABLED
+- (void)getFileContent:(NSString *)ns filePath:(NSString *)filePath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
+#else
+RCT_EXPORT_METHOD(getFileContent:(NSString *)ns filePath:(NSString *)filePath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+#endif
     @try {
-        NSString *content = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getFileContent:filePath];
+        AJPApplicationManager *manager = ExistingManager(ns, reject);
+        if (!manager) {
+            return;
+        }
+        NSString *content = [manager readPackageFile:filePath];
+        if (!content) {
+            reject(AirborneErrorCode, @"Cannot read package file", nil);
+            return;
+        }
         resolve(content);
     } @catch (NSException *exception) {
-        reject(@"AIRBORNE_ERROR", exception.reason, nil);
+        reject(AirborneErrorCode, exception.reason, nil);
     }
 }
 
-RCT_EXPORT_METHOD(getBundlePath:(RCTPromiseResolveBlock)resolve
-                  rejecter:(RCTPromiseRejectBlock)reject) {
+#ifdef RCT_NEW_ARCH_ENABLED
+- (void)getBundlePath:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
+#else
+RCT_EXPORT_METHOD(getBundlePath:(NSString *)ns resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
+#endif
     @try {
-        NSString *bundlePath = [[Airborne sharedInstanceWithNamespace:defaultNamespace] getBundlePath];
-        resolve(bundlePath);
+        AJPApplicationManager *manager = ExistingManager(ns, reject);
+        if (!manager) {
+            return;
+        }
+        // Same resolution as AirborneServices.getIndexBundlePath(); the host index name comes from
+        // the manager's delegate (AirborneServices forwards AirborneDelegate.indexBundleName).
+        resolve([manager getIndexBundleURL].absoluteString);
     } @catch (NSException *exception) {
-        reject(@"AIRBORNE_ERROR", exception.reason, nil);
+        reject(AirborneErrorCode, exception.reason, nil);
     }
 }
-#endif
 
 #ifdef RCT_NEW_ARCH_ENABLED
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:

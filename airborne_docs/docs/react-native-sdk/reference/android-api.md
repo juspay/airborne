@@ -30,7 +30,7 @@ class Airborne(
 | Method | Signature | Description |
 | --- | --- | --- |
 | `getBundlePath` | `fun getBundlePath(): String` | Returns the path of the index JS bundle. Falls back to the bundled asset path (`assets://...`, defaulting to `index.android.bundle`) when no downloaded bundle exists. Used by the React Native host's `getJSBundleFile()`. |
-| `getFileContent` | `fun getFileContent(filePath: String): String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. |
+| `getFileContent` | `fun getFileContent(filePath: String): String` | Reads the content of the file at `filePath` (relative to the package) and returns it as a string. Throws `IllegalArgumentException` for an empty or absolute path or one with a `..` component. |
 | `getReleaseConfig` | `fun getReleaseConfig(): String` | Returns the current release config as a stringified JSON. |
 | `setSslConfig` | `fun setSslConfig(sslSocketFactory: SSLSocketFactory, trustManager: X509TrustManager)` | Sets a custom SSL configuration for mTLS. Call before any network requests are made to enable client-certificate authentication. |
 
