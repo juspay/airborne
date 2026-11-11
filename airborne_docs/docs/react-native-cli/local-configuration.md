@@ -156,7 +156,7 @@ A freshly generated `release_config.json` has this shape, with `url` and `checks
 ```
 
 :::note
-`create-local-release-config` requires an existing `airborne-config.json` in the directory. It fails if a release config for the chosen platform already exists — use `update-local-release-config` to modify it instead.
+`create-local-release-config` requires an existing `airborne-config.json` in the directory. It fails if a release config for the chosen platform already exists (`init` writes one). To bundle again and refresh an existing one, run `bundle -p <platform>`, which creates the release config when there is none and rewrites it otherwise; use `update-local-release-config` to change its timeouts.
 :::
 
 ## update-local-release-config

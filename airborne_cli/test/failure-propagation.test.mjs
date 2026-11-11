@@ -14,9 +14,10 @@ async function load(name) {
   let exports;
   if(spec==='fs')exports={default:fs};
   else if(spec==='path')exports={default:path};
-  else if(spec==='child_process')exports={execSync(){throw Error('command failed');}};
+  else if(spec==='child_process')exports={execFileSync(){throw Error('command failed');}};
   else if(spec==='./common.js')exports={hexToBase64:v=>v,sha256FileHex:async()=>{throw Error('checksum failed');}};
   else if(spec==='airborne-core-cli/action')exports={UploadFileAction:async()=>{throw Error('server rejected upload');},CreateFileAction:async()=>{throw Error('server rejected file');},CreatePackageAction:async()=>{throw Error('server rejected package');}};
+  else if(spec==='./auth.js')exports={...await import(new URL('../src/utils/auth.js',import.meta.url).href)};
   else if(spec==='./file.js')exports={readFileMapping:async()=>({id:'index'})};
   else if(spec==='./release.js')exports={writeReleaseConfig:async()=>{}};
   else throw Error('Unexpected import '+spec);
@@ -37,7 +38,8 @@ test('server package rejection reaches command caller',async()=>{
 test('a rejected package command exits nonzero in a Node process',()=>{
  const loader=fs.readFileSync(new URL(import.meta.url),'utf8').split("test('failed uploads")[0]
   .replace("new URL('../src/utils/'+name,import.meta.url)","new URL('"+new URL('../src/utils/',import.meta.url).href+"'+name)")
-  .replace("new URL('../src/utils/'+name,import.meta.url)","new URL('"+new URL('../src/utils/',import.meta.url).href+"'+name)");
+  .replace("new URL('../src/utils/'+name,import.meta.url)","new URL('"+new URL('../src/utils/',import.meta.url).href+"'+name)")
+  .replace("new URL('../src/utils/auth.js',import.meta.url)","new URL('"+new URL('../src/utils/auth.js',import.meta.url).href+"')");
  const child=spawnSync(process.execPath,['--experimental-vm-modules','--input-type=module','-e',loader+"\nconst m=await load('package.js');await m.createPackageFromLocalRelease({}, {package:{index:{file_path:'index.bundle'}}});"],{encoding:'utf8'});
  assert.equal(child.status,1);assert.match(child.stderr,/server rejected package/);
 });

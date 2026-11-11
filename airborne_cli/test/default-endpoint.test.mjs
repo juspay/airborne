@@ -4,10 +4,10 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-test('first-time core CLI uses documented hosted endpoint and preserves explicit configuration', async () => {
+test('core CLI uses the hosted endpoint, a shared .config, or a per-project AIRBORNE_BASE_URL that wins over both', async () => {
  const source=fs.readFileSync(new URL('../../airborne-core-cli/action.js',import.meta.url),'utf8');
- for (const configured of [undefined,'http://127.0.0.1:8096']) {
-  const context=vm.createContext({console});
+ for (const [configured,env,expected] of [[undefined,undefined,'https://airborne.juspay.in'],['http://127.0.0.1:8096',undefined,'http://127.0.0.1:8096'],['http://127.0.0.1:8096',{AIRBORNE_BASE_URL:'http://localhost:8099'},'http://localhost:8099'],[undefined,{AIRBORNE_BASE_URL:'http://localhost:8099'},'http://localhost:8099']]) {
+  const context=vm.createContext({console,process:{env:{...(env||{})}}});
   const mod=new vm.SourceTextModule(source,{context,initializeImportMeta(meta){meta.url=import.meta.url;}});
   await mod.link(async spec=>{
    let values;
@@ -21,6 +21,6 @@ test('first-time core CLI uses documented hosted endpoint and preserves explicit
    return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v] of Object.entries(values))this.setExport(k,v);},{context});
   });
   await mod.evaluate();
-  assert.equal(await mod.namespace.getBaseUrl(),configured||'https://airborne.juspay.in');
+  assert.equal(await mod.namespace.getBaseUrl(),expected);
  }
 });

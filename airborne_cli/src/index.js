@@ -9,8 +9,16 @@ import {
   formatCommand,
   saveToken,
   airborneConfigExists,
-  loadToken,
+  requireToken,
 } from "./utils/common.js";
+import {
+  parseBaseUrl,
+  projectConfigPath,
+  useProjectEndpoint,
+  writeProjectConfig,
+} from "./utils/project-config.js";
+import { explainAuthFailure } from "./utils/auth.js";
+import { bundleRelease, publishRelease, registerReleaseFiles } from "./utils/publish.js";
 import { promptWithType } from "./utils/prompt.js";
 import { PLATFORMS, parsePlatform } from "./utils/platform.js";
 import {
@@ -20,7 +28,6 @@ import {
   updateLocalReleaseConfig,
   writeReleaseConfig,
 } from "./utils/release.js";
-import { createFiles, uploadFiles } from "./utils/file.js";
 import { createPackageFromLocalRelease } from "./utils/package.js";
 import {
   ConcludeReleaseAction,
@@ -38,6 +45,9 @@ import {
 } from "./utils/lifecycle.js";
 const program = new Command();
 
+// Servers are chosen per project (.airborne/config.json), not by a file inside this checkout.
+try { useProjectEndpoint(process.cwd()); } catch (err) { console.error(err.message); }
+
 program
   .name("airborne-devkit")
   .description("Command-line interface for Airborne operations")
@@ -53,8 +63,7 @@ program.command("first-release")
   .action(async options => {
     try {
       const { firstRelease } = await import("./init/first-release.js");
-      const token = process.env.AIRBORNE_TOKEN;
-      if (!token) throw new Error("Set AIRBORNE_TOKEN to an authenticated access token");
+      const token = process.env.AIRBORNE_TOKEN || requireToken(process.cwd());
       console.log(JSON.stringify(await firstRelease({ ...options, token }), null, 2));
     } catch (error) { console.error(error.message); process.exitCode = 1; }
   });
@@ -77,7 +86,8 @@ program.command("init [directory]")
   });
 
 coreCli.commands.forEach((cmd, i) => {
-  if (cmd._name !== "PostLogin") {
+  // PostLogin has its own login command; configure is per project below, not a file in this checkout.
+  if (cmd._name !== "PostLogin" && cmd._name !== "configure") {
     program.addCommand(formatCommand(cmd));
   }
 });
@@ -342,7 +352,7 @@ Notes:
           `❌ Release config for ${normalizedOptions.platform} platform already exists in ${directoryPath}`
         );
         console.error(
-          "Use 'update-local-release-config' command to modify existing configuration."
+          "To bundle the JavaScript again and refresh this config, run 'airborne-devkit bundle -p " + normalizedOptions.platform + "'. To change its timeouts, use 'update-local-release-config'."
         );
         process.exit(1);
       }
@@ -487,7 +497,7 @@ Notes:
 
       process.exit(0); // Exit with success code
     } catch (err) {
-      console.error("❌ Failed to create local release config:", err.message);
+      console.error("❌ Failed to update local release config:", err.message);
       process.exit(1); // Exit with failure code
     }
   });
@@ -579,6 +589,7 @@ Notes:
         );
       }
       const normalizedOptions = normalizeOptions(options);
+      useProjectEndpoint(normalizedOptions.directory_path);
       let airborneConfig = await readAndResolveAirborneConfig(
         normalizedOptions.directory_path,
         normalizedOptions.platform
@@ -591,12 +602,7 @@ Notes:
         airborneConfig.namespace
       );
 
-      try {
-        airborneConfig.token = await loadToken(normalizedOptions.directory_path)
-          .access_token;
-      } catch (err) {
-        throw new Error("Please log in first");
-      }
+      airborneConfig.token = requireToken(normalizedOptions.directory_path);
 
       let baseUrl;
       if (!options.upload) {
@@ -609,65 +615,14 @@ Notes:
         }
       }
 
-      const processFiles = async (files) => {
-        if (!files || files.length === 0) return;
-        if (options.upload) {
-          return await uploadFiles(files, airborneConfig);
-        } else {
-          return await createFiles(files, airborneConfig, baseUrl);
-        }
-      };
-
-      const applyResults = (entries, results) => {
-        if (!entries || !results) return;
-        for (const entry of entries) {
-          if (results[entry.file_path]) {
-            entry.url = results[entry.file_path].url;
-            entry.checksum = results[entry.file_path].checksum;
-          }
-        }
-      };
-
-      console.log("Processing index file");
-      const indexFiles = [releaseConfig.package.index];
-      const indexResults = await processFiles(indexFiles);
-      applyResults(indexFiles, indexResults);
-      releaseConfig.package.index = indexFiles[0];
-
-      const importantFiles = releaseConfig.package.important || [];
-      if (importantFiles.length > 0) {
-        console.log("Processing important files");
-        const importantResults = await processFiles(importantFiles);
-        applyResults(importantFiles, importantResults);
-        releaseConfig.package.important = importantFiles;
-      }
-
-      const lazyFiles = releaseConfig.package.lazy || [];
-      if (lazyFiles.length > 0) {
-        console.log("Processing lazy files");
-        const lazyResults = await processFiles(lazyFiles);
-        applyResults(lazyFiles, lazyResults);
-        releaseConfig.package.lazy = lazyFiles;
-      }
-
-      const resourceFiles = releaseConfig.resources || [];
-      if (resourceFiles.length > 0) {
-        console.log("Processing resource files");
-        const resourceResults = await processFiles(resourceFiles);
-        applyResults(resourceFiles, resourceResults);
-        releaseConfig.resources = resourceFiles;
-      }
-
-      await writeReleaseConfig(
-        releaseConfig,
-        airborneConfig.platform,
-        airborneConfig.namespace,
-        airborneConfig.directory_path
-      );
+      await registerReleaseFiles(airborneConfig, releaseConfig, {
+        upload: options.upload,
+        baseUrl,
+      });
 
       process.exit(0);
     } catch (err) {
-      console.error("❌ Failed to create remote files:", err.message);
+      console.error("❌ Failed to create remote files:", explainAuthFailure(err));
       process.exit(1);
     }
   });
@@ -765,14 +720,14 @@ Notes:
         );
       }
       const normalizedOptions = normalizeOptions(options);
+      useProjectEndpoint(normalizedOptions.directory_path);
       let airborneConfig = await readAndResolveAirborneConfig(
         normalizedOptions.directory_path,
         normalizedOptions.platform
       );
 
       airborneConfig = { ...airborneConfig, ...normalizedOptions };
-      airborneConfig.token = await loadToken(normalizedOptions.directory_path)
-        .access_token;
+      airborneConfig.token = requireToken(normalizedOptions.directory_path);
       const releaseConfig = await readReleaseConfig(
         airborneConfig.directory_path,
         airborneConfig.platform,
@@ -782,7 +737,7 @@ Notes:
       await createPackageFromLocalRelease(airborneConfig, releaseConfig);
       process.exit(0);
     } catch (err) {
-      console.error("❌ Failed to create remote package: ", err.message);
+      console.error("❌ Failed to create remote package: ", explainAuthFailure(err));
       process.exit(1);
     }
   });
@@ -860,12 +815,155 @@ Troubleshooting:
         client_secret: options.client_secret,
       };
 
+      useProjectEndpoint(directoryPath);
       const result = await PostLoginAction(null, loginOptions);
-      console.log("✅ Login successful");
-      saveToken(result.access_token, result.refresh_token, directoryPath);
+      await saveToken(result.access_token, result.refresh_token, directoryPath, result.expires_in);
+      const minutes = Math.floor(Number(result.expires_in) / 60);
+      console.log(
+        `✅ Login successful for ${process.env.AIRBORNE_BASE_URL || "https://airborne.juspay.in"}.` +
+          (minutes > 0 ? ` The access token is valid for about ${minutes} minute${minutes === 1 ? "" : "s"}; log in again after that.` : "")
+      );
       process.exit(0);
     } catch (err) {
       console.error("❌ Login error:", err.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("configure [directoryPath]")
+  .description(
+    `
+  Choose the Airborne server for this project:
+
+  The URL is saved in <project>/.airborne/config.json, so each project can use its own server and nothing
+  is written into the CLI checkout. Without it the CLI talks to https://airborne.juspay.in.
+  The AIRBORNE_BASE_URL environment variable overrides it for one command.
+
+  Parameters:
+      [directoryPath] (optional) : Project directory (defaults to current directory)
+      -u, --base-url <url> (required) : Origin of the Airborne API, for example http://localhost:8080
+`
+  )
+  .requiredOption("-u, --base-url <url>", "Origin of the Airborne API")
+  .addHelpText(
+    "after",
+    `
+Examples:
+
+1. Use a local sandbox for this project:
+   $ airborne-devkit configure --base-url http://localhost:8080
+`
+  )
+  .action((directoryPath, options) => {
+    try {
+      const directory = directoryPath || process.cwd();
+      const file = writeProjectConfig(directory, { baseUrl: parseBaseUrl(options.baseUrl) });
+      console.log(`✅ Base URL for this project set to ${parseBaseUrl(options.baseUrl)} (${file}).`);
+      process.exit(0);
+    } catch (err) {
+      console.error("❌ Failed to configure:", err.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("bundle [directoryPath]")
+  .description(
+    `
+  Bundle the JavaScript and refresh the platform's release_config.json:
+
+  Runs the React Native bundler (and the Hermes compiler when airborne-config.json enables it) into
+  <platform>/build/generated/airborne, then lists the output in release_config.json. It creates the release
+  config when there is none and rewrites it when there is (keeping its timeouts), so it is safe to run after
+  'init' and again after every change. Run it before create-remote-files.
+
+  Parameters:
+      [directoryPath] (optional) : Project directory (defaults to current directory)
+      -p, --platform <string> (required) : android | ios | web
+`
+  )
+  .requiredOption("-p, --platform <platform>", "android | ios | web", platformOption)
+  .action(async (directoryPath, options) => {
+    try {
+      await bundleRelease(directoryPath || process.cwd(), options.platform);
+      process.exit(0);
+    } catch (err) {
+      console.error("❌ Failed to bundle:", err.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("publish [directoryPath]")
+  .description(
+    `
+  Ship the current JavaScript as an OTA update in one command:
+
+  bundle -> upload -> create package -> prepare an exact-version release -> ramp (then conclude only with --conclude).
+  The package version is whatever the server assigns, and the app version is read from the project
+  (android/app/build.gradle versionName, or the iOS MARKETING_VERSION), so there are no numbers to guess.
+  Needs 'configure' and a fresh 'login' for this platform's application; the release applies only to
+  installs whose app_version matches.
+
+  Parameters:
+      [directoryPath] (optional) : Project directory (defaults to current directory)
+      -p, --platform <string> (required) : android | ios | web
+      --app-version <version> : Binary version to target (default: read from the project)
+      --ramp <0-${MAX_RAMP_PERCENTAGE}> : Traffic percentage to ramp to before concluding (default ${MAX_RAMP_PERCENTAGE})
+      --conclude : Conclude immediately after the ramp (default: stop after ramp)
+      --prepare-only : Stop with the release at 0% traffic; ramp it yourself with ramp-release
+      -t, --tag <string> : Tag for the uploaded files and package
+`
+  )
+  .requiredOption("-p, --platform <platform>", "android | ios | web", platformOption)
+  .option("--app-version <version>", "Binary version to target (default: read from the project)")
+  .option("--ramp <percentage>", `Traffic percentage before concluding, 0 to ${MAX_RAMP_PERCENTAGE}`, (value) => {
+    try {
+      return parseRampPercentage(value);
+    } catch (err) {
+      throw new InvalidOptionArgumentError(err.message);
+    }
+  })
+  .option("--conclude", "Conclude immediately after the ramp", false)
+  .option("--prepare-only", "Stop with the release at zero traffic")
+  .option("-t, --tag <tag>", "Tag for the uploaded files and package", (tag) => {
+    if (tag === "__default__") {
+      throw new InvalidOptionArgumentError("You cannot use '__default__' as a tag.");
+    }
+    return tag;
+  })
+  .addHelpText(
+    "after",
+    `
+Examples:
+
+1. Publish and ramp to 50% on the installed app version:
+   $ airborne-devkit publish -p android
+
+2. Prepare the release but leave it at 0% for review:
+   $ airborne-devkit publish -p android --prepare-only
+
+The release id is printed; use it with ramp-release, conclude-release, discard-release or rollback-release.
+Exits with a nonzero status, naming the stage, when any step fails.`
+  )
+  .action(async (directoryPath, options) => {
+    try {
+      const directory = directoryPath || process.cwd();
+      useProjectEndpoint(directory);
+      const result = await publishRelease({
+        directory,
+        platform: options.platform,
+        tag: options.tag,
+        appVersion: options.appVersion,
+        ramp: options.ramp,
+        conclude: options.conclude,
+        prepareOnly: options.prepareOnly,
+      });
+      console.log(JSON.stringify(result, null, 2));
+      process.exit(0);
+    } catch (err) {
+      console.error(`❌ ${explainAuthFailure(err)}`);
       process.exit(1);
     }
   });
@@ -893,10 +991,8 @@ function platformOption(value) {
 // airborne-config.json section of --platform, like the other release commands.
 async function lifecycleScope(directoryPath, options) {
   const directory = directoryPath || process.cwd();
-  const token = loadToken(directory)?.access_token;
-  if (!token) {
-    throw new Error("Not logged in. Run 'airborne-devkit login' first.");
-  }
+  useProjectEndpoint(directory);
+  const token = requireToken(directory);
   let { organisation, application } = options;
   if (!organisation || !application) {
     if (!options.platform) {
@@ -936,7 +1032,7 @@ function addLifecycleCommand(kind, name, description, configure, examples) {
         console.log(JSON.stringify(body, null, 2));
         process.exit(0);
       } catch (err) {
-        console.error(`❌ Failed to ${name.replace("-release", "")} release:`, describeFailure(err));
+        console.error(`❌ Failed to ${name.replace("-release", "")} release:`, explainAuthFailure(describeFailure(err)));
         process.exit(1);
       }
     });

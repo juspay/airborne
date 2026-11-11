@@ -183,6 +183,18 @@ export async function createLocalReleaseConfig(
   }
 }
 
+// init's Podfile adds release_config.json to the application target after pod install, which makes the
+// xcodeproj-based script redundant (and it needs a Ruby gem that is only on CocoaPods' load path).
+export function iosResourceWiredByPodfile(directory_path) {
+  try {
+    return fs
+      .readFileSync(path.join(directory_path, "ios", "Podfile"), "utf8")
+      .includes("# Airborne fallback resource");
+  } catch {
+    return false;
+  }
+}
+
 export async function writeReleaseConfig(
   releaseConfig,
   platform,
@@ -219,16 +231,20 @@ export async function writeReleaseConfig(
     console.log(`✅ Release config written to ${configPath}`);
 
     if (platform === "ios") {
-      console.log("Running ruby script for ios");
-      const rubyScriptPath = path.join(__dirname, "../", "bundleRC.rb");
-      const rubyCommand = `ruby "${rubyScriptPath}"`;
-
-      try {
-        execSync(rubyCommand, { stdio: "inherit", cwd: directory_path });
-        console.log("✅ Ruby script executed successfully");
-      } catch (error) {
-        console.error("❌ Ruby script execution failed:", error.message);
-    throw error;
+      if (iosResourceWiredByPodfile(directory_path)) {
+        console.log("✅ release_config.json is added to the app target by the Podfile written by init; no Xcode project edit needed");
+      } else {
+        console.log("Running ruby script for ios");
+        const rubyScriptPath = path.join(__dirname, "../", "bundleRC.rb");
+        try {
+          execSync(`ruby "${rubyScriptPath}"`, { stdio: "inherit", cwd: directory_path });
+          console.log("✅ Ruby script executed successfully");
+        } catch (error) {
+          console.error("❌ Ruby script execution failed:", error.message);
+          throw new Error(
+            `${error.message}\nAdding release_config.json to the Xcode project needs the 'xcodeproj' Ruby gem (gem install xcodeproj, or use CocoaPods' Ruby). Projects set up with 'airborne-devkit init' do not need it.`
+          );
+        }
       }
     }
   } catch (err) {

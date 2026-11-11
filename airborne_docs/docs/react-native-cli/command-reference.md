@@ -3,6 +3,9 @@ title: Command Reference
 description: A compact reference of the airborne-devkit workflow commands, the re-exposed Core CLI operations, and the three input methods.
 ---
 
+> Checkout-only commands: the published `airborne-devkit@0.45.0` does not include `init`, `bundle` or `publish`; its `configure` is different. Use the CLI from this checkout as described in [First OTA](../guides/first-ota.md) until a new package is published.
+
+
 This page summarizes the commands `airborne-devkit` provides. There are two groups: the **devkit-specific commands** (login, the five special workflow commands, and the four release lifecycle commands), and the **re-exposed Core CLI operations** for working with organisations, applications, dimensions, files, packages, and releases.
 
 All commands accept `-h, --help` for inline usage, and `-V, --version` is available on the CLI itself.
@@ -11,7 +14,12 @@ All commands accept `-h, --help` for inline usage, and `-V, --version` is availa
 
 | Command                         | Description                                                                 |
 | ------------------------------- | --------------------------------------------------------------------------- |
+| `configure`                     | Choose the Airborne server for this project (`.airborne/config.json`). See [Authentication](/docs/react-native-cli/authentication#choosing-the-server). |
 | `login`                         | Authenticate with client credentials and store a token locally. See [Authentication](/docs/react-native-cli/authentication). |
+| `init`                          | Integrate a recognised bare React Native app (native hosts, configs, local-HTTP network settings). See the [first OTA walkthrough](/docs/guides/first-ota). |
+| `bundle`                        | Bundle your JS and create or refresh `release_config.json`; safe to repeat. |
+| `publish`                       | Bundle, upload, package, release and ramp; print the exact conclude command. Add `--conclude` to conclude immediately. See the [first OTA walkthrough](/docs/guides/first-ota). |
+| `first-release`                 | Create the `app_version` dimension and prepare an exact-version release at zero traffic. |
 | `create-local-airborne-config`  | Scaffold `airborne-config.json` for your project. See [Local configuration](/docs/react-native-cli/local-configuration#create-local-airborne-config). |
 | `create-local-release-config`   | Bundle your JS and write a per-platform `release_config.json`. See [Local configuration](/docs/react-native-cli/local-configuration#create-local-release-config). |
 | `update-local-release-config`   | Re-bundle and update an existing `release_config.json`. See [Local configuration](/docs/react-native-cli/local-configuration#update-local-release-config). |

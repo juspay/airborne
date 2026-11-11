@@ -6,6 +6,37 @@ import { spawnSync } from 'node:child_process';
 
 const hash = s => createHash('sha256').update(s).digest('hex');
 const manual = 'Manual integration: install airborne-react-native; add the Juspay Maven repository; replace DefaultReactNativeHost and DefaultReactActivityDelegate with Airborne hosts; initialize Airborne before React with app_version and a stable per-install toss. On iOS import AirborneReact, defer factory.startReactNative until AirborneDelegate.startApp, return its bundle URL, and copy release_config.json into the app bundle. Exact code: https://airborne.juspay.in/docs/react-native-sdk/integration/android-setup and https://airborne.juspay.in/docs/react-native-sdk/integration/ios-setup';
+// Hosts a developer machine serves from: loopback, the Android emulator and Genymotion host aliases, mDNS names and private networks.
+export function isLocalHost(host) {
+  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  if (['localhost', '127.0.0.1', '::1', '10.0.2.2', '10.0.3.2'].includes(h) || h.endsWith('.local')) return true;
+  const ip = h.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  return Boolean(ip) && (ip[1] === '10' || (ip[1] === '192' && ip[2] === '168') || (ip[1] === '172' && ip[2] >= 16 && ip[2] <= 31));
+}
+const networkConfig = hosts => `<?xml version="1.0" encoding="utf-8"?>
+<!-- Added by airborne-devkit init. Development only: cleartext HTTP is allowed for these local hosts and nothing else.
+     Serve a real deployment over HTTPS and delete this file and src/release/AndroidManifest.xml. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+${hosts.map(host => `        <domain includeSubdomains="false">${host}</domain>`).join('\n')}
+    </domain-config>
+</network-security-config>
+`;
+const releaseManifest = `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>
+`;
+// Returns the Info.plist text with local networking allowed, or the same text when it already is.
+export function allowLocalNetworking(plist) {
+  if (/<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/.test(plist) || /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/.test(plist)) return plist;
+  if (/<key>NSAllowsLocalNetworking<\/key>\s*<false\/>/.test(plist)) return plist.replace(/(<key>NSAllowsLocalNetworking<\/key>\s*)<false\/>/, '$1<true/>');
+  const entry = '\t\t<key>NSAllowsLocalNetworking</key>\n\t\t<true/>\n';
+  if (/<key>NSAppTransportSecurity<\/key>\s*<dict\s*\/>/.test(plist)) return plist.replace(/(<key>NSAppTransportSecurity<\/key>\s*)<dict\s*\/>/, `$1<dict>\n${entry}\t</dict>`);
+  if (/<key>NSAppTransportSecurity<\/key>\s*<dict>/.test(plist)) return plist.replace(/(<key>NSAppTransportSecurity<\/key>\s*<dict>\s*)/, `$1${entry}`);
+  const end = plist.lastIndexOf('</dict>');
+  if (end < 0) throw new Error('Info.plist has no top-level dictionary');
+  return `${plist.slice(0, end)}\t<key>NSAppTransportSecurity</key>\n\t<dict>\n${entry}\t</dict>\n${plist.slice(end)}`;
+}
 export function initProject(directory, options) {
   const root = fs.realpathSync(directory);
   const { organisation, application, endpoint, dryRun = false, sdk = '^0.45.0' } = options;
@@ -15,6 +46,7 @@ export function initProject(directory, options) {
   if (!/^[A-Za-z0-9._~:/\[\]@!&'()*+,;=%-]+$/.test(endpoint || '')) throw new Error('Endpoint contains unsafe native source characters');
   const url = new URL(endpoint);
   if (!['https:', 'http:'].includes(url.protocol) || url.search || url.hash || url.username || url.password) throw new Error('Endpoint must be an HTTP(S) origin/path without credentials, query or fragment');
+  if (!/^[A-Za-z0-9.:[\]_-]+$/.test(url.hostname)) throw new Error('Unsafe endpoint host');
   const releaseURL = `${endpoint.replace(/\/$/, '')}/release/${organisation}/${application}`;
   const iosApplication = options.iosApplication || `${application}-ios`;
   if (!/^[a-zA-Z0-9_-]+$/.test(iosApplication) || iosApplication === application) throw new Error('iOS must use a valid, distinct application scope');
@@ -221,6 +253,39 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
   // CocoaPods resources are copied into the application target, unlike a file merely placed in ios/.
   s += `\n# Airborne fallback resource\npost_integrate do |installer|\n  installer.aggregate_targets.map(&:user_project).uniq.each do |project|\n    project.native_targets.select { |t| t.product_type == 'com.apple.product-type.application' }.each do |target|\n      ref = project.files.find { |f| f.path == 'release_config.json' } || project.main_group.new_file('release_config.json')\n      target.resources_build_phase.add_file_reference(ref) unless target.resources_build_phase.files_references.include?(ref)\n    end\n    project.save\n  end\nend\n`;
   planned.set(podfile, s);
+  // A release build silently serves the bundled JS when the platform blocks plain HTTP, so say what was done.
+  const notes = [];
+  if (url.protocol === 'http:') {
+    if (!isLocalHost(url.hostname)) {
+      notes.push(`Warning: ${url.origin} is plain HTTP on a non-local host. Android and iOS release builds block it and the app silently runs its bundled JS. Use HTTPS; nothing was added to allow cleartext.`);
+    } else {
+      const cleartextHosts = [...new Set([url.hostname, 'localhost', '127.0.0.1', '10.0.2.2'])].filter(h => !h.includes(':'));
+      const configFile = 'android/app/src/release/res/xml/network_security_config.xml';
+      const overlay = 'android/app/src/release/AndroidManifest.xml';
+      const mainManifest = path.join(root, 'android/app/src/main/AndroidManifest.xml');
+      if (fs.existsSync(path.join(root, configFile)) || fs.existsSync(path.join(root, overlay)) || (fs.existsSync(mainManifest) && read('android/app/src/main/AndroidManifest.xml').includes('networkSecurityConfig'))) {
+        notes.push(`Warning: Android already has a network security configuration; add cleartext for ${cleartextHosts.join(', ')} yourself or release builds will run bundled JS.`);
+      } else {
+        planned.set(configFile, networkConfig(cleartextHosts));
+        planned.set(overlay, releaseManifest);
+        notes.push(`Android release builds may use cleartext HTTP to ${cleartextHosts.join(', ')} only (android/app/src/release/res/xml/network_security_config.xml). Development only; use HTTPS elsewhere.`);
+      }
+      const plists = walk('ios').filter(f => !f.includes('/Pods/') && f.endsWith('/Info.plist'));
+      if (plists.length !== 1) throw new Error(`Expected one Info.plist under ios/; found ${plists.length}.\n${manual}`);
+      const plist = read(plists[0]);
+      const allowed = allowLocalNetworking(plist);
+      if (allowed === plist) notes.push(`iOS ${plists[0]} already allows local networking; left unchanged.`);
+      else {
+        planned.set(plists[0], allowed);
+        notes.push(`iOS ${plists[0]} now sets NSAllowsLocalNetworking so the simulator can use ${url.origin}. Development only; use HTTPS elsewhere.`);
+      }
+    }
+  }
+  const sdkDir = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
+  const localProperties = path.join(root, 'android/local.properties');
+  if (!sdkDir && !(fs.existsSync(localProperties) && /^sdk\.dir\s*=/m.test(fs.readFileSync(localProperties, 'utf8')))) {
+    notes.push('Note: ANDROID_HOME is not set and android/local.properties has no sdk.dir, so ./gradlew will stop with "SDK location not found". Set ANDROID_HOME to your Android SDK (macOS default: $HOME/Library/Android/sdk).');
+  }
   const config = { hermes_enabled: true, expo: false, js_entry_file: 'index.js' };
   for (const platform of ['android', 'ios']) {
     config[platform] = { organisation, namespace: platform === 'ios' ? iosApplication : application, index_file_path: platform === 'android' ? 'index.android.bundle' : 'main.jsbundle' };
@@ -241,7 +306,7 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
       fs.writeFileSync(path.join(temp, 'before'), before); fs.writeFileSync(path.join(temp, 'after'), after);
       const result = spawnSync('git', ['diff', '--no-index', '--no-ext-diff', '--', path.join(temp, 'before'), path.join(temp, 'after')], { encoding: 'utf8' });
       if (result.status !== 0 && result.status !== 1) throw new Error('Cannot generate dry-run diff');
-      diff += result.stdout.replaceAll(path.join(temp, 'before'), file).replaceAll(path.join(temp, 'after'), file);
+      diff += result.stdout.replaceAll(`a${path.join(temp, 'before')}`, `a/${file}`).replaceAll(`b${path.join(temp, 'after')}`, `b/${file}`).replaceAll(path.join(temp, 'before'), file).replaceAll(path.join(temp, 'after'), file);
     }
     if (!dryRun) {
       const state = JSON.stringify({ releaseURL, iosReleaseURL, sdk: pkg.dependencies['airborne-react-native'], nativeSdkProject: nativeSdkProject ? path.relative(root, nativeSdkProject) : null, iosSdkProject: iosSdkProject ? path.relative(root, iosSdkProject) : null, files: Object.fromEntries([...planned].map(([file, content]) => [file, hash(content)])) }, null, 2) + '\n';
@@ -261,5 +326,6 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
       } catch (error) { recover(); throw error; }
     }
   } finally { fs.rmSync(temp, { recursive: true }); }
-  return diff + (dryRun ? '\nDry run; no files written.\n' : '\nInstall dependencies, run pod install, and rebuild the native app.\n');
+  const report = notes.length ? `\n${notes.join('\n')}\n` : '';
+  return diff + report + (dryRun ? '\nDry run; no files written.\n' : '\nInstall dependencies, run pod install, and rebuild the native app.\n');
 }

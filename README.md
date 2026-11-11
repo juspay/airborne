@@ -16,7 +16,7 @@ The printed **SANDBOX READY** duration measures infrastructure readiness. **FIRS
 
 Open the printed sample URL. Run the printed `--publish-v2` command, then click **Check for update** and confirm “v2 — delivered over the air.” The small sample uses the real public manifest and a checksum-verified downloaded script; it is not a React Native SDK or native-device acceptance test. Its checked-in source is under `scripts/sample/`.
 
-For React Native, follow [Integrate React Native and deliver your first OTA](airborne_docs/docs/guides/first-ota.md). `airborne-devkit init --dry-run` shows the native diff; `init` patches recognized Kotlin/Swift scaffolds and writes configuration. Install dependencies and rebuild the binary before shipping an OTA. Unknown shapes are refused with manual steps.
+For React Native, follow [Integrate React Native and deliver your first OTA (13 commands on Android)](airborne_docs/docs/guides/first-ota.md). `airborne-devkit init --dry-run` shows the native diff; `init` patches recognized Kotlin/Swift scaffolds and writes configuration. Install dependencies and rebuild the binary before shipping an OTA. Unknown shapes are refused with manual steps.
 
 For your own app, create `app_version` (standard), then `version_cohort` (cohort depending on `app_version`) under Dimensions, and define its compatible range under Cohorts. Never reuse a version range for incompatible native binaries.
 

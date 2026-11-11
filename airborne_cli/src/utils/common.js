@@ -3,6 +3,7 @@ import path from "path";
 import { createHash } from "crypto";
 import { createReadStream } from "fs";
 import { promptWithType } from "./prompt.js";
+import { checkToken } from "./auth.js";
 
 function persistToConfig(configPath, platform, fields, label) {
   try {
@@ -344,13 +345,18 @@ export function formatCommand(cmd) {
     const token = loadToken(process.cwd());
     if (token?.access_token) {
       thisCmd.setOptionValue("token", token.access_token);
+      try {
+        checkToken(token);
+      } catch (err) {
+        console.error(`⚠️  ${err.message}`);
+      }
     }
   });
 
   return cmd;
 }
 
-export async function saveToken(access_token, refresh_token, directory_path) {
+export async function saveToken(access_token, refresh_token, directory_path, expires_in) {
   try {
     let tokenPath;
 
@@ -371,10 +377,15 @@ export async function saveToken(access_token, refresh_token, directory_path) {
       tokenPath = path.join(airborneDir, "credentials.json");
     }
 
+    const saved = new Date();
     const data = {
       access_token,
       refresh_token,
-      saved_at: new Date().toISOString(),
+      saved_at: saved.toISOString(),
+      // Lets later commands say "expired, log in again" instead of failing at the server.
+      ...(Number(expires_in) > 0
+        ? { expires_at: new Date(saved.getTime() + Number(expires_in) * 1000).toISOString() }
+        : {}),
     };
 
     fs.writeFileSync(tokenPath, JSON.stringify(data, null, 2), {
@@ -419,6 +430,11 @@ export function loadToken(directory_path) {
     console.error("❌ Failed to load tokens:", err.message);
     return null;
   }
+}
+
+// The stored access token, or an error that says how to log in (again).
+export function requireToken(directory_path) {
+  return checkToken(loadToken(directory_path));
 }
 
 export async function airborneConfigExists(directoryPath) {

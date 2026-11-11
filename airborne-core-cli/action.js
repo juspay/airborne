@@ -34,6 +34,8 @@ async function readConfigFile() {
  * Get the endpoint from the config file
  */
 export async function getBaseUrl() {
+  // A per-project endpoint (airborne-devkit configure) arrives here; it wins over the checkout-wide .config.
+  if (process.env.AIRBORNE_BASE_URL) return process.env.AIRBORNE_BASE_URL;
   try {
     const config = JSON.parse(await fsPromises.readFile(configFilePath, "utf-8"));
     return config.baseUrl || "https://airborne.juspay.in";

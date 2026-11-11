@@ -1,6 +1,35 @@
 import { readFileMapping } from "./file.js";
 import { CreatePackageAction } from "airborne-core-cli/action";
 import { writeReleaseConfig } from "./release.js";
+import { explainAuthFailure } from "./auth.js";
+import fs from "fs";
+import path from "path";
+
+// create-remote-package only reads what create-remote-files recorded, so name the step and tag that are missing.
+export function missingUploadMessage(file_path, config) {
+  const { directory_path, organisation, namespace, tag, platform } = config;
+  const where = `organisation ${organisation}, application ${namespace}, tag ${tag ? `"${tag}"` : "(none)"}`;
+  let others = [];
+  try {
+    const mappings = JSON.parse(
+      fs.readFileSync(path.join(directory_path, ".airborne", "mappings.json"), "utf8")
+    );
+    others = Object.entries(mappings[organisation]?.[namespace] || {})
+      .filter(([name, files]) => files[file_path] && name !== (tag || "__default__"))
+      .map(([name]) => (name === "__default__" ? null : name));
+  } catch {
+    // No mappings yet: nothing was uploaded from this project.
+  }
+  const flags = `-p ${platform || "<platform>"} --upload${tag ? ` -t ${tag}` : ""}`;
+  return (
+    `No uploaded record of "${file_path}" for ${where}. ` +
+    `Run create-remote-files ${flags} first (create-remote-package only uses what that step recorded in .airborne/mappings.json), ` +
+    `and fix any error it printed. Use the same -t tag for both steps.` +
+    (others.length
+      ? ` This file is recorded under ${others.map((t) => (t ? `tag "${t}"` : "no tag")).join(", ")}; pass ${others[0] ? `-t ${others[0]}` : "no -t"} if that is the upload you meant.`
+      : "")
+  );
+}
 
 export async function createPackageFromLocalRelease(
   airborneConfig,
@@ -20,7 +49,7 @@ export async function createPackageFromLocalRelease(
       airborneConfig
     );
     if (!indexMapping) {
-      throw new Error(`Missing upload for index file: ${indexFilePath}`);
+      throw new Error(missingUploadMessage(indexFilePath, airborneConfig));
     }
     const index_id = indexMapping.id;
 
@@ -39,7 +68,7 @@ export async function createPackageFromLocalRelease(
         airborneConfig
       );
       if (!mapping) {
-        throw new Error(`Missing mapping for file: ${file_path}`);
+        throw new Error(missingUploadMessage(file_path, airborneConfig));
       }
       file_ids.push(mapping.id);
     }
@@ -54,7 +83,12 @@ export async function createPackageFromLocalRelease(
       files: file_ids,
     };
 
-    const packg = await CreatePackageAction(null, createPackageOptions);
+    let packg;
+    try {
+      packg = await CreatePackageAction(null, createPackageOptions);
+    } catch (err) {
+      throw new Error(explainAuthFailure(err));
+    }
     releaseConfig.package.version = packg.version.toString();
     await writeReleaseConfig(
       releaseConfig,

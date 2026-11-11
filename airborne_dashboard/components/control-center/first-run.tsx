@@ -106,7 +106,7 @@ function Steps({ org, progress }: { org: string; progress: FirstRunProgress }) {
                 className="underline"
                 href={progress.firstRelease ? releasePath(org, app, progress.firstRelease.id) : appPath(org, app)}
               >
-                {progress.firstRelease ? `Start v${progress.firstRelease.version}` : "Open the app"}
+                {progress.firstRelease ? `Open v${progress.firstRelease.version}` : "Open the app"}
               </Link>{" "}
               for <span className="font-mono text-xs">{app}</span>.
             </>

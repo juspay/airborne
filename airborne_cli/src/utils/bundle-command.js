@@ -17,24 +17,24 @@ export function resolveBundleLayout(airborneConfig, platform) {
 }
 
 /**
- * Shell command that writes the bundle to `<build_folder>/<index_file_path>`.
+ * Process descriptor that writes the bundle to `<build_folder>/<index_file_path>`.
  * Web has no react-native bundle step: the app's own build command
  * (`web.build_command`, default `npm run build:web`) must emit a single script
  * at `$AIRBORNE_OUTPUT_DIR/$AIRBORNE_INDEX_FILE`.
  */
 export function buildBundleCommand(airborneConfig, platform, directoryPath, layout) {
   const { entry_file, index_file_path, build_folder } = layout;
-  const cd = `cd '${directoryPath}'`;
   if (platform === "web") {
     const buildCommand =
       airborneConfig.web?.build_command || DEFAULT_WEB_BUILD_COMMAND;
-    // Exported (not prefixed) so the build command's own arguments can expand them.
-    return `${cd} && export AIRBORNE_OUTPUT_DIR='${build_folder}' AIRBORNE_INDEX_FILE='${index_file_path}' && ${buildCommand}`;
+    // Environment is set before the shell expands the build command's arguments.
+    return { file: "/bin/sh", args: ["-c", buildCommand], cwd: directoryPath,
+      env: { AIRBORNE_OUTPUT_DIR: build_folder, AIRBORNE_INDEX_FILE: index_file_path } };
   }
-  const bundler = airborneConfig.expo
-    ? "npx expo export:embed"
-    : "npx react-native bundle";
-  return `${cd} && ${bundler} --platform ${platform} --dev false --entry-file '${entry_file}' --bundle-output '${build_folder}/${index_file_path}' --assets-dest '${build_folder}'`;
+  const args = airborneConfig.expo ? ["expo", "export:embed"] : ["react-native", "bundle"];
+  return { file: "npx", args: args.concat(["--platform", platform, "--dev", "false",
+    "--entry-file", entry_file, "--bundle-output", `${build_folder}/${index_file_path}`,
+    "--assets-dest", build_folder]), cwd: directoryPath };
 }
 
 /** Hermes bytecode only applies to native bundles. */

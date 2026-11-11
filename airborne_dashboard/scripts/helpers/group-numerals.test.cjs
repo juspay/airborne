@@ -7,5 +7,5 @@ test("dense group flag cards share the incident numerals and retain a release li
 
   assert.match(source, /!onReleasePage &&/);
   assert.match(source, /\{rate\} reported failing/);
-  assert.match(source, /Roll back · open release/);
+  assert.match(source, /Open release/);
 });

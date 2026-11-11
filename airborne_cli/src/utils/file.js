@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { hexToBase64, sha256FileHex } from "./common.js";
 import { UploadFileAction, CreateFileAction } from "airborne-core-cli/action";
+import { explainAuthFailure, isAuthFailure } from "./auth.js";
 
 export function readDirectoryRecursive(dirPath, baseDir = dirPath) {
   const items = [];
@@ -49,9 +50,10 @@ export async function executeReactNativeBundleCommand(command) {
     }
 
     // Execute the command
-    const output = execSync(command, {
+    const output = execFileSync(command.file, command.args, {
       encoding: "utf8",
-      cwd: process.cwd(),
+      cwd: command.cwd,
+      env: { ...process.env, ...command.env },
     });
 
     return {
@@ -190,6 +192,9 @@ export const uploadFiles = async (filesToUpload, config) => {
       results.errors.forEach(({ file, error }) => {
         console.log(`  • ${file}: ${error}`);
       });
+      // A rejected token fails every file the same way; say that once instead of "N operation(s) failed".
+      const rejected = results.errors.find(({ error }) => isAuthFailure(error));
+      if (rejected) throw new Error(explainAuthFailure(rejected.error));
       throw new Error(`${results.failed} file operation(s) failed`);
     }
   } catch (err) {
@@ -322,6 +327,9 @@ export async function createFiles(filesToCreate, config, prefixUrl) {
       results.errors.forEach(({ file, error }) => {
         console.log(`  • ${file}: ${error}`);
       });
+      // A rejected token fails every file the same way; say that once instead of "N operation(s) failed".
+      const rejected = results.errors.find(({ error }) => isAuthFailure(error));
+      if (rejected) throw new Error(explainAuthFailure(rejected.error));
       throw new Error(`${results.failed} file operation(s) failed`);
     }
   } catch (err) {

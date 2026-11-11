@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { initProject } from '../src/init/project.js';
+import { allowLocalNetworking, initProject, isLocalHost } from '../src/init/project.js';
 const opts = { organisation: 'sample', application: 'sample-android', endpoint: 'https://example.com' };
 function fixture(t) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'airborne-test-')); fs.cpSync(new URL('./fixtures/bare', import.meta.url), dir, { recursive: true }); t.after(() => fs.rmSync(dir, { recursive: true })); return dir; }
 test('dry-run writes nothing; recognized native scaffold receives hosts, dimensions and bundled config', t => {
@@ -149,4 +149,81 @@ test('atomic replacement preserves existing private file permissions', t => {
  const dir = fixture(t); const file = path.join(dir, 'package.json');
  fs.chmodSync(file, 0o600); initProject(dir, opts);
  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+});
+const local = { ...opts, endpoint: 'http://localhost:8099' };
+const release = 'android/app/src/release';
+test('a local HTTP endpoint gets Android release cleartext limited to local hosts, and init says so', t => {
+ const dir = fixture(t);
+ const out = initProject(dir, local);
+ const xml = fs.readFileSync(path.join(dir, release, 'res/xml/network_security_config.xml'), 'utf8');
+ assert.match(xml, /cleartextTrafficPermitted="true"/);
+ for (const host of ['localhost', '127.0.0.1', '10.0.2.2']) assert.match(xml, new RegExp(`<domain includeSubdomains="false">${host.replaceAll('.', '\\.')}</domain>`));
+ assert.doesNotMatch(xml, /example\.com|base-config/);
+ assert.match(fs.readFileSync(path.join(dir, release, 'AndroidManifest.xml'), 'utf8'), /android:networkSecurityConfig="@xml\/network_security_config"/);
+ assert.match(out, /cleartext HTTP to localhost, 127\.0\.0\.1, 10\.0\.2\.2 only/);
+ assert.match(initProject(dir, local), /already initialized/);
+});
+test('a private-network endpoint is allowed by name; main manifest and debug build stay untouched', t => {
+ const dir = fixture(t);
+ const main = path.join(dir, 'android/app/src/main/AndroidManifest.xml');
+ const before = fs.readFileSync(main, 'utf8');
+ initProject(dir, { ...opts, endpoint: 'http://192.168.1.20:8099' });
+ assert.match(fs.readFileSync(path.join(dir, release, 'res/xml/network_security_config.xml'), 'utf8'), />192\.168\.1\.20</);
+ assert.equal(fs.readFileSync(main, 'utf8'), before);
+ assert.equal(fs.existsSync(path.join(dir, 'android/app/src/debug')), false);
+});
+test('HTTPS adds no cleartext configuration; plain HTTP on a public host is refused loudly, not enabled', t => {
+ const dir = fixture(t);
+ assert.doesNotMatch(initProject(dir, opts), /cleartext|Warning/);
+ assert.equal(fs.existsSync(path.join(dir, release)), false);
+ const other = fixture(t);
+ const plistBefore = fs.readFileSync(path.join(other, 'ios/Kharcha/Info.plist'), 'utf8');
+ const out = initProject(other, { ...opts, endpoint: 'http://ota.example.com' });
+ assert.match(out, /Warning: http:\/\/ota\.example\.com is plain HTTP on a non-local host[\s\S]*silently runs its bundled JS/);
+ assert.equal(fs.existsSync(path.join(other, release)), false);
+ assert.equal(fs.readFileSync(path.join(other, 'ios/Kharcha/Info.plist'), 'utf8'), plistBefore);
+});
+test('iOS local networking is added only where the template lacks it', t => {
+ const dir = fixture(t);
+ const plist = path.join(dir, 'ios/Kharcha/Info.plist');
+ const kept = fs.readFileSync(plist, 'utf8');
+ assert.match(kept, /NSAllowsLocalNetworking/);
+ assert.match(initProject(dir, local), /already allows local networking; left unchanged/);
+ assert.equal(fs.readFileSync(plist, 'utf8'), kept);
+ const bare = '<plist><dict>\n\t<key>A</key>\n\t<string>b</string>\n</dict></plist>\n';
+ assert.match(allowLocalNetworking(bare), /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsLocalNetworking<\/key>\s*<true\/>/);
+ const strict = '<dict>\n\t<key>NSAppTransportSecurity</key>\n\t<dict>\n\t\t<key>NSAllowsLocalNetworking</key>\n\t\t<false/>\n\t</dict>\n</dict>';
+ assert.match(allowLocalNetworking(strict), /NSAllowsLocalNetworking<\/key>\s*<true\/>/);
+ const noLocal = '<dict>\n\t<key>NSAppTransportSecurity</key>\n\t<dict>\n\t\t<key>NSAllowsArbitraryLoads</key>\n\t\t<false/>\n\t</dict>\n</dict>';
+ assert.match(allowLocalNetworking(noLocal), /<key>NSAllowsLocalNetworking<\/key>\s*<true\/>[\s\S]*NSAllowsArbitraryLoads/);
+ assert.equal(allowLocalNetworking(allowLocalNetworking(noLocal)), allowLocalNetworking(noLocal));
+});
+test('an existing network security configuration is reported, not overwritten', t => {
+ const dir = fixture(t);
+ const main = path.join(dir, 'android/app/src/main/AndroidManifest.xml');
+ fs.writeFileSync(main, fs.readFileSync(main, 'utf8').replace('android:allowBackup', 'android:networkSecurityConfig="@xml/mine" android:allowBackup'));
+ const out = initProject(dir, local);
+ assert.match(out, /already has a network security configuration/);
+ assert.equal(fs.existsSync(path.join(dir, release)), false);
+});
+test('isLocalHost recognises development hosts only', () => {
+ for (const h of ['localhost', '127.0.0.1', '[::1]', '10.0.2.2', '192.168.0.4', '172.20.1.1', 'mac.local']) assert.equal(isLocalHost(h), true, h);
+ for (const h of ['example.com', '8.8.8.8', '172.32.0.1', 'localhost.example.com', '11.0.0.1']) assert.equal(isLocalHost(h), false, h);
+});
+test('dry-run diff headers keep their slashes and notes name a missing Android SDK', t => {
+ const dir = fixture(t);
+ const diff = initProject(dir, { ...local, dryRun: true });
+ assert.match(diff, /^diff --git a\/package\.json b\/package\.json$/m);
+ assert.match(diff, /^--- a\/package\.json$/m);
+ assert.match(diff, /^\+\+\+ b\/android\/app\/src\/release\/AndroidManifest\.xml$/m);
+ assert.equal(fs.existsSync(path.join(dir, release)), false);
+ const saved = { home: process.env.ANDROID_HOME, root: process.env.ANDROID_SDK_ROOT };
+ delete process.env.ANDROID_HOME; delete process.env.ANDROID_SDK_ROOT;
+ t.after(() => { if (saved.home) process.env.ANDROID_HOME = saved.home; if (saved.root) process.env.ANDROID_SDK_ROOT = saved.root; });
+ assert.match(initProject(dir, { ...local, dryRun: true }), /ANDROID_HOME is not set[\s\S]*SDK location not found/);
+ fs.writeFileSync(path.join(dir, 'android/local.properties'), 'sdk.dir=/x\n');
+ assert.doesNotMatch(initProject(dir, { ...local, dryRun: true }), /ANDROID_HOME is not set/);
+ process.env.ANDROID_HOME = '/sdk';
+ fs.rmSync(path.join(dir, 'android/local.properties'));
+ assert.doesNotMatch(initProject(dir, { ...local, dryRun: true }), /ANDROID_HOME is not set/);
 });

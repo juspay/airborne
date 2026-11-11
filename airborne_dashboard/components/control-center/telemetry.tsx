@@ -338,7 +338,7 @@ export function DeploymentFlagCard({
             className="mt-3 inline-block rounded-md border px-3 py-2 font-medium"
             href={releasePath(org, app, row.release_id)}
           >
-            Roll back · open release
+            Open release
           </Link>
         )}
         {actions && <div className="mt-4">{actions}</div>}
