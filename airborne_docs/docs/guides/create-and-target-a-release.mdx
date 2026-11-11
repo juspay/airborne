@@ -197,3 +197,5 @@ and explicitly ramp and conclude even the first release. A general concluded
 release alone does not opt a strict application's devices into default fallback.
 See [stored strict policy](/docs/server/control-center#stored-strict-serving-policy)
 for context preview and migration of legacy apps.
+
+Strict creation requires a nonempty `app_version` or `version_cohort` target, including the first release. Locale-only rules do not establish native compatibility. Custom targeting needs an audited `compatibility_exception` explanation of at least 20 characters; empty targeting is never an exception. Compatibility remains a declaration by the operator; the server does not verify native binary compatibility.

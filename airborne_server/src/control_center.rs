@@ -316,17 +316,35 @@ async fn overview(
         let mut allowed = Vec::new();
         let mut authorization_error = false;
         for app in org.applications {
-            if tokio::time::timeout_at(
-                deadline,
-                state.authz_provider.enforce_permission(
-                    &state,
-                    &auth_response.sub,
-                    &org.name,
-                    Some(&app.application),
-                    "release",
-                    "read",
-                ),
-            )
+            if tokio::time::timeout_at(deadline, async {
+                // Match app endpoints and enforce-batch: organisation permissions
+                // also authorize reads of applications inside that organisation.
+                if state
+                    .authz_provider
+                    .enforce_permission(
+                        &state,
+                        &auth_response.sub,
+                        &org.name,
+                        None,
+                        "release",
+                        "read",
+                    )
+                    .await?
+                {
+                    return Ok(true);
+                }
+                state
+                    .authz_provider
+                    .enforce_permission(
+                        &state,
+                        &auth_response.sub,
+                        &org.name,
+                        Some(&app.application),
+                        "release",
+                        "read",
+                    )
+                    .await
+            })
             .await
             .unwrap_or_else(|_| {
                 authorization_error = true;

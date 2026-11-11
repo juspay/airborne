@@ -1,5 +1,7 @@
 "use client";
 
+import { approvalStateReady } from "@/lib/control-center/overview-state";
+
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -189,7 +191,11 @@ export default function ControlCenterAppPage() {
                   policy={policy}
                   live={status.live}
                   permissions={{ ready: permissions.isReady, update: permissions.update }}
-                  approval={{ ready: !approvalOn || approval.isReady, policy: approval.policy, me }}
+                  approval={{
+                    ready: approvalStateReady(status, approval.isReady, Boolean(approval.error)),
+                    policy: approval.policy,
+                    me,
+                  }}
                   onChanged={refreshAll}
                 />
               </Panel>
@@ -210,9 +216,11 @@ export default function ControlCenterAppPage() {
                   <>
                     <PanelTitle>Approval policy</PanelTitle>
                     <p className="text-sm text-muted-foreground">
-                      {approvalOn
-                        ? "Loading the policy…"
-                        : "Off: release changes here are direct. An organisation admin can turn maker-checker on."}
+                      {!approvalStateReady(status, approval.isReady, Boolean(approval.error))
+                        ? "Unknown: approval state could not be verified. Refresh before acting."
+                        : approvalOn
+                          ? "Loading the policy…"
+                          : "Off: release changes here are direct. An organisation admin can turn maker-checker on."}
                     </p>
                   </>
                 )}

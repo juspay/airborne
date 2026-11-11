@@ -17,3 +17,12 @@ test("failed auxiliary reads never imply approvals off or writes unpaused", () =
   assert.equal(overviewStateWarning({}), null);
   assert.equal(overviewStateWarning(undefined), null);
 });
+
+test("approval readiness requires a verified overview and a successful policy read", () => {
+  const { approvalStateReady } = load("lib/control-center/overview-state");
+  assert.equal(approvalStateReady(undefined, true, false), false);
+  assert.equal(approvalStateReady({ auxiliary_error: "timeout", approval_required: false }, true, false), false);
+  assert.equal(approvalStateReady({ approval_required: false }, false, false), true);
+  assert.equal(approvalStateReady({ approval_required: true }, true, true), false);
+  assert.equal(approvalStateReady({ approval_required: true }, true, false), true);
+});

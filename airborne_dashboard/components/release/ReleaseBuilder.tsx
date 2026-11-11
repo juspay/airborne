@@ -54,7 +54,8 @@ function ReleaseBuilderContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Maker-checker: when the application's policy is on, the release is raised as a request instead of created.
-  const { policy } = useApprovalPolicy(org, app);
+  const { policy, error: policyError } = useApprovalPolicy(org, app);
+  const policyReady = Boolean(policy) && !policyError;
   const approvals = useApprovalActions();
   const me = useMe();
   const policyOn = Boolean(policy?.enabled);
@@ -65,6 +66,10 @@ function ReleaseBuilderContent() {
     reason?: string,
     marker?: RollbackSensitiveReason | null
   ) => {
+    if (!policyReady) {
+      toastError("Approval state unknown", "Refresh before creating or editing a release.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (policyOn && org && app) {
@@ -225,7 +230,7 @@ function ReleaseBuilderContent() {
             ) : (
               <Button
                 onClick={handleCreateClick}
-                disabled={isSubmitting || (policyOn && !maker)}
+                disabled={isSubmitting || !policyReady || (policyOn && !maker)}
                 title={policyOn && !maker ? `You are not a maker for ${app}.` : undefined}
               >
                 {getActionButtonText()}

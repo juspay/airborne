@@ -399,7 +399,7 @@ export function useApprovalPolicy(org: string | null, app: string | null) {
     error: swr.error as Error | undefined,
     isLoading: swr.isLoading,
     /** True once the server has answered (either way). Nothing is labelled "Request …" before that. */
-    isReady: Boolean(swr.data) || Boolean(swr.error),
+    isReady: Boolean(swr.data) && !swr.error,
     refresh: swr.mutate,
   };
 }

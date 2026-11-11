@@ -5,7 +5,7 @@ import { AirborneClientConfig } from "./AirborneClient";
 export declare const getRuntimeConfig: (config: AirborneClientConfig) => {
     runtime: string;
     sha256: import("@smithy/types").HashConstructor;
-    requestHandler: import("@smithy/types").NodeHttpHandlerOptions | import("@smithy/types").FetchHttpHandlerOptions | Record<string, unknown> | import("@smithy/protocol-http").HttpHandler<any> | import("@smithy/fetch-http-handler").FetchHttpHandler;
+    requestHandler: import("@smithy/types").NodeHttpHandlerOptions | import("@smithy/types").FetchHttpHandlerOptions | Record<string, unknown> | import("@smithy/fetch-http-handler").FetchHttpHandler | import("@smithy/protocol-http").HttpHandler<any>;
     apiVersion: string;
     cacheMiddleware?: boolean | undefined;
     urlParser: import("@smithy/types").UrlParser;

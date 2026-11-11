@@ -1,5 +1,7 @@
 "use client";
 
+import { approvalStateReady } from "@/lib/control-center/overview-state";
+
 import { OverviewStateNotice } from "@/components/control-center/overview-state-notice";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -187,7 +189,7 @@ export default function ControlCenterReleasePage() {
         update: permissions.update,
       }}
       approval={{
-        ready: !approvalOn || approval.isReady,
+        ready: approvalStateReady(located.app, approval.isReady, Boolean(approval.error)),
         policy: approval.policy,
         sensitive,
         me,

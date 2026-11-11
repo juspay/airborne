@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import useSWR from "swr";
 
 import { enforcePermissionsBatch, type PermissionCheckRequest } from "@/lib/authz";
-import type { PagePermissionMap } from "@/lib/page-permissions";
+import { contextualPermissionChecks, type PagePermissionMap } from "@/lib/page-permissions";
 import { useAppContext } from "@/providers/app-context";
 
 type PermissionDecisionMap<K extends string> = Record<K, boolean>;
@@ -35,20 +35,27 @@ export function usePagePermissions<K extends string>(permissionMap: PagePermissi
     [checks]
   );
 
-  const shouldFetch = Boolean(token && org && checks.length > 0);
+  const contextualChecks = contextualPermissionChecks(checks, app);
+  const shouldFetch = Boolean(token && org && contextualChecks.length > 0);
   const swrKey = shouldFetch ? ["page-permissions", token, org, app ?? "", requestFingerprint] : null;
 
   const { data, isLoading, error, mutate } = useSWR(swrKey, () =>
-    enforcePermissionsBatch({ token, org, app }, checks as PermissionCheckRequest[])
+    enforcePermissionsBatch({ token, org, app }, contextualChecks as PermissionCheckRequest[])
   );
 
   const decisions = useMemo(() => {
     const resolved = {} as PermissionDecisionMap<K>;
     aliases.forEach((alias, index) => {
-      resolved[alias] = data?.results?.[index]?.allowed ?? false;
+      resolved[alias] =
+        data?.results?.find(
+          (result) =>
+            result.resource === checks[index].resource &&
+            result.action === checks[index].action &&
+            result.scope === (checks[index].scope ?? "auto")
+        )?.allowed ?? false;
     });
     return resolved;
-  }, [aliases, data]);
+  }, [aliases, data, checks]);
 
   const can = (key: K) => {
     if (aliases.length === 0) return true;

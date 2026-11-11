@@ -1,5 +1,7 @@
 "use client";
 
+import { approvalStateReady } from "@/lib/control-center/overview-state";
+
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -135,7 +137,9 @@ export default function ReleaseDetailPage() {
   // With approval on the server turns a conclude (and so Revert) and a raised target into requests, and Revert on a
   // ramping release would be refused here although Roll back is direct in Control Center. Those actions live there.
   const { overview } = useOverview();
-  const approvalOn = Boolean(locateApp(overview, orgId, appId).app?.approval_required);
+  const overviewApp = locateApp(overview, orgId, appId).app;
+  const approvalOn = Boolean(overviewApp?.approval_required);
+  const approvalKnown = approvalStateReady(overviewApp, true, false);
 
   // Keep context in sync (avoids blank org/app in provider)
   useEffect(() => {
@@ -437,7 +441,8 @@ export default function ReleaseDetailPage() {
 
               {(release.experiment.status === "CREATED" || release.experiment.status === "INPROGRESS") &&
                 canRampRelease &&
-                !approvalOn && (
+                !approvalOn &&
+                approvalKnown && (
                   <Dialog open={rampDialogOpen} onOpenChange={setRampDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline" disabled={isRamping}>
@@ -485,7 +490,7 @@ export default function ReleaseDetailPage() {
                   </Dialog>
                 )}
 
-              {release.experiment.status === "INPROGRESS" && canConcludeRelease && !approvalOn && (
+              {release.experiment.status === "INPROGRESS" && canConcludeRelease && !approvalOn && approvalKnown && (
                 <>
                   <Dialog open={concludeDialogOpen} onOpenChange={setConcludeDialogOpen}>
                     <DialogTrigger asChild>

@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { toastError } from "@/hooks/use-toast";
+import { loginErrorMessage } from "@/lib/login-error";
 import { apiFetch } from "@/lib/api";
 import { GENERIC_OIDC_PROVIDER, resolveOidcProviders } from "@/lib/oidc-providers";
 import { useAppContext } from "@/providers/app-context";
@@ -49,6 +51,7 @@ export default function LoginPage() {
       const res = await apiFetch<any>("/users/login", {
         method: "POST",
         body: { name, password },
+        showErrorToast: false,
       });
       const token = res?.user_token?.access_token || "";
       setToken(token);
@@ -61,7 +64,7 @@ export default function LoginPage() {
       // if(res?.user_token?.access_token) window.location.href = "/dashboard"
     } catch (err: any) {
       console.log("Login Error", err);
-      // Error toast will be shown automatically by apiFetch
+      toastError("Could not sign in", loginErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +86,7 @@ export default function LoginPage() {
     } catch (e: any) {
       console.log("OIDC Login Error", e);
       setIsLoading(false);
-      // Error toast will be shown automatically by apiFetch
+      // apiFetch reports OIDC failures.
     }
   };
 

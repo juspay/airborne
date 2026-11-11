@@ -91,6 +91,14 @@ fn latest_live(exps: &[ExperimentResponse]) -> Vec<&ExperimentResponse> {
 pub(crate) fn version(exp: &ExperimentResponse) -> i64 {
     utils::extract_integer_from_experiment::<i64>(&experimental(exp), "package.version")
 }
+fn creation_actor<'a>(actors: &'a [(String, String)], id: &str) -> &'a str {
+    actors
+        .iter()
+        .find(|(release, actor)| release == id && !actor.trim().is_empty())
+        .map(|(_, actor)| actor.as_str())
+        .unwrap_or("Unknown actor (legacy release)")
+}
+
 pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Result<Value> {
     let pending = Value::Null; // overview attaches the authorized batch result
     let exps = match tokio::time::timeout(
@@ -106,10 +114,22 @@ pub async fn app_status(state: &web::Data<AppState>, org: &str, app: &str) -> Re
             )
         }
     };
+    let pool = state.db_pool.clone();
+    let (o, a) = (org.to_owned(), app.to_owned());
+    let actors = run_blocking!({
+        let mut c = pool.get_timeout(std::time::Duration::from_secs(2))?;
+        Ok(e::table
+            .filter(e::org_id.eq(o))
+            .filter(e::app_id.eq(a))
+            .filter(e::action.eq("created"))
+            .order((e::created_at.asc(), e::id.asc()))
+            .select((e::release_id, e::actor))
+            .load::<(String, String)>(&mut c)?)
+    })?;
     let live=latest_live(&exps).into_iter().map(|e|json!({"release_id":e.id,"package_version":version(e),"config_version":utils::extract_string_from_experiment(&experimental(e),"config.version"),"dimensions":context(e),"concluded_at":utils::dt(&e.last_modified)})).collect::<Vec<_>>();
-    let active=exps.iter().filter(|e|matches!(e.status,ExperimentStatusType::Created|ExperimentStatusType::Inprogress)).map(|e|json!({"release_id":e.id,"package_version":version(e),"status":e.status.as_str(),"traffic_percentage":e.traffic_percentage,"experimental_variant":experimental(e).map(|v|v.id.clone()).unwrap_or_default(),"dimensions":context(e),"created_at":utils::dt(&e.created_at),"created_by":e.created_by})).collect::<Vec<_>>();
+    let active=exps.iter().filter(|e|matches!(e.status,ExperimentStatusType::Created|ExperimentStatusType::Inprogress)).map(|e|json!({"release_id":e.id,"package_version":version(e),"status":e.status.as_str(),"traffic_percentage":e.traffic_percentage,"experimental_variant":experimental(e).map(|v|v.id.clone()).unwrap_or_default(),"dimensions":context(e),"created_at":utils::dt(&e.created_at),"created_by":creation_actor(&actors, &e.id)})).collect::<Vec<_>>();
     Ok(
-        json!({"application":app,"platform":null,"telemetry":tokio::time::timeout(std::time::Duration::from_millis(100),crate::telemetry::summary(state,org,app)).await.ok().and_then(|r|r.ok()).unwrap_or_else(||json!({"error":"Telemetry unavailable"})),"live":live,"active":active,"unresolved_operations":pending,"last_activity_at":exps.iter().max_by_key(|e|e.last_modified).map(|e|utils::dt(&e.last_modified)),"error":null}),
+        json!({"application":app,"platform":null,"first_device_seen_at":super::device_seen::read(state,org,app).await?,"telemetry":tokio::time::timeout(std::time::Duration::from_millis(100),crate::telemetry::summary(state,org,app)).await.ok().and_then(|r|r.ok()).unwrap_or_else(||json!({"error":"Telemetry unavailable"})),"live":live,"active":active,"unresolved_operations":pending,"last_activity_at":exps.iter().max_by_key(|e|e.last_modified).map(|e|utils::dt(&e.last_modified)),"error":null}),
     )
 }
 pub async fn event(
@@ -217,7 +237,7 @@ pub async fn events(
     })?;
     let mut events=rows.into_iter().map(|(action,actor,time,payload)|json!({"action":action,"actor":actor,"created_at":time,"payload":payload,"synthetic":false})).collect::<Vec<_>>();
     if !events.iter().any(|e| e["action"] == "created") {
-        events.push(json!({"action":"created","actor":exp.created_by,"created_at":utils::dt(&exp.created_at),"payload":{},"synthetic":true}));
+        events.push(json!({"action":"created","actor":"Unknown actor (legacy release)","created_at":utils::dt(&exp.created_at),"payload":{},"synthetic":true}));
     }
     let terminal = match exp.status {
         ExperimentStatusType::Concluded => Some("concluded"),
@@ -271,6 +291,29 @@ pub async fn rollback(
     path: Path<String>,
     req: Json<RollbackRequest>,
 ) -> Result<actix_web::HttpResponse> {
+    let auth = auth_response.into_inner();
+    let id = path.into_inner();
+    let req = req.into_inner();
+    let (status, body) = super::maker_checker::on_execution_stack(move || async move {
+        let response = rollback_inner(auth, state, id, req).await?;
+        let status = response.status();
+        let body = actix_web::body::to_bytes(response.into_body())
+            .await
+            .map_err(|_| ABError::InternalServerError("Invalid rollback response".into()))?;
+        Ok((status, body))
+    })
+    .await?;
+    Ok(actix_web::HttpResponse::build(status)
+        .content_type("application/json")
+        .body(body))
+}
+
+async fn rollback_inner(
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+    id: String,
+    req: RollbackRequest,
+) -> Result<actix_web::HttpResponse> {
     if req.reason.trim().is_empty() {
         return Err(ABError::BadRequest("Rollback reason required".into()));
     }
@@ -278,7 +321,6 @@ pub async fn rollback(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
-    let id = path.into_inner();
     let result = super::write_lock::locked(&state, &org, &app, async {
         if req.emergency {
             return super::maker_checker::emergency(
@@ -575,6 +617,22 @@ pub(super) fn snapshot(exp: &ExperimentResponse) -> Value {
         })
         .collect::<serde_json::Map<_, _>>();
     json!({"id":exp.id,"status":exp.status.as_str(),"context":context(exp),"variants":variants,"traffic_percentage":exp.traffic_percentage,"chosen_variant":exp.chosen_variant,"description":exp.description,"change_reason":exp.change_reason,"revision":format!("{}:{}",exp.last_modified.secs(),exp.last_modified.subsec_nanos())})
+}
+
+#[cfg(test)]
+mod actor_tests {
+    #[test]
+    fn actor_comes_from_scoped_creation_audit() {
+        let rows = vec![
+            ("other".into(), "wrong".into()),
+            ("r1".into(), "real-owner".into()),
+        ];
+        assert_eq!(super::creation_actor(&rows, "r1"), "real-owner");
+        assert_eq!(
+            super::creation_actor(&rows, "legacy"),
+            "Unknown actor (legacy release)"
+        );
+    }
 }
 
 #[cfg(test)]

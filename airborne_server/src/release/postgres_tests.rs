@@ -885,3 +885,117 @@ async fn third_pass_emergency_ramp_and_conclude_retry_by_another_checker() {
         upstream.stop(true).await;
     }
 }
+
+#[actix_web::test]
+#[ignore = "requires disposable TEST_DATABASE_URL; no live services or credentials"]
+async fn postgres_org_reader_overview_includes_apps() {
+    use actix_web::{dev::Service, test, HttpMessage};
+    let (state, upstream, _) = fixture().await;
+    let org = format!("scratch-{}", Uuid::new_v4());
+    state
+        .authz_provider
+        .create_organisation(&state, &org, "maker@test")
+        .await
+        .unwrap();
+    state
+        .authz_provider
+        .create_application(&state, &org, "test-app", "maker@test")
+        .await
+        .unwrap();
+    for role in ["read", "write"] {
+        let subject = format!("{role}@test");
+        state
+            .authz_provider
+            .add_organisation_user(&state, "maker@test", &org, &subject, role)
+            .await
+            .unwrap();
+        let mut actor = auth(&subject, &org, "test-app");
+        actor.is_super_admin = false;
+        actor.application = None;
+        let service = test::init_service(
+            actix_web::App::new()
+                .app_data(state.clone())
+                .wrap_fn(move |req, srv| {
+                    req.extensions_mut().insert(actor.clone());
+                    srv.call(req)
+                })
+                .service(crate::control_center::add_routes()),
+        )
+        .await;
+        let overview: Value = test::call_and_read_body_json(
+            &service,
+            test::TestRequest::get().uri("/overview").to_request(),
+        )
+        .await;
+        assert_eq!(
+            overview["organisations"][0]["ungrouped"][0]["application"], "test-app",
+            "{overview}"
+        );
+    }
+    upstream.stop(true).await;
+}
+
+#[actix_web::test]
+#[ignore = "requires disposable TEST_DATABASE_URL"]
+async fn postgres_interrupted_approval_is_recoverable_without_reexecution() {
+    use actix_web::{dev::Service, test, HttpMessage};
+    let (state, upstream, data) = fixture().await;
+    let org = format!("scratch-{}", Uuid::new_v4());
+    state
+        .authz_provider
+        .create_organisation(&state, &org, "maker@test")
+        .await
+        .unwrap();
+    state
+        .authz_provider
+        .add_organisation_user(&state, "maker@test", &org, "checker@test", "admin")
+        .await
+        .unwrap();
+    state
+        .authz_provider
+        .create_application(&state, &org, "test-app", "maker@test")
+        .await
+        .unwrap();
+    let id = Uuid::new_v4();
+    let request = json!({"id":id,"status":"executing","requester":"maker@test","action":"create","payload":{}});
+    {
+        let mut c = state.db_pool.get().unwrap();
+        diesel::sql_query("INSERT INTO hyperotaserver.approval_policies(org_id,app_id,data) VALUES($1,'test-app',$2)").bind::<Text,_>(&org).bind::<Jsonb,_>(json!({"enabled":true,"checkers":["checker@test"]})).execute(&mut c).unwrap();
+        diesel::sql_query("INSERT INTO hyperotaserver.deployment_requests(id,org_id,app_id,status,data) VALUES($1,$2,'test-app','executing',$3)").bind::<SqlUuid,_>(id).bind::<Text,_>(&org).bind::<Jsonb,_>(request).execute(&mut c).unwrap();
+    }
+    let o = org.clone();
+    let service = test::init_service(
+        actix_web::App::new()
+            .app_data(state.clone())
+            .wrap_fn(move |req, srv| {
+                req.extensions_mut()
+                    .insert(auth("checker@test", &o, "test-app"));
+                srv.call(req)
+            })
+            .configure(routes),
+    )
+    .await;
+    let recovered: Value = test::call_and_read_body_json(
+        &service,
+        test::TestRequest::post()
+            .uri(&format!("/deployment-requests/{id}/approve"))
+            .set_json(json!({"reason":"Inspect interrupted execution"}))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(recovered["status"], "failed", "{recovered}");
+    assert!(recovered["decision_reason"]
+        .as_str()
+        .unwrap()
+        .contains("Interrupted execution reconciled"));
+    assert_eq!(
+        *data.lock().unwrap(),
+        json!([]),
+        "recovery must not dispatch another create"
+    );
+    assert_eq!(
+        find(&state, &org, "test-app", id).await.unwrap()["status"],
+        "failed"
+    );
+    upstream.stop(true).await;
+}

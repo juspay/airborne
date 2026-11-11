@@ -533,3 +533,5 @@ cannot be abandoned. Resolve unknown write outcomes first.
 Without a CloudFront distribution, invalidation is `not_applicable` and release
 writes do not call CloudFront. Real configured distributions retain retry and
 partial-write reporting.
+
+Strict creation requires a nonempty `app_version` or `version_cohort` target, including the first release. Locale-only rules do not establish native compatibility. Custom targeting needs an audited `compatibility_exception` explanation of at least 20 characters; empty targeting is never an exception. Compatibility remains a declaration by the operator; the server does not verify native binary compatibility.

@@ -56,6 +56,7 @@ export interface GetControlCenterOverviewCommandOutput extends GetControlCenterO
  * //           name: "STRING_VALUE", // required
  * //           members: [ // ControlCenterAppStatusList // required
  * //             { // ControlCenterAppStatus
+ * //               first_device_seen_at: "STRING_VALUE",
  * //               auxiliary_error: "STRING_VALUE",
  * //               telemetry: "DOCUMENT_VALUE",
  * //               cache_invalidation: "DOCUMENT_VALUE",
@@ -125,6 +126,7 @@ export interface GetControlCenterOverviewCommandOutput extends GetControlCenterO
  * //       ],
  * //       ungrouped: [ // required
  * //         {
+ * //           first_device_seen_at: "STRING_VALUE",
  * //           auxiliary_error: "STRING_VALUE",
  * //           telemetry: "DOCUMENT_VALUE",
  * //           cache_invalidation: "DOCUMENT_VALUE",

@@ -249,6 +249,7 @@ const se_CreateReleaseCommand = async (input, context) => {
     b.bp("/api/releases");
     let body;
     body = JSON.stringify((0, smithy_client_1.take)(input, {
+        'compatibility_exception': [],
         'config': _ => se_CreateReleaseRequestConfig(_, context),
         'dimensions': _ => se_DimensionsMap(_, context),
         'package': _ => se_CreateReleaseRequestPackage(_, context),
@@ -2225,6 +2226,7 @@ const de_ControlCenterAppStatus = (output, context) => {
         'cache_invalidation': (_) => de_Document(_, context),
         'emergency_needs_review': (_) => de_EmergencyReviewList(_, context),
         'error': (_) => de_Document(_, context),
+        'first_device_seen_at': smithy_client_1.expectString,
         'last_activity_at': (_) => de_Document(_, context),
         'live': (_) => de_ControlCenterLiveReleaseList(_, context),
         'pending_requests': smithy_client_1.expectInt32,

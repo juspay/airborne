@@ -1,0 +1,1 @@
+DROP TABLE hyperotaserver.first_device_requests;

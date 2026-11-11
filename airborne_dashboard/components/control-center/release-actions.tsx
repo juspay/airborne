@@ -34,6 +34,7 @@ import {
   classifyApprovalError,
   everyRampTargetNeedsRequest,
   isChecker,
+  canOfferEmergency,
   isEmergencyReviewPending,
   isMaker,
   needsApproval,
@@ -219,7 +220,7 @@ function Facts({ rows }: { rows: { label: string; value: ReactNode }[] }) {
 }
 
 function PkgLine({ version, note }: { version: number | undefined; note?: string }) {
-  if (version === undefined) return <span className="text-muted-foreground">nothing live</span>;
+  if (version === undefined) return <span className="text-muted-foreground">Live state not verified</span>;
   return (
     <span className="inline-flex items-baseline gap-2">
       <Pkg version={version} />
@@ -282,8 +283,7 @@ export function ReleaseActionBar({
   const concludeNeedsRequest = policyOn;
   const rollbackNeedsRequest =
     policyOn && needsApproval("rollback", status, release.trafficPercentage, 0, Boolean(sensitive));
-  const emergencyOffered =
-    policyOn && isLive && Boolean(approval.policy?.emergency_rollback) && (approval.policy?.checkers.length ?? 0) >= 2;
+  const emergencyOffered = policyOn && isLive && canOfferEmergency(approval.policy, approval.me);
   const notMaker = policyOn && !maker;
   const notMakerHint = `You are not a maker for ${app}, so you cannot raise requests here.`;
 
@@ -300,6 +300,12 @@ export function ReleaseActionBar({
               ? "Concluded on the control variant. Nothing to ramp or roll back."
               : "State unknown: the server did not report this release's outcome, so no actions are offered."}
       </p>
+    );
+  }
+
+  if (!approval.ready) {
+    return place(
+      <p className="text-sm text-muted-foreground">Approval state unknown. Refresh before making release changes.</p>
     );
   }
 

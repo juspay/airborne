@@ -594,6 +594,7 @@ export const se_CreateReleaseCommand = async(
   b.bp("/api/releases");
   let body: any;
   body = JSON.stringify(take(input, {
+    'compatibility_exception': [],
     'config': _ => se_CreateReleaseRequestConfig(_, context),
     'dimensions': _ => se_DimensionsMap(_, context),
     'package': _ => se_CreateReleaseRequestPackage(_, context),
@@ -3294,6 +3295,7 @@ const de_CommandError = async(
       'cache_invalidation': (_: any) => de_Document(_, context),
       'emergency_needs_review': (_: any) => de_EmergencyReviewList(_, context),
       'error': (_: any) => de_Document(_, context),
+      'first_device_seen_at': __expectString,
       'last_activity_at': (_: any) => de_Document(_, context),
       'live': (_: any) => de_ControlCenterLiveReleaseList(_, context),
       'pending_requests': __expectInt32,

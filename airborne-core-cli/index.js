@@ -1051,6 +1051,7 @@ JSON file format (params.json):
 program
   .command("CreateRelease")
   .argument('[params_file]', 'JSON file containing all parameters (use @params.json format)')
+ .option("--compatibility_exception <reason>", "Audited custom compatibility declaration (at least 20 characters)")
  .option("--config <config>", "config parameter")
  .option("--package_id <package_id>", "package_id parameter")
  .option("--package <package>", "package parameter")

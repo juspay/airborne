@@ -48,6 +48,7 @@ declare const GetControlCenterOverviewCommand_base: {
  * //           name: "STRING_VALUE", // required
  * //           members: [ // ControlCenterAppStatusList // required
  * //             { // ControlCenterAppStatus
+ * //               first_device_seen_at: "STRING_VALUE",
  * //               auxiliary_error: "STRING_VALUE",
  * //               telemetry: "DOCUMENT_VALUE",
  * //               cache_invalidation: "DOCUMENT_VALUE",
@@ -117,6 +118,7 @@ declare const GetControlCenterOverviewCommand_base: {
  * //       ],
  * //       ungrouped: [ // required
  * //         {
+ * //           first_device_seen_at: "STRING_VALUE",
  * //           auxiliary_error: "STRING_VALUE",
  * //           telemetry: "DOCUMENT_VALUE",
  * //           cache_invalidation: "DOCUMENT_VALUE",

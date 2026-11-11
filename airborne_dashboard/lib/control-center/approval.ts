@@ -655,3 +655,12 @@ export function describeAcknowledgeFailure(f: AcknowledgeFailure): { title: stri
       return { title: "Refused", text: "The server refused this. Nothing was recorded." };
   }
 }
+
+export function canOfferEmergency(policy: ApprovalPolicy | null | undefined, me: string | null | undefined): boolean {
+  return Boolean(
+    policy?.enabled &&
+      policy.emergency_rollback &&
+      policy.checkers.length >= 2 &&
+      isChecker(policy ?? undefined, me ?? null)
+  );
+}

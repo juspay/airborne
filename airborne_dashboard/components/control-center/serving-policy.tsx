@@ -619,6 +619,11 @@ export function ServingPolicyPanel({
     );
   }
 
+  if (!approval.ready)
+    return (
+      <p className="text-sm text-muted-foreground">Approval state unknown. Refresh before changing serving policy.</p>
+    );
+
   const control = (() => {
     if (state === "forced")
       return { disabled: true, title: "Forced on by the deployment; it cannot be turned off here." };

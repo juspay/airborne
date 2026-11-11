@@ -13,3 +13,10 @@ export function definePagePermissions<K extends string>(permissions: PagePermiss
 export function permission(resource: string, action: string, scope: AuthzScope = "auto"): PagePermissionDefinition {
   return { resource, action, scope };
 }
+
+export function contextualPermissionChecks(
+  checks: PermissionCheckRequest[],
+  app: string | null | undefined
+): PermissionCheckRequest[] {
+  return checks.filter((check) => check.scope !== "app" || Boolean(app));
+}

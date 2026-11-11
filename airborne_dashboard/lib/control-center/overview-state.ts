@@ -6,3 +6,16 @@ export function overviewStateWarning(app: Pick<AppStatus, "auxiliary_error"> | n
     ? "The state of approvals, reviews, serving policy and paused writes could not be read. Refresh before making changes."
     : null;
 }
+
+export function approvalStateReady(
+  app: Pick<AppStatus, "auxiliary_error" | "approval_required"> | null | undefined,
+  policyReady: boolean,
+  policyError: boolean
+): boolean {
+  return Boolean(
+    app &&
+      app.auxiliary_error == null &&
+      typeof app.approval_required === "boolean" &&
+      (!app.approval_required || (policyReady && !policyError))
+  );
+}

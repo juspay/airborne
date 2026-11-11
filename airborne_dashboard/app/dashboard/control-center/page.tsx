@@ -20,7 +20,7 @@ import { UngroupedSection } from "@/components/control-center/ungrouped-table";
 import { EmptyState, ErrorState, OverviewSkeleton } from "@/components/control-center/states";
 import { GroupEditorDialog, type GroupEditorMode } from "@/components/control-center/group-editor-dialog";
 import { DeleteGroupDialog } from "@/components/control-center/delete-group-dialog";
-import { APPROVALS_PATH } from "@/components/control-center/paths";
+import { APPROVALS_PATH, createAppPath } from "@/components/control-center/paths";
 
 const PAGE_AUTHZ = definePagePermissions({
   manage_groups: permission("app_group", "create", "org"),
@@ -202,7 +202,7 @@ export default function ControlCenterOverviewPage() {
                 <h2 className="font-semibold">Your first OTA release</h2>
                 <ol className="list-decimal pl-5 space-y-2 text-sm">
                   <li>
-                    <Link className="underline" href="/dashboard">
+                    <Link className="underline" href={createAppPath(overview.organisations[0].name)}>
                       Create an app
                     </Link>{" "}
                     in your organisation, separately for each platform.

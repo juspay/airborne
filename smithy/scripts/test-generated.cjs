@@ -21,5 +21,12 @@ function client(status, type, body) {
   assert.deepEqual(result.blocked_package_versions,['1']);
   const listed=await client(200,'',{data:[{id:'one',warnings:['targeting is broad']}]}).send(new sdk.ListReleasesCommand({organisation:'o',application:'a'}));
   assert.deepEqual(listed.data[0].warnings,['targeting is broad']);
-  console.log('generated client contracts: 6 passed');
+  let sent;
+  const capture = new sdk.AirborneClient({endpoint:'http://localhost',maxAttempts:1,token:{token:'test'},
+    requestHandler:{async handle(request) { sent = JSON.parse(request.body); return {response:{statusCode:200,headers:{'content-type':'application/json'},body:Buffer.from('{}')}};}}});
+  await capture.send(new sdk.CreateReleaseCommand({organisation:'o',application:'a',config:{},compatibility_exception:'Custom native cohort verified by operator'}));
+  assert.equal(sent.compatibility_exception, 'Custom native cohort verified by operator');
+  const overview = await client(200, '', {organisations:[{name:'o',groups:[],ungrouped:[{application:'a',first_device_seen_at:'2026-01-01T00:00:00Z',live:[],active:[]}]}]}).send(new sdk.GetControlCenterOverviewCommand({}));
+  assert.equal(overview.organisations[0].ungrouped[0].first_device_seen_at, '2026-01-01T00:00:00Z');
+  console.log('generated client contracts: 8 passed');
 })().catch(e=>{console.error(e);process.exitCode=1;});

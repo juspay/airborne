@@ -116,6 +116,8 @@ list ControlCenterActiveReleaseList {
 
 /// Release state for one application, including per-application lookup failures.
 structure ControlCenterAppStatus {
+    /// First unverified public manifest request, independent of telemetry retention.
+    first_device_seen_at: String
     /// Local auxiliary data unavailable or deadline exceeded; corresponding fields are null.
     auxiliary_error: String
     telemetry: Document

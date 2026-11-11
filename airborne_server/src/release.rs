@@ -38,6 +38,7 @@ use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBui
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
 pub mod control_center;
+mod device_seen;
 pub(crate) mod maker_checker;
 pub(crate) mod operations;
 pub(crate) mod recovery;
@@ -457,7 +458,11 @@ pub(super) async fn create_release_impl(
 
     let dimensions = req.dimensions.clone().unwrap_or_default();
     let strict = serving_policy::get(&state, &organisation, &application).await?["effective_strict"].as_bool().unwrap_or(true);
-    validate_creation_targeting(strict, &dimensions)?;
+    validate_creation_targeting(strict, &dimensions, req.compatibility_exception.as_deref())?;
+    if let Some(reason) = &req.compatibility_exception {
+        // Persist the exception before any upstream mutation; audit failure blocks creation.
+        control_center::required_event(&state, &auth_response, "", "compatibility_exception", serde_json::json!({"reason":reason,"dimensions":dimensions})).await?;
+    }
 
 
     if utils::check_non_concluded_releases(
@@ -551,7 +556,7 @@ pub(super) async fn create_release_impl(
         &auth_response,
         &experiment_id_for_ramping,
         "created",
-        serde_json::json!({}),
+        serde_json::json!({"compatibility_exception":req.compatibility_exception}),
     )
     .await;
 
@@ -1408,6 +1413,11 @@ async fn serve_release_handler(
     .await
     .map_err(|e| ABError::NotFound(format!("Workspace unavailable; keep current code: {}", e)))?;
 
+    // The app exists (workspace lookup succeeded). A first strict fetch may return 404.
+    if let Err(error) = device_seen::record(&state, &organisation, &application).await {
+        log::warn!("First device request could not be recorded: {error}");
+    }
+
     let context: HashMap<String, String> = req
         .headers()
         .get("x-dimension")
@@ -2024,24 +2034,58 @@ mod targeting_warning_tests {
 fn validate_creation_targeting(
     strict: bool,
     dimensions: &HashMap<String, Value>,
+    exception: Option<&str>,
 ) -> airborne_types::Result<()> {
-    if strict && dimensions.is_empty() {
-        return Err(ABError::BadRequest("Strict serving requires a targeted release, including the first release. Create an app_version dimension and a version_cohort with a compatible version range in Cohorts, then select that cohort in Create Release → Targeting. After creation, ramp and conclude the release explicitly.".into()));
+    let explicit_version = ["app_version", "version_cohort"].iter().any(|key| {
+        dimensions
+            .get(*key)
+            .and_then(Value::as_str)
+            .is_some_and(|v| !v.trim().is_empty())
+    });
+    if strict
+        && (dimensions.is_empty()
+            || (!explicit_version && exception.is_none_or(|r| r.trim().len() < 20)))
+    {
+        return Err(ABError::BadRequest("Strict creation requires a nonempty app_version or version_cohort target declaring compatible native versions. For custom targeting provide compatibility_exception (at least 20 characters explaining native compatibility); it is audited. Compatibility remains the operator's declaration, not server verification.".into()));
     }
     Ok(())
 }
+
 #[cfg(test)]
 mod creation_targeting_tests {
     use super::*;
     #[test]
-    fn strict_creation_requires_targeting_but_legacy_allows_defaults() {
-        assert!(validate_creation_targeting(true, &HashMap::new()).is_err());
-        assert!(validate_creation_targeting(false, &HashMap::new()).is_ok());
+    fn strict_creation_requires_declared_compatibility() {
+        let locale = HashMap::from([("locale".into(), serde_json::json!("en"))]);
+        assert!(validate_creation_targeting(true, &locale, None).is_err());
         assert!(validate_creation_targeting(
             true,
-            &HashMap::from([("version_cohort".into(), serde_json::json!("v1"))])
+            &locale,
+            Some("legacy native cohort reviewed by owner")
         )
         .is_ok());
+        assert!(validate_creation_targeting(true, &locale, Some(" ")).is_err());
+        assert!(validate_creation_targeting(
+            true,
+            &HashMap::new(),
+            Some("legacy native cohort reviewed by owner")
+        )
+        .is_err());
+        assert!(validate_creation_targeting(false, &HashMap::new(), None).is_ok());
+        for key in ["app_version", "version_cohort"] {
+            assert!(validate_creation_targeting(
+                true,
+                &HashMap::from([(key.into(), json!("1.0.0"))]),
+                None
+            )
+            .is_ok());
+            for v in [json!(""), json!(null), json!(true), json!([])] {
+                assert!(
+                    validate_creation_targeting(true, &HashMap::from([(key.into(), v)]), None)
+                        .is_err()
+                );
+            }
+        }
     }
 }
 

@@ -466,6 +466,7 @@ async fn snapshot_payload(
             super::validate_creation_targeting(
                 strict,
                 &req.dimensions.clone().unwrap_or_default(),
+                req.compatibility_exception.as_deref(),
             )?;
         }
         let (workspace, _) = control_center::experiments(state, org, app).await?;
@@ -676,6 +677,43 @@ async fn marker(
     let (o, a, id) = (org.to_owned(), app.to_owned(), id.to_owned());
     write_lock::store(move|c|c.transaction::<_,ABError,_>(|c|{if let Some(version)=threshold {diesel::sql_query("INSERT INTO hyperotaserver.blocked_packages(org_id,app_id,package_version,source_release) SELECT org_id,app_id,version::text,$3 FROM hyperotaserver.packages_v2 WHERE org_id=$1 AND app_id=$2 AND version < $4::integer ON CONFLICT DO NOTHING").bind::<Text,_>(&o).bind::<Text,_>(&a).bind::<Text,_>(&id).bind::<Text,_>(version).execute(c)?;} diesel::sql_query("INSERT INTO hyperotaserver.release_protections(org_id,app_id,release_id,data) VALUES($1,$2,$3,$4) ON CONFLICT(org_id,app_id,release_id) DO UPDATE SET data=excluded.data").bind::<Text,_>(o).bind::<Text,_>(a).bind::<Text,_>(id).bind::<Jsonb,_>(json!({"rollback_sensitive":v})).execute(c)?;Ok(())})).await
 }
+// Construct AND poll large debug execution futures on an explicitly sized stack.
+// The factory is invoked on the worker: boxing a future after constructing it on
+// an Actix thread does not bound construction temporaries. The writer lock and
+// all execution task-locals must be acquired inside the factory, never transferred.
+pub(super) async fn on_execution_stack<F, Fut, T>(factory: F) -> Result<T>
+where
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = Result<T>> + 'static,
+    T: Send + 'static,
+{
+    static EXECUTIONS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(8);
+    let permit = EXECUTIONS.try_acquire().map_err(|_| {
+        coded(
+            503,
+            "execution_capacity",
+            "Release execution capacity reached; retry shortly",
+        )
+    })?;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    std::thread::Builder::new()
+        .name("release-execution".into())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let _permit = permit;
+            let result = actix_web::rt::System::new().block_on(factory());
+            let _ = tx.send(result);
+        })
+        .map_err(|_| {
+            coded(
+                503,
+                "execution_unavailable",
+                "Could not start release execution",
+            )
+        })?;
+    rx.await.map_err(|_| coded(500, "execution_interrupted", "Execution interrupted; inspect release state and reconcile the request or operation before retrying"))?
+}
+
 #[post("/deployment-requests/{id}/{decision}")]
 async fn decide(
     auth_response: web::ReqData<AuthResponse>,
@@ -683,8 +721,26 @@ async fn decide(
     path: Path<(Uuid, String)>,
     req: Json<Decision>,
 ) -> Result<Json<Value>> {
+    let auth = auth_response.into_inner();
+    let path = path.into_inner();
+    let req = req.into_inner();
+    on_execution_stack(move || async move {
+        decide_inner(auth, state, path, req)
+            .await
+            .map(|v| v.into_inner())
+    })
+    .await
+    .map(Json)
+}
+
+async fn decide_inner(
+    auth_response: AuthResponse,
+    state: web::Data<AppState>,
+    path: (Uuid, String),
+    req: Decision,
+) -> Result<Json<Value>> {
     let (o, a) = scope(&auth_response)?;
-    let (id, decision) = path.into_inner();
+    let (id, decision) = path;
     write_lock::validate_user_reason(&req.reason)?;
     write_lock::locked(&state,&o,&a,async{
         let mut r=find(&state,&o,&a,id).await?;let p=policy(&state,&o,&a).await?;
@@ -1217,9 +1273,14 @@ mod org_member_middleware_tests {
     async fn implicit_app_read_does_not_allow_write() {
         let env = |k| std::env::var(k).unwrap();
         let client = reqwest::Client::new();
-        let request = |method| {
+        let request = |method: reqwest::Method| {
+            let path = if method == reqwest::Method::GET {
+                "/api/releases/list"
+            } else {
+                "/api/releases"
+            };
             client
-                .request(method, format!("{}/api/releases", env("TEST_API_URL")))
+                .request(method, format!("{}{}", env("TEST_API_URL"), path))
                 .bearer_auth(env("TEST_ORG_READER_TOKEN"))
                 .header("x-organisation", env("TEST_ORG"))
                 .header("x-application", env("TEST_APP"))
@@ -1236,5 +1297,43 @@ mod org_member_middleware_tests {
             403,
             "implicit READ must never grant write"
         );
+    }
+}
+
+#[cfg(test)]
+mod execution_stack_tests {
+    use super::*;
+
+    #[actix_web::test]
+    async fn execution_future_is_constructed_on_the_worker() {
+        let caller = std::thread::current().id();
+        let value = on_execution_stack(move || {
+            assert_ne!(std::thread::current().id(), caller);
+            assert_eq!(std::thread::current().name(), Some("release-execution"));
+            async { Ok(42) }
+        })
+        .await
+        .unwrap();
+        assert_eq!(value, 42);
+    }
+
+    #[actix_web::test]
+    async fn interrupted_worker_reports_reconciliation_instead_of_success() {
+        let error = on_execution_stack(|| async {
+            panic!("simulated execution panic");
+            #[allow(unreachable_code)]
+            Ok(())
+        })
+        .await
+        .unwrap_err();
+        match error {
+            ABError::ReleaseOperation { status, body } => {
+                assert_eq!(status, 500);
+                assert_eq!(body["code"], "execution_interrupted");
+                assert!(body["message"].as_str().unwrap().contains("reconcile"));
+            }
+            other => panic!("unexpected error: {other}"),
+        }
+        assert_eq!(on_execution_stack(|| async { Ok(1) }).await.unwrap(), 1);
     }
 }

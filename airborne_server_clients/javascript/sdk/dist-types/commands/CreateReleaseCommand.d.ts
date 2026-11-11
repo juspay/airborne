@@ -56,6 +56,7 @@ declare const CreateReleaseCommand_base: {
  *   resources: [
  *     "STRING_VALUE",
  *   ],
+ *   compatibility_exception: "STRING_VALUE",
  *   rollback_sensitive: "security" || "one_way_migration",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required

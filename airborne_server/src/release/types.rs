@@ -10,6 +10,8 @@ use superposition_sdk::types::ExperimentStatusType;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateReleaseRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatibility_exception: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollback_sensitive: Option<String>,
     pub config: ConfigRequest,
     pub package_id: Option<String>,

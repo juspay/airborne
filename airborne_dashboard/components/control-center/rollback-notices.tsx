@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import Link from "next/link";
 import { OctagonAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AbandonRollback } from "./abandon-rollback";
 import { OperationRecovery } from "./operation-recovery";
 import { cn } from "@/lib/utils";
 import type { RollbackFailure } from "@/lib/control-center/rollback-error";
@@ -234,6 +235,7 @@ export function RollbackProblem({
             </p>
           )}
           <ServerSaid message={failure.message} />
+          <AbandonRollback org={org} app={app} releaseId={releaseId} />
         </Notice>
       );
     }

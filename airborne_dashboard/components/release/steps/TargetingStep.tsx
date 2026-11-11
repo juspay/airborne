@@ -36,6 +36,11 @@ export function TargetingStep() {
   // Live locale-targeted releases that a general release would leave behind (Superposition specificity).
   const { overview } = useOverview();
   const appStatus = locateApp(overview, org ?? "", app ?? "").app;
+  const auxiliaryReady =
+    appStatus != null &&
+    appStatus.auxiliary_error == null &&
+    typeof appStatus.approval_required === "boolean" &&
+    appStatus.serving_policy != null;
   const proposed = Object.fromEntries(
     targetingRules.filter((r) => r.dimension && r.values).map((r) => [r.dimension, r.values])
   );
@@ -118,14 +123,20 @@ export function TargetingStep() {
             </div>
           )}
 
-          {!isEditMode && dimensions.length === 0 && appStatus?.approval_required && (
+          {!isEditMode && !auxiliaryReady && (
+            <p role="status" className="text-sm">
+              Approval and serving state could not be verified. Refresh before changing dimensions or creating a
+              release.
+            </p>
+          )}
+          {!isEditMode && auxiliaryReady && dimensions.length === 0 && appStatus?.approval_required && (
             <p role="status" className="text-sm">
               No dimensions yet, and this application requires approval, which freezes dimension and cohort changes
               (they cannot be raised as requests). An organisation owner or admin has to turn approval off to create
               them, then back on.
             </p>
           )}
-          {!isEditMode && dimensions.length === 0 && !appStatus?.approval_required && (
+          {!isEditMode && auxiliaryReady && dimensions.length === 0 && !appStatus?.approval_required && (
             <p role="status" className="text-sm">
               No dimensions yet.{" "}
               <Link
@@ -158,7 +169,9 @@ export function TargetingStep() {
             {targetingRules.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Target className="mx-auto h-8 w-8 mb-2" />
-                {targetingRequired ? (
+                {!auxiliaryReady ? (
+                  <p className="text-sm">Targeting requirements could not be verified.</p>
+                ) : targetingRequired ? (
                   <>
                     <p className="text-sm font-medium text-foreground">
                       Add a targeting rule to continue. This application serves strictly, so a release needs one,

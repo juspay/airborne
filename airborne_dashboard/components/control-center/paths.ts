@@ -35,3 +35,8 @@ export function requestPath(org: string, app: string, requestId: string): string
 export function approvalPolicyPath(org: string, app: string): string {
   return `${CC_ROOT}/${encodeURIComponent(org)}/apps/${encodeURIComponent(app)}/approval-policy`;
 }
+
+/** Applications page includes the permissioned Create application dialog. */
+export function createAppPath(org: string): string {
+  return `/dashboard/${encodeURIComponent(org)}`;
+}

@@ -146,6 +146,9 @@ structure CreateReleaseRequest {
     /// Resources for the release
     resources: StringList
 
+    /// Audited operator declaration for custom native compatibility targeting; at least 20 characters. Does not permit empty targeting.
+    compatibility_exception: String
+
     /// Optional declared reason this release needs additional rollback protection.
     rollback_sensitive: RollbackSensitiveReason
 

@@ -538,6 +538,7 @@ export function ApplyPolicyToGroupDialog({
   members,
   pendingByApp,
   policiesByApp,
+  stateReady,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -548,6 +549,7 @@ export function ApplyPolicyToGroupDialog({
   pendingByApp: Record<string, number>;
   /** Whether each member currently has approval on, from the overview. */
   policiesByApp: Record<string, boolean>;
+  stateReady: boolean;
 }) {
   const me = useMe();
   const firstApp = members[0]?.application ?? null;
@@ -583,6 +585,7 @@ export function ApplyPolicyToGroupDialog({
   const pendingTotal = members.reduce((n, m) => n + (pendingByApp[m.application] ?? 0), 0);
 
   const review = async () => {
+    if (!stateReady) return;
     setPending(true);
     const read = await Promise.allSettled(members.map((m) => actions.readPolicy(org, m.application)));
     const policies = read.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
@@ -613,6 +616,7 @@ export function ApplyPolicyToGroupDialog({
   };
 
   const apply = async () => {
+    if (!stateReady) return;
     setPending(true);
     const results = await applyPolicyBatch(
       members.map((m) => m.application),
@@ -674,6 +678,11 @@ export function ApplyPolicyToGroupDialog({
             </div>
           ) : (
             <>
+              {!stateReady && (
+                <ApprovalNotice title="Approval state unknown" tone="warning">
+                  Approval state could not be verified for every member. Refresh before applying a group policy.
+                </ApprovalNotice>
+              )}
               <PolicyForm
                 value={draft}
                 onChange={setDraft}
@@ -681,11 +690,11 @@ export function ApplyPolicyToGroupDialog({
                 candidatesLoading={candidatesLoading}
                 candidatesError={candidatesError}
                 me={me}
-                disabled={pending}
+                disabled={pending || !stateReady}
                 problems={problems}
                 idPrefix="cc-group-policy"
               />
-              {anyOn && !draft.enabled && (
+              {stateReady && anyOn && !draft.enabled && (
                 <ApprovalNotice title="This turns approval off" tone="warning" icon={UserMinus}>
                   <p className="text-muted-foreground">
                     {pendingTotal} pending request{pendingTotal === 1 ? "" : "s"} across the group will be cancelled and
@@ -699,7 +708,7 @@ export function ApplyPolicyToGroupDialog({
                 </Button>
                 <Button
                   onClick={() => void review()}
-                  disabled={pending || problems.length > 0 || members.length === 0}
+                  disabled={pending || !stateReady || problems.length > 0 || members.length === 0}
                   title={problems.length > 0 ? problems.map((p) => p.message).join(" ") : undefined}
                 >
                   <ShieldCheck />{" "}
@@ -711,7 +720,7 @@ export function ApplyPolicyToGroupDialog({
         </DialogContent>
       </Dialog>
       <PolicySaveConfirm
-        open={confirming}
+        open={confirming && stateReady}
         onOpenChange={setConfirming}
         apps={members.map((m) => m.application)}
         before={current?.before ?? { ...DEFAULT_APPROVAL_POLICY, enabled: anyOn }}

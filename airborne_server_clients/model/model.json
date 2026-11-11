@@ -2579,6 +2579,12 @@
         "io.airborne.server#ControlCenterAppStatus": {
             "type": "structure",
             "members": {
+                "first_device_seen_at": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "First unverified public manifest request, independent of telemetry retention."
+                    }
+                },
                 "auxiliary_error": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -4203,6 +4209,12 @@
                     "target": "io.airborne.server#StringList",
                     "traits": {
                         "smithy.api#documentation": "Resources for the release"
+                    }
+                },
+                "compatibility_exception": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Audited operator declaration for custom native compatibility targeting; at least 20 characters. Does not permit empty targeting."
                     }
                 },
                 "rollback_sensitive": {

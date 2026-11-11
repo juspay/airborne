@@ -1,5 +1,7 @@
 "use client";
 
+import { approvalStateReady } from "@/lib/control-center/overview-state";
+
 import { OverviewStateNotice } from "@/components/control-center/overview-state-notice";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -228,6 +230,7 @@ export default function GroupPage() {
             groupName={group.name}
             members={toAppGroup(group).members}
             pendingByApp={Object.fromEntries(members.map((m) => [m.application, m.pending_requests ?? 0]))}
+            stateReady={members.every((m) => m.auxiliary_error == null && typeof m.approval_required === "boolean")}
             policiesByApp={Object.fromEntries(members.map((m) => [m.application, Boolean(m.approval_required)]))}
           />
         </>
@@ -252,7 +255,7 @@ function PlatformColumn({ org, app, onChanged }: { org: string; app: AppStatus; 
   const live = [...app.live].sort((a, b) => Object.keys(a.dimensions).length - Object.keys(b.dimensions).length);
   const pending = (requests.requests ?? []).filter((r) => isOpenRequest(r.status));
   const approvalCtx = {
-    ready: !app.approval_required || approval.isReady,
+    ready: approvalStateReady(app, approval.isReady, Boolean(approval.error)),
     policy: approval.policy,
     me,
   };

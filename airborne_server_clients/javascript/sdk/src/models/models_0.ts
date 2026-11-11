@@ -1176,6 +1176,12 @@ export interface CreateReleaseRequest {
   resources?: (string)[] | undefined;
 
   /**
+   * Audited operator declaration for custom native compatibility targeting; at least 20 characters. Does not permit empty targeting.
+   * @public
+   */
+  compatibility_exception?: string | undefined;
+
+  /**
    * Optional declared reason this release needs additional rollback protection.
    * @public
    */
@@ -1661,6 +1667,12 @@ export interface ControlCenterUnresolvedOperation {
  * @public
  */
 export interface ControlCenterAppStatus {
+  /**
+   * First unverified public manifest request, independent of telemetry retention.
+   * @public
+   */
+  first_device_seen_at?: string | undefined;
+
   /**
    * Local auxiliary data unavailable or deadline exceeded; corresponding fields are null.
    * @public
