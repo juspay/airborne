@@ -18,6 +18,9 @@ structure Unauthorized {
 @error("client")
 @httpError(400)
 structure BadRequestError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Airborne error code (AB_005).
     @required
     code: String
@@ -30,6 +33,9 @@ structure BadRequestError {
 @error("client")
 @httpError(404)
 structure NotFoundError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Airborne error code (AB_001).
     @required
     code: String
@@ -42,6 +48,9 @@ structure NotFoundError {
 @error("server")
 @httpError(500)
 structure InternalServerError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Airborne error code (AB_003).
     @required
     code: String
@@ -54,9 +63,26 @@ structure InternalServerError {
 @error("client")
 @httpError(403)
 structure ForbiddenError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Airborne error code (AB_006).
     @required
     code: String
+
+    @required
+    message: String
+}
+
+/// A direct release write was refused because this application requires an approved deployment request.
+@error("client")
+@httpError(403)
+structure ApprovalRequiredError {
+    @required
+    code: String
+
+    @required
+    application: String
 
     @required
     message: String
@@ -66,6 +92,9 @@ structure ForbiddenError {
 @error("client")
 @httpError(409)
 structure ConflictError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Airborne error code (AB_007).
     @required
     code: String
@@ -94,6 +123,9 @@ structure ReleaseSupersededError {
 @error("client")
 @httpError(422)
 structure RollbackUnprocessableError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Rollback block code: `no_predecessor` or `incompatible`.
     @required
     code: String
@@ -119,6 +151,9 @@ enum RollbackFailureStage {
 @error("server")
 @httpError(502)
 structure RollbackPartialFailureError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String
     /// Airborne error code (AB_003).
     @required
     code: String
@@ -184,5 +219,15 @@ structure RollbackReplacementChangedError {
     operation_id: String
 
     @required
-    replacement_release_id: String
+    replacement_release_id: Document
 }
+
+@error("client")
+@httpError(429)
+structure TooManyRequestsError { @required code: String, @required message: String }
+@error("server")
+@httpError(503)
+structure ServiceUnavailableError {
+    /// Present when an approved action failed and its failed status was saved.
+    request_id: String
+    request_status: String @required code: String, @required message: String }

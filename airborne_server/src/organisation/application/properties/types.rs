@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct SchemaNode {
     pub description: String,
     pub default_value: Value,
@@ -64,4 +64,21 @@ pub struct ConfigProperty {
 #[derive(Serialize)]
 pub struct ListPropertiesResponse {
     pub properties: Vec<ConfigProperty>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn identical_schema_is_noop_but_default_changes_are_not() {
+        let node = SchemaNode {
+            description: "flag".into(),
+            default_value: Value::Bool(true),
+            schema: serde_json::json!({"type":"boolean"}),
+        };
+        assert_eq!(node, node.clone());
+        let mut changed = node.clone();
+        changed.default_value = Value::Bool(false);
+        assert_ne!(node, changed);
+    }
 }

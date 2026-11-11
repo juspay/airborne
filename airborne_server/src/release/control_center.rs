@@ -41,15 +41,17 @@ pub async fn experiments(
     .await
     .map_err(|_| ABError::InternalServerError("Workspace lookup deadline".into()))??;
     // Fetch all before filtering: pagination occurs upstream of the name filter.
-    let all = state
-        .superposition_client
-        .list_experiment()
-        .org_id(state.env.superposition_org_id.clone())
-        .workspace_id(&workspace)
-        .all(true)
-        .send()
-        .await
-        .map_err(|_| ABError::InternalServerError("Failed to list releases".into()))?;
+    let all = write_lock::bounded_read(
+        state
+            .superposition_client
+            .list_experiment()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(&workspace)
+            .all(true)
+            .send(),
+    )
+    .await?
+    .map_err(|_| ABError::InternalServerError("Failed to list releases".into()))?;
     let name = format!("{app}-{org}-release-exp");
     let result = (
         workspace,
@@ -193,7 +195,7 @@ pub async fn events(
         Ok(e::table
             .filter(e::org_id.eq(org))
             .filter(e::app_id.eq(app))
-            .filter(e::release_id.eq(id))
+            .filter(e::release_id.eq(id).or(e::release_id.eq("")))
             .order((e::created_at.asc(), e::id.asc()))
             .select((e::action, e::actor, e::created_at, e::payload))
             .load::<(String, String, DateTime<Utc>, Value)>(&mut c)?)
@@ -317,8 +319,8 @@ pub async fn rollback(
     }
 }
 
-fn partial_metadata(state: &str, stage: &Value, replacement: &Value) -> bool {
-    state != "completed" && stage != "completed" && (!replacement.is_null() || stage == "create")
+fn partial_metadata(state: &str, stage: &Value, _replacement: &Value) -> bool {
+    state != "completed" && stage != "completed"
 }
 pub(super) fn current_live<'a>(
     exp: &ExperimentResponse,
@@ -359,26 +361,108 @@ pub fn ensure_inprogress(status: &ExperimentStatusType) -> Result<()> {
         ))
     }
 }
-pub async fn invalidate(state: &web::Data<AppState>, org: &str, app: &str) {
+async fn retry_invalidation<F, Fut>(mut attempt: F) -> bool
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for _ in 0..3 {
+        if attempt().await {
+            return true;
+        }
+    }
+    false
+}
+pub async fn invalidate(state: &web::Data<AppState>, org: &str, app: &str) -> Result<()> {
+    if state.env.cloudfront_distribution_id.is_empty() {
+        return Ok(());
+    }
+    let mut failed = Vec::new();
     for path in [
         format!("/release/{org}/{app}*"),
         format!("/release/v2/{org}/{app}*"),
     ] {
-        log::info!("Invalidating release config cache: {path}");
-        if tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            utils::invalidate_cf(
-                &state.cf_client,
-                path,
-                &state.env.cloudfront_distribution_id,
-            ),
-        )
-        .await
-        .is_err()
-        {
-            log::warn!("Release cache invalidation failed");
+        let ok = retry_invalidation(|| async {
+            matches!(
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    utils::invalidate_cf(
+                        &state.cf_client,
+                        path.clone(),
+                        &state.env.cloudfront_distribution_id,
+                    )
+                )
+                .await,
+                Ok(Ok(()))
+            )
+        })
+        .await;
+        if !ok {
+            failed.push(path);
         }
     }
+    let payload =
+        json!({"failed_paths":failed,"attempts_per_path":3,"mutation_may_have_committed":true});
+    let (org, app) = (org.to_owned(), app.to_owned());
+    let action = if failed.is_empty() {
+        "cache_invalidated"
+    } else {
+        "cache_invalidation_failed"
+    };
+    let pool = state.db_pool.clone();
+    let saved: Result<()> = run_blocking!({
+        let mut c = pool.get()?;
+        diesel::insert_into(e::table)
+            .values((
+                e::id.eq(Uuid::new_v4()),
+                e::org_id.eq(org),
+                e::app_id.eq(app),
+                e::release_id.eq(""),
+                e::action.eq(action),
+                e::actor.eq("system:cache"),
+                e::payload.eq(payload),
+            ))
+            .execute(&mut c)?;
+        Ok(())
+    });
+    saved?;
+    if failed.is_empty() {
+        Ok(())
+    } else {
+        Err(ABError::ReleaseOperation {
+            status: 502,
+            body: json!({"code":"cache_invalidation_failed","message":"Release state may have changed. Retry cache invalidation; inspect release state before repeating the original action.","failed_paths":failed,"mutation_may_have_committed":true}),
+        })
+    }
+}
+#[authz(resource="release",action="read",org_roles=["owner","admin"],app_roles=["admin"])]
+#[post("/cache-invalidation/retry")]
+pub async fn retry_cache(
+    auth_response: web::ReqData<AuthResponse>,
+    state: web::Data<AppState>,
+) -> Result<Json<Value>> {
+    if !auth_response.is_super_admin
+        && !auth_response
+            .organisation
+            .as_ref()
+            .is_some_and(|a| a.is_admin_or_higher())
+        && !auth_response
+            .application
+            .as_ref()
+            .is_some_and(|a| a.is_admin_or_higher())
+    {
+        return Err(ABError::Forbidden(
+            "Application or organisation admin required".into(),
+        ));
+    }
+    let (org, app) = require_org_and_app(
+        auth_response.organisation.clone(),
+        auth_response.application.clone(),
+    )?;
+    invalidate(&state, &org, &app).await?;
+    Ok(Json(
+        json!({"status":if state.env.cloudfront_distribution_id.is_empty(){"not_applicable"}else{"invalidation_submitted"}}),
+    ))
 }
 pub(super) fn sp_error(e: impl std::fmt::Display) -> ABError {
     log::error!("Release operation failed: {e}");
@@ -493,6 +577,45 @@ pub(crate) mod tests {
         ));
     }
 
+    #[test]
+    fn planned_and_terminal_action_failures_include_stage() {
+        for stage in [
+            "planned",
+            "discarded",
+            "concluded_control",
+            "create",
+            "ramp",
+            "conclude",
+        ] {
+            assert!(super::partial_metadata(
+                "planned",
+                &serde_json::json!(stage),
+                &serde_json::Value::Null
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn invalidation_retries_returned_errors_and_stop_on_success() {
+        let calls = std::cell::Cell::new(0);
+        assert!(
+            super::retry_invalidation(|| {
+                calls.set(calls.get() + 1);
+                std::future::ready(calls.get() == 2)
+            })
+            .await
+        );
+        assert_eq!(calls.get(), 2);
+        calls.set(0);
+        assert!(
+            !super::retry_invalidation(|| {
+                calls.set(calls.get() + 1);
+                std::future::ready(false)
+            })
+            .await
+        );
+        assert_eq!(calls.get(), 3);
+    }
     use super::*;
     use superposition_sdk::types::ExperimentType;
     #[test]

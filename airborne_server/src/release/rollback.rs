@@ -16,8 +16,99 @@ fn blocked(code: &str, message: &str, current: Option<&str>) -> Value {
 fn base(exp: &ExperimentResponse) -> Value {
     json!({"action":null,"current_package_version":version(exp),"resulting_package_version":null,"reconciled_keys":null,"blocked":null})
 }
+fn apply_lineage(p: &mut Value, parent: Option<&str>, description: &str) {
+    if parent.is_some() || description.starts_with("Rollback operation ") {
+        p["rollback_of"] = json!(parent);
+        p["blocked"] = blocked("rollback_chain", "This release is a rollback replacement. Rolling it back can restore the rejected release. Create an explicitly reviewed release with the intended package instead.", None);
+    }
+}
 // Both GET and POST call this function. It only reads upstream/journal state.
 pub(super) async fn plan(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    id: &str,
+    exps: &[ExperimentResponse],
+    existing: Option<&Operation>,
+) -> airborne_types::Result<Value> {
+    let mut p = plan_inner(state, org, app, id, exps, existing).await?;
+    if !p["blocked"].is_null() || existing.is_some_and(|o| o.state == "completed") {
+        return Ok(p);
+    }
+    // Discard/control keep existing content, including a pristine first-release
+    // control with an empty index. Probe only artifacts being restored.
+    if p["action"] != "rereleased" {
+        return Ok(p);
+    }
+    let values = p["overrides"]["EXPERIMENTAL"].clone();
+    let check = check_artifacts(state, org, app, &values);
+    match tokio::time::timeout(std::time::Duration::from_secs(10), check).await {
+        Ok(Ok(())) => {},
+        Ok(Err(message)) => p["blocked"] = blocked("missing_files", &message, None),
+        Err(_) => p["blocked"] = blocked("missing_files", "Artifact verification deadline exceeded; no rollback is allowed until all restored files are accessible", None),
+    }
+    Ok(p)
+}
+async fn check_artifacts(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    values: &Value,
+) -> std::result::Result<(), String> {
+    let mut keys = std::collections::BTreeSet::new();
+    if let Some(key) = values["package.index"].as_str() {
+        keys.insert(key.to_owned());
+    }
+    for name in ["package.important", "package.lazy", "resources"] {
+        if let Some(list) = values[name].as_array() {
+            for key in list {
+                if let Some(key) = key.as_str() {
+                    keys.insert(key.to_owned());
+                }
+            }
+        }
+    }
+    if keys.is_empty() {
+        return Err("Restored package has no index file".into());
+    }
+    // Bypass Redis: stale metadata must not hide deleted records.
+    let files = utils::get_files_by_file_keys_async(
+        state.db_pool.clone(),
+        &None,
+        org.into(),
+        app.into(),
+        keys.iter().cloned().collect(),
+    )
+    .await
+    .map_err(|_| "Cannot read restored file records".to_string())?;
+    if files.len() != keys.len() {
+        return Err("Restored file records are missing".into());
+    }
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+        .map_err(|_| "Cannot initialize artifact verification".to_string())?;
+    for file in files {
+        if file.size <= 0 || file.checksum.is_empty() {
+            return Err(format!("Restored file {} is incomplete", file.file_path));
+        }
+        let response = client
+            .head(&file.url)
+            .send()
+            .await
+            .map_err(|_| format!("Restored file {} is inaccessible", file.file_path))?;
+        if !response.status().is_success() {
+            return Err(format!(
+                "Restored file {} is inaccessible (HTTP {})",
+                file.file_path,
+                response.status()
+            ));
+        }
+    }
+    Ok(())
+}
+pub(super) async fn plan_inner(
     state: &web::Data<AppState>,
     org: &str,
     app: &str,
@@ -60,6 +151,13 @@ pub(super) async fn plan(
         .find(|e| e.id == id)
         .ok_or_else(|| ABError::NotFound("Release not found".into()))?;
     let mut p = base(exp);
+    let parent = operations::rollback_parent(state, org, app, id).await?;
+    // Also fail closed for a create response lost before replacement ID was saved.
+    apply_lineage(&mut p, parent.as_deref(), &exp.description);
+    if !p["blocked"].is_null() {
+        return Ok(p);
+    }
+
     let choice = match decision(&exp.status, live(exp)) {
         Ok(c) => c,
         Err(_) => {
@@ -799,6 +897,19 @@ async fn verify_effect(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rollback_lineage_blocks_restoring_rejected_content() {
+        let mut p = json!({"blocked":null});
+        apply_lineage(&mut p, Some("bad-release"), "renamed");
+        assert_eq!(p["blocked"]["code"], "rollback_chain");
+        assert_eq!(p["rollback_of"], "bad-release");
+        let mut lost = json!({"blocked":null});
+        apply_lineage(&mut lost, None, "Rollback operation lost-response");
+        assert_eq!(lost["blocked"]["code"], "rollback_chain");
+        let mut normal = json!({"blocked":null});
+        apply_lineage(&mut normal, None, "Release");
+        assert!(normal["blocked"].is_null());
+    }
     fn replacement_fixture() -> (Operation, ExperimentResponse) {
         let mut r = super::super::control_center::tests::make("replacement", 2, "ios");
         r.status = ExperimentStatusType::Created;

@@ -56,6 +56,14 @@ export interface GetControlCenterOverviewCommandOutput extends GetControlCenterO
  * //           name: "STRING_VALUE", // required
  * //           members: [ // ControlCenterAppStatusList // required
  * //             { // ControlCenterAppStatus
+ * //               auxiliary_error: "STRING_VALUE",
+ * //               telemetry: "DOCUMENT_VALUE",
+ * //               cache_invalidation: "DOCUMENT_VALUE",
+ * //               serving_policy: { // ServingPolicy
+ * //                 strict: true || false, // required
+ * //                 deployment_override: true || false, // required
+ * //                 effective_strict: true || false, // required
+ * //               },
  * //               application: "STRING_VALUE", // required
  * //               platform: "DOCUMENT_VALUE", // required
  * //               live: [ // ControlCenterLiveReleaseList // required
@@ -79,23 +87,52 @@ export interface GetControlCenterOverviewCommandOutput extends GetControlCenterO
  * //                   created_by: "STRING_VALUE", // required
  * //                 },
  * //               ],
- * //               unresolved_operations: [ // ControlCenterUnresolvedOperationList // required
+ * //               unresolved_operations: [ // ControlCenterUnresolvedOperationList
  * //                 { // ControlCenterUnresolvedOperation
  * //                   operation_id: "STRING_VALUE", // required
  * //                   message: "STRING_VALUE", // required
- * //                   expected: "DOCUMENT_VALUE", // required
- * //                   before: "DOCUMENT_VALUE", // required
- * //                   upstream_workspace: "DOCUMENT_VALUE", // required
  * //                 },
  * //               ],
  * //               last_activity_at: "DOCUMENT_VALUE", // required
  * //               error: "DOCUMENT_VALUE", // required
+ * //               approval_required: true || false,
+ * //               pending_requests: Number("int"),
+ * //               emergency_needs_review: [ // EmergencyReviewList
+ * //                 { // EmergencyReview
+ * //                   rollback_finished: true || false,
+ * //                   rolled_back_to_package_version: "DOCUMENT_VALUE",
+ * //                   rollback_result: "DOCUMENT_VALUE",
+ * //                   new_release_id: "DOCUMENT_VALUE",
+ * //                   id: "STRING_VALUE", // required
+ * //                   release_id: "STRING_VALUE", // required
+ * //                   actor: "STRING_VALUE", // required
+ * //                   acknowledged_by: "DOCUMENT_VALUE", // required
+ * //                   reason: "STRING_VALUE", // required
+ * //                   confirm_sensitive_risk: true || false, // required
+ * //                   plan: "DOCUMENT_VALUE", // required
+ * //                   created_at: new Date("TIMESTAMP"), // required
+ * //                 },
+ * //               ],
+ * //               release_protections: [ // ReleaseProtectionList
+ * //                 { // ReleaseProtection
+ * //                   release_id: "STRING_VALUE", // required
+ * //                   rollback_sensitive: "DOCUMENT_VALUE", // required
+ * //                 },
+ * //               ],
  * //             },
  * //           ],
  * //         },
  * //       ],
  * //       ungrouped: [ // required
  * //         {
+ * //           auxiliary_error: "STRING_VALUE",
+ * //           telemetry: "DOCUMENT_VALUE",
+ * //           cache_invalidation: "DOCUMENT_VALUE",
+ * //           serving_policy: {
+ * //             strict: true || false, // required
+ * //             deployment_override: true || false, // required
+ * //             effective_strict: true || false, // required
+ * //           },
  * //           application: "STRING_VALUE", // required
  * //           platform: "DOCUMENT_VALUE", // required
  * //           live: [ // required
@@ -119,17 +156,38 @@ export interface GetControlCenterOverviewCommandOutput extends GetControlCenterO
  * //               created_by: "STRING_VALUE", // required
  * //             },
  * //           ],
- * //           unresolved_operations: [ // required
+ * //           unresolved_operations: [
  * //             {
  * //               operation_id: "STRING_VALUE", // required
  * //               message: "STRING_VALUE", // required
- * //               expected: "DOCUMENT_VALUE", // required
- * //               before: "DOCUMENT_VALUE", // required
- * //               upstream_workspace: "DOCUMENT_VALUE", // required
  * //             },
  * //           ],
  * //           last_activity_at: "DOCUMENT_VALUE", // required
  * //           error: "DOCUMENT_VALUE", // required
+ * //           approval_required: true || false,
+ * //           pending_requests: Number("int"),
+ * //           emergency_needs_review: [
+ * //             {
+ * //               rollback_finished: true || false,
+ * //               rolled_back_to_package_version: "DOCUMENT_VALUE",
+ * //               rollback_result: "DOCUMENT_VALUE",
+ * //               new_release_id: "DOCUMENT_VALUE",
+ * //               id: "STRING_VALUE", // required
+ * //               release_id: "STRING_VALUE", // required
+ * //               actor: "STRING_VALUE", // required
+ * //               acknowledged_by: "DOCUMENT_VALUE", // required
+ * //               reason: "STRING_VALUE", // required
+ * //               confirm_sensitive_risk: true || false, // required
+ * //               plan: "DOCUMENT_VALUE", // required
+ * //               created_at: new Date("TIMESTAMP"), // required
+ * //             },
+ * //           ],
+ * //           release_protections: [
+ * //             {
+ * //               release_id: "STRING_VALUE", // required
+ * //               rollback_sensitive: "DOCUMENT_VALUE", // required
+ * //             },
+ * //           ],
  * //         },
  * //       ],
  * //     },
