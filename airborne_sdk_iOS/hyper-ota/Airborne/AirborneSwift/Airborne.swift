@@ -20,6 +20,7 @@ import AirborneSwiftModel
  * All methods are optional, providing sensible defaults when not implemented.
  */
 @objc public protocol AirborneDelegate {
+    @objc optional func telemetryEnabled() -> Bool
     
     /**
      * Returns the namespace identifier for this application instance.
@@ -343,6 +344,8 @@ extension AirborneServices: AJPApplicationManagerDelegate {
     /**
      * Provides the release configuration URL to the application manager.
      */
+    public func telemetryEnabled() -> Bool { delegate?.telemetryEnabled?() ?? false }
+
     public func getReleaseConfigURL() -> String {
         self.releaseConfigURL
     }

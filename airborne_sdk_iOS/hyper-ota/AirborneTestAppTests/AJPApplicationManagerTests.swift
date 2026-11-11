@@ -222,6 +222,7 @@ final class AJPApplicationManagerTests: XCTestCase {
                 .appendingPathComponent(workspace)
             try? fm.removeItem(atPath: wsPath)
         }
+        try? fm.removeItem(at: manager.telemetryStateURLForTesting)
         try? fm.removeItem(at: AJPBootGuard.directory(forWorkspace: workspace))
         AJPBootGuard.forgetForTesting(workspace: workspace)
         manager  = nil
@@ -1145,6 +1146,42 @@ final class AJPApplicationManagerTests: XCTestCase {
         let state = try readGuardState()
         XCTAssertEqual(state["pending"] as? String, "2.0.0")
         XCTAssertEqual(state["attempts"] as? Int, 1)
+    }
+
+    func testSecurityExclusionsPersistWithBootGuardOff() throws {
+        let manifest = try XCTUnwrap(manager.getCurrentApplicationManifest() as? AJPApplicationManifest)
+        manifest.blockedPackageVersions = ["1.0.0", "2.0.0"]
+        manager.received(manifest)
+        XCTAssertFalse(manager.allowPackage("1.0.0"))
+        XCTAssertFalse(manager.allowPackage("2.0.0"))
+        XCTAssertTrue(manager.allowPackage("3.0.0"))
+        relaunch(guardEnabled: false)
+        let current = try XCTUnwrap(manager.getCurrentApplicationManifest() as? AJPApplicationManifest)
+        XCTAssertNotEqual(current.package.version, "2.0.0")
+        XCTAssertFalse(manager.allowPackage("1.0.0"))
+        XCTAssertFalse(manager.allowPackage("2.0.0"))
+    }
+
+    func testEmptyManifestDoesNotPersistTelemetryState() throws {
+        let manifest = try XCTUnwrap(manager.getCurrentApplicationManifest() as? AJPApplicationManifest)
+        manifest.blockedPackageVersions = []
+        manager.received(manifest)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: manager.telemetryStateURLForTesting.path))
+    }
+
+    func testConcurrentManifestReceiptAndBootStateReads() throws {
+        let manifest = try XCTUnwrap(manager.getCurrentApplicationManifest() as? AJPApplicationManifest)
+        manifest.blockedPackageVersions = ["excluded"]
+        DispatchQueue.concurrentPerform(iterations: 100) { index in
+            if index % 2 == 0 { manager.received(manifest) }
+            else {
+                _ = manager.getCurrentApplicationManifest()
+                _ = manager.getPathForPackageFile("index.jsa")
+                _ = manager.readPackageFile("index.jsa")
+            }
+        }
+        let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: manager.telemetryStateURLForTesting)) as! [String: Any]
+        XCTAssertEqual(saved["securityBlocked"] as? [String], ["excluded"])
     }
 
     // MARK: - Download status

@@ -65,6 +65,23 @@ class BootGuardTest {
         snapshots = FileSnapshotStore(snapshotDir, packageDir)
     }
 
+    @Test fun securityExclusionFallsBackWithGuardOff() {
+        val guard = process(enabled = false)
+        assertEquals(BootGuard.Selection.Bundled, guard.select("bad", { it == "bad" }))
+        assertEquals(BootGuard.Selection.Bundled, guard.select("new"))
+    }
+
+    @Test fun securityExcludedLastGoodIsNeverSelected() {
+        install("good")
+        val first = process()
+        first.select("good")
+        first.prepareBoot(booted("good"))
+        first.markBootSuccess()
+        install("bad")
+        val next = process()
+        assertEquals(BootGuard.Selection.Bundled, next.select("bad", { true }) { false })
+    }
+
     /** One app process: a fresh guard over the same persisted storage and snapshot dir. */
     private fun process(
         enabled: Boolean = true,

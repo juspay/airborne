@@ -83,7 +83,8 @@ internal class UpdateTask(
     // package about to be written to / committed to the package dir.
     private val allowPackage: (version: String) -> Boolean = { true },
     private val onPackageInstallStarting: () -> Unit = {},
-    private val onPackageInstalled: (Package) -> Unit = {}
+    private val onPackageInstalled: (Package) -> Unit = {},
+    private val onManifest: (ReleaseConfig) -> Unit = {}
 ) {
     val updateUUID = UUID.randomUUID().toString()
 
@@ -390,6 +391,7 @@ internal class UpdateTask(
                 val serialized = String(body.bytes(), StandardCharsets.UTF_8)
                 try {
                     val releaseConfig = ReleaseConfig.deSerialize(serialized).getOrThrow()
+                    onManifest(releaseConfig)
                     trackReleaseConfigFetchResult(fr, startTime)
                     if (allowPackage(releaseConfig.pkg.version)) {
                         releaseConfig

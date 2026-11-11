@@ -113,6 +113,79 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     
     private var managerId: String
     private var startTime: TimeInterval
+    private var telemetryEnabled: Bool { delegate?.telemetryEnabled?() ?? false }
+    private var sendingReports = false
+    private func forbidden(_ version: String) -> Bool {
+        bootLock.lock(); defer { bootLock.unlock() }
+        return (bootState["securityBlocked"] as? [String] ?? []).contains(version)
+    }
+    func received(_ manifest: AJPApplicationManifest) {
+        bootLock.lock(); defer { bootLock.unlock() }
+        let blocked = Array(Set((bootState["securityBlocked"] as? [String] ?? []) + manifest.blockedPackageVersions))
+        if !blocked.isEmpty { bootState["securityBlocked"] = blocked }
+        if telemetryEnabled, let meta = manifest.telemetry {
+            var receipts = bootState["receipts"] as? [String: Any] ?? [:]
+            receipts[manifest.package.version] = meta; bootState["receipts"] = receipts
+        }
+        if !blocked.isEmpty || telemetryEnabled { saveBootState() }
+    }
+    private func report(_ version: String?, _ kind: String) {
+        guard telemetryEnabled, let version = version else { return }
+        bootLock.lock(); defer { bootLock.unlock() }
+        guard let receipts = bootState["receipts"] as? [String: Any], let meta = receipts[version] as? [String: Any] else { return }
+        var queue = bootState["queue"] as? [[String: Any]] ?? []
+        queue.append(["meta": meta, "event": ["id": UUID().uuidString, "kind": kind]])
+        bootState["queue"] = Array(queue.suffix(128))
+        if bootState["install"] == nil { bootState["install"] = UUID().uuidString }
+        saveBootState(); flushReports()
+    }
+    private func flushReports() {
+        bootLock.lock(); defer { bootLock.unlock() }
+        guard telemetryEnabled && !sendingReports else { return }
+        var queue = bootState["queue"] as? [[String: Any]] ?? []
+        queue = queue.filter { (($0["meta"] as? [String: Any])?["expires_at"] as? Double ?? 0) > Date().timeIntervalSince1970 }
+        bootState["queue"] = queue
+        guard let first = queue.first, let meta = first["meta"] as? [String: Any], let token = meta["receipt"] as? String,
+              let path = meta["ingest_path"] as? String, let base = URL(string: releaseConfigURL), let endpoint = URL(string: path, relativeTo: base) else { return }
+        let batch = Array(queue.filter { ($0["meta"] as? [String: Any])?["receipt"] as? String == token }.prefix(32))
+        var request = URLRequest(url: endpoint); request.httpMethod = "POST"; request.timeoutInterval = 5
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["receipt": token, "install_id": bootState["install"] ?? "", "events": batch.compactMap { $0["event"] }])
+        sendingReports = true
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, _ in
+            guard let self = self else { return }
+            self.bootLock.lock(); defer { self.bootLock.unlock() }
+            self.sendingReports = false
+            if let code = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(code) || code == 400 {
+                let ids = Set(batch.compactMap { ($0["event"] as? [String: String])?["id"] })
+                self.bootState["queue"] = (self.bootState["queue"] as? [[String: Any]] ?? []).filter { !ids.contains(($0["event"] as? [String: String])?["id"] ?? "") }
+                self.saveBootState()
+                self.flushReports()
+            }
+        }.resume()
+    }
+    private let bootLock = NSRecursiveLock()
+    private var bootState: [String: Any] = [:]
+    var telemetryStateURLForTesting: URL { bootStateURL }
+    private var bootStateURL: URL {
+        let key = workspace.data(using: .utf8)!.base64EncodedString().replacingOccurrences(of: "/", with: "_")
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("airborne-telemetry-\(key).json")
+    }
+    @discardableResult private func saveBootState() -> Bool {
+        do {
+            try FileManager.default.createDirectory(at: bootStateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONSerialization.data(withJSONObject: bootState).write(to: bootStateURL, options: .atomic)
+            return true
+        } catch { NSLog("Airborne cannot persist telemetry/exclusions: \(error)"); return false }
+    }
+    func allowPackage(_ version: String) -> Bool {
+        if forbidden(version) { report(version, "blocked_package"); return false }
+        let allowed = !bootGuard.refusePackage(version, source: "release_config")
+        if !allowed { report(version, "blocked_package") }
+        return allowed
+    }
+
     private var workspace: String
     private var releaseConfigURL: String
     private var releaseConfigHeaders: [String: String]
@@ -279,7 +352,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         )
 
         super.init()
-        
+        if let data = try? Data(contentsOf: bootStateURL),
+           let stored = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { bootState = stored }
+        if telemetryEnabled {
+            let pending = bootState["telemetryPending"] as? String
+            report(pending, "boot_failed")
+            if let pending = pending, bootGuard.isBlocked(pending) { report(pending, "rollback") }
+            bootState.removeValue(forKey: "telemetryPending"); saveBootState(); flushReports()
+        }
+
         // Let's fire up initialization
         self.initializeDefaults()
         
@@ -451,7 +532,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             }
             
             // A staged package naming the blocked version must never be installed.
-            if bootGuard.refusePackage(tempPackage.version, source: "staged") {
+            if !allowPackage(tempPackage.version) {
                 try? fileUtil.deleteFile(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
                 utils.cleanupTempDirectory()
                 return
@@ -578,8 +659,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     // MARK: - Exposed Public Getters
     
     @objc public func getCurrentApplicationManifest() -> Any? {
-        collectionsLock.withLock {
-            return AJPApplicationManifest(package: self.package, config: self.config, resources: self.resources)
+        bootLock.lock()
+        let blocked = bootState["securityBlocked"] as? [String] ?? []
+        let receipts = bootState["receipts"] as? [String: Any] ?? [:]
+        bootLock.unlock()
+        return collectionsLock.withLock {
+            let manifest = AJPApplicationManifest(package: self.package, config: self.config, resources: self.resources)
+            manifest.blockedPackageVersions = blocked
+            manifest.telemetry = receipts[package.version] as? [String: Any]
+            return manifest
         }
     }
     
@@ -917,8 +1005,17 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
      * tracked. No-op when the boot guard is off.
      */
     @objc public func prepareBoot() {
+        guard bootGuard.enabled || telemetryEnabled else { return }
+        let session = bootGuard.bootSession ?? makeBootSession()
+        if session.tracked && telemetryEnabled {
+            bootLock.lock(); defer { bootLock.unlock() }
+            if bootState["telemetryPending"] as? String != session.package.version {
+                report(session.package.version, "boot_started")
+                bootState["telemetryPending"] = session.package.version; saveBootState()
+            }
+        }
         guard bootGuard.enabled, !bootGuard.hasBootSession else { return }
-        bootGuard.beginBoot(makeBootSession())
+        bootGuard.beginBoot(session)
     }
 
     /**
@@ -930,6 +1027,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
      * failures are reported through the tracker. No-op when the boot guard is off.
      */
     @objc public func markBootSuccess() {
+        guard bootGuard.enabled || telemetryEnabled else { return }
+        let session = bootGuard.bootSession ?? makeBootSession()
+        if session.tracked { report(session.package.version, "boot_success") }
+        if telemetryEnabled { bootLock.lock(); bootState.removeValue(forKey: "telemetryPending"); saveBootState(); bootLock.unlock() }
         bootGuard.markBootSuccess()
     }
 
@@ -1014,10 +1115,11 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
 
     /// Replaces a blocked installed package with the last-good snapshot, else the bundled package.
     private func substituteBlockedPackage() {
-        guard let installed = self.package, bootGuard.isBlocked(installed.version) else { return }
+        guard let installed = self.package, forbidden(installed.version) || bootGuard.isBlocked(installed.version) else { return }
+        report(installed.version, "blocked_package")
         bootGuard.reportBlockedPackage(installed.version, source: "installed")
 
-        if let fallback = bootGuard.lastGoodFallback() {
+        if let fallback = bootGuard.lastGoodFallback(), !forbidden(fallback.package.version) {
             self.package = fallback.package
             self.bootSource = .snapshot(fallback.directory)
         } else {
@@ -1029,12 +1131,12 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
 
     /// Lets the guard clear its block once a server-delivered package is installed with its index on disk.
     private func notifyBootGuardOfInstall(_ package: AJPApplicationPackage) {
-        guard bootGuard.enabled else { return }
         let indexFilePath = package.index.filePath
         guard !indexFilePath.isEmpty,
               FileManager.default.fileExists(atPath: installedFilePath(indexFilePath)) else {
             return
         }
+        report(package.version, "package_downloaded")
         bootGuard.packageInstalled(package.version)
     }
     
@@ -1094,7 +1196,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         tracker.trackInfo("app_update_result", value: logVal)
         
         // Release configs naming the blocked version are already refused; this guards any other path.
-        if bootGuard.refusePackage(package.version, source: "download") {
+        if !allowPackage(package.version) {
             return
         }
 
@@ -1279,8 +1381,9 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.fetchReleaseConfigWithCompletionHandler { [weak self] manifest, error, didTimeout in
             guard let self = self else { return }
+            if let manifest = manifest { self.received(manifest) }
             
-            if let manifest = manifest, self.bootGuard.refusePackage(manifest.package.version, source: "release_config") {
+            if let manifest = manifest, !self.allowPackage(manifest.package.version) {
                 // Name the installed package instead (so nothing is downloaded or installed, and the
                 // block stays); the config and resources of this release config still apply.
                 manifest.package = self.displacedPackage ?? self.package
@@ -1495,7 +1598,13 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         
         self.startReleaseConfigTimeoutTimer()
         
-        guard let manifestUrl = URL(string: self.releaseConfigURL) else {
+        var components = URLComponents(string: self.releaseConfigURL)
+        if telemetryEnabled {
+            var items = components?.queryItems ?? []
+            items += [URLQueryItem(name: "telemetry_platform", value: "ios"), URLQueryItem(name: "native_version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown")]
+            components?.queryItems = items
+        }
+        guard let manifestUrl = components?.url else {
             completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
             return
         }
