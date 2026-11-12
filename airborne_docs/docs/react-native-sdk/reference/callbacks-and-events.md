@@ -247,6 +247,21 @@ Fired when there is an error downloading the release config.
 }
 ```
 
+### react_instance_exception
+
+Android only. Fired by the React host delegate when the React instance fails (for example the bundle cannot be loaded, or a fatal JS error) while React Native dev support is disabled, so no RedBox is shown. Delivered to the `Airborne` instance whose bundle the failing host loaded. `key` is the exception message (or class name when there is none).
+
+```typescript
+{
+  category: "lifecycle",
+  subCategory: "hyperota",
+  level: "exception",
+  label: "react_instance_exception",
+  key: "<Exception message>",
+  value: { throwable: <Throwable> }
+}
+```
+
 ## See also
 
 - [Android API](/docs/react-native-sdk/reference/android-api) — `AirborneInterface.onEvent` and the lazy download callback.
