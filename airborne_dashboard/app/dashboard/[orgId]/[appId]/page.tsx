@@ -193,7 +193,9 @@ export default function ApplicationDetailPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Releases</p>
-                        <p className="text-2xl font-bold">{releases.length}</p>
+                        {/* The list below is one page of 5; the count comes from the paginated
+                            total, not from how many rows happen to be on this page. */}
+                        <p className="text-2xl font-bold">{data?.total_items ?? releases.length}</p>
                       </div>
                       <Rocket className="h-8 w-8 text-muted-foreground" />
                     </div>
@@ -249,8 +251,10 @@ export default function ApplicationDetailPage() {
                           </TableCell>
 
                           <TableCell>
-                            <div className="block w-full h-full">
+                            <div className="flex w-full h-full items-center gap-1.5">
                               <Badge variant="outline">{r?.experiment?.status || "—"}</Badge>
+                              {r.is_reverted && <Badge variant="secondary">Reverted</Badge>}
+                              {r.is_delete_release && <Badge variant="secondary">Deletion</Badge>}
                             </div>
                           </TableCell>
 

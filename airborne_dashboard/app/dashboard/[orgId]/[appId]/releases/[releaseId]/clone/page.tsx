@@ -5,6 +5,8 @@ import useSWR from "swr";
 import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { ReleaseBuilder } from "@/components/release";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { ApiReleaseData } from "@/types/release";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
@@ -70,6 +72,27 @@ export default function CloneReleasePage() {
       <div className="p-6 flex items-center justify-center min-h-screen">
         <div className="text-center text-destructive">
           <p>Release data not found. Unable to clone.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Guarded here as well as on the detail page, so the URL cannot be used to get around it.
+  if (releaseData.is_delete_release) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="max-w-md space-y-3 text-center">
+          <p className="font-medium">This release can&apos;t be cloned.</p>
+          <p className="text-sm text-muted-foreground">
+            It is a deletion release — it exists to retire the targeting of one slice of users, so a copy of it would
+            just ship the default configuration as an ordinary release. To delete another slice, use{" "}
+            <strong>Delete release</strong> on its view.
+          </p>
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/${encodeURIComponent(org || "")}/${encodeURIComponent(params.appId)}/views`}>
+              Go to Release Views
+            </Link>
+          </Button>
         </div>
       </div>
     );
