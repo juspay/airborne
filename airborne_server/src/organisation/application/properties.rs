@@ -286,6 +286,10 @@ async fn put_properties_schema_api(
         }
     }
 
+    // `state` is moved into the rollback closure below; keep a handle for the
+    // cache invalidation that follows.
+    let state_for_cache = state.clone();
+
     let metadata_for_rollback = task_metadata.clone();
     match transaction::run_fail_end(tasks, move |success_indices| async move {
         rollback_config_update(
@@ -318,6 +322,14 @@ async fn put_properties_schema_api(
             }
         },
     }
+
+    crate::release::utils::refresh_unresolved_properties(
+        &state_for_cache,
+        &organisation,
+        &application,
+        &workspace_name,
+    )
+    .await;
 
     Ok(Json(types::PutPropertiesSchemaResponse {
         properties: req.properties.clone(),

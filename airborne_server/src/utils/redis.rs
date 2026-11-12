@@ -185,6 +185,46 @@ impl RedisCache {
         Ok(())
     }
 
+    /// SET with TTL (seconds), but only if the key is not already present
+    /// (Redis `SET … EX … NX`), JSON-serializing the value.
+    ///
+    /// Returns `true` if the value was stored and `false` if something was already
+    /// cached and was left untouched. Prefer this over [`set_ex`](Self::set_ex)
+    /// when the caller might be holding a snapshot older than what is already
+    /// cached — a cache-aside read that raced with a writer, for instance.
+    pub async fn set_ex_nx<T: Serialize>(
+        &self,
+        redis_key: &RedisKey,
+        value: &T,
+        ttl_secs: usize,
+    ) -> Result<bool, ABError> {
+        let mut r = (*self.conn).clone();
+        let key = redis_key.key.clone();
+        let payload = serde_json::to_vec(value).map_err(|e| {
+            error!("Failed to encode cache {key}: {e}");
+            CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+            ABError::InternalServerError("service error".to_string())
+        })?;
+
+        // `SET … NX` replies with the simple string OK when it stored the value and
+        // with nil when the key already existed.
+        let reply: Option<String> = redis::cmd("SET")
+            .arg(&key)
+            .arg(payload)
+            .arg("EX")
+            .arg(ttl_secs)
+            .arg("NX")
+            .query_async(&mut r)
+            .await
+            .map_err(|e| {
+                error!("Failed to SET NX {key}: {e}");
+                CACHE_FAILS.with_label_values(&redis_key.labels).inc();
+                ABError::InternalServerError("service error".to_string())
+            })?;
+
+        Ok(reply.is_some())
+    }
+
     #[allow(unused)]
     pub async fn del(&self, redis_key: &RedisKey) -> Result<(), ABError> {
         let mut r = (*self.conn).clone();
