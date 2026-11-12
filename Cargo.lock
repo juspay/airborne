@@ -5617,9 +5617,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "superposition_core"
-version = "0.113.0"
+version = "0.117.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13903fdef6c27a862efe4a1f6867d2962847bcb19996e1a7da31b500dcdf9d6c"
+checksum = "9dc05c7fd97978d8eeaba0a008c0b5719c140acb154d82fa649a11269944a28b"
 dependencies = [
  "bigdecimal",
  "blake3",
@@ -5638,9 +5638,9 @@ dependencies = [
 
 [[package]]
 name = "superposition_derives"
-version = "0.113.0"
+version = "0.117.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bce101077584b211911eb4f1e2664a2779ee31219c2d42d441412fadbe5ff97f"
+checksum = "87fab04b78903f80cdca9c6a3c4f55c8208fca6787b75ef4e3c929ada0ad6a69"
 dependencies = [
  "proc-macro-crate",
  "quote",
@@ -5649,9 +5649,9 @@ dependencies = [
 
 [[package]]
 name = "superposition_provider"
-version = "0.113.0"
+version = "0.117.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e05a793e895603c1ee8ae9d95b12b58826901875bfac60c6abec54c60e2985b"
+checksum = "413b63606fe249662f1474984ca370052dc4e4f047fc779f44a1360dc2dbd13d"
 dependencies = [
  "async-trait",
  "aws-smithy-types",
@@ -5674,9 +5674,9 @@ dependencies = [
 
 [[package]]
 name = "superposition_sdk"
-version = "0.113.0"
+version = "0.117.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d49bffbfad3c661d582db82c669dc004bc7531500bcfbbaa35af99d1cb001be3"
+checksum = "2fa6f6130e7e6da746825f56b5581d005fc3d46ab76801c18cb684ae9340775d"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http 0.62.6",
@@ -5692,9 +5692,9 @@ dependencies = [
 
 [[package]]
 name = "superposition_types"
-version = "0.113.0"
+version = "0.117.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "941c6ac97fdf31ba43653e25f56c6918a8031d7d23b51e0dbfb90644eb5e69b3"
+checksum = "563e7def3ffb8a0c1810afad39d8d7c4c72812cfd7313191dce38297668987fb"
 dependencies = [
  "bigdecimal",
  "chrono",
