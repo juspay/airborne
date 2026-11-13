@@ -135,6 +135,25 @@ get_client_secret() {
     echo "$client_secret"
 }
 
+# Airborne requires an email claim. Realms imported before realm-export.json
+# gained the airborne-email mapper lack it, so add it when it is missing. The
+# mapper definition is read from realm-export.json to keep one source of truth.
+OIDC_CLIENT_UUID=$(get_client_uuid "$OIDC_CLIENT_ID")
+if [[ -z "$OIDC_CLIENT_UUID" || "$OIDC_CLIENT_UUID" == null ]]; then
+  echo "Failed to find client UUID for $OIDC_CLIENT_ID" >&2; exit 1
+fi
+EMAIL_MAPPER=$(jq -ce '[.clients[].protocolMappers[]? | select(.name == "airborne-email")][0]' \
+  "${SCRIPT_DIR}/../realm-export.json") || {
+  echo "airborne-email mapper not found in realm-export.json" >&2; exit 1
+}
+MAPPERS_URL="${KC_BASE_URL}/admin/realms/${KC_REALM}/clients/${OIDC_CLIENT_UUID}/protocol-mappers/models"
+MAPPERS=$(curl -fsS "$MAPPERS_URL" -H "Authorization: Bearer ${ADMIN_TOKEN}")
+if ! printf '%s' "$MAPPERS" | jq -e '.[] | select(.name == "airborne-email")' >/dev/null; then
+    curl -fsS -X POST "$MAPPERS_URL" \
+      -H "Authorization: Bearer ${ADMIN_TOKEN}" -H "Content-Type: application/json" \
+      -d "$EMAIL_MAPPER"
+fi
+
 OIDC_CLIENT_SECRET_VALUE=$(get_client_secret "$OIDC_CLIENT_ID")
 if [ "$AUTH_ADMIN_CLIENT_ID" = "$OIDC_CLIENT_ID" ]; then
     AUTH_ADMIN_CLIENT_SECRET_VALUE="$OIDC_CLIENT_SECRET_VALUE"
