@@ -146,7 +146,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
     // Airborne SDK dependency
-    api "io.juspay:airborne:0.46.0"
+    api "io.juspay:airborne:0.50.0"
 }
 
 react {
