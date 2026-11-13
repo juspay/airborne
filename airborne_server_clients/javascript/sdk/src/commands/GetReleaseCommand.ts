@@ -50,6 +50,9 @@ export interface GetReleaseCommandOutput extends GetReleaseResponse, __MetadataB
  * const command = new GetReleaseCommand(input);
  * const response = await client.send(command);
  * // { // GetReleaseResponse
+ * //   warnings: [ // ReleaseWarnings
+ * //     "STRING_VALUE",
+ * //   ],
  * //   id: "STRING_VALUE",
  * //   created_at: "STRING_VALUE",
  * //   config: { // GetReleaseConfig

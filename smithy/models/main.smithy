@@ -36,6 +36,17 @@ service Airborne {
         ListDimensions
         UpdateDimension
         DeleteDimension
+        // Control Center overview, app groups, release history, and rollback
+        GetControlCenterOverview
+        ListControlCenterGroups
+        ListControlCenterOperations
+        ResolveControlCenterOperation
+        CreateControlCenterGroup
+        UpdateControlCenterGroup
+        DeleteControlCenterGroup
+        GetControlCenterReleaseEvents
+        GetControlCenterRollbackPreview
+        RollbackRelease
     ]
     errors: [
         Unauthorized
