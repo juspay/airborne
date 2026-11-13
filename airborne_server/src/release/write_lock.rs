@@ -51,6 +51,14 @@ pub async fn locked_inner<T>(
     reconcile: bool,
     operation: impl std::future::Future<Output = airborne_types::Result<T>>,
 ) -> airborne_types::Result<T> {
+    // Only an internal approval execution can re-enter its existing scoped lock.
+    if super::maker_checker::executing(org, app)
+        && SESSION
+            .try_with(|s| s.org == org && s.app == app)
+            .unwrap_or(false)
+    {
+        return operation.await;
+    }
     let permit = WRITERS
         .try_acquire()
         .map_err(|_| ABError::Conflict("Release writer capacity reached; retry shortly".into()))?;

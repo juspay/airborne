@@ -54,8 +54,7 @@ async fn list_cohorts_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
 
     let superposition_org_id = state.env.superposition_org_id.clone();
 
@@ -99,160 +98,167 @@ async fn create_cohort_checkpoint_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    // Get workspace name for this application
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+        // Get workspace name for this application
+        let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await?;
 
-    let superposition_org_id = state.env.superposition_org_id.clone();
+        let superposition_org_id = state.env.superposition_org_id.clone();
 
-    let dimension_output = state
-        .superposition_client
-        .get_dimension()
-        .org_id(superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .dimension(cohort_dimension_id.clone())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch dimension: {}", e)))?;
+        let dimension_output = state
+            .superposition_client
+            .get_dimension()
+            .org_id(superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .dimension(cohort_dimension_id.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to fetch dimension: {}", e))
+            })?;
 
-    let depends_on = match &dimension_output.dimension_type {
-        superposition_sdk::types::DimensionType::LocalCohort(depends_on) => depends_on,
-        _ => {
-            return Err(ABError::BadRequest(format!(
-                "Dimension '{}' is not a cohort dimension",
-                cohort_dimension_id
-            )));
-        }
-    };
-
-    info!("Fetched dimension: {:?}", dimension_output);
-    let mut cohort_dimension: CohortDimensionSchema = dimension_output
-        .schema
-        .try_into()
-        .map_err(|e| ABError::InternalServerError(format!("Schema parse error: {}", e)))?;
-
-    if cohort_dimension.check_has_default() {
-        // First checkpoint
-        cohort_dimension.remove_default();
-    }
-
-    if cohort_dimension.r#enum.contains(&req.name) {
-        return Err(ABError::BadRequest(format!(
-            "Cohort '{}' already exists",
-            req.name
-        )));
-    }
-
-    let (last_index_of_group, last_checkpoint): (Option<usize>, Option<types::CohortName>) =
-        cohort_dimension.r#enum.iter().enumerate().fold(
-            (None, None),
-            |(last_in, first), (idx, cohort_name)| {
-                let Some(definitions) = cohort_dimension.definitions.get(cohort_name) else {
-                    return (last_in, first);
-                };
-
-                match definitions.keys().next() {
-                    // track the last index where the key is `In`
-                    Some(key) if *key == types::JsonLogicKey::In => (Some(idx), first),
-
-                    // on the first non-`In`, capture the *cohort name*
-                    Some(_key) if first.is_none() => (last_in, Some(cohort_name.clone())),
-
-                    _ => (last_in, first),
-                }
-            },
-        );
-
-    let mut logic_hashmap = HashMap::new();
-    logic_hashmap.insert(
-        req.comparator.clone().into(),
-        types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.value])),
-    );
-
-    cohort_dimension
-        .definitions
-        .insert(req.name.clone(), logic_hashmap);
-
-    // put the req.name in enums after last_index_of_group if it exists, else at the start and edit last_checkpoint if it exists and add an upper bound there with AND
-    match last_index_of_group {
-        Some(idx) => {
-            cohort_dimension.r#enum.insert(idx + 1, req.name.clone());
-        }
-        None => {
-            cohort_dimension.r#enum.insert(0, req.name.clone());
-        }
-    }
-
-    // Update the last checkpoint to have an upper bound if it exists
-    if let Some(last_checkpoint) = last_checkpoint {
-        let comparator = match req.comparator {
-            types::Comparator::SemverGt => types::JsonLogicKey::SemVerLe,
-            types::Comparator::StrGt => types::JsonLogicKey::StrLe,
-            types::Comparator::SemverGe => types::JsonLogicKey::SemVerLt,
-            types::Comparator::StrGe => types::JsonLogicKey::StrLt,
+        let depends_on = match &dimension_output.dimension_type {
+            superposition_sdk::types::DimensionType::LocalCohort(depends_on) => depends_on,
+            _ => {
+                return Err(ABError::BadRequest(format!(
+                    "Dimension '{}' is not a cohort dimension",
+                    cohort_dimension_id
+                )));
+            }
         };
 
-        let mut logic_hashmap = HashMap::new();
-        let mut and_conditions: Vec<types::DefinitionValue> = Vec::new();
+        info!("Fetched dimension: {:?}", dimension_output);
+        let mut cohort_dimension: CohortDimensionSchema = dimension_output
+            .schema
+            .try_into()
+            .map_err(|e| ABError::InternalServerError(format!("Schema parse error: {}", e)))?;
 
-        // Retain existing definition
-        if let Some(existing) = cohort_dimension.definitions.get(&last_checkpoint) {
-            // put first key of existing into and_conditions as a Node
-            if let Some((key, val)) = existing.iter().next() {
-                let mut inner_map = HashMap::new();
-                inner_map.insert(key.clone(), val.clone());
-                and_conditions.push(types::DefinitionValue::Node(inner_map));
+        if cohort_dimension.check_has_default() {
+            // First checkpoint
+            cohort_dimension.remove_default();
+        }
+
+        if cohort_dimension.r#enum.contains(&req.name) {
+            return Err(ABError::BadRequest(format!(
+                "Cohort '{}' already exists",
+                req.name
+            )));
+        }
+
+        let (last_index_of_group, last_checkpoint): (Option<usize>, Option<types::CohortName>) =
+            cohort_dimension.r#enum.iter().enumerate().fold(
+                (None, None),
+                |(last_in, first), (idx, cohort_name)| {
+                    let Some(definitions) = cohort_dimension.definitions.get(cohort_name) else {
+                        return (last_in, first);
+                    };
+
+                    match definitions.keys().next() {
+                        // track the last index where the key is `In`
+                        Some(key) if *key == types::JsonLogicKey::In => (Some(idx), first),
+
+                        // on the first non-`In`, capture the *cohort name*
+                        Some(_key) if first.is_none() => (last_in, Some(cohort_name.clone())),
+
+                        _ => (last_in, first),
+                    }
+                },
+            );
+
+        let mut logic_hashmap = HashMap::new();
+        logic_hashmap.insert(
+            req.comparator.clone().into(),
+            types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.value])),
+        );
+
+        cohort_dimension
+            .definitions
+            .insert(req.name.clone(), logic_hashmap);
+
+        // put the req.name in enums after last_index_of_group if it exists, else at the start and edit last_checkpoint if it exists and add an upper bound there with AND
+        match last_index_of_group {
+            Some(idx) => {
+                cohort_dimension.r#enum.insert(idx + 1, req.name.clone());
+            }
+            None => {
+                cohort_dimension.r#enum.insert(0, req.name.clone());
             }
         }
 
-        // Add upper bound as a Leaf
-        let mut upper_bound_map = HashMap::new();
-        upper_bound_map.insert(
-            comparator,
-            types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.value])),
-        );
-        and_conditions.push(types::DefinitionValue::Node(upper_bound_map));
+        // Update the last checkpoint to have an upper bound if it exists
+        if let Some(last_checkpoint) = last_checkpoint {
+            let comparator = match req.comparator {
+                types::Comparator::SemverGt => types::JsonLogicKey::SemVerLe,
+                types::Comparator::StrGt => types::JsonLogicKey::StrLe,
+                types::Comparator::SemverGe => types::JsonLogicKey::SemVerLt,
+                types::Comparator::StrGe => types::JsonLogicKey::StrLt,
+            };
 
-        logic_hashmap.insert(
-            types::JsonLogicKey::And,
-            types::DefinitionValue::Array(and_conditions),
-        );
+            let mut logic_hashmap = HashMap::new();
+            let mut and_conditions: Vec<types::DefinitionValue> = Vec::new();
 
-        if cohort_dimension
-            .definitions
-            .remove(&last_checkpoint)
-            .is_some()
-        {
-            cohort_dimension
+            // Retain existing definition
+            if let Some(existing) = cohort_dimension.definitions.get(&last_checkpoint) {
+                // put first key of existing into and_conditions as a Node
+                if let Some((key, val)) = existing.iter().next() {
+                    let mut inner_map = HashMap::new();
+                    inner_map.insert(key.clone(), val.clone());
+                    and_conditions.push(types::DefinitionValue::Node(inner_map));
+                }
+            }
+
+            // Add upper bound as a Leaf
+            let mut upper_bound_map = HashMap::new();
+            upper_bound_map.insert(
+                comparator,
+                types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.value])),
+            );
+            and_conditions.push(types::DefinitionValue::Node(upper_bound_map));
+
+            logic_hashmap.insert(
+                types::JsonLogicKey::And,
+                types::DefinitionValue::Array(and_conditions),
+            );
+
+            if cohort_dimension
                 .definitions
-                .insert(last_checkpoint.to_string(), logic_hashmap);
+                .remove(&last_checkpoint)
+                .is_some()
+            {
+                cohort_dimension
+                    .definitions
+                    .insert(last_checkpoint.to_string(), logic_hashmap);
+            }
         }
-    }
 
-    let _ = state
-        .superposition_client
-        .update_dimension()
-        .org_id(superposition_org_id)
-        .workspace_id(workspace_name)
-        .dimension(cohort_dimension_id.clone())
-        .set_schema(Some(cohort_dimension.to_kv_str_doc()))
-        .change_reason("Added cohort checkpoint via API".to_string())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+        let _ = state
+            .superposition_client
+            .update_dimension()
+            .org_id(superposition_org_id)
+            .workspace_id(workspace_name)
+            .dimension(cohort_dimension_id.clone())
+            .set_schema(Some(cohort_dimension.to_kv_str_doc()))
+            .change_reason("Added cohort checkpoint via API".to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to update dimension: {}", e))
+            })?;
 
-    Ok(Json(types::CreateCohortDimensionCheckpointOutput {
-        name: req.name.clone(),
-        value: req.value.clone(),
-        comparator: req.comparator.clone(),
-    }))
+        Ok(Json(types::CreateCohortDimensionCheckpointOutput {
+            name: req.name.clone(),
+            value: req.value.clone(),
+            comparator: req.comparator.clone(),
+        }))
+    })
+    .await
 }
 
 #[authz(
@@ -275,85 +281,92 @@ async fn create_cohort_group_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    // Get workspace name for this application
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+        // Get workspace name for this application
+        let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await?;
 
-    let superposition_org_id = state.env.superposition_org_id.clone();
+        let superposition_org_id = state.env.superposition_org_id.clone();
 
-    let dimension_output = state
-        .superposition_client
-        .get_dimension()
-        .org_id(superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .dimension(cohort_dimension_id.clone())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch dimension: {}", e)))?;
+        let dimension_output = state
+            .superposition_client
+            .get_dimension()
+            .org_id(superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .dimension(cohort_dimension_id.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to fetch dimension: {}", e))
+            })?;
 
-    let depends_on = match &dimension_output.dimension_type {
-        superposition_sdk::types::DimensionType::LocalCohort(depends_on) => depends_on,
-        _ => {
+        let depends_on = match &dimension_output.dimension_type {
+            superposition_sdk::types::DimensionType::LocalCohort(depends_on) => depends_on,
+            _ => {
+                return Err(ABError::BadRequest(format!(
+                    "Dimension '{}' is not a cohort dimension",
+                    cohort_dimension_id
+                )));
+            }
+        };
+
+        info!("Fetched dimension: {:?}", dimension_output);
+        let mut cohort_dimension: CohortDimensionSchema = dimension_output
+            .schema
+            .try_into()
+            .map_err(|e| ABError::InternalServerError(format!("Schema parse error: {}", e)))?;
+
+        if cohort_dimension.check_has_default() {
+            // First group
+            cohort_dimension.remove_default();
+        }
+
+        if cohort_dimension.r#enum.contains(&req.name) {
             return Err(ABError::BadRequest(format!(
-                "Dimension '{}' is not a cohort dimension",
-                cohort_dimension_id
+                "Cohort '{}' already exists",
+                req.name
             )));
         }
-    };
 
-    info!("Fetched dimension: {:?}", dimension_output);
-    let mut cohort_dimension: CohortDimensionSchema = dimension_output
-        .schema
-        .try_into()
-        .map_err(|e| ABError::InternalServerError(format!("Schema parse error: {}", e)))?;
+        let mut logic_hashmap = HashMap::new();
+        logic_hashmap.insert(
+            types::JsonLogicKey::In,
+            types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.members])),
+        );
 
-    if cohort_dimension.check_has_default() {
-        // First group
-        cohort_dimension.remove_default();
-    }
+        cohort_dimension
+            .definitions
+            .insert(req.name.clone(), logic_hashmap);
 
-    if cohort_dimension.r#enum.contains(&req.name) {
-        return Err(ABError::BadRequest(format!(
-            "Cohort '{}' already exists",
-            req.name
-        )));
-    }
+        cohort_dimension.r#enum.insert(0, req.name.clone());
 
-    let mut logic_hashmap = HashMap::new();
-    logic_hashmap.insert(
-        types::JsonLogicKey::In,
-        types::DefinitionValue::Leaf(serde_json::json!([{ "var": depends_on }, req.members])),
-    );
+        let _ = state
+            .superposition_client
+            .update_dimension()
+            .org_id(superposition_org_id)
+            .workspace_id(workspace_name)
+            .dimension(cohort_dimension_id.clone())
+            .set_schema(Some(cohort_dimension.to_kv_str_doc()))
+            .change_reason("Added cohort checkpoint via API".to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to update dimension: {}", e))
+            })?;
 
-    cohort_dimension
-        .definitions
-        .insert(req.name.clone(), logic_hashmap);
-
-    cohort_dimension.r#enum.insert(0, req.name.clone());
-
-    let _ = state
-        .superposition_client
-        .update_dimension()
-        .org_id(superposition_org_id)
-        .workspace_id(workspace_name)
-        .dimension(cohort_dimension_id.clone())
-        .set_schema(Some(cohort_dimension.to_kv_str_doc()))
-        .change_reason("Added cohort checkpoint via API".to_string())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
-
-    Ok(Json(types::CreateCohortGroupOutput {
-        name: req.name.clone(),
-        members: req.members.clone(),
-    }))
+        Ok(Json(types::CreateCohortGroupOutput {
+            name: req.name.clone(),
+            members: req.members.clone(),
+        }))
+    })
+    .await
 }
 
 #[authz(
@@ -382,8 +395,7 @@ async fn get_cohort_priority_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
 
     let superposition_org_id = state.env.superposition_org_id.clone();
 
@@ -449,96 +461,103 @@ async fn update_cohort_priority_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    // Get workspace name for this application
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+        // Get workspace name for this application
+        let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await?;
 
-    let superposition_org_id = state.env.superposition_org_id.clone();
+        let superposition_org_id = state.env.superposition_org_id.clone();
 
-    let dimension_output = state
-        .superposition_client
-        .get_dimension()
-        .org_id(superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .dimension(cohort_dimension_id.clone())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to fetch dimension: {}", e)))?;
+        let dimension_output = state
+            .superposition_client
+            .get_dimension()
+            .org_id(superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .dimension(cohort_dimension_id.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to fetch dimension: {}", e))
+            })?;
 
-    info!("Fetched dimension: {:?}", dimension_output);
-    let mut cohort_dimension: CohortDimensionSchema = dimension_output
-        .schema
-        .try_into()
-        .map_err(|e| ABError::InternalServerError(format!("Schema parse error: {}", e)))?;
+        info!("Fetched dimension: {:?}", dimension_output);
+        let mut cohort_dimension: CohortDimensionSchema = dimension_output
+            .schema
+            .try_into()
+            .map_err(|e| ABError::InternalServerError(format!("Schema parse error: {}", e)))?;
 
-    let in_keys: Vec<String> = cohort_dimension
-        .definitions
-        .iter()
-        .filter_map(|(cohort_name, definition)| {
-            if definition.contains_key(&types::JsonLogicKey::In) {
-                Some(cohort_name.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    let mut priority_map: HashMap<String, i32> = HashMap::new();
-    for cohort_name in in_keys {
-        if let Some(idx) = cohort_dimension
-            .r#enum
+        let in_keys: Vec<String> = cohort_dimension
+            .definitions
             .iter()
-            .position(|c| c == &cohort_name)
-        {
-            priority_map.insert(cohort_name, idx as i32);
-        }
-    }
+            .filter_map(|(cohort_name, definition)| {
+                if definition.contains_key(&types::JsonLogicKey::In) {
+                    Some(cohort_name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-    // Let's reorder the enums based on req.priority_map
-    for (cohort_name, new_priority) in &req.priority_map {
-        if *new_priority > priority_map.len() as i32 - 1 || *new_priority < 0 {
-            return Err(ABError::BadRequest(format!(
-                "Invalid priority {} for cohort '{}'. Must be between 0 and {}",
-                new_priority,
-                cohort_name,
-                priority_map.len() - 1
-            )));
-        }
-        if let Some(current_idx) = cohort_dimension
-            .r#enum
-            .iter()
-            .position(|c| c == cohort_name)
-        {
-            // Remove from current position
-            cohort_dimension.r#enum.remove(current_idx);
-            // Insert at new position
-            let insert_idx = (*new_priority as usize).min(cohort_dimension.r#enum.len());
-            cohort_dimension
+        let mut priority_map: HashMap<String, i32> = HashMap::new();
+        for cohort_name in in_keys {
+            if let Some(idx) = cohort_dimension
                 .r#enum
-                .insert(insert_idx, cohort_name.clone());
+                .iter()
+                .position(|c| c == &cohort_name)
+            {
+                priority_map.insert(cohort_name, idx as i32);
+            }
         }
-    }
 
-    let _ = state
-        .superposition_client
-        .update_dimension()
-        .org_id(superposition_org_id)
-        .workspace_id(workspace_name)
-        .dimension(cohort_dimension_id.clone())
-        .set_schema(Some(cohort_dimension.to_kv_str_doc()))
-        .change_reason("Updated cohort priority via API".to_string())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+        // Let's reorder the enums based on req.priority_map
+        for (cohort_name, new_priority) in &req.priority_map {
+            if *new_priority > priority_map.len() as i32 - 1 || *new_priority < 0 {
+                return Err(ABError::BadRequest(format!(
+                    "Invalid priority {} for cohort '{}'. Must be between 0 and {}",
+                    new_priority,
+                    cohort_name,
+                    priority_map.len() - 1
+                )));
+            }
+            if let Some(current_idx) = cohort_dimension
+                .r#enum
+                .iter()
+                .position(|c| c == cohort_name)
+            {
+                // Remove from current position
+                cohort_dimension.r#enum.remove(current_idx);
+                // Insert at new position
+                let insert_idx = (*new_priority as usize).min(cohort_dimension.r#enum.len());
+                cohort_dimension
+                    .r#enum
+                    .insert(insert_idx, cohort_name.clone());
+            }
+        }
 
-    Ok(Json(types::UpdatePriorityOutput {
-        priority_map: req.priority_map.clone(),
-    }))
+        let _ = state
+            .superposition_client
+            .update_dimension()
+            .org_id(superposition_org_id)
+            .workspace_id(workspace_name)
+            .dimension(cohort_dimension_id.clone())
+            .set_schema(Some(cohort_dimension.to_kv_str_doc()))
+            .change_reason("Updated cohort priority via API".to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to update dimension: {}", e))
+            })?;
+
+        Ok(Json(types::UpdatePriorityOutput {
+            priority_map: req.priority_map.clone(),
+        }))
+    })
+    .await
 }

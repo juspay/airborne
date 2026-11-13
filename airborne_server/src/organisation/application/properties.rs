@@ -72,256 +72,272 @@ async fn put_properties_schema_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(
+        &state.clone(),
+        &organisation,
+        &application,
+        async {
+            crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    let properties = req.properties.clone();
-    let properties = properties
-        .iter()
-        .map(|(k, v)| (format!("config.properties.{}", k), v.to_owned()))
-        .collect::<BTreeMap<String, types::SchemaNode>>();
+            let properties = req.properties.clone();
+            let properties = properties
+                .iter()
+                .map(|(k, v)| (format!("config.properties.{}", k), v.to_owned()))
+                .collect::<BTreeMap<String, types::SchemaNode>>();
 
-    info!("Properties to be updated: {:?}", properties);
+            info!("Properties to be updated: {:?}", properties);
 
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
+            let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+                state.db_pool.clone(),
+                &state.redis_cache,
+                application.clone(),
+                organisation.clone(),
+            )
+            .await?;
+
+            let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+            info!(
+                "Using org and workspace: {} / {}",
+                superposition_org_id_from_env, workspace_name
+            );
+
+            let mut tasks = Vec::with_capacity(properties.len());
+            let mut task_metadata: Vec<types::PutPropertiesSchemaTaskMetadata> =
+                Vec::with_capacity(properties.len());
+
+            let all_configs = state
+                .superposition_client
+                .list_default_configs()
+                .org_id(superposition_org_id_from_env.clone())
+                .workspace_id(workspace_name.clone())
+                .all(true)
+                .send()
+                .await
+                .map_err(|e| {
+                    ABError::InternalServerError(format!(
+                        "Failed to get current config properties: {}",
+                        e
+                    ))
+                })?;
+
+            let existing_config_properties = all_configs
+                .data()
+                .iter()
+                .filter_map(|config| {
+                    if config.key.starts_with("config.properties.") {
+                        Some(config.key.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<String>>();
+
+            let existing_config_schemas = all_configs
+                .data()
+                .iter()
+                .filter_map(|config| {
+                    if config.key.starts_with("config.properties.") {
+                        let schema = hashmap_to_json_value(config.schema());
+                        let schema_node = types::SchemaNode {
+                            description: config.description().to_string(),
+                            default_value: document_to_json_value(config.value()),
+                            schema,
+                        };
+                        Some((config.key.clone(), schema_node))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<BTreeMap<String, types::SchemaNode>>();
+
+            let to_be_deleted = utils::to_be_deleted(
+                &existing_config_properties,
+                &properties.keys().cloned().collect::<Vec<String>>(),
+            );
+            let to_be_created = utils::to_be_created(
+                &existing_config_properties,
+                &properties.keys().cloned().collect::<Vec<String>>(),
+            );
+            let to_be_updated = utils::to_be_updated(
+                &existing_config_properties,
+                &properties.keys().cloned().collect::<Vec<String>>(),
+            );
+            let all_configs: Vec<String> = to_be_created
+                .iter()
+                .chain(to_be_updated.iter())
+                .chain(to_be_deleted.iter())
+                .cloned()
+                .collect();
+
+            for key in all_configs {
+                let value = properties.get(&key).cloned();
+                let existing_value = existing_config_schemas.get(&key).cloned();
+                let org = superposition_org_id_from_env.clone();
+                let workspace = workspace_name.clone();
+                let superposition_client = state.superposition_client.clone();
+
+                let key_for_api = key.clone();
+                let key_for_msg = key.clone();
+
+                if to_be_created.contains(&key_for_api) {
+                    let value = value.ok_or_else(|| {
+                        ABError::BadRequest(format!("Property {key_for_msg} not found in request"))
+                    })?;
+
+                    let description = value.description.clone();
+                    let default_value = value.default_value.clone();
+                    let schema = value.schema.clone();
+
+                    task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
+                        key: key_for_api.clone(),
+                        schema_new: Some(value.clone()),
+                        schema_old: None,
+                        action: types::PutPropertiesSchemaTaskAction::Create,
+                        org_id: org.clone(),
+                        workspace_id: workspace.clone(),
+                    });
+
+                    tasks.push(transaction::op(move || async move {
+                        superposition_client
+                            .create_default_config()
+                            .org_id(org)
+                            .workspace_id(workspace)
+                            .key(key_for_api)
+                            .value(value_to_document(&default_value))
+                            .description(description)
+                            .change_reason("Create default config".to_string())
+                            .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&schema))))
+                            .send()
+                            .await
+                            .map_err(|e| {
+                                info!("Error in create: {:?}", e.as_service_error());
+                                ABError::InternalServerError(format!(
+                                    "Failed to create: {}",
+                                    key_for_msg
+                                ))
+                            })?;
+
+                        Ok::<_, ABError>(format!("Added config {key_for_msg}"))
+                    }));
+                } else if to_be_updated.contains(&key_for_api) {
+                    let value = value.ok_or_else(|| {
+                        ABError::BadRequest(format!("Property {key_for_msg} not found in request"))
+                    })?;
+
+                    let existing_value = existing_value.ok_or_else(|| {
+                        ABError::BadRequest(format!("Property {key_for_msg} not found"))
+                    })?;
+
+                    let description = value.description.clone();
+                    let default_value = value.default_value.clone();
+                    let schema = value.schema.clone();
+
+                    task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
+                        key: key_for_api.clone(),
+                        schema_new: Some(value.clone()),
+                        schema_old: Some(existing_value.clone()),
+                        action: types::PutPropertiesSchemaTaskAction::Update,
+                        org_id: org.clone(),
+                        workspace_id: workspace.clone(),
+                    });
+
+                    tasks.push(transaction::op(move || async move {
+                        superposition_client
+                            .update_default_config()
+                            .org_id(org)
+                            .workspace_id(workspace)
+                            .key(key_for_api)
+                            .value(value_to_document(&default_value))
+                            .description(description)
+                            .change_reason("Update default config".to_string())
+                            .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&schema))))
+                            .send()
+                            .await
+                            .map_err(|e| {
+                                info!("Error in update: {:?}", e.as_service_error());
+                                ABError::InternalServerError(format!(
+                                    "Could not modify {} as it is being used in releases",
+                                    key_for_msg
+                                ))
+                            })?;
+
+                        Ok::<_, ABError>(format!("Updated config {key_for_msg}"))
+                    }));
+                } else if to_be_deleted.contains(&key_for_api) {
+                    let existing_value = existing_value.ok_or_else(|| {
+                        ABError::BadRequest(format!("Property {key_for_msg} not found"))
+                    })?;
+
+                    task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
+                        key: key_for_api.clone(),
+                        schema_new: None,
+                        schema_old: Some(existing_value.clone()),
+                        action: types::PutPropertiesSchemaTaskAction::Delete,
+                        org_id: org.clone(),
+                        workspace_id: workspace.clone(),
+                    });
+
+                    tasks.push(transaction::op(move || async move {
+                        superposition_client
+                            .delete_default_config()
+                            .org_id(org)
+                            .workspace_id(workspace)
+                            .key(key_for_api)
+                            .send()
+                            .await
+                            .map_err(|e| {
+                                info!("Error in delete: {:?}", e.as_service_error());
+                                ABError::InternalServerError(format!(
+                                    "Could not modify {} as it is being used in releases",
+                                    key_for_msg
+                                ))
+                            })?;
+
+                        Ok::<_, ABError>(format!("Deleted config {key_for_msg}"))
+                    }));
+                }
+            }
+
+            let metadata_for_rollback = task_metadata.clone();
+            match transaction::run_fail_end(tasks, move |success_indices| async move {
+                rollback_config_update(
+                    success_indices,
+                    metadata_for_rollback,
+                    &state.superposition_client,
+                )
+                .await;
+            })
+            .await
+            {
+                Ok(values) => info!("All good: {:?}", values),
+                Err(e) => match e {
+                    transaction::TxnError::Operation { source, .. } => return Err(source),
+                    transaction::TxnError::Join { source, .. } => {
+                        log::error!("Task Join Error: {:?}", source);
+                        return Err(ABError::InternalServerError("service error".to_string()));
+                    }
+                    transaction::TxnError::Panic { index } => {
+                        log::error!(
+                            "Task Panic at: {:?}, task_metadata: {:?}",
+                            index,
+                            task_metadata.get(index)
+                        );
+                        return Err(ABError::InternalServerError("service error".to_string()));
+                    }
+                    transaction::TxnError::MissingResult { index } => {
+                        log::error!("Missing result for task: {:?}", index);
+                        return Err(ABError::InternalServerError("service error".to_string()));
+                    }
+                },
+            }
+
+            Ok(Json(types::PutPropertiesSchemaResponse {
+                properties: req.properties.clone(),
+            }))
+        },
     )
     .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
-
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-
-    info!(
-        "Using org and workspace: {} / {}",
-        superposition_org_id_from_env, workspace_name
-    );
-
-    let mut tasks = Vec::with_capacity(properties.len());
-    let mut task_metadata: Vec<types::PutPropertiesSchemaTaskMetadata> =
-        Vec::with_capacity(properties.len());
-
-    let all_configs = state
-        .superposition_client
-        .list_default_configs()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .all(true)
-        .send()
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to get current config properties: {}", e))
-        })?;
-
-    let existing_config_properties = all_configs
-        .data()
-        .iter()
-        .filter_map(|config| {
-            if config.key.starts_with("config.properties.") {
-                Some(config.key.clone())
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<String>>();
-
-    let existing_config_schemas = all_configs
-        .data()
-        .iter()
-        .filter_map(|config| {
-            if config.key.starts_with("config.properties.") {
-                let schema = hashmap_to_json_value(config.schema());
-                let schema_node = types::SchemaNode {
-                    description: config.description().to_string(),
-                    default_value: document_to_json_value(config.value()),
-                    schema,
-                };
-                Some((config.key.clone(), schema_node))
-            } else {
-                None
-            }
-        })
-        .collect::<BTreeMap<String, types::SchemaNode>>();
-
-    let to_be_deleted = utils::to_be_deleted(
-        &existing_config_properties,
-        &properties.keys().cloned().collect::<Vec<String>>(),
-    );
-    let to_be_created = utils::to_be_created(
-        &existing_config_properties,
-        &properties.keys().cloned().collect::<Vec<String>>(),
-    );
-    let to_be_updated = utils::to_be_updated(
-        &existing_config_properties,
-        &properties.keys().cloned().collect::<Vec<String>>(),
-    );
-    let all_configs: Vec<String> = to_be_created
-        .iter()
-        .chain(to_be_updated.iter())
-        .chain(to_be_deleted.iter())
-        .cloned()
-        .collect();
-
-    for key in all_configs {
-        let value = properties.get(&key).cloned();
-        let existing_value = existing_config_schemas.get(&key).cloned();
-        let org = superposition_org_id_from_env.clone();
-        let workspace = workspace_name.clone();
-        let superposition_client = state.superposition_client.clone();
-
-        let key_for_api = key.clone();
-        let key_for_msg = key.clone();
-
-        if to_be_created.contains(&key_for_api) {
-            let value = value.ok_or_else(|| {
-                ABError::BadRequest(format!("Property {key_for_msg} not found in request"))
-            })?;
-
-            let description = value.description.clone();
-            let default_value = value.default_value.clone();
-            let schema = value.schema.clone();
-
-            task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
-                key: key_for_api.clone(),
-                schema_new: Some(value.clone()),
-                schema_old: None,
-                action: types::PutPropertiesSchemaTaskAction::Create,
-                org_id: org.clone(),
-                workspace_id: workspace.clone(),
-            });
-
-            tasks.push(transaction::op(move || async move {
-                superposition_client
-                    .create_default_config()
-                    .org_id(org)
-                    .workspace_id(workspace)
-                    .key(key_for_api)
-                    .value(value_to_document(&default_value))
-                    .description(description)
-                    .change_reason("Create default config".to_string())
-                    .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&schema))))
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        info!("Error in create: {:?}", e.as_service_error());
-                        ABError::InternalServerError(format!("Failed to create: {}", key_for_msg))
-                    })?;
-
-                Ok::<_, ABError>(format!("Added config {key_for_msg}"))
-            }));
-        } else if to_be_updated.contains(&key_for_api) {
-            let value = value.ok_or_else(|| {
-                ABError::BadRequest(format!("Property {key_for_msg} not found in request"))
-            })?;
-
-            let existing_value = existing_value
-                .ok_or_else(|| ABError::BadRequest(format!("Property {key_for_msg} not found")))?;
-
-            let description = value.description.clone();
-            let default_value = value.default_value.clone();
-            let schema = value.schema.clone();
-
-            task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
-                key: key_for_api.clone(),
-                schema_new: Some(value.clone()),
-                schema_old: Some(existing_value.clone()),
-                action: types::PutPropertiesSchemaTaskAction::Update,
-                org_id: org.clone(),
-                workspace_id: workspace.clone(),
-            });
-
-            tasks.push(transaction::op(move || async move {
-                superposition_client
-                    .update_default_config()
-                    .org_id(org)
-                    .workspace_id(workspace)
-                    .key(key_for_api)
-                    .value(value_to_document(&default_value))
-                    .description(description)
-                    .change_reason("Update default config".to_string())
-                    .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&schema))))
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        info!("Error in update: {:?}", e.as_service_error());
-                        ABError::InternalServerError(format!(
-                            "Could not modify {} as it is being used in releases",
-                            key_for_msg
-                        ))
-                    })?;
-
-                Ok::<_, ABError>(format!("Updated config {key_for_msg}"))
-            }));
-        } else if to_be_deleted.contains(&key_for_api) {
-            let existing_value = existing_value
-                .ok_or_else(|| ABError::BadRequest(format!("Property {key_for_msg} not found")))?;
-
-            task_metadata.push(types::PutPropertiesSchemaTaskMetadata {
-                key: key_for_api.clone(),
-                schema_new: None,
-                schema_old: Some(existing_value.clone()),
-                action: types::PutPropertiesSchemaTaskAction::Delete,
-                org_id: org.clone(),
-                workspace_id: workspace.clone(),
-            });
-
-            tasks.push(transaction::op(move || async move {
-                superposition_client
-                    .delete_default_config()
-                    .org_id(org)
-                    .workspace_id(workspace)
-                    .key(key_for_api)
-                    .send()
-                    .await
-                    .map_err(|e| {
-                        info!("Error in delete: {:?}", e.as_service_error());
-                        ABError::InternalServerError(format!(
-                            "Could not modify {} as it is being used in releases",
-                            key_for_msg
-                        ))
-                    })?;
-
-                Ok::<_, ABError>(format!("Deleted config {key_for_msg}"))
-            }));
-        }
-    }
-
-    let metadata_for_rollback = task_metadata.clone();
-    match transaction::run_fail_end(tasks, move |success_indices| async move {
-        rollback_config_update(
-            success_indices,
-            metadata_for_rollback,
-            &state.superposition_client,
-        )
-        .await;
-    })
-    .await
-    {
-        Ok(values) => info!("All good: {:?}", values),
-        Err(e) => match e {
-            transaction::TxnError::Operation { source, .. } => return Err(source),
-            transaction::TxnError::Join { source, .. } => {
-                log::error!("Task Join Error: {:?}", source);
-                return Err(ABError::InternalServerError("service error".to_string()));
-            }
-            transaction::TxnError::Panic { index } => {
-                log::error!(
-                    "Task Panic at: {:?}, task_metadata: {:?}",
-                    index,
-                    task_metadata.get(index)
-                );
-                return Err(ABError::InternalServerError("service error".to_string()));
-            }
-            transaction::TxnError::MissingResult { index } => {
-                log::error!("Missing result for task: {:?}", index);
-                return Err(ABError::InternalServerError("service error".to_string()));
-            }
-        },
-    }
-
-    Ok(Json(types::PutPropertiesSchemaResponse {
-        properties: req.properties.clone(),
-    }))
 }
 
 async fn rollback_config_update(
@@ -461,8 +477,7 @@ async fn get_properties_schema_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
     let context: HashMap<String, Value> = req
@@ -624,8 +639,7 @@ async fn list_properties_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 

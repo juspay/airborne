@@ -17,7 +17,7 @@ fn base(exp: &ExperimentResponse) -> Value {
     json!({"action":null,"current_package_version":version(exp),"resulting_package_version":null,"reconciled_keys":null,"blocked":null})
 }
 // Both GET and POST call this function. It only reads upstream/journal state.
-async fn plan(
+pub(super) async fn plan(
     state: &web::Data<AppState>,
     org: &str,
     app: &str,
@@ -187,6 +187,15 @@ async fn plan(
         }
     }
     Ok(p)
+}
+pub(super) async fn approval_plan(
+    state: &web::Data<AppState>,
+    org: &str,
+    app: &str,
+    id: &str,
+    exps: &[ExperimentResponse],
+) -> airborne_types::Result<Value> {
+    plan(state, org, app, id, exps, None).await
 }
 fn needs_registration(op: &Operation, exps: &[ExperimentResponse]) -> bool {
     op.state != "completed"
@@ -488,6 +497,7 @@ pub async fn run(
     reason: &str,
 ) -> airborne_types::Result<actix_web::HttpResponse> {
     write_lock::validate_user_reason(reason)?;
+    super::maker_checker::gate(state, org, app, "rollback", id, &json!({})).await?;
     let (workspace, mut exps) = experiments(state, org, app).await?;
     let stored = operations::load(state, org, app, Some(id)).await?.pop();
     let row_id = stored.as_ref().map(|o| o.id);
@@ -586,6 +596,9 @@ pub async fn run(
             .await?;
             op.data["replacement_release_id"] = json!(created.id);
             exps = experiments(state, org, app).await?.1;
+        }
+        if let Some(r) = replacement(&op, &exps) {
+            super::maker_checker::inherit_predecessor(state, org, app, id, &r.id).await?;
         }
         validate(&op, &exps)?;
         let mut r = replacement(&op, &exps)
