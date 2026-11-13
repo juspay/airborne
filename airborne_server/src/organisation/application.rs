@@ -20,7 +20,7 @@ use airborne_authz_macros::authz;
 
 use actix_web::{post, web};
 use aws_smithy_types::Document;
-use diesel::RunQueryDsl;
+use diesel::{Connection, RunQueryDsl};
 use log::info;
 use serde::{Deserialize, Serialize};
 use superposition_sdk::operation::create_default_config::CreateDefaultConfigOutput;
@@ -177,13 +177,19 @@ async fn add_application(
     };
 
     let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-    let mut inserted_workspace: WorkspaceName = diesel::insert_into(workspace_names::table)
+    let mut inserted_workspace: WorkspaceName = conn.transaction::<_, ABError, _>(|conn| {
+    let workspace = diesel::insert_into(workspace_names::table)
         .values(&new_workspace_name)
-        .get_result(&mut conn)
+        .get_result(conn)
         .map_err(|e| {
             ABError::InternalServerError(format!("Failed to store workspace name: {}", e))
         })?;
 
+    diesel::sql_query("INSERT INTO hyperotaserver.serving_policies(org_id,app_id,strict) VALUES($1,$2,true) ON CONFLICT DO NOTHING")
+        .bind::<diesel::sql_types::Text,_>(&organisation)
+        .bind::<diesel::sql_types::Text,_>(&application).execute(conn)?;
+        Ok(workspace)
+    })?;
     let generated_id = inserted_workspace.id;
     let generated_workspace_name = format!("workspace{}", generated_id);
     inserted_workspace.workspace_name = generated_workspace_name.clone();

@@ -55,10 +55,6 @@ export interface ListControlCenterOperationsCommandOutput extends ListControlCen
  * //       code: "STRING_VALUE", // required
  * //       operation_id: "STRING_VALUE", // required
  * //       message: "STRING_VALUE", // required
- * //       expected: "DOCUMENT_VALUE", // required
- * //       before: "DOCUMENT_VALUE", // required
- * //       upstream_workspace: "DOCUMENT_VALUE", // required
- * //       upstream_org: "DOCUMENT_VALUE", // required
  * //     },
  * //   ],
  * // };

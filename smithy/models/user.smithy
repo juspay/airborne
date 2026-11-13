@@ -57,9 +57,7 @@ structure User {
 @requiresauth
 operation GetUser {
     output: User
-    errors: [
-        Unauthorized
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Exchange user credentials (client_id and client_secret) for an access token and a refresh token. Public — no auth token required. Call this first, then send the returned access token as a bearer token on subsequent requests.
@@ -69,7 +67,5 @@ operation GetUser {
 operation PostLogin {
     input: UserCredentials
     output: UserToken
-    errors: [
-        Unauthorized
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }

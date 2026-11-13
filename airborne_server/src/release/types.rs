@@ -60,6 +60,7 @@ pub struct Config {
 
 #[derive(Serialize)]
 pub struct CreateReleaseResponse {
+    pub warnings: Vec<String>,
     pub id: String,
     pub created_at: DateTime<Utc>,
     pub config: Config,
@@ -175,7 +176,6 @@ pub struct ServeReleaseQueryParams {
 pub struct BuildOverrides {
     pub final_important: Option<Vec<String>>,
     pub package_data: PackageV2Entry,
-    pub is_first_release: bool,
     pub final_lazy: Option<Vec<String>>,
     pub final_resources: Option<Vec<String>>,
     pub config_version: String,

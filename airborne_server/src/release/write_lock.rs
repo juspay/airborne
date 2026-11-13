@@ -144,9 +144,12 @@ pub async fn locked_inner<T>(
         Err(error) => Err(error),
     };
     // Invalidate on errors too: an upstream timeout can have committed a change.
-    super::control_center::invalidate(state, org, app).await;
     drop(conn);
-    result
+    let invalidation = super::control_center::invalidate(state, org, app).await;
+    match result {
+        Ok(value) => invalidation.map(|_| value),
+        Err(error) => Err(error),
+    }
 }
 
 // Fail-fast capacity: a stalled app owns only one of 64 slots; no permit waiters.

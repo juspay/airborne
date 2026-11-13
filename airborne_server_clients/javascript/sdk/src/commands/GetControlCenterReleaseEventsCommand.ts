@@ -52,7 +52,7 @@ export interface GetControlCenterReleaseEventsCommandOutput extends GetControlCe
  * // { // GetControlCenterReleaseEventsResponse
  * //   events: [ // ControlCenterReleaseEventList // required
  * //     { // ControlCenterReleaseEvent
- * //       action: "created" || "ramped" || "concluded" || "discarded" || "rolled_back" || "operation_resolved", // required
+ * //       action: "created" || "ramped" || "concluded" || "discarded" || "rolled_back" || "operation_resolved" || "requested" || "approved" || "rejected" || "cancelled" || "expired" || "stale" || "executed" || "failed" || "emergency_rollback" || "emergency_acknowledged" || "policy_changed", // required
  * //       actor: "STRING_VALUE", // required
  * //       created_at: new Date("TIMESTAMP"), // required
  * //       payload: "DOCUMENT_VALUE", // required

@@ -1846,11 +1846,116 @@
                 }
             }
         },
+        "io.airborne.server#AcknowledgeEmergencyRollback": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#AcknowledgeEmergencyRollbackInput"
+            },
+            "output": {
+                "target": "io.airborne.server#AcknowledgeEmergencyRollbackResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Independently acknowledge the emergency rollback for its source release. Only a different current checker may acknowledge it.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/releases/{release_id}/acknowledge-emergency"
+                },
+                "smithy.api#tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "io.airborne.server#AcknowledgeEmergencyRollbackInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Independent review explanation; must be nonblank.",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#AcknowledgeEmergencyRollbackResponse": {
+            "type": "structure",
+            "members": {
+                "success": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
         "io.airborne.server#Airborne": {
             "type": "service",
             "operations": [
                 {
+                    "target": "io.airborne.server#AcknowledgeEmergencyRollback"
+                },
+                {
+                    "target": "io.airborne.server#ApproveControlCenterDeploymentRequest"
+                },
+                {
+                    "target": "io.airborne.server#CancelControlCenterDeploymentRequest"
+                },
+                {
+                    "target": "io.airborne.server#ConcludeRelease"
+                },
+                {
                     "target": "io.airborne.server#CreateApplication"
+                },
+                {
+                    "target": "io.airborne.server#CreateCohortRange"
+                },
+                {
+                    "target": "io.airborne.server#CreateControlCenterDeploymentRequest"
                 },
                 {
                     "target": "io.airborne.server#CreateControlCenterGroup"
@@ -1877,6 +1982,15 @@
                     "target": "io.airborne.server#DeleteDimension"
                 },
                 {
+                    "target": "io.airborne.server#DiscardRelease"
+                },
+                {
+                    "target": "io.airborne.server#GetControlCenterApprovalPolicy"
+                },
+                {
+                    "target": "io.airborne.server#GetControlCenterDeploymentRequest"
+                },
+                {
                     "target": "io.airborne.server#GetControlCenterOverview"
                 },
                 {
@@ -1889,7 +2003,19 @@
                     "target": "io.airborne.server#GetRelease"
                 },
                 {
+                    "target": "io.airborne.server#GetServingPolicy"
+                },
+                {
+                    "target": "io.airborne.server#GetTelemetrySummary"
+                },
+                {
                     "target": "io.airborne.server#GetUser"
+                },
+                {
+                    "target": "io.airborne.server#IngestTelemetryReports"
+                },
+                {
+                    "target": "io.airborne.server#ListControlCenterDeploymentRequests"
                 },
                 {
                     "target": "io.airborne.server#ListControlCenterGroups"
@@ -1919,6 +2045,18 @@
                     "target": "io.airborne.server#PostLogin"
                 },
                 {
+                    "target": "io.airborne.server#PreviewServingPolicy"
+                },
+                {
+                    "target": "io.airborne.server#PutServingPolicy"
+                },
+                {
+                    "target": "io.airborne.server#RampRelease"
+                },
+                {
+                    "target": "io.airborne.server#RejectControlCenterDeploymentRequest"
+                },
+                {
                     "target": "io.airborne.server#RequestOrganisation"
                 },
                 {
@@ -1934,6 +2072,9 @@
                     "target": "io.airborne.server#ServeReleaseV2"
                 },
                 {
+                    "target": "io.airborne.server#UpdateControlCenterApprovalPolicy"
+                },
+                {
                     "target": "io.airborne.server#UpdateControlCenterGroup"
                 },
                 {
@@ -1944,23 +2085,6 @@
                 },
                 {
                     "target": "io.airborne.server#UploadFile"
-                }
-            ],
-            "errors": [
-                {
-                    "target": "io.airborne.server#BadRequestError"
-                },
-                {
-                    "target": "io.airborne.server#ForbiddenError"
-                },
-                {
-                    "target": "io.airborne.server#InternalServerError"
-                },
-                {
-                    "target": "io.airborne.server#NotFoundError"
-                },
-                {
-                    "target": "io.airborne.server#Unauthorized"
                 }
             ],
             "traits": {
@@ -2007,9 +2131,124 @@
                 "smithy.api#documentation": "List of applications"
             }
         },
+        "io.airborne.server#ApprovalRequiredError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A direct release write was refused because this application requires an approved deployment request.",
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 403
+            }
+        },
+        "io.airborne.server#ApproveControlCenterDeploymentRequest": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ApproveControlCenterDeploymentRequestInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterDeploymentRequest"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#RollbackPartialFailureError"
+                },
+                {
+                    "target": "io.airborne.server#RollbackUnprocessableError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                },
+                {
+                    "target": "io.airborne.server#UnresolvedOperationError"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Approve and immediately execute a pending request. The checker must be currently eligible and different from the immutable requester.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/deployment-requests/{id}/approve"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#ApproveControlCenterDeploymentRequestInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String"
+                }
+            }
+        },
         "io.airborne.server#BadRequestError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -2030,6 +2269,202 @@
                 "smithy.api#httpError": 400
             }
         },
+        "io.airborne.server#CancelControlCenterDeploymentRequest": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CancelControlCenterDeploymentRequestInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterDeploymentRequest"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Cancel a request. Only its requester may cancel it.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/deployment-requests/{id}/cancel"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#CancelControlCenterDeploymentRequestInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String"
+                }
+            }
+        },
+        "io.airborne.server#ConcludeRelease": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ConcludeReleaseInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ConcludeReleaseResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                },
+                {
+                    "target": "io.airborne.server#UnresolvedOperationError"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Make one variant of a ramped release permanent. Concluding on an experimental variant promotes the release; concluding on the control variant ends it and leaves the previous release live. Read the variant ids from experiment.experiment_variants on GetRelease. The release must have been ramped first. Unknown release ids return 404. Pass the organisation and application in the x-organisation and x-application headers. Returns 409 when the release is still only created (ramp it first) or has already concluded or been discarded, 409 with \"code: unresolved\" when an upstream outcome is unknown, and 400 when the chosen variant does not exist. When the application requires approvals, every conclude is refused with 403 \"approval_required\"; raise a deployment request instead. Requires a bearer token and release conclude permission.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/releases/{release_id}/conclude"
+                },
+                "smithy.api#tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "io.airborne.server#ConcludeReleaseInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the release (the experiment id returned by CreateRelease).",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "chosen_variant": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Variant to make permanent: the control variant keeps the previous release live, an experimental variant promotes this release. Take the id from experiment.experiment_variants on GetRelease; the experiment service generates the ids, so they cannot be guessed. An unknown variant returns 400 and names the available ones.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "change_reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional reason recorded upstream. It must not contain the reserved, case-sensitive text \"Airborne operation\", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Request to conclude a release."
+            }
+        },
+        "io.airborne.server#ConcludeReleaseResponse": {
+            "type": "structure",
+            "members": {
+                "success": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Always true; failures are returned as errors.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Human-readable summary.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "experiment_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the concluded release.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "chosen_variant": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Variant that was made permanent.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Result of concluding a release."
+            }
+        },
         "io.airborne.server#ConfigProperties": {
             "type": "structure",
             "members": {
@@ -2048,6 +2483,15 @@
         "io.airborne.server#ConflictError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -2135,6 +2579,24 @@
         "io.airborne.server#ControlCenterAppStatus": {
             "type": "structure",
             "members": {
+                "auxiliary_error": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Local auxiliary data unavailable or deadline exceeded; corresponding fields are null."
+                    }
+                },
+                "telemetry": {
+                    "target": "smithy.api#Document"
+                },
+                "cache_invalidation": {
+                    "target": "smithy.api#Document"
+                },
+                "serving_policy": {
+                    "target": "io.airborne.server#ServingPolicy",
+                    "traits": {
+                        "smithy.api#documentation": "Stored policy plus deployment force-on override."
+                    }
+                },
                 "application": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -2163,8 +2625,7 @@
                 "unresolved_operations": {
                     "target": "io.airborne.server#ControlCenterUnresolvedOperationList",
                     "traits": {
-                        "smithy.api#documentation": "Unresolved upstream writes. While any item exists, writes are paused for this application.",
-                        "smithy.api#required": {}
+                        "smithy.api#documentation": "Unresolved upstream writes. While any item exists, writes are paused for this application."
                     }
                 },
                 "last_activity_at": {
@@ -2180,6 +2641,30 @@
                         "smithy.api#documentation": "Sanitized lookup failure message, or JSON null when lookup succeeded.",
                         "smithy.api#required": {}
                     }
+                },
+                "approval_required": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Whether this application currently requires a separate checker for protected writes."
+                    }
+                },
+                "pending_requests": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Number of pending requests. This count is not capped by the queue list limit."
+                    }
+                },
+                "emergency_needs_review": {
+                    "target": "io.airborne.server#EmergencyReviewList",
+                    "traits": {
+                        "smithy.api#documentation": "Emergency rollbacks waiting for independent checker acknowledgement."
+                    }
+                },
+                "release_protections": {
+                    "target": "io.airborne.server#ReleaseProtectionList",
+                    "traits": {
+                        "smithy.api#documentation": "Local rollback sensitivity markers for releases."
+                    }
                 }
             },
             "traits": {
@@ -2190,6 +2675,167 @@
             "type": "list",
             "member": {
                 "target": "io.airborne.server#ControlCenterAppStatus"
+            }
+        },
+        "io.airborne.server#ControlCenterApprovalPolicy": {
+            "type": "structure",
+            "members": {
+                "enabled": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "makers": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Sorted unique canonical identity subjects.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "checkers": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Sorted unique canonical identity subjects.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "request_ttl_hours": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Request lifetime in hours, from 1 through 720.",
+                        "smithy.api#range": {
+                            "min": 1,
+                            "max": 720
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "emergency_rollback": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Complete application approval policy. PUT replaces the policy; omitted fields use server defaults."
+            }
+        },
+        "io.airborne.server#ControlCenterDeploymentRequest": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "UUID.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "org": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "action": {
+                    "target": "io.airborne.server#DeploymentRequestAction",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "payload": {
+                    "target": "io.airborne.server#DeploymentRequestPayload",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "payload_hash": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Lowercase hexadecimal SHA-256 digest of the immutable approved content.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "base_state": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Snapshot of application release/config state at request creation. Keep as a document; it is not an editable approval body.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "requester": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "status": {
+                    "target": "io.airborne.server#DeploymentRequestStatus",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "expires_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "decided_by": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Subject of the latest decision, or JSON null.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "decision_reason": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Decision explanation, or JSON null.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "updated_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "result": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Existing action execution result or JSON null.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Immutable deployment request and its latest decision/result."
+            }
+        },
+        "io.airborne.server#ControlCenterDeploymentRequestList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ControlCenterDeploymentRequest"
             }
         },
         "io.airborne.server#ControlCenterGroup": {
@@ -2511,6 +3157,72 @@
                     "traits": {
                         "smithy.api#enumValue": "operation_resolved"
                     }
+                },
+                "REQUESTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "requested"
+                    }
+                },
+                "APPROVED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "approved"
+                    }
+                },
+                "REJECTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rejected"
+                    }
+                },
+                "CANCELLED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "cancelled"
+                    }
+                },
+                "EXPIRED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "expired"
+                    }
+                },
+                "STALE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "stale"
+                    }
+                },
+                "EXECUTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "executed"
+                    }
+                },
+                "FAILED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "failed"
+                    }
+                },
+                "EMERGENCY_ROLLBACK": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "emergency_rollback"
+                    }
+                },
+                "EMERGENCY_ACKNOWLEDGED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "emergency_acknowledged"
+                    }
+                },
+                "POLICY_CHANGED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "policy_changed"
+                    }
                 }
             },
             "traits": {
@@ -2609,24 +3321,6 @@
                     "traits": {
                         "smithy.api#required": {}
                     }
-                },
-                "expected": {
-                    "target": "smithy.api#Document",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
-                },
-                "before": {
-                    "target": "smithy.api#Document",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
-                },
-                "upstream_workspace": {
-                    "target": "smithy.api#Document",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
                 }
             },
             "traits": {
@@ -2650,30 +3344,6 @@
                 },
                 "message": {
                     "target": "smithy.api#String",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
-                },
-                "expected": {
-                    "target": "smithy.api#Document",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
-                },
-                "before": {
-                    "target": "smithy.api#Document",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
-                },
-                "upstream_workspace": {
-                    "target": "smithy.api#Document",
-                    "traits": {
-                        "smithy.api#required": {}
-                    }
-                },
-                "upstream_org": {
-                    "target": "smithy.api#Document",
                     "traits": {
                         "smithy.api#required": {}
                     }
@@ -2703,6 +3373,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -2743,6 +3422,209 @@
                 "smithy.api#documentation": "Create application request"
             }
         },
+        "io.airborne.server#CreateCohortRange": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreateCohortRangeInput"
+            },
+            "output": {
+                "target": "io.airborne.server#CreateCohortRangeOutput"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "smithy.api#documentation": "Add an independent inclusive stable major.minor.patch semantic version interval. Prerelease and build metadata bounds return 400 because upstream comparators do not support their precedence. Earlier definitions are unchanged. Enum index zero wins overlaps. Does not alter checkpoint semantics. Requires cohort update permission; unavailable while maker-checker is enabled, like other targeting edits.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/organisations/applications/dimension/{dimension}/cohort/range",
+                    "code": 200
+                },
+                "smithy.api#tags": [
+                    "Dimensions"
+                ]
+            }
+        },
+        "io.airborne.server#CreateCohortRangeInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "dimension": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "lower": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "upper": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "priority": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#range": {
+                            "min": 0
+                        },
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#CreateCohortRangeOutput": {
+            "type": "structure",
+            "members": {
+                "name": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "lower": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "upper": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "priority": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#CreateControlCenterDeploymentRequest": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#CreateControlCenterDeploymentRequestInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterDeploymentRequest"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Raise an immutable deployment request. The server resolves and freezes the snapshot, hashes it and records the authenticated subject as requester.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/deployment-requests"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#CreateControlCenterDeploymentRequestInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "action": {
+                    "target": "io.airborne.server#DeploymentRequestAction",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "payload": {
+                    "target": "io.airborne.server#DeploymentRequestInputPayload",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Nonblank maker explanation. Reserved \"Airborne operation\" text is refused.",
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Create a deployment request. The client may send only action, payload and reason; the server resolves requester, snapshot and base state."
+            }
+        },
         "io.airborne.server#CreateControlCenterGroup": {
             "type": "operation",
             "input": {
@@ -2760,6 +3642,9 @@
                 },
                 {
                     "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -2817,7 +3702,19 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -2938,7 +3835,19 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -3096,6 +4005,15 @@
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
                 }
             ],
@@ -3137,6 +4055,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -3208,10 +4135,22 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
                     "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -3264,6 +4203,12 @@
                     "target": "io.airborne.server#StringList",
                     "traits": {
                         "smithy.api#documentation": "Resources for the release"
+                    }
+                },
+                "rollback_sensitive": {
+                    "target": "io.airborne.server#RollbackSensitiveReason",
+                    "traits": {
+                        "smithy.api#documentation": "Optional declared reason this release needs additional rollback protection."
                     }
                 },
                 "organisation": {
@@ -3455,7 +4400,16 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
                 },
                 {
                     "target": "io.airborne.server#NotFoundError"
@@ -3502,6 +4456,146 @@
                         "smithy.api#documentation": "Name of the application",
                         "smithy.api#httpHeader": "x-application",
                         "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#DeploymentRequestAction": {
+            "type": "enum",
+            "members": {
+                "CREATE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "create"
+                    }
+                },
+                "UPDATE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "update"
+                    }
+                },
+                "RAMP": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "ramp"
+                    }
+                },
+                "CONCLUDE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "conclude"
+                    }
+                },
+                "DISCARD": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "discard"
+                    }
+                },
+                "ROLLBACK": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rollback"
+                    }
+                },
+                "SET_STRICT_SERVING": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "set_strict_serving"
+                    }
+                },
+                "SET_ROLLBACK_SENSITIVE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "set_rollback_sensitive"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Supported approved release mutation."
+            }
+        },
+        "io.airborne.server#DeploymentRequestInputPayload": {
+            "type": "structure",
+            "members": {
+                "body": {
+                    "target": "smithy.api#Document"
+                },
+                "release_id": {
+                    "target": "smithy.api#String"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Request payload accepted from the maker. The body is action-specific and is frozen by the server."
+            }
+        },
+        "io.airborne.server#DeploymentRequestPayload": {
+            "type": "structure",
+            "members": {
+                "body": {
+                    "target": "smithy.api#Document"
+                },
+                "release_id": {
+                    "target": "smithy.api#String"
+                },
+                "snapshot": {
+                    "target": "smithy.api#Document"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Frozen action payload returned by the server, including its resolved immutable snapshot."
+            }
+        },
+        "io.airborne.server#DeploymentRequestStatus": {
+            "type": "enum",
+            "members": {
+                "PENDING": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "pending"
+                    }
+                },
+                "EXECUTING": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "executing"
+                    }
+                },
+                "EXECUTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "executed"
+                    }
+                },
+                "FAILED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "failed"
+                    }
+                },
+                "REJECTED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "rejected"
+                    }
+                },
+                "CANCELLED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "cancelled"
+                    }
+                },
+                "EXPIRED": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "expired"
+                    }
+                },
+                "STALE": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "stale"
                     }
                 }
             }
@@ -3601,6 +4695,213 @@
             },
             "traits": {
                 "smithy.api#documentation": "Map of dimension name to value."
+            }
+        },
+        "io.airborne.server#DiscardRelease": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#DiscardReleaseInput"
+            },
+            "output": {
+                "target": "io.airborne.server#DiscardReleaseResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                },
+                {
+                    "target": "io.airborne.server#UnresolvedOperationError"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Discard a release that has not been ramped, so it never serves traffic. Only a release in the created state can be discarded; a ramped release must be concluded on \"control\" or rolled back instead, and a release that is already concluded or discarded returns 409. Unknown release ids return 404. Discarding never needs approval. Pass the organisation and application in the x-organisation and x-application headers. Returns 409 with \"code: unresolved\" when an upstream outcome is unknown. Requires a bearer token and release discard permission.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/releases/{release_id}/discard"
+                },
+                "smithy.api#tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "io.airborne.server#DiscardReleaseInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the release (the experiment id returned by CreateRelease).",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "change_reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional reason recorded upstream. It must not contain the reserved, case-sensitive text \"Airborne operation\", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Request to discard a release."
+            }
+        },
+        "io.airborne.server#DiscardReleaseResponse": {
+            "type": "structure",
+            "members": {
+                "success": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Always true; failures are returned as errors.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Human-readable summary.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "experiment_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the discarded release.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Result of discarding a release."
+            }
+        },
+        "io.airborne.server#EmergencyReview": {
+            "type": "structure",
+            "members": {
+                "rollback_finished": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Present for new successful emergencies; absent on legacy rows."
+                    }
+                },
+                "rolled_back_to_package_version": {
+                    "target": "smithy.api#Document"
+                },
+                "rollback_result": {
+                    "target": "smithy.api#Document"
+                },
+                "new_release_id": {
+                    "target": "smithy.api#Document"
+                },
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "actor": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "acknowledged_by": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "confirm_sensitive_risk": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "plan": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "created_at": {
+                    "target": "smithy.api#Timestamp",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A pending emergency rollback awaiting an independent review."
+            }
+        },
+        "io.airborne.server#EmergencyReviewList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#EmergencyReview"
+            }
+        },
+        "io.airborne.server#ExperimentVariants": {
+            "type": "structure",
+            "members": {
+                "control": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Id of the control variant, which keeps the previous release live. The experiment service prefixes it with the release id, for example \"7522252134449025024-control\"."
+                    }
+                },
+                "experimentals": {
+                    "target": "io.airborne.server#StringList",
+                    "traits": {
+                        "smithy.api#documentation": "Ids of the experimental variants, which promote this release, for example \"7522252134449025024-experimental_1\". A release created by Airborne has exactly one."
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Variant ids of the experiment backing a release. Pass one of these as chosen_variant when concluding."
             }
         },
         "io.airborne.server#File": {
@@ -3826,6 +5127,15 @@
         "io.airborne.server#ForbiddenError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -3845,6 +5155,124 @@
                 "smithy.api#httpError": 403
             }
         },
+        "io.airborne.server#GetControlCenterApprovalPolicy": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetControlCenterApprovalPolicyInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterApprovalPolicy"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Return the application's current approval policy. An absent row returns disabled, empty rosters, a 24-hour TTL and emergency rollback enabled.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/approval-policy"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#GetControlCenterApprovalPolicyInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#GetControlCenterDeploymentRequest": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetControlCenterDeploymentRequestInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterDeploymentRequest"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Fetch one request by UUID independently of queue pagination. Both scope headers are required.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/deployment-requests/{id}"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#GetControlCenterDeploymentRequestInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
         "io.airborne.server#GetControlCenterOverview": {
             "type": "operation",
             "input": {
@@ -3855,7 +5283,16 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
                     "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -4005,6 +5442,12 @@
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
                     "target": "io.airborne.server#NotFoundError"
                 },
                 {
@@ -4037,14 +5480,14 @@
                 "release_config_timeout": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Time allowed for fetching the release config, in seconds.",
+                        "smithy.api#documentation": "Time allowed for fetching the release config, in milliseconds.",
                         "smithy.api#required": {}
                     }
                 },
                 "boot_timeout": {
                     "target": "smithy.api#Integer",
                     "traits": {
-                        "smithy.api#documentation": "Time allowed for the app to boot, in seconds.",
+                        "smithy.api#documentation": "Time allowed for the app to boot, in milliseconds.",
                         "smithy.api#required": {}
                     }
                 },
@@ -4160,6 +5603,18 @@
         "io.airborne.server#GetServeReleaseInput": {
             "type": "structure",
             "members": {
+                "telemetry_platform": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "telemetry_platform"
+                    }
+                },
+                "native_version": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpQuery": "native_version"
+                    }
+                },
                 "organisation": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -4181,6 +5636,102 @@
                 "smithy.api#documentation": "Input for get release operations"
             }
         },
+        "io.airborne.server#GetServingPolicy": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#GetServingPolicyInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ServingPolicy"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Read stored and effective strict serving policy.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/serving-policy",
+                    "code": 200
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#GetServingPolicyInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#GetTelemetrySummary": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#TelemetrySummaryInput"
+            },
+            "output": {
+                "target": "io.airborne.server#TelemetrySummary"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/telemetry",
+                    "code": 200
+                },
+                "smithy.api#readonly": {}
+            }
+        },
         "io.airborne.server#GetUser": {
             "type": "operation",
             "input": {
@@ -4190,6 +5741,18 @@
                 "target": "io.airborne.server#User"
             },
             "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
                 {
                     "target": "io.airborne.server#Unauthorized"
                 }
@@ -4207,9 +5770,50 @@
                 ]
             }
         },
+        "io.airborne.server#IngestTelemetryReports": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#TelemetryBatch"
+            },
+            "output": {
+                "target": "io.airborne.server#TelemetryAccepted"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#ServiceUnavailableError"
+                },
+                {
+                    "target": "io.airborne.server#TooManyRequestsError"
+                }
+            ],
+            "traits": {
+                "smithy.api#auth": [],
+                "smithy.api#documentation": "Optional unverified device reports. 400 drops invalid/expired receipts; 429 retries later; 503 means disabled/unavailable.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/telemetry/reports",
+                    "code": 202
+                }
+            }
+        },
         "io.airborne.server#InternalServerError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -4230,6 +5834,77 @@
                 "smithy.api#httpError": 500
             }
         },
+        "io.airborne.server#ListControlCenterDeploymentRequests": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#ListControlCenterDeploymentRequestsInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ListControlCenterDeploymentRequestsResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "List the newest deployment requests. Status filtering precedes the 1,000-row cap. Omit x-application to list across the organisation, with per-application read filtering.",
+                "smithy.api#http": {
+                    "method": "GET",
+                    "uri": "/api/control-center/deployment-requests"
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#ListControlCenterDeploymentRequestsInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional: omit x-application to list readable requests across the organisation. Filter is applied before the 1,000 newest-row cap.",
+                        "smithy.api#httpHeader": "x-application"
+                    }
+                },
+                "status": {
+                    "target": "io.airborne.server#DeploymentRequestStatus",
+                    "traits": {
+                        "smithy.api#httpQuery": "status"
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ListControlCenterDeploymentRequestsResponse": {
+            "type": "structure",
+            "members": {
+                "requests": {
+                    "target": "io.airborne.server#ControlCenterDeploymentRequestList",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
         "io.airborne.server#ListControlCenterGroups": {
             "type": "operation",
             "input": {
@@ -4247,6 +5922,9 @@
                 },
                 {
                     "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -4310,6 +5988,9 @@
                     "target": "io.airborne.server#InternalServerError"
                 },
                 {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
                 }
             ],
@@ -4351,7 +6032,7 @@
                 }
             },
             "traits": {
-                "smithy.api#documentation": "List unresolved write operations for one application. `status` is currently `unresolved`."
+                "smithy.api#documentation": "List unresolved write operations for one application. \"status\" is currently \"unresolved\"."
             }
         },
         "io.airborne.server#ListControlCenterOperationsResponse": {
@@ -4376,6 +6057,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -4469,6 +6159,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -4595,6 +6294,15 @@
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
                 }
             ],
@@ -4700,6 +6408,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -4833,6 +6550,15 @@
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
                 }
             ],
@@ -4875,6 +6601,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -4987,6 +6722,15 @@
                     "target": "io.airborne.server#BadRequestError"
                 },
                 {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
                 }
             ],
@@ -5094,6 +6838,15 @@
         "io.airborne.server#NotFoundError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -5223,6 +6976,18 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
                     "target": "io.airborne.server#Unauthorized"
                 }
             ],
@@ -5236,6 +7001,282 @@
                 "smithy.api#tags": [
                     "Authentication"
                 ]
+            }
+        },
+        "io.airborne.server#PreviewServingPolicy": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#PreviewServingPolicyInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ServingPreviewOutput"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Read-only evaluation of one context and toss. Returns whether enabling strict serving removes default fallback; this is not a population-wide impact count.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/serving-policy/preview",
+                    "code": 200
+                },
+                "smithy.api#readonly": {},
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#PreviewServingPolicyInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "context": {
+                    "target": "io.airborne.server#ServingPreviewContext",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "toss": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#PutServingPolicy": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#PutServingPolicyInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ServingPolicy"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Change strict serving. Requires release update permission. Both directions require set_strict_serving approval when maker-checker is enabled. Payload body is {strict: boolean}, without release_id.",
+                "smithy.api#http": {
+                    "method": "PUT",
+                    "uri": "/api/control-center/serving-policy",
+                    "code": 200
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#PutServingPolicyInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "strict": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#RampRelease": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#RampReleaseInput"
+            },
+            "output": {
+                "target": "io.airborne.server#RampReleaseResponse"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                },
+                {
+                    "target": "io.airborne.server#UnresolvedOperationError"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Set the share of traffic that receives a release. A release starts at 0% and is not served until it is ramped; the first ramp moves it from created to in progress, and later ramps raise or lower the share. Pass the organisation and application in the x-organisation and x-application headers. Unknown release ids return 404. Values outside 0–50 return 400 before any write is attempted. Explicit upstream 400 and 422 validation rejections for ramps are recorded as not applied and do not pause writes for the application; other uncertain outcomes return 409 with code \"unresolved\" and own_attempt true, so inspect the real state before retrying and never repeat a committed ramp merely to clear a cache failure. Returns 409 when the release has already concluded or been discarded, and 409 with code \"unresolved\" when an earlier upstream write for the application still needs recovery; an organisation admin can resolve that operation with ResolveControlCenterOperation. When the application requires approvals, raising traffic (or any ramp of a rollback-sensitive release) is refused with 403 \"approval_required\"; raise a deployment request instead. Requires a bearer token and release ramp permission.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/releases/{release_id}/ramp"
+                },
+                "smithy.api#tags": [
+                    "Releases"
+                ]
+            }
+        },
+        "io.airborne.server#RampReleaseInput": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the release (the experiment id returned by CreateRelease).",
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the organisation",
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Name of the application",
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "traffic_percentage": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Percentage of traffic to route to the release, from 0 to 50. Values outside this range return 400 before any write is attempted. Setting it to 0 pauses the release without discarding it. Lowering it needs no approval, raising it does when approvals are enabled.",
+                        "smithy.api#range": {
+                            "min": 0,
+                            "max": 50
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "change_reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Optional reason recorded upstream. It must not contain the reserved, case-sensitive text \"Airborne operation\", and with the generated suffix it must fit Superposition's 255-byte limit, so it is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched."
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Request to ramp a release's traffic."
+            }
+        },
+        "io.airborne.server#RampReleaseResponse": {
+            "type": "structure",
+            "members": {
+                "success": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Always true; failures are returned as errors.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Human-readable summary.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "experiment_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "ID of the ramped release.",
+                        "smithy.api#required": {}
+                    }
+                },
+                "traffic_percentage": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#documentation": "Traffic percentage now routed to the release.",
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Result of ramping a release."
             }
         },
         "io.airborne.server#ReconciledKeys": {
@@ -5260,9 +7301,90 @@
                 "smithy.api#documentation": "How the configuration of a re-released rollback was reconciled with the currently registered keys."
             }
         },
+        "io.airborne.server#RejectControlCenterDeploymentRequest": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#RejectControlCenterDeploymentRequestInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterDeploymentRequest"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Reject a request. A checker may reject their own request; a reason is required.",
+                "smithy.api#http": {
+                    "method": "POST",
+                    "uri": "/api/control-center/deployment-requests/{id}/reject"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#RejectControlCenterDeploymentRequestInput": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpLabel": {},
+                        "smithy.api#required": {}
+                    }
+                },
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "reason": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#length": {
+                            "min": 1
+                        },
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
         "io.airborne.server#ReleaseConfig": {
             "type": "structure",
             "members": {
+                "blocked_package_versions": {
+                    "target": "io.airborne.server#StringList"
+                },
+                "telemetry": {
+                    "target": "smithy.api#Document"
+                },
                 "config": {
                     "target": "io.airborne.server#GetReleaseConfig",
                     "traits": {
@@ -5298,6 +7420,12 @@
                         "smithy.api#documentation": "Identifier of the experiment."
                     }
                 },
+                "experiment_variants": {
+                    "target": "io.airborne.server#ExperimentVariants",
+                    "traits": {
+                        "smithy.api#documentation": "Variant ids that can be chosen when concluding the release."
+                    }
+                },
                 "package_version": {
                     "target": "smithy.api#Integer",
                     "traits": {
@@ -5331,6 +7459,30 @@
             },
             "traits": {
                 "smithy.api#documentation": "Details of the experiment backing a release, used to ramp it out gradually."
+            }
+        },
+        "io.airborne.server#ReleaseProtection": {
+            "type": "structure",
+            "members": {
+                "release_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "rollback_sensitive": {
+                    "target": "smithy.api#Document",
+                    "traits": {
+                        "smithy.api#documentation": "Explicitly cleared markers are represented as JSON null.",
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ReleaseProtectionList": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#ReleaseProtection"
             }
         },
         "io.airborne.server#ReleaseSupersededError": {
@@ -5383,6 +7535,15 @@
             "errors": [
                 {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -5502,7 +7663,7 @@
             ],
             "traits": {
                 "io.airborne.server#requiresauth": {},
-                "smithy.api#documentation": "Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text `Airborne operation`. Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.",
+                "smithy.api#documentation": "Resolve an unresolved operation after upstream verification. Only organisation owners/admins or super admins may recover. applied needs positive evidence of the expected change, matched through the operation's generated marker in current upstream state or its audit history. did_not_apply needs the experiment and the application's workspace configuration (defaults, contexts, overrides) to be unchanged from the values saved before the write, plus the operator's confirmation that the original request has terminated. A 409 names the changed config keys or contexts: restore them, or finish the intended change and resolve as applied. Operations created before this evidence was saved cannot be resolved as did_not_apply. The reason must not contain the reserved text \"Airborne operation\". Markers are not authenticated provenance: anyone who can write to Superposition directly can forge one, so restrict direct upstream write access to trusted operators.",
                 "smithy.api#http": {
                     "method": "POST",
                     "uri": "/api/control-center/operations/{id}/resolve"
@@ -5545,7 +7706,7 @@
                 "reason": {
                     "target": "smithy.api#String",
                     "traits": {
-                        "smithy.api#documentation": "Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400.",
+                        "smithy.api#documentation": "Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text \"Airborne operation\"; such a reason returns 400.",
                         "smithy.api#length": {
                             "min": 1
                         },
@@ -5630,6 +7791,15 @@
         "io.airborne.server#RollbackPartialFailureError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -5770,6 +7940,9 @@
         "io.airborne.server#RollbackPreviewResponse": {
             "type": "structure",
             "members": {
+                "blocked_package_versions": {
+                    "target": "io.airborne.server#StringList"
+                },
                 "action": {
                     "target": "smithy.api#Document",
                     "traits": {
@@ -5814,6 +7987,9 @@
                 "target": "io.airborne.server#RollbackReleaseResponse"
             },
             "errors": [
+                {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
                 {
                     "target": "io.airborne.server#BadRequestError"
                 },
@@ -5910,11 +8086,23 @@
                 "reason": {
                     "target": "smithy.api#String",
                     "traits": {
-                        "smithy.api#documentation": "The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.",
+                        "smithy.api#documentation": "The reason must not contain the reserved, case-sensitive text \"Airborne operation\": Airborne appends a generated suffix made of \"[Airborne operation \", a canonical UUID and \"]\" to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.",
                         "smithy.api#length": {
                             "min": 1
                         },
                         "smithy.api#required": {}
+                    }
+                },
+                "emergency": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Use only for the constrained emergency rollback path."
+                    }
+                },
+                "confirm_sensitive_risk": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Required when the latest live source is marked rollback-sensitive."
                     }
                 }
             },
@@ -5932,6 +8120,18 @@
                             "min": 1
                         },
                         "smithy.api#required": {}
+                    }
+                },
+                "emergency": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Use only for the constrained emergency rollback path."
+                    }
+                },
+                "confirm_sensitive_risk": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#documentation": "Required when the latest live source is marked rollback-sensitive."
                     }
                 }
             },
@@ -6011,7 +8211,7 @@
                     }
                 },
                 "replacement_release_id": {
-                    "target": "smithy.api#String",
+                    "target": "smithy.api#Document",
                     "traits": {
                         "smithy.api#required": {}
                     }
@@ -6023,9 +8223,38 @@
                 "smithy.api#httpError": 409
             }
         },
+        "io.airborne.server#RollbackSensitiveReason": {
+            "type": "enum",
+            "members": {
+                "SECURITY": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "security"
+                    }
+                },
+                "ONE_WAY_MIGRATION": {
+                    "target": "smithy.api#Unit",
+                    "traits": {
+                        "smithy.api#enumValue": "one_way_migration"
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "A declared reason a release must retain additional rollback protection."
+            }
+        },
         "io.airborne.server#RollbackUnprocessableError": {
             "type": "structure",
             "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
                 "code": {
                     "target": "smithy.api#String",
                     "traits": {
@@ -6149,10 +8378,19 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
                     "target": "io.airborne.server#InternalServerError"
                 },
                 {
                     "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
                 }
             ],
             "traits": {
@@ -6178,10 +8416,19 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
                     "target": "io.airborne.server#InternalServerError"
                 },
                 {
                     "target": "io.airborne.server#NotFoundError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
                 }
             ],
             "traits": {
@@ -6195,6 +8442,121 @@
                 "smithy.api#tags": [
                     "Release serving"
                 ]
+            }
+        },
+        "io.airborne.server#ServiceUnavailableError": {
+            "type": "structure",
+            "members": {
+                "request_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#documentation": "Present when an approved action failed and its failed status was saved."
+                    }
+                },
+                "request_status": {
+                    "target": "smithy.api#String"
+                },
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#error": "server",
+                "smithy.api#httpError": 503
+            }
+        },
+        "io.airborne.server#ServingPolicy": {
+            "type": "structure",
+            "members": {
+                "strict": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "deployment_override": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "effective_strict": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#ServingPreviewContext": {
+            "type": "map",
+            "key": {
+                "target": "smithy.api#String"
+            },
+            "value": {
+                "target": "smithy.api#String"
+            }
+        },
+        "io.airborne.server#ServingPreviewOutput": {
+            "type": "structure",
+            "members": {
+                "serving_policy": {
+                    "target": "io.airborne.server#ServingPolicy",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "context": {
+                    "target": "io.airborne.server#ServingPreviewContext",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "toss": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "config_version": {
+                    "target": "smithy.api#String"
+                },
+                "package_version": {
+                    "target": "smithy.api#Document"
+                },
+                "targeted": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "would_stop_serving": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "strict_status": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "scope": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
             }
         },
         "io.airborne.server#StreamingBlob": {
@@ -6211,6 +8573,147 @@
             },
             "traits": {
                 "smithy.api#documentation": "List of strings"
+            }
+        },
+        "io.airborne.server#TelemetryAccepted": {
+            "type": "structure",
+            "members": {
+                "accepted": {
+                    "target": "smithy.api#Boolean",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "verification": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#TelemetryBatch": {
+            "type": "structure",
+            "members": {
+                "receipt": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#length": {
+                            "max": 4096
+                        },
+                        "smithy.api#required": {}
+                    }
+                },
+                "install_id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "events": {
+                    "target": "io.airborne.server#TelemetryEvents",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#TelemetryEvent": {
+            "type": "structure",
+            "members": {
+                "id": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "kind": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#TelemetryEvents": {
+            "type": "list",
+            "member": {
+                "target": "io.airborne.server#TelemetryEvent"
+            },
+            "traits": {
+                "smithy.api#length": {
+                    "min": 1,
+                    "max": 32
+                }
+            }
+        },
+        "io.airborne.server#TelemetrySummary": {
+            "type": "structure",
+            "members": {
+                "window_days": {
+                    "target": "smithy.api#Integer"
+                },
+                "verification": {
+                    "target": "smithy.api#String"
+                },
+                "automatic_action": {
+                    "target": "smithy.api#String"
+                },
+                "adoption_definition": {
+                    "target": "smithy.api#String"
+                },
+                "releases": {
+                    "target": "smithy.api#Document"
+                },
+                "release_totals": {
+                    "target": "smithy.api#Document"
+                },
+                "blocked_package_versions": {
+                    "target": "smithy.api#Document"
+                }
+            },
+            "traits": {
+                "smithy.api#documentation": "Advisory only; reports never change releases. Native versions and rows are bounded."
+            }
+        },
+        "io.airborne.server#TelemetrySummaryInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                }
+            }
+        },
+        "io.airborne.server#TooManyRequestsError": {
+            "type": "structure",
+            "members": {
+                "code": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                },
+                "message": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#required": {}
+                    }
+                }
+            },
+            "traits": {
+                "smithy.api#error": "client",
+                "smithy.api#httpError": 429
             }
         },
         "io.airborne.server#Unauthorized": {
@@ -6294,6 +8797,83 @@
                 "smithy.api#documentation": "A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.",
                 "smithy.api#error": "client",
                 "smithy.api#httpError": 409
+            }
+        },
+        "io.airborne.server#UpdateControlCenterApprovalPolicy": {
+            "type": "operation",
+            "input": {
+                "target": "io.airborne.server#UpdateControlCenterApprovalPolicyInput"
+            },
+            "output": {
+                "target": "io.airborne.server#ControlCenterApprovalPolicy"
+            },
+            "errors": [
+                {
+                    "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ConflictError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#Unauthorized"
+                }
+            ],
+            "traits": {
+                "io.airborne.server#requiresauth": {},
+                "smithy.api#documentation": "Replace the application's approval policy. Only actual organisation owners/admins may edit it. Roster identities must be enabled Keycloak users with app access and ordinary release permissions. Enabling requires at least two distinct subjects and a different eligible checker for each maker. Returns 409 until the operator deployment readiness fence is attested after all old instances and writes are drained.",
+                "smithy.api#http": {
+                    "method": "PUT",
+                    "uri": "/api/control-center/approval-policy"
+                },
+                "smithy.api#tags": [
+                    "Control Center"
+                ]
+            }
+        },
+        "io.airborne.server#UpdateControlCenterApprovalPolicyInput": {
+            "type": "structure",
+            "members": {
+                "organisation": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-organisation",
+                        "smithy.api#required": {}
+                    }
+                },
+                "application": {
+                    "target": "smithy.api#String",
+                    "traits": {
+                        "smithy.api#httpHeader": "x-application",
+                        "smithy.api#required": {}
+                    }
+                },
+                "enabled": {
+                    "target": "smithy.api#Boolean"
+                },
+                "makers": {
+                    "target": "io.airborne.server#StringList"
+                },
+                "checkers": {
+                    "target": "io.airborne.server#StringList"
+                },
+                "request_ttl_hours": {
+                    "target": "smithy.api#Integer",
+                    "traits": {
+                        "smithy.api#range": {
+                            "min": 1,
+                            "max": 720
+                        }
+                    }
+                },
+                "emergency_rollback": {
+                    "target": "smithy.api#Boolean"
+                }
             }
         },
         "io.airborne.server#UpdateControlCenterGroup": {
@@ -6380,7 +8960,16 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
                 },
                 {
                     "target": "io.airborne.server#NotFoundError"
@@ -6455,7 +9044,19 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"
@@ -6522,7 +9123,19 @@
             },
             "errors": [
                 {
+                    "target": "io.airborne.server#ApprovalRequiredError"
+                },
+                {
                     "target": "io.airborne.server#BadRequestError"
+                },
+                {
+                    "target": "io.airborne.server#ForbiddenError"
+                },
+                {
+                    "target": "io.airborne.server#InternalServerError"
+                },
+                {
+                    "target": "io.airborne.server#NotFoundError"
                 },
                 {
                     "target": "io.airborne.server#Unauthorized"

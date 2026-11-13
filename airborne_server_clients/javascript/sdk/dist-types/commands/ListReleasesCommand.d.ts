@@ -98,6 +98,12 @@ declare const ListReleasesCommand_base: {
  * //       ],
  * //       experiment: { // ReleaseExperiment
  * //         experiment_id: "STRING_VALUE",
+ * //         experiment_variants: { // ExperimentVariants
+ * //           control: "STRING_VALUE",
+ * //           experimentals: [ // StringList
+ * //             "STRING_VALUE",
+ * //           ],
+ * //         },
  * //         package_version: Number("int"),
  * //         config_version: "STRING_VALUE",
  * //         created_at: "STRING_VALUE",

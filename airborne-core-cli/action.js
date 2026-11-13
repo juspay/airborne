@@ -1,7 +1,7 @@
 import fs from "fs";
 import { promises as fsPromises } from "fs";
 import path from "path";
-import { CreateApplicationCommand, CreateControlCenterGroupCommand, CreateDimensionCommand, CreateFileCommand, CreateOrganisationCommand, CreatePackageCommand, CreateReleaseCommand, DeleteControlCenterGroupCommand, DeleteDimensionCommand, GetControlCenterOverviewCommand, GetControlCenterReleaseEventsCommand, GetControlCenterRollbackPreviewCommand, GetReleaseCommand, GetUserCommand, ListControlCenterGroupsCommand, ListControlCenterOperationsCommand, ListDimensionsCommand, ListFileGroupsCommand, ListFilesCommand, ListOrganisationsCommand, ListPackagesCommand, ListReleasesCommand, PostLoginCommand, RequestOrganisationCommand, ResolveControlCenterOperationCommand, RollbackReleaseCommand, ServeReleaseCommand, ServeReleaseV2Command, UpdateControlCenterGroupCommand, UpdateDimensionCommand, UpdateFileCommand, UploadFileCommand, AirborneClient } from "airborne-server-sdk"
+import { AcknowledgeEmergencyRollbackCommand, ApproveControlCenterDeploymentRequestCommand, CancelControlCenterDeploymentRequestCommand, ConcludeReleaseCommand, CreateApplicationCommand, CreateCohortRangeCommand, CreateControlCenterDeploymentRequestCommand, CreateControlCenterGroupCommand, CreateDimensionCommand, CreateFileCommand, CreateOrganisationCommand, CreatePackageCommand, CreateReleaseCommand, DeleteControlCenterGroupCommand, DeleteDimensionCommand, DiscardReleaseCommand, GetControlCenterApprovalPolicyCommand, GetControlCenterDeploymentRequestCommand, GetControlCenterOverviewCommand, GetControlCenterReleaseEventsCommand, GetControlCenterRollbackPreviewCommand, GetReleaseCommand, GetServingPolicyCommand, GetTelemetrySummaryCommand, GetUserCommand, IngestTelemetryReportsCommand, ListControlCenterDeploymentRequestsCommand, ListControlCenterGroupsCommand, ListControlCenterOperationsCommand, ListDimensionsCommand, ListFileGroupsCommand, ListFilesCommand, ListOrganisationsCommand, ListPackagesCommand, ListReleasesCommand, PostLoginCommand, PreviewServingPolicyCommand, PutServingPolicyCommand, RampReleaseCommand, RejectControlCenterDeploymentRequestCommand, RequestOrganisationCommand, ResolveControlCenterOperationCommand, RollbackReleaseCommand, ServeReleaseCommand, ServeReleaseV2Command, UpdateControlCenterApprovalPolicyCommand, UpdateControlCenterGroupCommand, UpdateDimensionCommand, UpdateFileCommand, UploadFileCommand, AirborneClient } from "airborne-server-sdk"
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
@@ -35,20 +35,20 @@ async function readConfigFile() {
  */
 export async function getBaseUrl() {
   try {
-    const config = await readConfigFile();
-    return config.baseUrl || null; // return null if not set
+    const config = JSON.parse(await fsPromises.readFile(configFilePath, "utf-8"));
+    return config.baseUrl || "https://airborne.juspay.in";
   } catch (err) {
-    console.error("Error reading endpoint:", err);
-    return null;
+    if (err.code === "ENOENT") return "https://airborne.juspay.in";
+    throw err;
   }
 }
 
 async function getClient(token,isAuthReq){
   const baseUrl = await getBaseUrl();
-  
+
   if(!token || !isAuthReq){
     return new AirborneClient({
-      endpoint: baseUrl 
+      endpoint: baseUrl
     })
   }
   else{
@@ -73,17 +73,17 @@ function readJsonFile(filePath) {
 
 function mergeOptionsWithJsonFile(options, jsonFilePath) {
   const jsonOptions = readJsonFile(jsonFilePath);
-  
+
   // CLI arguments take precedence over JSON file values
   const merged = { ...jsonOptions };
-  
+
   // Override with any CLI arguments that were provided
   Object.keys(options).forEach(key => {
     if (options[key] !== undefined) {
       merged[key] = options[key];
     }
   });
-  
+
   return merged;
 }
 
@@ -106,10 +106,10 @@ function validateRequiredOptions(options, requiredParams) {
     if (fieldParts.length > 1) {
       // Get the parent path (everything except the last part)
       const parentPath = fieldParts.slice(0, -1).join('.');
-      
+
       // Check if the parent is also in the required params
       const parentIsRequired = requiredParams.includes(parentPath);
-      
+
       // If parent is not required, only validate this field if parent exists
       if (!parentIsRequired) {
         const parentExists = getNestedValue(options, parentPath);
@@ -129,12 +129,108 @@ function validateRequiredOptions(options, requiredParams) {
     throw new Error(`Missing required parameters: ${missing.join(', ')}`);
   }
 }
+export async function AcknowledgeEmergencyRollbackAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","reason","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new AcknowledgeEmergencyRollbackCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function ApproveControlCenterDeploymentRequestAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new ApproveControlCenterDeploymentRequestCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function CancelControlCenterDeploymentRequestAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new CancelControlCenterDeploymentRequestCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function ConcludeReleaseAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","chosen_variant","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new ConcludeReleaseCommand(finalOptions);
+  return await client.send(command);
+}
+
 export async function CreateApplicationAction(paramsFile, options){
   let finalOptions = {};
   const requiredParams = ["application","organisation","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -145,20 +241,20 @@ export async function CreateApplicationAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new CreateApplicationCommand(finalOptions);
   return await client.send(command);
 }
 
-export async function CreateControlCenterGroupAction(paramsFile, options){
+export async function CreateCohortRangeAction(paramsFile, options){
   let finalOptions = {};
-  const requiredParams = ["organisation","name","members","members[].undefined.application","members[].undefined.platform","token"];
+  const requiredParams = ["organisation","application","dimension","name","lower","upper","priority","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -169,9 +265,57 @@ export async function CreateControlCenterGroupAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new CreateCohortRangeCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function CreateControlCenterDeploymentRequestAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","action","payload","reason","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new CreateControlCenterDeploymentRequestCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function CreateControlCenterGroupAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","name","members","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new CreateControlCenterGroupCommand(finalOptions);
   return await client.send(command);
@@ -182,7 +326,7 @@ export async function CreateDimensionAction(paramsFile, options){
   const requiredParams = ["dimension","description","dimension_type","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -193,9 +337,9 @@ export async function CreateDimensionAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new CreateDimensionCommand(finalOptions);
   return await client.send(command);
@@ -206,7 +350,7 @@ export async function CreateFileAction(paramsFile, options){
   const requiredParams = ["file_path","url","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -217,7 +361,7 @@ export async function CreateFileAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
+
 
   // Handle document fields specially if they're objects from JSON
   if (finalOptions.metadata && typeof finalOptions.metadata === 'object') {
@@ -235,7 +379,7 @@ export async function CreateOrganisationAction(paramsFile, options){
   const requiredParams = ["name","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -246,9 +390,9 @@ export async function CreateOrganisationAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new CreateOrganisationCommand(finalOptions);
   return await client.send(command);
@@ -259,7 +403,7 @@ export async function CreatePackageAction(paramsFile, options){
   const requiredParams = ["index","files","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -270,9 +414,9 @@ export async function CreatePackageAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new CreatePackageCommand(finalOptions);
   return await client.send(command);
@@ -283,7 +427,7 @@ export async function CreateReleaseAction(paramsFile, options){
   const requiredParams = ["config","config.release_config_timeout","config.boot_timeout","config.properties","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -294,9 +438,9 @@ export async function CreateReleaseAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new CreateReleaseCommand(finalOptions);
   return await client.send(command);
@@ -307,7 +451,7 @@ export async function DeleteControlCenterGroupAction(paramsFile, options){
   const requiredParams = ["id","organisation","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -318,9 +462,9 @@ export async function DeleteControlCenterGroupAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new DeleteControlCenterGroupCommand(finalOptions);
   return await client.send(command);
@@ -331,7 +475,7 @@ export async function DeleteDimensionAction(paramsFile, options){
   const requiredParams = ["dimension","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -342,11 +486,83 @@ export async function DeleteDimensionAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new DeleteDimensionCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function DiscardReleaseAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new DiscardReleaseCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetControlCenterApprovalPolicyAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetControlCenterApprovalPolicyCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetControlCenterDeploymentRequestAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetControlCenterDeploymentRequestCommand(finalOptions);
   return await client.send(command);
 }
 
@@ -355,7 +571,7 @@ export async function GetControlCenterOverviewAction(paramsFile, options){
   const requiredParams = ["token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -366,9 +582,9 @@ export async function GetControlCenterOverviewAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new GetControlCenterOverviewCommand(finalOptions);
   return await client.send(command);
@@ -379,7 +595,7 @@ export async function GetControlCenterReleaseEventsAction(paramsFile, options){
   const requiredParams = ["release_id","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -390,9 +606,9 @@ export async function GetControlCenterReleaseEventsAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new GetControlCenterReleaseEventsCommand(finalOptions);
   return await client.send(command);
@@ -403,7 +619,7 @@ export async function GetControlCenterRollbackPreviewAction(paramsFile, options)
   const requiredParams = ["release_id","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -414,9 +630,9 @@ export async function GetControlCenterRollbackPreviewAction(paramsFile, options)
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new GetControlCenterRollbackPreviewCommand(finalOptions);
   return await client.send(command);
@@ -427,7 +643,7 @@ export async function GetReleaseAction(paramsFile, options){
   const requiredParams = ["releaseId","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -438,11 +654,59 @@ export async function GetReleaseAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new GetReleaseCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetServingPolicyAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetServingPolicyCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function GetTelemetrySummaryAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new GetTelemetrySummaryCommand(finalOptions);
   return await client.send(command);
 }
 
@@ -451,7 +715,7 @@ export async function GetUserAction(paramsFile, options){
   const requiredParams = ["token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -462,11 +726,59 @@ export async function GetUserAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new GetUserCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function IngestTelemetryReportsAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["receipt","install_id","events"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(null, false);
+  const command = new IngestTelemetryReportsCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function ListControlCenterDeploymentRequestsAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new ListControlCenterDeploymentRequestsCommand(finalOptions);
   return await client.send(command);
 }
 
@@ -475,7 +787,7 @@ export async function ListControlCenterGroupsAction(paramsFile, options){
   const requiredParams = ["organisation","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -486,9 +798,9 @@ export async function ListControlCenterGroupsAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListControlCenterGroupsCommand(finalOptions);
   return await client.send(command);
@@ -499,7 +811,7 @@ export async function ListControlCenterOperationsAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -510,9 +822,9 @@ export async function ListControlCenterOperationsAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListControlCenterOperationsCommand(finalOptions);
   return await client.send(command);
@@ -523,7 +835,7 @@ export async function ListDimensionsAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -534,9 +846,9 @@ export async function ListDimensionsAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListDimensionsCommand(finalOptions);
   return await client.send(command);
@@ -547,7 +859,7 @@ export async function ListFileGroupsAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -558,9 +870,9 @@ export async function ListFileGroupsAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListFileGroupsCommand(finalOptions);
   return await client.send(command);
@@ -571,7 +883,7 @@ export async function ListFilesAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -582,9 +894,9 @@ export async function ListFilesAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListFilesCommand(finalOptions);
   return await client.send(command);
@@ -595,7 +907,7 @@ export async function ListOrganisationsAction(paramsFile, options){
   const requiredParams = ["token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -606,9 +918,9 @@ export async function ListOrganisationsAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListOrganisationsCommand(finalOptions);
   return await client.send(command);
@@ -619,7 +931,7 @@ export async function ListPackagesAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -630,9 +942,9 @@ export async function ListPackagesAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListPackagesCommand(finalOptions);
   return await client.send(command);
@@ -643,7 +955,7 @@ export async function ListReleasesAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -654,9 +966,9 @@ export async function ListReleasesAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ListReleasesCommand(finalOptions);
   return await client.send(command);
@@ -667,7 +979,7 @@ export async function PostLoginAction(paramsFile, options){
   const requiredParams = ["client_id","client_secret"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -678,11 +990,107 @@ export async function PostLoginAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(null, false);
   const command = new PostLoginCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function PreviewServingPolicyAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","context","toss","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new PreviewServingPolicyCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function PutServingPolicyAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["organisation","application","strict","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new PutServingPolicyCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function RampReleaseAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["release_id","organisation","application","traffic_percentage","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new RampReleaseCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function RejectControlCenterDeploymentRequestAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","application","reason","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new RejectControlCenterDeploymentRequestCommand(finalOptions);
   return await client.send(command);
 }
 
@@ -691,7 +1099,7 @@ export async function RequestOrganisationAction(paramsFile, options){
   const requiredParams = ["organisation_name","name","email","phone","app_store_link","play_store_link","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -702,9 +1110,9 @@ export async function RequestOrganisationAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new RequestOrganisationCommand(finalOptions);
   return await client.send(command);
@@ -715,7 +1123,7 @@ export async function ResolveControlCenterOperationAction(paramsFile, options){
   const requiredParams = ["id","organisation","application","finding","reason","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -726,9 +1134,9 @@ export async function ResolveControlCenterOperationAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ResolveControlCenterOperationCommand(finalOptions);
   return await client.send(command);
@@ -739,7 +1147,7 @@ export async function RollbackReleaseAction(paramsFile, options){
   const requiredParams = ["release_id","organisation","application","reason","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -750,9 +1158,9 @@ export async function RollbackReleaseAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new RollbackReleaseCommand(finalOptions);
   return await client.send(command);
@@ -763,7 +1171,7 @@ export async function ServeReleaseAction(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -774,9 +1182,9 @@ export async function ServeReleaseAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ServeReleaseCommand(finalOptions);
   return await client.send(command);
@@ -787,7 +1195,7 @@ export async function ServeReleaseV2Action(paramsFile, options){
   const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -798,20 +1206,20 @@ export async function ServeReleaseV2Action(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new ServeReleaseV2Command(finalOptions);
   return await client.send(command);
 }
 
-export async function UpdateControlCenterGroupAction(paramsFile, options){
+export async function UpdateControlCenterApprovalPolicyAction(paramsFile, options){
   let finalOptions = {};
-  const requiredParams = ["id","organisation","name","members","members[].undefined.application","members[].undefined.platform","token"];
+  const requiredParams = ["organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -822,9 +1230,33 @@ export async function UpdateControlCenterGroupAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
+  const client = await getClient(finalOptions.token, true);
+  const command = new UpdateControlCenterApprovalPolicyCommand(finalOptions);
+  return await client.send(command);
+}
+
+export async function UpdateControlCenterGroupAction(paramsFile, options){
+  let finalOptions = {};
+  const requiredParams = ["id","organisation","name","members","token"];
+
+  if (paramsFile && paramsFile.startsWith('@')) {
+    const jsonFilePath = paramsFile.slice(1);
+    finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
+  } else if (paramsFile) {
+    throw new Error("Params file must start with @ (e.g., @params.json)");
+  } else {
+    finalOptions = options;
+  }
+
+  // Validate that all required options are present
+  validateRequiredOptions(finalOptions, requiredParams);
+
+
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new UpdateControlCenterGroupCommand(finalOptions);
   return await client.send(command);
@@ -835,7 +1267,7 @@ export async function UpdateDimensionAction(paramsFile, options){
   const requiredParams = ["dimension","change_reason","position","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -846,9 +1278,9 @@ export async function UpdateDimensionAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new UpdateDimensionCommand(finalOptions);
   return await client.send(command);
@@ -859,7 +1291,7 @@ export async function UpdateFileAction(paramsFile, options){
   const requiredParams = ["file_key","tag","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -870,9 +1302,9 @@ export async function UpdateFileAction(paramsFile, options){
   // Validate that all required options are present
   validateRequiredOptions(finalOptions, requiredParams);
 
-  
 
-  
+
+
   const client = await getClient(finalOptions.token, true);
   const command = new UpdateFileCommand(finalOptions);
   return await client.send(command);
@@ -883,7 +1315,7 @@ export async function UploadFileAction(paramsFile, options){
   const requiredParams = ["file","file_path","checksum","organisation","application","token"];
 
   if (paramsFile && paramsFile.startsWith('@')) {
-    const jsonFilePath = paramsFile.slice(1); 
+    const jsonFilePath = paramsFile.slice(1);
     finalOptions = mergeOptionsWithJsonFile(options, jsonFilePath, requiredParams);
   } else if (paramsFile) {
     throw new Error("Params file must start with @ (e.g., @params.json)");
@@ -905,7 +1337,7 @@ export async function UploadFileAction(paramsFile, options){
   }
 
 
-  
+
   const client = await getClient(finalOptions.token, true);
   const command = new UploadFileCommand(finalOptions);
   return await client.send(command);
