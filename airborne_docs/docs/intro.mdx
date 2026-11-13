@@ -1,12 +1,12 @@
 ---
 title: Introduction
-description: Airborne delivers over-the-air updates to your React Native, Android, and iOS apps — with precise targeting, instant rollbacks, and analytics.
+description: Airborne delivers over-the-air updates to your React Native, Android, and iOS apps — with precise targeting, operator-controlled rollback, and analytics.
 slug: /intro
 ---
 
 import Screenshot from '@site/src/components/Screenshot';
 
-**Airborne** lets you ship code and asset updates to your **React Native, Android, and iOS** apps over-the-air — without waiting on an app store review for every change. Bundle your JavaScript and assets, target them at precise user segments, ramp traffic gradually, and roll back instantly if something looks wrong.
+**Airborne** lets you ship code and asset updates to your **React Native, Android, and iOS** apps over-the-air — without waiting on an app store review for every change. Bundle your JavaScript and assets, target them at precise user segments, ramp traffic gradually, and request a rollback if something looks wrong.
 
 You can use the **Juspay-hosted** service or **self-host** the entire stack.
 
@@ -62,3 +62,5 @@ import Link from '@docusaurus/Link';
 </div>
 
 Already integrated? Jump to the [React Native SDK reference](/docs/react-native-sdk/reference/javascript-api), the [Core CLI command reference](/docs/core-cli/command-reference), or the [server configuration](/docs/server/configuration).
+
+Rollback is not guaranteed to be immediate: release protections, approval policy, or unresolved operations can block it. Even after the server saves a change and submits CDN invalidation, edge caches may serve stale configuration until propagation or expiry. Devices must fetch and boot the replacement; inactive devices have no bounded recovery time.
