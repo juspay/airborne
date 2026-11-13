@@ -2,6 +2,44 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_android-v0.4.0 - 2026-11-13
+#### Bug Fixes
+- **(android)** reject empty OTA index paths on first launch - (d76e895) - Shiva Nandan
+#### Features
+- **(android)** add PackagePaths.isPackageRelativePath - (7ac46a0) - Shiva Nandan
+
+- - -
+
+## v0.49.1 - 2026-11-13
+#### Miscellaneous Chores
+- **(version)** v0.49.1 [skip ci] - (aa9ce4b) - Airborne Bot
+
+- - -
+
+## v0.49.0 - 2026-11-13
+#### Miscellaneous Chores
+- **(version)** v0.49.0 [skip ci] - (4bdc1e9) - Airborne Bot
+
+- - -
+
+## v0.48.1 - 2026-11-13
+#### Miscellaneous Chores
+- **(version)** v0.48.1 [skip ci] - (78f348d) - Airborne Bot
+
+- - -
+
+## v0.48.0 - 2026-11-13
+#### Miscellaneous Chores
+- **(version)** v0.48.0 [skip ci] - (530f1ac) - Airborne Bot
+
+- - -
+
+## v0.47.0 - 2026-11-13
+#### Miscellaneous Chores
+- **(version)** v0.47.0 [skip ci] - (2e01695) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_android-v0.3.0 - 2026-11-05
 #### Bug Fixes
 - **(android)** publish io.juspay:airborne with the release version - (144b53f) - Yaswanth
