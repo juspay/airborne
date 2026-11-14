@@ -53,7 +53,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use superposition_sdk::config::Config as SrsConfig;
+use superposition_provider::AuthMethod;
+use superposition_sdk::config::{Config as SrsConfig, Login as SrsLogin};
 use tracing_actix_web::TracingLogger;
 use utils::db;
 
@@ -243,7 +244,24 @@ async fn main() -> std::io::Result<()> {
             .expect("Failed to complete Keycloak -> Casbin import");
     }
 
-    let superposition_token = app_config.superposition_token.clone().unwrap_or_default();
+    // Both the SDK client and the per-workspace providers authenticate with HTTP Basic.
+    // Unauthenticated Superposition ignores the header, but the SDK still needs an identity
+    // to sign requests with, so send empty credentials in that mode.
+    let (superposition_username, superposition_password) =
+        if app_config.enable_authenticated_superposition {
+            (
+                app_config
+                    .superposition_username
+                    .clone()
+                    .unwrap_or_default(),
+                app_config
+                    .superposition_password
+                    .clone()
+                    .unwrap_or_default(),
+            )
+        } else {
+            (String::new(), String::new())
+        };
 
     let cac_url = app_config.superposition_url.clone();
     let superposition_org_id_env = app_config.superposition_org_id.clone();
@@ -370,23 +388,17 @@ async fn main() -> std::io::Result<()> {
         hub = Some(Sheets::new(client, gcp_auth));
     }
 
-    let superposition_client = if app_config.enable_authenticated_superposition {
-        superposition_sdk::Client::from_conf(
-            SrsConfig::builder()
-                .bearer_token(superposition_token.clone().into())
-                .endpoint_url(cac_url.clone())
-                .behavior_version_latest()
-                .build(),
-        )
-    } else {
-        superposition_sdk::Client::from_conf(
-            SrsConfig::builder()
-                .bearer_token("abcd".into())
-                .endpoint_url(cac_url.clone())
-                .behavior_version_latest()
-                .build(),
-        )
-    };
+    let superposition_client = superposition_sdk::Client::from_conf(
+        SrsConfig::builder()
+            .basic_auth_login(SrsLogin::new(
+                superposition_username.clone(),
+                superposition_password.clone(),
+                None,
+            ))
+            .endpoint_url(cac_url.clone())
+            .behavior_version_latest()
+            .build(),
+    );
 
     let authz_provider = build_authz_provider(
         authz_provider_kind,
@@ -418,7 +430,10 @@ async fn main() -> std::io::Result<()> {
 
     let provider_registry = Arc::new(ProviderRegistry::new(
         superposition_org_id_env.clone(),
-        superposition_token.clone(),
+        AuthMethod::Basic {
+            username: superposition_username,
+            password: superposition_password,
+        },
         provider_url.clone(),
     ));
 
