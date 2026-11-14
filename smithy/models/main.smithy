@@ -21,6 +21,11 @@ service Airborne {
         ListFiles
         UploadFile
         ListFileGroups
+        CreateFileSet
+        ListFileSets
+        GetFileSet
+        CreateFileSetVersion
+        GetFileSetVersion
         UpdateFile
         // package
         CreatePackage

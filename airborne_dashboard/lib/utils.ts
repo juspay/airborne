@@ -48,3 +48,11 @@ export function hasAppAccess(orgAccess: string[], appAccess: string[], accessTyp
   // Otherwise, no access
   return false;
 }
+
+/** Parse a set version's file keys (`path@version:N`) into path + version pairs. */
+export function fileKeysToMembers(keys: string[]): { file_path: string; version: number }[] {
+  return keys.flatMap((key) => {
+    const { filePath, version } = parseFileRef(key);
+    return version === undefined ? [] : [{ file_path: filePath, version }];
+  });
+}

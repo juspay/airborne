@@ -32,7 +32,7 @@ fn parse_tags(tags: Option<&str>) -> Vec<String> {
 
 /// Escape SQL LIKE wildcard characters in search term
 /// Escapes '%', '_', and '\' with backslash
-fn escape_like_pattern(input: &str) -> String {
+pub(crate) fn escape_like_pattern(input: &str) -> String {
     input
         .replace('\\', "\\\\")
         .replace('%', "\\%")
