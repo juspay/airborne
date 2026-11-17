@@ -33,7 +33,7 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
     }
 
     private fun firstTimeCleanup() {
-        val prevBuildId = workspace.getFromSharedPreference(OTAConstants.OTA_BUILD_ID, "__failed")
+        val prevBuildId = workspace.getFromSharedPreference(OTAConstants.OTA_BUILD_ID, "__failed", Workspace.BOOTUP_PREFS_SCOPE)
 
         if (prevBuildId != cleanUpValue) {
             trackerCallback.track(
@@ -44,8 +44,10 @@ class OTAServices(private val ctx: Context, val workspace: Workspace, val cleanU
                 "started",
                 JSONObject().put("status", "started")
             )
-            workspace.writeToSharedPreference(OTAConstants.OTA_BUILD_ID, cleanUpValue)
+            workspace.writeToSharedPreference(OTAConstants.OTA_BUILD_ID, cleanUpValue, Workspace.BOOTUP_PREFS_SCOPE)
             workspace.removeFromSharedPreference("asset_metadata.json")
+            // Older SDKs read the build id from the main prefs; removing it makes a rollback to one run its cleanup.
+            workspace.removeFromSharedPreference(OTAConstants.OTA_BUILD_ID)
             try {
                 ctx.let { workspace.clean(it) }
                 trackerCallback.track(
