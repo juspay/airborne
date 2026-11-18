@@ -1,4 +1,7 @@
-use crate::{package::types::Package, utils::db::models::PackageV2Entry};
+use crate::{
+    package::types::{Package, PackageFileSet},
+    utils::db::models::PackageV2Entry,
+};
 
 pub fn parse_package_key(spec: &str) -> (Option<i32>, Option<String>) {
     if let Some((kind, value)) = spec.split_once(':') {
@@ -13,10 +16,20 @@ pub fn parse_package_key(spec: &str) -> (Option<i32>, Option<String>) {
 }
 
 pub fn db_response_to_package(db_pkg: PackageV2Entry) -> Package {
+    let file_sets: Vec<PackageFileSet> =
+        serde_json::from_value(db_pkg.file_sets).unwrap_or_else(|e| {
+            log::warn!(
+                "Package {} has unreadable file_sets JSON, showing none: {}",
+                db_pkg.version,
+                e
+            );
+            Vec::new()
+        });
     Package {
         index: db_pkg.index,
         tag: db_pkg.tag,
         version: db_pkg.version,
         files: db_pkg.files.into_iter().flatten().collect(),
+        file_sets,
     }
 }

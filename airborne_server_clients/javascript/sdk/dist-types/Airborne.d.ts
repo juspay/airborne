@@ -2,14 +2,19 @@ import { AirborneClient } from "./AirborneClient";
 import { CreateApplicationCommandInput, CreateApplicationCommandOutput } from "./commands/CreateApplicationCommand";
 import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "./commands/CreateDimensionCommand";
 import { CreateFileCommandInput, CreateFileCommandOutput } from "./commands/CreateFileCommand";
+import { CreateFileSetCommandInput, CreateFileSetCommandOutput } from "./commands/CreateFileSetCommand";
+import { CreateFileSetVersionCommandInput, CreateFileSetVersionCommandOutput } from "./commands/CreateFileSetVersionCommand";
 import { CreateOrganisationCommandInput, CreateOrganisationCommandOutput } from "./commands/CreateOrganisationCommand";
 import { CreatePackageCommandInput, CreatePackageCommandOutput } from "./commands/CreatePackageCommand";
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "./commands/CreateReleaseCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./commands/DeleteDimensionCommand";
+import { GetFileSetCommandInput, GetFileSetCommandOutput } from "./commands/GetFileSetCommand";
+import { GetFileSetVersionCommandInput, GetFileSetVersionCommandOutput } from "./commands/GetFileSetVersionCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
 import { ListFileGroupsCommandInput, ListFileGroupsCommandOutput } from "./commands/ListFileGroupsCommand";
+import { ListFileSetsCommandInput, ListFileSetsCommandOutput } from "./commands/ListFileSetsCommand";
 import { ListFilesCommandInput, ListFilesCommandOutput } from "./commands/ListFilesCommand";
 import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from "./commands/ListOrganisationsCommand";
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
@@ -42,6 +47,18 @@ export interface Airborne {
     createFile(args: CreateFileCommandInput, cb: (err: any, data?: CreateFileCommandOutput) => void): void;
     createFile(args: CreateFileCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreateFileCommandOutput) => void): void;
     /**
+     * @see {@link CreateFileSetCommand}
+     */
+    createFileSet(args: CreateFileSetCommandInput, options?: __HttpHandlerOptions): Promise<CreateFileSetCommandOutput>;
+    createFileSet(args: CreateFileSetCommandInput, cb: (err: any, data?: CreateFileSetCommandOutput) => void): void;
+    createFileSet(args: CreateFileSetCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreateFileSetCommandOutput) => void): void;
+    /**
+     * @see {@link CreateFileSetVersionCommand}
+     */
+    createFileSetVersion(args: CreateFileSetVersionCommandInput, options?: __HttpHandlerOptions): Promise<CreateFileSetVersionCommandOutput>;
+    createFileSetVersion(args: CreateFileSetVersionCommandInput, cb: (err: any, data?: CreateFileSetVersionCommandOutput) => void): void;
+    createFileSetVersion(args: CreateFileSetVersionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreateFileSetVersionCommandOutput) => void): void;
+    /**
      * @see {@link CreateOrganisationCommand}
      */
     createOrganisation(args: CreateOrganisationCommandInput, options?: __HttpHandlerOptions): Promise<CreateOrganisationCommandOutput>;
@@ -65,6 +82,18 @@ export interface Airborne {
     deleteDimension(args: DeleteDimensionCommandInput, options?: __HttpHandlerOptions): Promise<DeleteDimensionCommandOutput>;
     deleteDimension(args: DeleteDimensionCommandInput, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
     deleteDimension(args: DeleteDimensionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
+    /**
+     * @see {@link GetFileSetCommand}
+     */
+    getFileSet(args: GetFileSetCommandInput, options?: __HttpHandlerOptions): Promise<GetFileSetCommandOutput>;
+    getFileSet(args: GetFileSetCommandInput, cb: (err: any, data?: GetFileSetCommandOutput) => void): void;
+    getFileSet(args: GetFileSetCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetFileSetCommandOutput) => void): void;
+    /**
+     * @see {@link GetFileSetVersionCommand}
+     */
+    getFileSetVersion(args: GetFileSetVersionCommandInput, options?: __HttpHandlerOptions): Promise<GetFileSetVersionCommandOutput>;
+    getFileSetVersion(args: GetFileSetVersionCommandInput, cb: (err: any, data?: GetFileSetVersionCommandOutput) => void): void;
+    getFileSetVersion(args: GetFileSetVersionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetFileSetVersionCommandOutput) => void): void;
     /**
      * @see {@link GetReleaseCommand}
      */
@@ -96,6 +125,12 @@ export interface Airborne {
     listFiles(args: ListFilesCommandInput, options?: __HttpHandlerOptions): Promise<ListFilesCommandOutput>;
     listFiles(args: ListFilesCommandInput, cb: (err: any, data?: ListFilesCommandOutput) => void): void;
     listFiles(args: ListFilesCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListFilesCommandOutput) => void): void;
+    /**
+     * @see {@link ListFileSetsCommand}
+     */
+    listFileSets(args: ListFileSetsCommandInput, options?: __HttpHandlerOptions): Promise<ListFileSetsCommandOutput>;
+    listFileSets(args: ListFileSetsCommandInput, cb: (err: any, data?: ListFileSetsCommandOutput) => void): void;
+    listFileSets(args: ListFileSetsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListFileSetsCommandOutput) => void): void;
     /**
      * @see {@link ListOrganisationsCommand}
      */
