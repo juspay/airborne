@@ -5,17 +5,20 @@
 //  Created by Balaganesh S on 27/04/26.
 //
 
-
 import Foundation
+#if SWIFT_PACKAGE
+import AirborneSwiftCore
+#endif
 
 @objcMembers public class AJPApplicationConstants: NSObject {
     // MARK: - Directory Names
-    public static let JUSPAY_MANIFEST_DIR = "JuspayManifests"
-    public static let JUSPAY_PACKAGE_DIR = "JuspayPackages"
-    public static let JUSPAY_RESOURCE_DIR = "JuspayResources"
+    // Prefixed with `AJPIdentity.storageDirectoryPrefix` (default keeps the historical names).
+    public static var AIRBORNE_MANIFEST_DIR: String { "\(AJPIdentity.storageDirectoryPrefix)Manifests" }
+    public static var AIRBORNE_PACKAGE_DIR: String { "\(AJPIdentity.storageDirectoryPrefix)Packages" }
+    public static var AIRBORNE_RESOURCE_DIR: String { "\(AJPIdentity.storageDirectoryPrefix)Resources" }
 
-    public static let JUSPAY_MAIN_DIR = "main"
-    public static let JUSPAY_TEMP_DIR = "temp"
+    public static let AIRBORNE_MAIN_DIR = "main"
+    public static let AIRBORNE_TEMP_DIR = "temp"
 
     // MARK: - File Names
     public static let APP_CONFIG_DATA_FILE_NAME = "app-config.dat"
@@ -36,8 +39,8 @@ import Foundation
     public static let LAZY_PACKAGE_NOTIFICATION = Notification.Name("AJPLazyPackageNotification")
 
     // MARK: - UserDefaults Keys
-    public static let APP_VERSION_USER_DEFAULTS_KEY = "in.juspay.airborne.appVersion"
+    public static var APP_VERSION_USER_DEFAULTS_KEY: String { "\(AJPIdentity.identifierPrefix).airborne.appVersion" }
 
     // MARK: - Misc
-    public static let APPL_MANAGER_SUB_CAT = "hyperota"
+    public static let APPL_MANAGER_SUB_CAT = "airborne"
 }

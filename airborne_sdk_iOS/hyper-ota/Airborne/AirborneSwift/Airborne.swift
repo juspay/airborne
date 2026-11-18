@@ -2,8 +2,6 @@
 //  Airborne.swift
 //  Airborne
 //
-//  Copyright © Juspay Technologies. All rights reserved.
-//
 
 import Foundation
 #if SWIFT_PACKAGE
@@ -28,10 +26,34 @@ import AirborneSwiftModel
      * across different workspaces
      *
      * @return A string identifier for the application namespace.
-     *         If not implemented, defaults to "juspay".
+     *         If not implemented, defaults to "default".
      */
     @objc optional func namespace() -> String
     
+    /**
+     * Returns the reverse-DNS prefix the SDK uses for its NSError domains, dispatch queue
+     * labels (visible in crash reports) and UserDefaults keys, e.g. "com.example".
+     *
+     * @return The identifier prefix. Errors are reported in the domain "<prefix>.Airborne".
+     *         If not implemented, the SDK's built-in default is used.
+     *
+     * @note Process-wide: it is applied when the first AirborneServices is created and
+     *       must be the same for every instance. Equivalent to setting
+     *       `AJPIdentity.identifierPrefix` before initialization.
+     */
+    @objc optional func identifierPrefix() -> String
+
+    /**
+     * Returns the prefix of the directories the SDK creates in the app's Library folder,
+     * e.g. "Example" → "ExampleManifests", "ExamplePackages", "ExampleResources".
+     *
+     * @return The storage directory prefix. If not implemented, the SDK's built-in default is used.
+     *
+     * @note Process-wide, like `identifierPrefix()`. Changing it in an app update makes the SDK
+     *       ignore packages downloaded under the previous prefix (they are fetched again).
+     */
+    @objc optional func storageDirectoryPrefix() -> String
+
     /**
      * Returns the custom bundle for loading local assets and fallback files.
      *
@@ -100,7 +122,7 @@ import AirborneSwiftModel
      * @param key A specific identifier for the event type
      * @param value Additional structured data about the event
      * @param category The broad category of the event (e.g., "lifecycle")
-     * @param subcategory The specific subcategory (e.g., "hyperota")
+     * @param subcategory The specific subcategory (e.g., "airborne")
      *
      * @note Use this for logging, analytics, debugging, and monitoring OTA performance.
      */
@@ -198,6 +220,12 @@ import AirborneSwiftModel
         self.releaseConfigURL = releaseConfigURL
         self.delegate = delegate
         super.init()
+        if let prefix = delegate?.identifierPrefix?() {
+            AJPIdentity.identifierPrefix = prefix
+        }
+        if let prefix = delegate?.storageDirectoryPrefix?() {
+            AJPIdentity.storageDirectoryPrefix = prefix
+        }
         self.setupLazyPackageNotifications()
         self.startApplicationManager()
     }

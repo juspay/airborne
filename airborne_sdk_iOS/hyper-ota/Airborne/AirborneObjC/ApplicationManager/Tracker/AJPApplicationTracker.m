@@ -2,8 +2,6 @@
 //  AJPApplicationTracker.m
 //  Airborne
 //
-//  Copyright © Juspay Technologies. All rights reserved.
-//
 
 #if SWIFT_PACKAGE
 // Must precede AJPApplicationTracker.h: that header declares <AJPLoggerDelegate> against a bare

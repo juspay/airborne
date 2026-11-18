@@ -39,6 +39,8 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 ```swift
 @objc public protocol AirborneDelegate {
     @objc optional func namespace() -> String
+    @objc optional func identifierPrefix() -> String
+    @objc optional func storageDirectoryPrefix() -> String
     @objc optional func bundle() -> Bundle
     @objc optional func indexBundleName() -> String
     @objc optional func dimensions() -> [String: String]
@@ -53,7 +55,9 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 
 | Method | Signature | Description |
 | --- | --- | --- |
-| `namespace` | `func namespace() -> String` | Returns the namespace that isolates this app instance's downloads. Must match the namespace segment of your release URL. Defaults to `"juspay"`. |
+| `namespace` | `func namespace() -> String` | Returns the namespace that isolates this app instance's downloads. Must match the namespace segment of your release URL. Defaults to `"default"`. |
+| `identifierPrefix` | `func identifierPrefix() -> String` | Reverse-DNS prefix (e.g. `"com.example"`) used for the SDK's NSError domains (`<prefix>.Airborne`), dispatch queue labels (visible in crash reports) and UserDefaults keys. Defaults to `"in.juspay"`. Process-wide — see [Customizing SDK identifiers](#customizing-sdk-identifiers). |
+| `storageDirectoryPrefix` | `func storageDirectoryPrefix() -> String` | Prefix of the directories the SDK creates in the app's Library folder (`<prefix>Manifests`, `<prefix>Packages`, `<prefix>Resources`). Defaults to `"Juspay"`. Process-wide — see [Customizing SDK identifiers](#customizing-sdk-identifiers). |
 | `bundle` | `func bundle() -> Bundle` | Returns the bundle used for local assets and fallback files (default release config and index bundle). Defaults to `Bundle.main`. |
 | `indexBundleName` | `func indexBundleName() -> String` | Returns the resource name of the index bundle file used as the fallback entry point. Defaults to `"main.jsbundle"`. |
 | `dimensions` | `func dimensions() -> [String: String]` | Returns custom dimensions sent as HTTP headers with the release config request, for targeting / A-B testing / segmentation. Defaults to an empty dictionary. |
@@ -61,6 +65,20 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 | `onEvent` | `func onEvent(level: String, label: String, key: String, value: [String: Any], category: String, subcategory: String)` | Receives lifecycle and error events. See the [callbacks & events reference](/docs/react-native-sdk/reference/callbacks-and-events) for the full catalogue. |
 | `onLazyPackageDownloadComplete` | `func onLazyPackageDownloadComplete(downloadSuccess: Bool, url: String, filePath: String)` | Called when an individual lazy package download completes (success or failure). |
 | `onAllLazyPackageDownloadsComplete` | `func onAllLazyPackageDownloadsComplete()` | Called when all lazy package downloads have completed. Use `onLazyPackageDownloadComplete` for individual results. |
+
+### Customizing SDK identifiers
+
+By default the SDK uses `in.juspay` / `Juspay` (the identifiers earlier versions used, so existing installs keep their downloads) for identifiers a host app or its users can observe: error domains, the network-monitor queue label that shows up in crash reports, a UserDefaults key, and the storage directory names. To use your own values, either implement `identifierPrefix()` / `storageDirectoryPrefix()` on your delegate, or set them directly **before** creating the first `AirborneServices`:
+
+```swift
+AJPIdentity.identifierPrefix = "com.example"       // → errors in "com.example.Airborne"
+AJPIdentity.storageDirectoryPrefix = "Example"     // → Library/ExampleManifests, ...
+let airborne = AirborneServices(releaseConfigURL: url, delegate: self)
+```
+
+These values are process-wide and must be the same for every `AirborneServices` instance. Changing `storageDirectoryPrefix` in an app update makes the SDK ignore packages downloaded under the old prefix — they are downloaded again.
+
+The framework's own bundle identifier is `io.airborne.Airborne`.
 
 #### startApp parameters
 
@@ -77,7 +95,7 @@ The protocol you conform to (typically in an `AppDelegate` extension) to customi
 | `key` | `String` | The specific event identifier. |
 | `value` | `[String: Any]` | Structured payload for the event. |
 | `category` | `String` | The broad category, e.g. `"lifecycle"`. |
-| `subcategory` | `String` | The subcategory, e.g. `"hyperota"`. |
+| `subcategory` | `String` | The subcategory, e.g. `"airborne"`. |
 
 #### onLazyPackageDownloadComplete parameters
 

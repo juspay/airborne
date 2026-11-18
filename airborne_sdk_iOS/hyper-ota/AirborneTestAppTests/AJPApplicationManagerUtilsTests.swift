@@ -35,9 +35,9 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
     override func tearDownWithError() throws {
         let fm      = FileManager.default
         let library = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first!
-        for folder in [AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
-                       AJPApplicationConstants.JUSPAY_MANIFEST_DIR,
-                       AJPApplicationConstants.JUSPAY_RESOURCE_DIR] {
+        for folder in [AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
+                       AJPApplicationConstants.AIRBORNE_MANIFEST_DIR,
+                       AJPApplicationConstants.AIRBORNE_RESOURCE_DIR] {
             let wsPath = ((library as NSString).appendingPathComponent(folder) as NSString)
                 .appendingPathComponent(workspace)
             try? fm.removeItem(atPath: wsPath)
@@ -66,8 +66,8 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
 
     private var tempDirPath: String {
         fileUtil.fullPathInStorageForFilePath(
-            AJPApplicationConstants.JUSPAY_TEMP_DIR,
-            inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+            AJPApplicationConstants.AIRBORNE_TEMP_DIR,
+            inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
     }
 
     // MARK: - jsFileName
@@ -313,29 +313,29 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
 
     func testGetAllFilesInDirectory_nonexistentSubfolder_returnsEmpty() {
         let result = utils.getAllFilesInDirectory(
-            AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+            AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
             subFolder: "nonexistent_\(UUID().uuidString)",
             includeSubfolders: false)
         XCTAssertTrue(result.isEmpty)
     }
 
     func testGetAllFilesInDirectory_flatListing_returnsFileNamesOnly() throws {
-        try writeFile("a.js", subFolder: "main", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
-        try writeFile("b.js", subFolder: "main", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        try writeFile("a.js", subFolder: "main", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
+        try writeFile("b.js", subFolder: "main", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         let result = utils.getAllFilesInDirectory(
-            AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+            AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
             subFolder: "main",
             includeSubfolders: false)
         XCTAssertEqual(Set(result), ["a.js", "b.js"])
     }
 
     func testGetAllFilesInDirectory_flatListing_excludesSubdirectories() throws {
-        try writeFile("a.js",        subFolder: "main",     inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
-        try writeFile("nested.js",   subFolder: "main/sub", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        try writeFile("a.js",        subFolder: "main",     inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
+        try writeFile("nested.js",   subFolder: "main/sub", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         let result = utils.getAllFilesInDirectory(
-            AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+            AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
             subFolder: "main",
             includeSubfolders: false)
         XCTAssertEqual(result.count, 1)
@@ -344,11 +344,11 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
     }
 
     func testGetAllFilesInDirectory_recursive_includesFilesInSubfolders() throws {
-        try writeFile("a.js",      subFolder: "main",     inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
-        try writeFile("nested.js", subFolder: "main/sub", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        try writeFile("a.js",      subFolder: "main",     inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
+        try writeFile("nested.js", subFolder: "main/sub", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         let result = utils.getAllFilesInDirectory(
-            AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+            AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
             subFolder: "main",
             includeSubfolders: true)
         XCTAssertTrue(result.contains("a.js"),      "Top-level file must be listed")
@@ -356,10 +356,10 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
     }
 
     func testGetAllFilesInDirectory_recursive_excludesDirectoryEntries() throws {
-        try writeFile("nested.js", subFolder: "main/sub", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        try writeFile("nested.js", subFolder: "main/sub", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         let result = utils.getAllFilesInDirectory(
-            AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+            AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
             subFolder: "main",
             includeSubfolders: true)
         XCTAssertFalse(result.contains("sub"), "Subdirectory names must not appear in recursive listing")
@@ -369,11 +369,11 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
         // Writing a file in a sibling folder creates the workspace directory tree
         // but the "empty_main" subfolder itself has no files.
         let emptyDirPath = fileUtil.fullPathInStorageForFilePath(
-            "empty_main", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+            "empty_main", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
         try FileManager.default.createDirectory(atPath: emptyDirPath, withIntermediateDirectories: true)
 
         let result = utils.getAllFilesInDirectory(
-            AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
+            AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
             subFolder: "empty_main",
             includeSubfolders: false)
         XCTAssertTrue(result.isEmpty)
@@ -383,11 +383,11 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
 
     func testDeleteFile_existingFile_isRemovedFromDisk() throws {
         let fullPath = try writeFile("delete_me.js", subFolder: "main",
-                                    inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+                                    inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
         XCTAssertTrue(FileManager.default.fileExists(atPath: fullPath))
 
         try utils.deleteFile("delete_me.js", subFolder: "main",
-                             inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+                             inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: fullPath))
     }
@@ -395,17 +395,17 @@ final class AJPApplicationManagerUtilsTests: XCTestCase {
     func testDeleteFile_nonExistentFile_doesNotThrow() {
         XCTAssertNoThrow(
             try utils.deleteFile("ghost_\(UUID().uuidString).js", subFolder: "main",
-                                 inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR),
+                                 inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR),
             "Deleting a missing file must not propagate a throw (error is tracked internally)"
         )
     }
 
     func testDeleteFile_leavesOtherFilesUntouched() throws {
-        let keep   = try writeFile("keep.js",   subFolder: "main", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
-        try writeFile("remove.js", subFolder: "main", inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let keep   = try writeFile("keep.js",   subFolder: "main", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
+        try writeFile("remove.js", subFolder: "main", inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         try utils.deleteFile("remove.js", subFolder: "main",
-                             inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+                             inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         XCTAssertTrue(FileManager.default.fileExists(atPath: keep),
                       "deleteFile must only remove the targeted file")

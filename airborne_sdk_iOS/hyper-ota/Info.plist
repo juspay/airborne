@@ -7,7 +7,7 @@
   <key>CFBundleDisplayName</key>
   <string>Airborne</string>
   <key>CFBundleIdentifier</key>
-  <string>in.juspay.Airborne</string>
+  <string>io.airborne.Airborne</string>
   <key>CFBundleVersion</key>
   <string>1.0</string>
   <key>CFBundleShortVersionString</key>

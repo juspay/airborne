@@ -2,8 +2,6 @@
 //  AJPApplicationManagerUtils.swift
 //  Airborne
 //
-//  Copyright © Juspay Technologies. All rights reserved.
-//
 
 import Foundation
 #if SWIFT_PACKAGE
@@ -37,12 +35,12 @@ class AJPApplicationManagerUtils {
     
     func prepareTempDirectory() {
         cleanupTempDirectory()
-        let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.JUSPAY_TEMP_DIR, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.AIRBORNE_TEMP_DIR, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
         fileUtil.createFolderIfDoesNotExist(tempDirPath)
     }
     
     func cleanupTempDirectory() {
-        let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.JUSPAY_TEMP_DIR, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.AIRBORNE_TEMP_DIR, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: tempDirPath) {
             try? fileManager.removeItem(atPath: tempDirPath)
@@ -50,11 +48,11 @@ class AJPApplicationManagerUtils {
     }
 
     func cleanupPackageDirectory() {
-        fileUtil.cleanupEntireDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        fileUtil.cleanupEntireDirectory(AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
     }
 
     func cleanupManifestDirectory() {
-        fileUtil.cleanupEntireDirectory(AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        fileUtil.cleanupEntireDirectory(AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
     }
 
     // MARK: - File System Helpers
@@ -185,11 +183,11 @@ class AJPApplicationManagerUtils {
     // MARK: - Package File Operations
 
     func movePackageFromTempToMain(_ fileName: String) throws {
-        let tempFilePath = (AJPApplicationConstants.JUSPAY_TEMP_DIR as NSString).appendingPathComponent(fileName)
-        let mainFilePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
+        let tempFilePath = (AJPApplicationConstants.AIRBORNE_TEMP_DIR as NSString).appendingPathComponent(fileName)
+        let mainFilePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(fileName)
 
-        let tempPath = fileUtil.fullPathInStorageForFilePath(tempFilePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
-        let mainPath = fileUtil.fullPathInStorageForFilePath(mainFilePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let tempPath = fileUtil.fullPathInStorageForFilePath(tempFilePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
+        let mainPath = fileUtil.fullPathInStorageForFilePath(mainFilePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: mainPath) {
@@ -210,7 +208,7 @@ class AJPApplicationManagerUtils {
     }
 
     func moveAllPackagesFromTempToMain() {
-        let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.JUSPAY_TEMP_DIR, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let tempDirPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.AIRBORNE_TEMP_DIR, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         guard let tempFiles = try? FileManager.default.contentsOfDirectory(atPath: tempDirPath) else {
             let map = NSMutableDictionary()
@@ -238,9 +236,9 @@ class AJPApplicationManagerUtils {
         let fileManager = FileManager.default
         let fileNameOnDisk = jsFileName(for: resource.filePath)
 
-        let sourcePath = fileUtil.fullPathInStorageForFilePath(fileNameOnDisk, inFolder: AJPApplicationConstants.JUSPAY_RESOURCE_DIR)
-        let destFilePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileNameOnDisk)
-        let destPath = fileUtil.fullPathInStorageForFilePath(destFilePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let sourcePath = fileUtil.fullPathInStorageForFilePath(fileNameOnDisk, inFolder: AJPApplicationConstants.AIRBORNE_RESOURCE_DIR)
+        let destFilePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(fileNameOnDisk)
+        let destPath = fileUtil.fullPathInStorageForFilePath(destFilePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
 
         if fileManager.fileExists(atPath: destPath) {
             do {
@@ -265,7 +263,7 @@ class AJPApplicationManagerUtils {
     }
 
     func isAppInstalled(withPackage package: AJPApplicationPackage, inSubFolder subFolder: String) -> Bool {
-        let downloadedFileNames = getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR, subFolder: subFolder, includeSubfolders: true)
+        let downloadedFileNames = getAllFilesInDirectory(AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, subFolder: subFolder, includeSubfolders: true)
 
         for split in package.allImportantSplits() {
             let fileNameOnDisk = jsFileName(for: split.filePath)
@@ -283,7 +281,7 @@ class AJPApplicationManagerUtils {
 
     func saveManifestToTemp(_ manifest: AJPApplicationManifest) {
         do {
-            try fileUtil.writeInstance(manifest, fileName: AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try fileUtil.writeInstance(manifest, fileName: AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
             let map = NSMutableDictionary()
             map["config_version"] = manifest.config.version
             map["package_version"] = manifest.package.version
@@ -296,11 +294,11 @@ class AJPApplicationManagerUtils {
     }
 
     func readTempManifest() -> AJPApplicationManifest? {
-        let tempManifestPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let tempManifestPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         guard FileManager.default.fileExists(atPath: tempManifestPath) else { return nil }
 
         do {
-            let decoded = try fileUtil.getDecodedInstanceForClass(AJPApplicationManifest.self, withContentOfFileName: AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationManifest
+            let decoded = try fileUtil.getDecodedInstanceForClass(AJPApplicationManifest.self, withContentOfFileName: AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationManifest
             return decoded
         } catch {
             let map = NSMutableDictionary()
@@ -311,9 +309,9 @@ class AJPApplicationManagerUtils {
     }
 
     func deleteTempManifest() {
-        let tempManifestPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let tempManifestPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         guard FileManager.default.fileExists(atPath: tempManifestPath) else { return }
-        try? deleteFile(AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, subFolder: "", inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        try? deleteFile(AJPApplicationConstants.APP_MANIFEST_DATA_TEMP_FILE_NAME, subFolder: "", inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
     }
 
     // MARK: - Temp Package Staging
@@ -323,7 +321,7 @@ class AJPApplicationManagerUtils {
         map["trying_to_install_temp_package"] = "New app version downloaded in temp, installing to disk. \(package.version)"
         tracker.trackInfo("app_update_result", value: map)
         do {
-            try fileUtil.writeInstance(package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try fileUtil.writeInstance(package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         } catch {
             let errMap = NSMutableDictionary()
             errMap["error"] = error.localizedDescription
@@ -347,15 +345,15 @@ class AJPApplicationManagerUtils {
     }
 
     private func doesCurrentResourceFileExist() -> Bool {
-        let path = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let path = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         return FileManager.default.fileExists(atPath: path)
     }
 
     @discardableResult
     private func moveCurrentResourceFileAsOld() -> Bool {
         let fileManager = FileManager.default
-        let currentPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
-        let oldPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let currentPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
+        let oldPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
 
         if fileManager.fileExists(atPath: oldPath) {
             try? fileManager.removeItem(atPath: oldPath)
@@ -372,11 +370,11 @@ class AJPApplicationManagerUtils {
     private func createEmptyOldResourceFile() {
         let emptyResources = AJPApplicationResources()
         emptyResources.resources = [:]
-        try? fileUtil.writeInstance(emptyResources, fileName: AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        try? fileUtil.writeInstance(emptyResources, fileName: AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
     }
 
     func loadOldResourcesForComparison() -> [String: AJPResource] {
-        guard let decoded = try? fileUtil.getDecodedInstanceForClass(AJPApplicationResources.self, withContentOfFileName: AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationResources else {
+        guard let decoded = try? fileUtil.getDecodedInstanceForClass(AJPApplicationResources.self, withContentOfFileName: AJPApplicationConstants.APP_OLD_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationResources else {
             return [:]
         }
         return decoded.resources
@@ -409,7 +407,7 @@ class AJPApplicationManagerUtils {
             logData["url"] = resourceURL.absoluteString
             logData["error"] = err
             tracker.trackError("fetch_failed", value: logData)
-            throw NSError(domain: "in.juspay.Airborne", code: 1, userInfo: [NSLocalizedDescriptionKey: err ?? ""])
+            throw NSError(domain: AJPIdentity.errorDomain, code: 1, userInfo: [NSLocalizedDescriptionKey: err ?? ""])
         }
     }
 }

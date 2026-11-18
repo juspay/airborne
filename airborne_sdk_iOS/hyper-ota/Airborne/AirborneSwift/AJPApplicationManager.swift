@@ -2,8 +2,6 @@
 //  AJPApplicationManager.swift
 //  Airborne
 //
-//  Copyright © Juspay Technologies. All rights reserved.
-//
 
 import Foundation
 import UIKit
@@ -373,8 +371,8 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             let fm = FileManager.default
             for (key, _) in self.resources.resources {
                 let fileName = utils.jsFileName(for: key)
-                let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
-                let fullPath = self.fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+                let filePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(fileName)
+                let fullPath = self.fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
                 if fm.fileExists(atPath: fullPath) {
                     _downloadedSplits.add(key)
                 }
@@ -391,21 +389,21 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
 
     private func handleTempPackageInstallation() {
         
-        // Check if any app-pkg-temp.dat file is available in JuspayManifest.
+        // Check if any app-pkg-temp.dat file is available in the manifest directory.
         // If yes, a temporary package exists, which means an update was timedout.
-        let tempPackagePath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let tempPackagePath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         guard FileManager.default.fileExists(atPath: tempPackagePath) else {
             return
         }
         
         do {
             // Read temp package data
-            guard let tempPackage = try fileUtil.getDecodedInstanceForClass(AJPApplicationPackage.self, withContentOfFileName: AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationPackage else {
+            guard let tempPackage = try fileUtil.getDecodedInstanceForClass(AJPApplicationPackage.self, withContentOfFileName: AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationPackage else {
                 return
             }
             
             // Move all files from temp to main
-            let tempFiles = utils.getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR, subFolder: AJPApplicationConstants.JUSPAY_TEMP_DIR, includeSubfolders: true)
+            let tempFiles = utils.getAllFilesInDirectory(AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, subFolder: AJPApplicationConstants.AIRBORNE_TEMP_DIR, includeSubfolders: true)
             var allMoveSuccessful = true
             
             let infoMap = NSMutableDictionary()
@@ -426,7 +424,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             // If files were moved successfully, update the package data
             if allMoveSuccessful {
                 do {
-                    try fileUtil.writeInstance(tempPackage, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                    try fileUtil.writeInstance(tempPackage, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
                     let sMap = NSMutableDictionary()
                     sMap["version"] = tempPackage.version
                     tracker.trackInfo("temp_package_installed", value: sMap)
@@ -438,27 +436,27 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             }
             
             // Clean up the temp package file and directory
-            try? fileUtil.deleteFile(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try? fileUtil.deleteFile(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
             utils.cleanupTempDirectory()
         } catch {
             // Failed to read temp package, clean up
             let logVal = NSMutableDictionary()
             logVal["error"] = error.localizedDescription
             tracker.trackError("temp_package_read_failed", value: logVal)
-            try? fileUtil.deleteFile(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try? fileUtil.deleteFile(AJPApplicationConstants.APP_PACKAGE_DATA_TEMP_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         }
     }
     
     private func handleTempResourcesInstallation() {
         // Check if temp resources file exists
-        let tempResourcesPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let tempResourcesPath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         guard FileManager.default.fileExists(atPath: tempResourcesPath) else {
             return
         }
         
         do {
             // Read temp resources data
-            guard let tempResources = try fileUtil.getDecodedInstanceForClass(AJPApplicationResources.self, withContentOfFileName: AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationResources else {
+            guard let tempResources = try fileUtil.getDecodedInstanceForClass(AJPApplicationResources.self, withContentOfFileName: AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationResources else {
                 return
             }
             
@@ -483,18 +481,18 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             tracker.trackInfo("temp_resources_installed", value: cMap)
             
             // Clean up the temp resources file
-            try? fileUtil.deleteFile(AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try? fileUtil.deleteFile(AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         } catch {
             // Failed to read temp resources, clean up
             let map = NSMutableDictionary()
             map["error"] = error.localizedDescription
             tracker.trackError("temp_resources_read_failed", value: map)
-            try? fileUtil.deleteFile(AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try? fileUtil.deleteFile(AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         }
     }
     
     private func initializeLazyResourcesDownloadStatus() {
-        let storedPackagePath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+        let storedPackagePath = fileUtil.fullPathInStorageForFilePath(AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
         AJPApplicationManager.isFirstRunAfterInstallation = !FileManager.default.fileExists(atPath: storedPackagePath)
         
         // First, check if this is a bundle-loaded package (first run)
@@ -508,7 +506,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             
             // Save the updated package to disk
             do {
-                try self.fileUtil.writeInstance(self.package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                try self.fileUtil.writeInstance(self.package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
                 let map = NSMutableDictionary()
                 map["count"] = updatedLazy.count
                 tracker.trackInfo("lazy_resources_initialized", value: map)
@@ -604,9 +602,9 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             tracker.trackError("read_package_file", value: map)
             return nil
         }
-        let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
+        let filePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(fileName)
         do {
-            let fileContent = try fileUtil.loadFile(filePath, folder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, withLocalAssets: self.isLocalAssets)
+            let fileContent = try fileUtil.loadFile(filePath, folder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, withLocalAssets: self.isLocalAssets)
             return fileContent
         } catch {
             let map = NSMutableDictionary()
@@ -655,9 +653,9 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     }
 
     @objc public func readResourceFile(_ resourceFileName: String) -> String? {
-        let mainResourcePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(resourceFileName)
+        let mainResourcePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(resourceFileName)
         do {
-            let fileContent = try fileUtil.loadFile(mainResourcePath, folder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, withLocalAssets: self.isLocalAssets)
+            let fileContent = try fileUtil.loadFile(mainResourcePath, folder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, withLocalAssets: self.isLocalAssets)
             return fileContent
         } catch {
             let map = NSMutableDictionary()
@@ -750,8 +748,8 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     }
 
     @objc public func getPathForPackageFile(_ fileName: String) -> String {
-        let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(fileName)
-        return fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+        let filePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(fileName)
+        return fileUtil.fullPathInStorageForFilePath(filePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
     }
     
     @objc public func getPathForAssetsInReleaseConfig(_ resourcePath: String?) -> String? {
@@ -792,15 +790,15 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
     // MARK: - Reads
     
     private func readApplicationPackage() -> AJPApplicationPackage? {
-        return try? fileUtil.getDecodedInstanceForClass(AJPApplicationPackage.self, withContentOfFileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationPackage
+        return try? fileUtil.getDecodedInstanceForClass(AJPApplicationPackage.self, withContentOfFileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationPackage
     }
     
     private func readApplicationResources() -> AJPApplicationResources? {
-        return try? fileUtil.getDecodedInstanceForClass(AJPApplicationResources.self, withContentOfFileName: AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationResources
+        return try? fileUtil.getDecodedInstanceForClass(AJPApplicationResources.self, withContentOfFileName: AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationResources
     }
     
     private func readApplicationConfig() -> AJPApplicationConfig? {
-        return try? fileUtil.getDecodedInstanceForClass(AJPApplicationConfig.self, withContentOfFileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR) as? AJPApplicationConfig
+        return try? fileUtil.getDecodedInstanceForClass(AJPApplicationConfig.self, withContentOfFileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR) as? AJPApplicationConfig
     }
     
     private func updatePackage(_ package: AJPApplicationPackage, didDownloadImportant: Bool, startTime: TimeInterval) {
@@ -809,10 +807,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         tracker.trackInfo("app_update_result", value: logVal)
         
         // Only write to disk if no important downloads happened OR if all files are successfully downloaded & moved to main
-        if !didDownloadImportant || utils.isAppInstalled(withPackage: package, inSubFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR) {
+        if !didDownloadImportant || utils.isAppInstalled(withPackage: package, inSubFolder: AJPApplicationConstants.AIRBORNE_MAIN_DIR) {
             do {
                 // Save the new package data to disk
-                try fileUtil.writeInstance(package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                try fileUtil.writeInstance(package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
                 
                 // Update current package state
                 self.package = package
@@ -853,7 +851,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         let appResources = AJPApplicationResources()
         appResources.resources = dict
         do {
-            try fileUtil.writeInstance(appResources, fileName: AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            try fileUtil.writeInstance(appResources, fileName: AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
             collectionsLock.withLock {
                 self.resources = appResources
             }
@@ -872,7 +870,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         if config.version != self.config.version {
             do {
                 // Save the new config data to disk
-                try fileUtil.writeInstance(config, fileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                try fileUtil.writeInstance(config, fileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
                 
                 // Update current config state
                 self.config = config
@@ -923,7 +921,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         if AJPApplicationManager.isFirstRunAfterAppLaunch {
             AJPApplicationManager.isFirstRunAfterAppLaunch = false
             
-            let allPackageFiles = utils.getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_PACKAGE_DIR, subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR, includeSubfolders: true)
+            let allPackageFiles = utils.getAllFilesInDirectory(AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, subFolder: AJPApplicationConstants.AIRBORNE_MAIN_DIR, includeSubfolders: true)
             var requiredFiles = Set<String>()
             
             for resource in self.package.allSplits() {
@@ -948,13 +946,13 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                     let map = NSMutableDictionary()
                     map["file"] = fileName
                     tracker.trackInfo("cleaning_unused_file", value: map)
-                    utils.deleteFile(fileName, subFolder: AJPApplicationConstants.JUSPAY_MAIN_DIR, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+                    utils.deleteFile(fileName, subFolder: AJPApplicationConstants.AIRBORNE_MAIN_DIR, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
                 }
             }
             
-            let resourceFileNames = utils.getAllFilesInDirectory(AJPApplicationConstants.JUSPAY_RESOURCE_DIR, subFolder: "", includeSubfolders: true)
+            let resourceFileNames = utils.getAllFilesInDirectory(AJPApplicationConstants.AIRBORNE_RESOURCE_DIR, subFolder: "", includeSubfolders: true)
             for fileName in resourceFileNames {
-                utils.deleteFile(fileName, subFolder: "", inFolder: AJPApplicationConstants.JUSPAY_RESOURCE_DIR)
+                utils.deleteFile(fileName, subFolder: "", inFolder: AJPApplicationConstants.AIRBORNE_RESOURCE_DIR)
             }
         }
     }
@@ -1174,7 +1172,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
         self.startReleaseConfigTimeoutTimer()
         
         guard let manifestUrl = URL(string: self.releaseConfigURL) else {
-            completionHandler(nil, NSError(domain: "in.juspay.Airborne", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
+            completionHandler(nil, NSError(domain: AJPIdentity.errorDomain, code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]), false)
             return
         }
         
@@ -1321,10 +1319,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                     guard let self = self else { return }
                     
                     let fileName = (split.url.pathExtension == "zip") ? split.url.lastPathComponent : split.filePath
-                    let tempPath = "\(AJPApplicationConstants.JUSPAY_TEMP_DIR)/\(fileName)"
+                    let tempPath = "\(AJPApplicationConstants.AIRBORNE_TEMP_DIR)/\(fileName)"
                     
                     do {
-                        try await self.utils.downloadFileFromURL(split.url, andSaveInFilePath: tempPath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, checksum: split.checksum)
+                        try await self.utils.downloadFileFromURL(split.url, andSaveInFilePath: tempPath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, checksum: split.checksum)
                         let _ = downloadLock.withLock {
                             pendingDownloads.remove(split.filePath)
                         }
@@ -1447,10 +1445,10 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                         return
                     }
                     
-                    let tempFilePath = "\(AJPApplicationConstants.JUSPAY_TEMP_DIR)/\(split.filePath)"
+                    let tempFilePath = "\(AJPApplicationConstants.AIRBORNE_TEMP_DIR)/\(split.filePath)"
                     
                     do {
-                        try await self.utils.downloadFileFromURL(split.url, andSaveInFilePath: tempFilePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR, checksum: split.checksum)
+                        try await self.utils.downloadFileFromURL(split.url, andSaveInFilePath: tempFilePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR, checksum: split.checksum)
                         singleDownloadHandler(true, split)
                     } catch {
                         let map = NSMutableDictionary()
@@ -1531,7 +1529,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             if found {
                 self.package.lazy = updatedLazy
                 do {
-                    try fileUtil.writeInstance(self.package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                    try fileUtil.writeInstance(self.package, fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
                     let map = NSMutableDictionary()
                     map["filePath"] = resource.filePath
                     map["isDownloaded"] = isDownloaded
@@ -1629,7 +1627,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
                     if self.bootTimeoutOccurred { return }
                     
                     do {
-                        try await self.utils.downloadFileFromURL(resource.url, andSaveInFilePath: resource.filePath, inFolder: AJPApplicationConstants.JUSPAY_RESOURCE_DIR, checksum: resource.checksum)
+                        try await self.utils.downloadFileFromURL(resource.url, andSaveInFilePath: resource.filePath, inFolder: AJPApplicationConstants.AIRBORNE_RESOURCE_DIR, checksum: resource.checksum)
                         
                         if !self.bootTimeoutOccurred {
                             // Success - move to main and update available resources
@@ -1693,7 +1691,7 @@ public typealias AJPReleaseConfigCompletionHandler = (AJPApplicationManifest?, E
             // Save to file
             guard let tempRes = tempResources else { return }
             do {
-                try fileUtil.writeInstance(tempRes, fileName: AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+                try fileUtil.writeInstance(tempRes, fileName: AJPApplicationConstants.APP_TEMP_RESOURCES_DATA_FILE_NAME, inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
             } catch {
                 let map = NSMutableDictionary()
                 map["resource"] = resource.filePath

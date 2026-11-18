@@ -114,11 +114,11 @@ import Foundation
         }
         
         guard let data = fileData else {
-            throw fileReadError ?? NSError(domain: "in.juspay.Airborne", code: 1001, userInfo: [NSLocalizedDescriptionKey: "Failed to read file content."])
+            throw fileReadError ?? NSError(domain: AJPIdentity.errorDomain, code: 1001, userInfo: [NSLocalizedDescriptionKey: "Failed to read file content."])
         }
         
         guard let fileDataString = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "in.juspay.Airborne", code: 1002, userInfo: [NSLocalizedDescriptionKey: "Failed to convert file data to string."])
+            throw NSError(domain: AJPIdentity.errorDomain, code: 1002, userInfo: [NSLocalizedDescriptionKey: "Failed to convert file data to string."])
         }
         
         return fileDataString
@@ -177,7 +177,7 @@ import Foundation
     @objc public func getDecodedInstanceForClass(_ className: AnyClass, withContentOfFileName fileName: String, inFolder folderName: String) throws -> Any {
         let fileData = try getFileDataFromInternalStorage(fileName, inFolder: folderName)
         guard let decoded = try NSKeyedUnarchiver.unarchivedObject(ofClasses: [className], from: fileData) else {
-            throw NSError(domain: "in.juspay.Airborne", code: 1003, userInfo: [NSLocalizedDescriptionKey: "Failed to decode object or object was nil"])
+            throw NSError(domain: AJPIdentity.errorDomain, code: 1003, userInfo: [NSLocalizedDescriptionKey: "Failed to decode object or object was nil"])
         }
         return decoded
     }
@@ -249,7 +249,7 @@ import Foundation
 
     /// Removes an entire top-level directory from the application's Library folder.
     /// Unlike workspace-scoped deletions, this does not insert the workspace segment.
-    /// - Parameter dirName: The name of the directory to remove (e.g. "JuspayManifests").
+    /// - Parameter dirName: The name of the directory to remove (e.g. `AJPApplicationConstants.AIRBORNE_MANIFEST_DIR`).
     @objc public func cleanupEntireDirectory(_ dirName: String) {
         let paths = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true)
         guard var rootPath = paths.first else { return }
