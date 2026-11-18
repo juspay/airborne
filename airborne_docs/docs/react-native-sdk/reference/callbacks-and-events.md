@@ -18,7 +18,7 @@ The Airborne SDK reports its progress to your app through a set of callbacks and
 Every event delivered to `onEvent` carries the same set of fields:
 
 - `category` — the broad category, e.g. `lifecycle`.
-- `subCategory` — the subcategory, e.g. `hyperota` (`subcategory` on iOS).
+- `subCategory` — the subcategory, e.g. `airborne` on iOS (`subcategory` on iOS).
 - `level` — severity, e.g. `info` or `error`.
 - `label` — a category label for the event, e.g. `ota_update`.
 - `key` — the specific event identifier (e.g. `boot`).

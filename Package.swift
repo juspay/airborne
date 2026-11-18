@@ -22,7 +22,7 @@ let package = Package(
         ),
         .target(
             name: "AirborneSwiftModel",
-            dependencies: [],
+            dependencies: ["AirborneSwiftCore"],
             path: "airborne_sdk_iOS/hyper-ota/Airborne/AirborneSwiftModel"
         ),
         .target(
@@ -32,7 +32,6 @@ let package = Package(
             publicHeadersPath: "include",
             cSettings: [
                 .headerSearchPath("include"),
-                .headerSearchPath("ApplicationManager/Constants"),
                 .headerSearchPath("ApplicationManager/Tracker"),
                 .headerSearchPath("Helper")
             ],

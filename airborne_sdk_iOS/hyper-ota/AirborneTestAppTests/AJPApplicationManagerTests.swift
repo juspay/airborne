@@ -70,9 +70,9 @@ final class AJPApplicationManagerTests: XCTestCase {
     override func tearDownWithError() throws {
         let fm      = FileManager.default
         let library = NSSearchPathForDirectoriesInDomains(.libraryDirectory, .userDomainMask, true).first!
-        for folder in [AJPApplicationConstants.JUSPAY_MANIFEST_DIR,
-                       AJPApplicationConstants.JUSPAY_PACKAGE_DIR,
-                       AJPApplicationConstants.JUSPAY_RESOURCE_DIR] {
+        for folder in [AJPApplicationConstants.AIRBORNE_MANIFEST_DIR,
+                       AJPApplicationConstants.AIRBORNE_PACKAGE_DIR,
+                       AJPApplicationConstants.AIRBORNE_RESOURCE_DIR] {
             let wsPath = ((library as NSString).appendingPathComponent(folder) as NSString)
                 .appendingPathComponent(workspace)
             try? fm.removeItem(atPath: wsPath)
@@ -96,7 +96,7 @@ final class AJPApplicationManagerTests: XCTestCase {
         try fileUtil.writeInstance(
             AJPApplicationPackage(dictionary: pkg),
             fileName: AJPApplicationConstants.APP_PACKAGE_DATA_FILE_NAME,
-            inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
 
         let cfg: NSDictionary = [
             "version":                "2.0.0",
@@ -106,7 +106,7 @@ final class AJPApplicationManagerTests: XCTestCase {
         try fileUtil.writeInstance(
             AJPApplicationConfig(dictionary: cfg),
             fileName: AJPApplicationConstants.APP_CONFIG_DATA_FILE_NAME,
-            inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
 
         let res: NSArray = [
             ["url": "https://cdn.example.com/logo.js", "file_path": "logo.js", "checksum": "abc123"]
@@ -114,14 +114,14 @@ final class AJPApplicationManagerTests: XCTestCase {
         try fileUtil.writeInstance(
             AJPApplicationResources(resourcesArray: res),
             fileName: AJPApplicationConstants.APP_RESOURCES_DATA_FILE_NAME,
-            inFolder: AJPApplicationConstants.JUSPAY_MANIFEST_DIR)
+            inFolder: AJPApplicationConstants.AIRBORNE_MANIFEST_DIR)
     }
 
     /// Writes a UTF-8 file to the path `readPackageFile` / `readResourceFile` resolves.
     private func writePackageFile(_ name: String, content: String) throws {
-        let filePath = (AJPApplicationConstants.JUSPAY_MAIN_DIR as NSString).appendingPathComponent(name)
+        let filePath = (AJPApplicationConstants.AIRBORNE_MAIN_DIR as NSString).appendingPathComponent(name)
         let fullPath = fileUtil.fullPathInStorageForFilePath(
-            filePath, inFolder: AJPApplicationConstants.JUSPAY_PACKAGE_DIR)
+            filePath, inFolder: AJPApplicationConstants.AIRBORNE_PACKAGE_DIR)
         let dir = (fullPath as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         try content.write(toFile: fullPath, atomically: true, encoding: .utf8)

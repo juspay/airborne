@@ -2,8 +2,6 @@
 //  AJPApplicationPackage.swift
 //  Airborne
 //
-//  Copyright © Juspay Technologies. All rights reserved.
-//
 
 import Foundation
 

@@ -73,7 +73,7 @@ import CoreTelephony
 
     // MARK: - Private Helpers
 
-    private static let monitorQueue = DispatchQueue(label: "in.juspay.Airborne.NetworkDetector")
+    private static let monitorQueue = DispatchQueue(label: AJPIdentity.qualified("NetworkDetector"))
     private static let pathLock = NSLock()
     private static var _cachedPath: NWPath?
     private static let firstPathSemaphore = DispatchSemaphore(value: 0)

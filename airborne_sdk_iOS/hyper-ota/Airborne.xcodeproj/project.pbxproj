@@ -42,6 +42,7 @@
 		DC6A9D772F8E3DFB00FE7DF0 /* Airborne.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DCB613FB2E6191FB0099D87E /* Airborne.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DC6A9D842F8E53F100FE7DF0 /* AJPHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = DC6A9D832F8E53F100FE7DF0 /* AJPHelpers.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		DC6A9D862F8E540300FE7DF0 /* AJPHelpers.m in Sources */ = {isa = PBXBuildFile; fileRef = DC6A9D852F8E540300FE7DF0 /* AJPHelpers.m */; };
+		DCA1B2C42FA0000100AB1234 /* AJPIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCA1B2C32FA0000100AB1234 /* AJPIdentity.swift */; };
 		DCD493C32F98DD2E000534A0 /* AJPResource.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD493C22F98DD2E000534A0 /* AJPResource.swift */; };
 		DCD868E02F9B523900E341CD /* AJPApplicationConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */; };
 		DCD868E12F9B523900E341CD /* AJPApplicationPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCD868DE2F9B523900E341CD /* AJPApplicationPackage.swift */; };
@@ -100,6 +101,7 @@
 		DC6A9D4F2F8E286900FE7DF0 /* AirborneTestAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AirborneTestAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC6A9D832F8E53F100FE7DF0 /* AJPHelpers.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AJPHelpers.h; sourceTree = "<group>"; };
 		DC6A9D852F8E540300FE7DF0 /* AJPHelpers.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AJPHelpers.m; sourceTree = "<group>"; };
+		DCA1B2C32FA0000100AB1234 /* AJPIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPIdentity.swift; sourceTree = "<group>"; };
 		DCB613FB2E6191FB0099D87E /* Airborne.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Airborne.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		DCD493C22F98DD2E000534A0 /* AJPResource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPResource.swift; sourceTree = "<group>"; };
 		DCD868DD2F9B523900E341CD /* AJPApplicationConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AJPApplicationConfig.swift; sourceTree = "<group>"; };
@@ -244,6 +246,7 @@
 			children = (
 				DC3A44872F91FC8F00E8F78D /* AJPFileUtil.swift */,
 				DC3A44882F91FC8F00E8F78D /* AJPHelpers.swift */,
+				DCA1B2C32FA0000100AB1234 /* AJPIdentity.swift */,
 				DC3A44AE2F92009000E8F78D /* AJPLoggerDelegate.swift */,
 				DC3A44892F91FC8F00E8F78D /* AJPNetworkClient.swift */,
 				DC3A448A2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift */,
@@ -478,6 +481,7 @@
 				DC3A448F2F91FC8F00E8F78D /* AJPNetworkTypeDetector.swift in Sources */,
 				DC3A44902F91FC8F00E8F78D /* AJPNetworkClient.swift in Sources */,
 				DC3A44912F91FC8F00E8F78D /* AJPHelpers.swift in Sources */,
+				DCA1B2C42FA0000100AB1234 /* AJPIdentity.swift in Sources */,
 				DC6376832F9F327200BE5CD4 /* AJPApplicationConstants.swift in Sources */,
 				DCD868E02F9B523900E341CD /* AJPApplicationConfig.swift in Sources */,
 				DCD868E12F9B523900E341CD /* AJPApplicationPackage.swift in Sources */,
@@ -602,7 +606,7 @@
 				MODULEMAP_FILE = Airborne/Airborne.modulemap;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
-				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.Airborne;
+				PRODUCT_BUNDLE_IDENTIFIER = io.airborne.Airborne;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -956,7 +960,7 @@
 				MODULEMAP_FILE = Airborne/Airborne.modulemap;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
-				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.Airborne;
+				PRODUCT_BUNDLE_IDENTIFIER = io.airborne.Airborne;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -993,7 +997,7 @@
 				MODULEMAP_FILE = Airborne/Airborne.modulemap;
 				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
 				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
-				PRODUCT_BUNDLE_IDENTIFIER = in.juspay.Airborne;
+				PRODUCT_BUNDLE_IDENTIFIER = io.airborne.Airborne;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

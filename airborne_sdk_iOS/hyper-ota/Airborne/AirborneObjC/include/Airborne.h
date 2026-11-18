@@ -2,8 +2,6 @@
 //  Airborne.h
 //  Airborne
 //
-//  Copyright © Juspay Technologies. All rights reserved.
-//
 
 #if SWIFT_PACKAGE
 #import "AJPHelpers.h"
