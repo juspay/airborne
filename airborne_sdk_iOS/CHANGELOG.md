@@ -2,6 +2,42 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## airborne_sdk_ios-v0.10.0 - 2026-11-18
+#### Features
+- **(ios)** add configurable identifier and storage prefixes, remove hardcoded Juspay references - (fe3a768) - Balaganesh S
+
+- - -
+
+## v0.50.0 - 2026-11-18
+#### Miscellaneous Chores
+- **(version)** v0.50.0 [skip ci] - (369a874) - Airborne Bot
+
+- - -
+
+## v0.49.1 - 2026-11-18
+#### Miscellaneous Chores
+- **(version)** v0.49.1 [skip ci] - (aa9ce4b) - Airborne Bot
+
+- - -
+
+## v0.49.0 - 2026-11-18
+#### Miscellaneous Chores
+- **(version)** v0.49.0 [skip ci] - (4bdc1e9) - Airborne Bot
+
+- - -
+
+## v0.48.1 - 2026-11-18
+#### Miscellaneous Chores
+- **(version)** v0.48.1 [skip ci] - (78f348d) - Airborne Bot
+
+- - -
+
+## v0.48.0 - 2026-11-18
+#### Miscellaneous Chores
+- **(version)** v0.48.0 [skip ci] - (530f1ac) - Airborne Bot
+
+- - -
+
 ## airborne_sdk_ios-v0.9.0 - 2026-11-06
 #### Bug Fixes
 - **(ios)** reject package-escaping file paths in readPackageFile - (fa97813) - Shiva Nandan

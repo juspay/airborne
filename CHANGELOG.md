@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.51.0 - 2026-11-18
+### Package updates
+- airborne_sdk_ios bumped to airborne_sdk_ios-v0.10.0
+### Global changes
+#### Features
+- **(ios)** add configurable identifier and storage prefixes, remove hardcoded Juspay references - (fe3a768) - Balaganesh S
+
+- - -
+
 ## v0.50.0 - 1970-01-01
 ### Package updates
 - airborne_sdk_android bumped to airborne_sdk_android-v0.4.0
