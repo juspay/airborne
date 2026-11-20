@@ -21,7 +21,7 @@ use crate::{
     utils::{document::dotted_docs_to_nested, workspace::get_workspace_name_for_application},
 };
 use actix_web::{
-    error, get, post, put,
+    get, post, put,
     web::{self, Json, Path, Query},
     Scope,
 };
@@ -37,8 +37,13 @@ use superposition_provider::{AllFeatureProvider, SuperpositionAPIProvider};
 use superposition_sdk::types::builders::{VariantBuilder, VariantUpdateRequestBuilder};
 use superposition_sdk::types::ExperimentStatusType;
 use superposition_sdk::types::VariantType::Experimental;
+pub mod control_center;
+pub(crate) mod operations;
+pub(crate) mod recovery;
+pub(crate) mod rollback;
 mod types;
 pub mod utils;
+mod write_lock;
 
 fn encode_url_path(raw_url: &str) -> String {
     match url::Url::parse(raw_url) {
@@ -83,7 +88,8 @@ pub fn add_routes(path: &str) -> Scope {
             .service(conclude_release)
             .service(get_release)
             .service(update_release)
-            .service(discard_release),
+            .service(discard_release)
+            .service(control_center::rollback),
     )
 }
 
@@ -129,7 +135,7 @@ async fn get_release(
     .map_err(|_| ABError::InternalServerError("Failed to get workspace name".to_string()))?;
 
     let exp_details = state
-        .superposition_client
+        .release_superposition_client
         .get_experiment()
         .org_id(superposition_org_id_from_env)
         .workspace_id(workspace_name)
@@ -379,6 +385,7 @@ async fn create_release(
         auth_response.application.clone(),
     )?;
 
+    write_lock::locked(&state, &organisation, &application, async {
     let workspace_name = get_workspace_name_for_application(
         state.db_pool.clone(),
         &state.redis_cache,
@@ -399,7 +406,7 @@ async fn create_release(
     )
     .await?
     {
-        return Err(ABError::BadRequest(
+        return Err(ABError::Conflict(
             "There is already an ongoing release for the given dimensions. Please conclude it before creating a new release."
                 .to_string(),
         ));
@@ -446,7 +453,7 @@ async fn create_release(
         .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
     let created_experiment_response = state
-        .superposition_client
+        .release_superposition_client
         .create_experiment()
         .org_id(superposition_org_id_from_env.clone())
         .workspace_id(workspace_name.clone())
@@ -472,12 +479,18 @@ async fn create_release(
             .collect::<HashMap<_, _>>(),
     ));
 
-    let created_experiment_response = created_experiment_response.send().await.map_err(|e| {
-        info!("Failed to create experiment: {:?}", e);
-        ABError::InternalServerError("Failed to create experiment in Superposition".to_string())
-    })?;
+    write_lock::check().await?;
+    let created_experiment_response = Box::pin(write_lock::mutate(control_center::create_expected(&control_variant, &experimental_variant, &dimensions), created_experiment_response.idempotency_key(write_lock::reason()).change_reason(write_lock::user_reason(&format!("Release creation for application {} with PATCH-style overrides", application))?).send())).await?;
 
     let experiment_id_for_ramping = created_experiment_response.id.to_string();
+    control_center::event(
+        &state,
+        &auth_response,
+        &experiment_id_for_ramping,
+        "created",
+        serde_json::json!({}),
+    )
+    .await;
 
     let response_important = final_important.unwrap_or_else(|| {
         package_data
@@ -489,7 +502,8 @@ async fn create_release(
 
     if is_first_release {
         // For first ever release -> Directly conclude the experiment to make it live
-        let transformed_variant_id = format!("{}-experimental_1", experiment_id_for_ramping);
+        let transformed_variant_id =
+            format!("{}-{}", experiment_id_for_ramping, experimental_variant_id);
         info!(
             "Concluding first release experiment with variant id: {}",
             transformed_variant_id
@@ -501,39 +515,37 @@ async fn create_release(
             50,
             &Some("Ramping first release experiment to 50%".to_string()),
         )
-        .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-        let _ = state
-            .superposition_client
+        .await?;
+        control_center::event(
+            &state,
+            &auth_response,
+            &experiment_id_for_ramping,
+            "ramped",
+            serde_json::json!({"traffic_percentage":50}),
+        )
+        .await;
+        write_lock::check().await?;
+    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id_for_ramping,"status":"CONCLUDED","chosen_variant":transformed_variant_id}),         state
+            .release_superposition_client
             .conclude_experiment()
             .org_id(superposition_org_id_from_env.clone())
             .workspace_id(workspace_name.clone())
             .id(experiment_id_for_ramping.clone())
             .chosen_variant(transformed_variant_id.clone())
-            .change_reason("Concluding first release experiment to make it live".to_string())
-            .send()
-            .await
-            .map_err(|e| {
-                info!("Failed to conclude first release experiment: {:?}", e);
-                error::ErrorInternalServerError("Failed to conclude experiment".to_string())
-            });
+            .change_reason(write_lock::user_reason("Concluding first release experiment to make it live")?).send())).await?;
+        control_center::event(
+            &state,
+            &auth_response,
+            &experiment_id_for_ramping,
+            "concluded",
+            serde_json::json!({"chosen_variant":transformed_variant_id}),
+        )
+        .await;
     }
 
     let response_lazy = final_lazy.unwrap_or_default();
 
     let response_resources = final_resources.unwrap_or_default();
-
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
 
     let now = Utc::now();
     let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
@@ -630,12 +642,18 @@ async fn create_release(
                 experimentals: vec![experimental_variant.id],
             },
             package_version: pkg_version,
-            config_version: format!("v{}", pkg_version),
+            config_version: config_version.clone(),
             created_at: now.to_string(),
-            traffic_percentage: 0, // Default to 100% for new releases
-            status: "CREATED".to_string(),
+            traffic_percentage: if is_first_release { 50 } else { 0 },
+            status: if is_first_release {
+                "CONCLUDED"
+            } else {
+                "CREATED"
+            }
+            .to_string(),
         }),
     }))
+    }).await
 }
 
 #[authz(
@@ -948,67 +966,79 @@ async fn ramp_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<RampReleaseResponse>> {
+    write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
     let auth_response = auth_response.into_inner();
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
-    let experiment_id = release_id.to_string();
+    write_lock::locked(&state, &organisation, &application, async {
+        let experiment_id = release_id.to_string();
 
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+        let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let workspace_name = get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
+        let workspace_name = get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await
+        .map_err(|e| {
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
+        })?;
+
+        let details = state
+            .release_superposition_client
+            .get_experiment()
+            .org_id(&superposition_org_id_from_env)
+            .workspace_id(&workspace_name)
+            .id(&experiment_id)
+            .send()
+            .await
+            .map_err(|_| ABError::InternalServerError("Failed to read release".into()))?;
+        control_center::ensure_active(&details.status)?;
+
+        info!(
+            "Ramping experiment {} to {}% traffic for release {} in workspace {} org {}",
+            experiment_id,
+            req.traffic_percentage,
+            release_id,
+            workspace_name,
+            superposition_org_id_from_env
+        );
+
+        ramp_experiment(
+            &state,
+            &workspace_name,
+            &experiment_id,
+            req.traffic_percentage as i32,
+            &req.change_reason,
+        )
+        .await?;
+
+        info!("Successfully ramped experiment {}", experiment_id);
+
+        control_center::event(
+            &state,
+            &auth_response,
+            &release_id.to_string(),
+            "ramped",
+            serde_json::json!({"traffic_percentage":req.traffic_percentage}),
+        )
+        .await;
+        Ok(Json(RampReleaseResponse {
+            success: true,
+            message: format!(
+                "Release experiment ramped to {}% traffic",
+                req.traffic_percentage
+            ),
+            experiment_id: experiment_id.to_string(),
+            traffic_percentage: req.traffic_percentage,
+        }))
+    })
     .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
-
-    info!(
-        "Ramping experiment {} to {}% traffic for release {} in workspace {} org {}",
-        experiment_id,
-        req.traffic_percentage,
-        release_id,
-        workspace_name,
-        superposition_org_id_from_env
-    );
-
-    ramp_experiment(
-        &state,
-        &workspace_name,
-        &experiment_id,
-        req.traffic_percentage as i32,
-        &req.change_reason,
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
-    info!("Successfully ramped experiment {}", experiment_id);
-
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
-    .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
-
-    Ok(Json(RampReleaseResponse {
-        success: true,
-        message: format!(
-            "Release experiment ramped to {}% traffic",
-            req.traffic_percentage
-        ),
-        experiment_id: experiment_id.to_string(),
-        traffic_percentage: req.traffic_percentage,
-    }))
 }
 
 async fn ramp_experiment(
@@ -1018,25 +1048,20 @@ async fn ramp_experiment(
     traffic_percentage: i32,
     change_reason: &Option<String>,
 ) -> airborne_types::Result<()> {
-    state
-        .superposition_client
+    write_lock::check().await?;
+    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id,"status":"INPROGRESS","traffic_percentage":traffic_percentage}),     state
+        .release_superposition_client
         .ramp_experiment()
         .org_id(state.env.superposition_org_id.clone())
         .workspace_id(workspace_name)
         .id(experiment_id.to_string())
         .traffic_percentage(traffic_percentage)
-        .change_reason(change_reason.clone().unwrap_or_else(|| {
+        .change_reason(write_lock::user_reason(&(change_reason.clone().unwrap_or_else(|| {
             format!(
                 "Ramping release {} to {}% traffic",
                 experiment_id, traffic_percentage
             )
-        }))
-        .send()
-        .await
-        .map_err(|e| {
-            info!("Failed to ramp experiment: {:?}", e);
-            ABError::InternalServerError("Failed to ramp experiment in Superposition".to_owned())
-        })?;
+        })))?).send())).await?;
     Ok(())
 }
 
@@ -1053,110 +1078,109 @@ async fn conclude_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<ConcludeReleaseResponse>> {
+    write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
     let auth_response = auth_response.into_inner();
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
-    let experiment_id = release_id.to_string();
+    write_lock::locked(&state, &organisation, &application, async {
+        let experiment_id = release_id.to_string();
 
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+        let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let workspace_name = get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
-
-    let experiment_details = state
-        .superposition_client
-        .get_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .id(experiment_id.to_string())
-        .send()
+        let workspace_name = get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
         .await
         .map_err(|e| {
-            info!("Failed to get experiment details: {:?}", e);
-            ABError::InternalServerError(
-                "Failed to get experiment details from Superposition".to_string(),
-            )
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
 
-    let transformed_variant_id = experiment_details
-        .variants
-        .iter()
-        .find(|variant| variant.id == req.chosen_variant)
-        .map(|variant| variant.id.clone())
-        .ok_or_else(|| {
-            ABError::BadRequest(format!(
-                "Variant '{}' not found in experiment. Available variants: {:?}",
-                req.chosen_variant,
-                experiment_details
-                    .variants
-                    .iter()
-                    .map(|v| &v.id)
-                    .collect::<Vec<_>>()
-            ))
-        })?;
+        let experiment_details = state
+            .release_superposition_client
+            .get_experiment()
+            .org_id(superposition_org_id_from_env.clone())
+            .workspace_id(workspace_name.clone())
+            .id(experiment_id.to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                info!("Failed to get experiment details: {:?}", e);
+                ABError::InternalServerError(
+                    "Failed to get experiment details from Superposition".to_string(),
+                )
+            })?;
 
-    info!(
-        "Concluding experiment {} with transformed variant {} (original: {}) for release {}",
-        experiment_id, transformed_variant_id, req.chosen_variant, release_id
-    );
+        control_center::ensure_inprogress(&experiment_details.status)?;
 
-    state
-        .superposition_client
-        .conclude_experiment()
-        .org_id(superposition_org_id_from_env)
-        .workspace_id(workspace_name)
-        .id(experiment_id.to_string())
-        .chosen_variant(transformed_variant_id.clone())
-        .change_reason(req.change_reason.clone().unwrap_or_else(|| {
-            format!(
-                "Concluding release {} with variant {}",
-                release_id, req.chosen_variant
-            )
+        let transformed_variant_id = experiment_details
+            .variants
+            .iter()
+            .find(|variant| variant.id == req.chosen_variant)
+            .map(|variant| variant.id.clone())
+            .ok_or_else(|| {
+                ABError::BadRequest(format!(
+                    "Variant '{}' not found in experiment. Available variants: {:?}",
+                    req.chosen_variant,
+                    experiment_details
+                        .variants
+                        .iter()
+                        .map(|v| &v.id)
+                        .collect::<Vec<_>>()
+                ))
+            })?;
+
+        info!(
+            "Concluding experiment {} with transformed variant {} (original: {}) for release {}",
+            experiment_id, transformed_variant_id, req.chosen_variant, release_id
+        );
+
+        write_lock::check().await?;
+
+    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id,"status":"CONCLUDED","chosen_variant":transformed_variant_id}),         state
+            .release_superposition_client
+            .conclude_experiment()
+            .org_id(superposition_org_id_from_env)
+            .workspace_id(workspace_name)
+            .id(experiment_id.to_string())
+            .chosen_variant(transformed_variant_id.clone())
+            .change_reason(write_lock::user_reason(&(req.change_reason.clone().unwrap_or_else(|| {
+                format!(
+                    "Concluding release {} with variant {}",
+                    release_id, req.chosen_variant
+                )
+            })))?).send())).await?;
+
+        control_center::event(
+            &state,
+            &auth_response,
+            &experiment_id,
+            "concluded",
+            serde_json::json!({"chosen_variant":req.chosen_variant}),
+        )
+        .await;
+        info!(
+            "Successfully concluded experiment {} with variant {}",
+            experiment_id, transformed_variant_id
+        );
+
+
+        Ok(Json(ConcludeReleaseResponse {
+            success: true,
+            message: format!(
+                "Release experiment concluded with variant {}",
+                req.chosen_variant
+            ),
+            experiment_id: experiment_id.to_string(),
+            chosen_variant: req.chosen_variant.clone(),
         }))
-        .send()
-        .await
-        .map_err(|e| {
-            info!("Failed to conclude experiment: {:?}", e);
-            ABError::InternalServerError(
-                "Failed to conclude experiment in Superposition".to_string(),
-            )
-        })?;
-
-    info!(
-        "Successfully concluded experiment {} with variant {}",
-        experiment_id, transformed_variant_id
-    );
-
-    let path = format!("/release/{}/{}*", organisation.clone(), application.clone());
-
-    if let Err(e) = utils::invalidate_cf(
-        &state.cf_client,
-        path,
-        &state.env.cloudfront_distribution_id,
-    )
+    })
     .await
-    {
-        info!("Failed to invalidate CloudFront cache: {:?}", e);
-    }
-
-    Ok(Json(ConcludeReleaseResponse {
-        success: true,
-        message: format!(
-            "Release experiment concluded with variant {}",
-            req.chosen_variant
-        ),
-        experiment_id: experiment_id.to_string(),
-        chosen_variant: req.chosen_variant.clone(),
-    }))
 }
 
 #[authz(
@@ -1172,73 +1196,87 @@ async fn discard_release(
     auth_response: web::ReqData<AuthResponse>,
     state: web::Data<AppState>,
 ) -> airborne_types::Result<Json<DiscardReleaseResponse>> {
+    write_lock::validate_user_reason(req.change_reason.as_deref().unwrap_or_default())?;
     let auth_response = auth_response.into_inner();
     let (organisation, application) = require_org_and_app(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
 
-    let experiment_id = release_id.to_string();
+    write_lock::locked(&state, &organisation, &application, async {
+        let experiment_id = release_id.to_string();
 
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+        let superposition_org_id_from_env = state.env.superposition_org_id.clone();
 
-    let workspace_name = get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
-
-    let experiment_details = state
-        .superposition_client
-        .get_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .id(experiment_id.to_string())
-        .send()
-        .await
-        .map_err(|e| {
-            info!("Failed to get experiment details: {:?}", e);
-            ABError::InternalServerError(
-                "Failed to get experiment details from Superposition".to_string(),
-            )
-        })?;
-
-    if experiment_details.status != ExperimentStatusType::Created {
-        return Err(ABError::BadRequest(
-            "Release can only be discarded when in CREATED status".to_string(),
-        ));
-    }
-
-    state
-        .superposition_client
-        .discard_experiment()
-        .workspace_id(workspace_name)
-        .org_id(superposition_org_id_from_env)
-        .id(experiment_id.to_string())
-        .change_reason(
-            req.change_reason
-                .clone()
-                .unwrap_or_else(|| format!("Discarding release {} ", release_id)),
+        let workspace_name = get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
         )
-        .send()
         .await
         .map_err(|e| {
-            info!("Failed to discard experiment: {:?}", e);
-            ABError::InternalServerError(
-                "Failed to discard experiment in Superposition".to_string(),
-            )
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
 
-    info!("Successfully discarded experiment {}", experiment_id);
+        let experiment_details = state
+            .release_superposition_client
+            .get_experiment()
+            .org_id(superposition_org_id_from_env.clone())
+            .workspace_id(workspace_name.clone())
+            .id(experiment_id.to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                info!("Failed to get experiment details: {:?}", e);
+                ABError::InternalServerError(
+                    "Failed to get experiment details from Superposition".to_string(),
+                )
+            })?;
 
-    Ok(Json(DiscardReleaseResponse {
-        success: true,
-        message: "Release experiment discarded".to_string(),
-        experiment_id: experiment_id.to_string(),
-    }))
+        if experiment_details.status != ExperimentStatusType::Created {
+            return Err(ABError::Conflict(
+                "Release can only be discarded when in CREATED status".to_string(),
+            ));
+        }
+
+        write_lock::check().await?;
+
+        Box::pin(write_lock::mutate(
+            serde_json::json!({"id":experiment_id,"status":"DISCARDED"}),
+            state
+                .release_superposition_client
+                .discard_experiment()
+                .workspace_id(workspace_name)
+                .org_id(superposition_org_id_from_env)
+                .id(experiment_id.to_string())
+                .change_reason(write_lock::user_reason(
+                    &(req
+                        .change_reason
+                        .clone()
+                        .unwrap_or_else(|| format!("Discarding release {} ", release_id))),
+                )?)
+                .send(),
+        ))
+        .await?;
+
+        control_center::event(
+            &state,
+            &auth_response,
+            &experiment_id,
+            "discarded",
+            serde_json::json!({"change_reason":req.change_reason}),
+        )
+        .await;
+        info!("Successfully discarded experiment {}", experiment_id);
+
+        Ok(Json(DiscardReleaseResponse {
+            success: true,
+            message: "Release experiment discarded".to_string(),
+            experiment_id: experiment_id.to_string(),
+        }))
+    })
+    .await
 }
 
 #[get("{organisation}/{application}")]
@@ -1513,169 +1551,160 @@ async fn update_release(
         auth_response.application.clone(),
     )?;
 
-    let workspace_name = get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
-    let superposition_org_id_from_env = state.env.superposition_org_id.clone();
-
-    let dimensions = req.dimensions.clone().unwrap_or_default();
-
-    let release_id = path.into_inner();
-
-    let BuildOverrides {
-        final_important,
-        package_data,
-        is_first_release: _,
-        final_lazy,
-        final_resources,
-        config_version,
-        config_properties,
-        pkg_version,
-        files,
-        final_properties,
-        control_overrides,
-        experimental_overrides,
-    } = utils::build_overrides(
-        &req,
-        superposition_org_id_from_env.clone(),
-        application.clone(),
-        organisation.clone(),
-        dimensions.clone(),
-        state.clone(),
-        workspace_name.clone(),
-    )
-    .await?;
-
-    let experiment_details = state
-        .superposition_client
-        .get_experiment()
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .id(release_id.to_string())
-        .send()
+    write_lock::locked(&state, &organisation, &application, async {
+        let workspace_name = get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
         .await
         .map_err(|e| {
-            info!("Failed to get experiment details: {:?}", e);
-            ABError::InternalServerError(
-                "Failed to get experiment details from Superposition".to_string(),
-            )
+            ABError::InternalServerError(format!("Failed to get workspace name: {}", e))
         })?;
-    let experiment_variant_id = experiment_details
-        .variants
-        .iter()
-        .find(|variant| variant.variant_type == Experimental)
-        .map(|variant| variant.id.clone())
-        .ok_or_else(|| {
-            ABError::BadRequest(format!(
-                "Variant '{}' not found in experiment. Available variants: {:?}",
-                Experimental,
-                experiment_details
-                    .variants
-                    .iter()
-                    .map(|v| &v.id)
-                    .collect::<Vec<_>>()
+        let superposition_org_id_from_env = state.env.superposition_org_id.clone();
+
+        let dimensions = req.dimensions.clone().unwrap_or_default();
+
+        let release_id = path.into_inner();
+
+        let BuildOverrides {
+            final_important,
+            package_data,
+            is_first_release: _,
+            final_lazy,
+            final_resources,
+            config_version,
+            config_properties,
+            pkg_version,
+            files,
+            final_properties,
+            control_overrides,
+            experimental_overrides,
+        } = utils::build_overrides(
+            &req,
+            superposition_org_id_from_env.clone(),
+            application.clone(),
+            organisation.clone(),
+            dimensions.clone(),
+            state.clone(),
+            workspace_name.clone(),
+        )
+        .await?;
+
+        let experiment_details = state
+            .release_superposition_client
+            .get_experiment()
+            .org_id(superposition_org_id_from_env.clone())
+            .workspace_id(workspace_name.clone())
+            .id(release_id.to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                info!("Failed to get experiment details: {:?}", e);
+                ABError::InternalServerError(
+                    "Failed to get experiment details from Superposition".to_string(),
+                )
+            })?;
+        control_center::ensure_active(&experiment_details.status)?;
+        let experiment_variant_id = experiment_details
+            .variants
+            .iter()
+            .find(|variant| variant.variant_type == Experimental)
+            .map(|variant| variant.id.clone())
+            .ok_or_else(|| {
+                ABError::BadRequest(format!(
+                    "Variant '{}' not found in experiment. Available variants: {:?}",
+                    Experimental,
+                    experiment_details
+                        .variants
+                        .iter()
+                        .map(|v| &v.id)
+                        .collect::<Vec<_>>()
+                ))
+            })?;
+
+        let expected_variants =
+            control_center::override_values(&control_overrides, &experimental_overrides);
+        let control_variant = VariantUpdateRequestBuilder::default()
+            .id(format!("{:}-control", release_id))
+            .set_overrides(Some(control_overrides))
+            .build()
+            .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+
+        let experiment_variant = VariantUpdateRequestBuilder::default()
+            .id(experiment_variant_id.clone())
+            .set_overrides(Some(experimental_overrides))
+            .build()
+            .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+
+        let updated_experiment_response = state
+            .release_superposition_client
+            .update_overrides_experiment()
+            .id(release_id.clone())
+            .org_id(superposition_org_id_from_env.clone())
+            .workspace_id(workspace_name.clone())
+            .description(format!(
+                "Release Update for application {} in organisation {} with package version {}",
+                application, organisation, pkg_version
             ))
-        })?;
+            .change_reason(format!(
+                "Release update for application {} with PATCH-style overrides",
+                application
+            ))
+            .variant_list(control_variant)
+            .variant_list(experiment_variant);
 
-    let control_variant = VariantUpdateRequestBuilder::default()
-        .id(format!("{:}-control", release_id))
-        .set_overrides(Some(control_overrides))
-        .build()
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
-    let experiment_variant = VariantUpdateRequestBuilder::default()
-        .id(experiment_variant_id.clone())
-        .set_overrides(Some(experimental_overrides))
-        .build()
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-
-    let updated_experiment_response = state
-        .superposition_client
-        .update_overrides_experiment()
-        .id(release_id.clone())
-        .org_id(superposition_org_id_from_env.clone())
-        .workspace_id(workspace_name.clone())
-        .description(format!(
-            "Release Update for application {} in organisation {} with package version {}",
-            application, organisation, pkg_version
+        let updated_experiment_response = Box::pin(write_lock::mutate(
+            serde_json::json!({"id":release_id,"variants":expected_variants}),
+            updated_experiment_response
+                .change_reason(write_lock::user_reason(&format!(
+                    "Release update for application {} with PATCH-style overrides",
+                    application
+                ))?)
+                .send(),
         ))
-        .change_reason(format!(
-            "Release update for application {} with PATCH-style overrides",
-            application
-        ))
-        .variant_list(control_variant)
-        .variant_list(experiment_variant);
+        .await?;
 
-    let updated_experiment_response = updated_experiment_response.send().await.map_err(|e| {
-        info!("Failed to update experiment: {:?}", e);
-        ABError::InternalServerError("Failed to update experiment in Superposition".to_string())
-    })?;
+        let response_important = final_important.unwrap_or_else(|| {
+            package_data
+                .files
+                .iter()
+                .filter_map(|f| f.as_ref().cloned())
+                .collect()
+        });
+        let response_resources = final_resources.unwrap_or_default();
+        let response_lazy = final_lazy.unwrap_or_default();
+        let millis = updated_experiment_response
+            .created_at
+            .to_millis()
+            .map_err(|_| ABError::InternalServerError("Error while converting time".to_string()))?;
+        let created_at = DateTime::from_timestamp_millis(millis)
+            .ok_or_else(|| ABError::InternalServerError("Invalid timestamp".to_string()))?;
 
-    let response_important = final_important.unwrap_or_else(|| {
-        package_data
-            .files
-            .iter()
-            .filter_map(|f| f.as_ref().cloned())
-            .collect()
-    });
-    let response_resources = final_resources.unwrap_or_default();
-    let response_lazy = final_lazy.unwrap_or_default();
-    let millis = updated_experiment_response
-        .created_at
-        .to_millis()
-        .map_err(|_| ABError::InternalServerError("Error while converting time".to_string()))?;
-    let created_at = DateTime::from_timestamp_millis(millis)
-        .ok_or_else(|| ABError::InternalServerError("Invalid timestamp".to_string()))?;
+        let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
+        let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
+            info!(
+                "Failed to convert dotted docs to nested structure: {:?}",
+                err
+            );
+            Value::Object(serde_json::Map::new())
+        });
 
-    let nested_config_props_result = dotted_docs_to_nested(config_properties.clone());
-    let nested_config_props_response = nested_config_props_result.unwrap_or_else(|err| {
-        info!(
-            "Failed to convert dotted docs to nested structure: {:?}",
-            err
-        );
-        Value::Object(serde_json::Map::new())
-    });
-
-    Ok(Json(CreateReleaseResponse {
-        id: release_id.clone(),
-        created_at,
-        config: Config {
-            boot_timeout: req.config.boot_timeout as u32,
-            release_config_timeout: req.config.release_config_timeout as u32,
-            version: config_version.clone(),
-            properties: Some(nested_config_props_response),
-        },
-        package: ServePackage {
-            name: application.clone(),
-            version: pkg_version.to_string(),
-            index: {
-                let (file_path, _, _) = parse_file_key(&package_data.index);
-                files
-                    .iter()
-                    .find(|file| file.file_path == file_path.clone())
-                    .map(|file| ServeFile {
-                        file_path: file.file_path.clone(),
-                        url: encode_url_path(&file.url),
-                        checksum: file.checksum.clone(),
-                        size: file.size,
-                    })
-                    .unwrap_or_else(|| ServeFile {
-                        file_path: file_path.clone(),
-                        url: "".to_string(),
-                        checksum: "".to_string(),
-                        size: 0,
-                    })
+        Ok(Json(CreateReleaseResponse {
+            id: release_id.clone(),
+            created_at,
+            config: Config {
+                boot_timeout: req.config.boot_timeout as u32,
+                release_config_timeout: req.config.release_config_timeout as u32,
+                version: config_version.clone(),
+                properties: Some(nested_config_props_response),
             },
-            properties: final_properties.unwrap_or_default(),
-            important: response_important
-                .iter()
-                .filter_map(|file_key| {
-                    let (file_path, _, _) = parse_file_key(file_key);
+            package: ServePackage {
+                name: application.clone(),
+                version: pkg_version.to_string(),
+                index: {
+                    let (file_path, _, _) = parse_file_key(&package_data.index);
                     files
                         .iter()
                         .find(|file| file.file_path == file_path.clone())
@@ -1685,50 +1714,73 @@ async fn update_release(
                             checksum: file.checksum.clone(),
                             size: file.size,
                         })
-                })
-                .collect(),
-            lazy: response_lazy
-                .iter()
-                .filter_map(|file_key| {
-                    let (file_path, _, _) = parse_file_key(file_key);
-                    files
-                        .iter()
-                        .find(|file| file.file_path == file_path.clone())
-                        .map(|file| ServeFile {
-                            file_path: file.file_path.clone(),
-                            url: encode_url_path(&file.url),
-                            checksum: file.checksum.clone(),
-                            size: file.size,
+                        .unwrap_or_else(|| ServeFile {
+                            file_path: file_path.clone(),
+                            url: "".to_string(),
+                            checksum: "".to_string(),
+                            size: 0,
                         })
-                })
-                .collect(),
-        },
-        resources: response_resources
-            .iter()
-            .filter_map(|file_key| {
-                let (file_path, _, _) = parse_file_key(file_key);
-                files
+                },
+                properties: final_properties.unwrap_or_default(),
+                important: response_important
                     .iter()
-                    .find(|file| file.file_path == file_path.clone())
-                    .map(|file| ServeFile {
-                        file_path: file.file_path.clone(),
-                        url: encode_url_path(&file.url),
-                        checksum: file.checksum.clone(),
-                        size: file.size,
+                    .filter_map(|file_key| {
+                        let (file_path, _, _) = parse_file_key(file_key);
+                        files
+                            .iter()
+                            .find(|file| file.file_path == file_path.clone())
+                            .map(|file| ServeFile {
+                                file_path: file.file_path.clone(),
+                                url: encode_url_path(&file.url),
+                                checksum: file.checksum.clone(),
+                                size: file.size,
+                            })
                     })
-            })
-            .collect(),
-        dimensions: dimensions.clone(),
-        experiment: Some(ReleaseExperiment {
-            experiment_id: release_id,
-            experiment_variants: utils::extract_variants_from_experiment(
-                &experiment_details.variants,
-            ),
-            package_version: pkg_version,
-            config_version: format!("v{}", pkg_version),
-            created_at: created_at.to_string(),
-            traffic_percentage: 0, // Default to 100% for new releases
-            status: "CREATED".to_string(),
-        }),
-    }))
+                    .collect(),
+                lazy: response_lazy
+                    .iter()
+                    .filter_map(|file_key| {
+                        let (file_path, _, _) = parse_file_key(file_key);
+                        files
+                            .iter()
+                            .find(|file| file.file_path == file_path.clone())
+                            .map(|file| ServeFile {
+                                file_path: file.file_path.clone(),
+                                url: encode_url_path(&file.url),
+                                checksum: file.checksum.clone(),
+                                size: file.size,
+                            })
+                    })
+                    .collect(),
+            },
+            resources: response_resources
+                .iter()
+                .filter_map(|file_key| {
+                    let (file_path, _, _) = parse_file_key(file_key);
+                    files
+                        .iter()
+                        .find(|file| file.file_path == file_path.clone())
+                        .map(|file| ServeFile {
+                            file_path: file.file_path.clone(),
+                            url: encode_url_path(&file.url),
+                            checksum: file.checksum.clone(),
+                            size: file.size,
+                        })
+                })
+                .collect(),
+            dimensions: dimensions.clone(),
+            experiment: Some(ReleaseExperiment {
+                experiment_id: release_id,
+                experiment_variants: utils::extract_variants_from_experiment(
+                    &experiment_details.variants,
+                ),
+                package_version: pkg_version,
+                config_version: format!("v{}", pkg_version),
+                created_at: created_at.to_string(),
+                traffic_percentage: 0, // Default to 100% for new releases
+                status: "CREATED".to_string(),
+            }),
+        }))
+    })
+    .await
 }

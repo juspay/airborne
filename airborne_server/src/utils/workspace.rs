@@ -20,13 +20,13 @@ use diesel::prelude::*;
 /// Get the workspace name for Superposition based on organization and application
 /// This retrieves the workspace name that was created during application setup
 /// which follows the format: {application_name}{generated_id}
-async fn get_workspace_name_for_application_db(
+pub(crate) async fn get_workspace_name_for_application_db(
     pool: DbPool,
     application: String,
     organisation: String,
 ) -> airborne_types::Result<String> {
     let workspace_result = run_blocking!({
-        let mut conn = pool.get()?;
+        let mut conn = pool.get_timeout(std::time::Duration::from_secs(2))?;
         let result = workspace_names::table
             .filter(workspace_names::organization_id.eq(organisation))
             .filter(workspace_names::application_id.eq(application))
@@ -46,7 +46,7 @@ async fn get_workspace_name_for_application_db(
             Ok(name.workspace_name)
         }
         Err(ABError::NotFound(_)) => Err(ABError::NotFound("workspace not found".to_owned())),
-        Err(e) => Err(ABError::InternalServerError(e.to_string())),
+        Err(e) => Err(e),
     }
 }
 
