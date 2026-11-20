@@ -42,6 +42,7 @@ pub(crate) mod maker_checker;
 pub(crate) mod operations;
 pub(crate) mod recovery;
 pub(crate) mod rollback;
+pub(crate) mod serving_policy;
 mod types;
 pub mod utils;
 pub(crate) mod write_lock;
@@ -426,7 +427,7 @@ pub(super) async fn create_release_impl(
     let BuildOverrides {
         final_important,
         package_data,
-        is_first_release,
+
         final_lazy,
         final_resources,
         config_version,
@@ -512,48 +513,8 @@ pub(super) async fn create_release_impl(
             .collect()
     });
 
-    if is_first_release {
-        // For first ever release -> Directly conclude the experiment to make it live
-        let transformed_variant_id =
-            format!("{}-{}", experiment_id_for_ramping, experimental_variant_id);
-        info!(
-            "Concluding first release experiment with variant id: {}",
-            transformed_variant_id
-        );
-        ramp_experiment(
-            &state,
-            &workspace_name,
-            &experiment_id_for_ramping,
-            50,
-            &Some("Ramping first release experiment to 50%".to_string()),
-        )
-        .await?;
-        control_center::event(
-            &state,
-            &auth_response,
-            &experiment_id_for_ramping,
-            "ramped",
-            serde_json::json!({"traffic_percentage":50}),
-        )
-        .await;
-        write_lock::check().await?;
-    Box::pin(write_lock::mutate(serde_json::json!({"id":experiment_id_for_ramping,"status":"CONCLUDED","chosen_variant":transformed_variant_id}),         state
-            .release_superposition_client
-            .conclude_experiment()
-            .org_id(superposition_org_id_from_env.clone())
-            .workspace_id(workspace_name.clone())
-            .id(experiment_id_for_ramping.clone())
-            .chosen_variant(transformed_variant_id.clone())
-            .change_reason(write_lock::user_reason("Concluding first release experiment to make it live")?).send())).await?;
-        control_center::event(
-            &state,
-            &auth_response,
-            &experiment_id_for_ramping,
-            "concluded",
-            serde_json::json!({"chosen_variant":transformed_variant_id}),
-        )
-        .await;
-    }
+    // Initial/default configuration is also seen after a workspace rebuild.
+    // Never infer operator approval from missing upstream release state.
 
     let response_lazy = final_lazy.unwrap_or_default();
 
@@ -570,6 +531,7 @@ pub(super) async fn create_release_impl(
     });
 
     Ok(Json(CreateReleaseResponse {
+            warnings: targeting_warnings(&dimensions),
         id: experiment_id_for_ramping.clone(),
         created_at: now,
         config: Config {
@@ -656,13 +618,8 @@ pub(super) async fn create_release_impl(
             package_version: pkg_version,
             config_version: config_version.clone(),
             created_at: now.to_string(),
-            traffic_percentage: if is_first_release { 50 } else { 0 },
-            status: if is_first_release {
-                "CONCLUDED"
-            } else {
-                "CREATED"
-            }
-            .to_string(),
+            traffic_percentage: 0,
+            status: "CREATED".to_string(),
         }),
     }))
     }).await
@@ -931,6 +888,7 @@ async fn list_releases(
         });
 
         let release_response = CreateReleaseResponse {
+            warnings: targeting_warnings(&dimensions),
             id: experiment.id.to_string(),
             created_at,
             config: Config {
@@ -1453,8 +1411,58 @@ async fn serve_release_handler(
 
     log::info!("Final evaluation Context {:?}", evaluation_context);
 
-    let of_release_config =
-        get_release_config_from_provider(&provider, &evaluation_context).await?;
+    let strict = serving_policy::cached(&state, &organisation, &application).await?
+        ["effective_strict"]
+        .as_bool()
+        .unwrap_or(true);
+    let of_release_config = if strict {
+        // Keep snapshot versions: a concurrent default change must never make an
+        // old fallback look like a targeted override. Fail closed on that race.
+        let builder = state
+            .release_superposition_client
+            .get_resolved_config_with_identifier()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .identifier(toss.clone());
+        let resolved = builder
+            .clone()
+            .set_context(Some(
+                context
+                    .iter()
+                    .map(|(k, v)| (k.clone(), Document::String(v.clone())))
+                    .collect(),
+            ))
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to resolve strict release: {e}"))
+            })?;
+        let defaults = builder.send().await.map_err(|e| {
+            ABError::InternalServerError(format!("Failed to resolve strict defaults: {e}"))
+        })?;
+        let resolved_json = crate::utils::document::document_to_json_value(&resolved.config);
+        let default_json = crate::utils::document::document_to_json_value(&defaults.config);
+        if !has_targeted_release(
+            resolved_json["config.version"].as_str().unwrap_or("0.0.0"),
+            default_json["config.version"].as_str().unwrap_or("0.0.0"),
+            &resolved.version,
+            &defaults.version,
+        ) {
+            return Err(ABError::NotFound(
+                "No compatible targeted release; use bundled code".into(),
+            ));
+        }
+        serde_json::from_value(dotted_docs_to_nested(
+            resolved_json
+                .as_object()
+                .ok_or_else(|| ABError::InternalServerError("Invalid resolved release".into()))?
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        )?)
+        .map_err(|e| ABError::InternalServerError(format!("Invalid strict release: {e}")))?
+    } else {
+        get_release_config_from_provider(&provider, &evaluation_context).await?
+    };
 
     if of_release_config.config.version == "0.0.0" {
         return Err(ABError::NotFound("No release yet".to_string()));
@@ -1590,7 +1598,7 @@ async fn serve_release_handler(
         )
         .header(
             actix_web::http::header::CACHE_CONTROL,
-            HeaderValue::from_static("public, s-maxage=86400, max-age=0"),
+            HeaderValue::from_static("public, s-maxage=60, max-age=0, stale-if-error=300"),
         )
         .status(StatusCode::OK))
 }
@@ -1654,7 +1662,7 @@ pub(super) async fn update_release_impl(
         let BuildOverrides {
             final_important,
             package_data,
-            is_first_release: _,
+
             final_lazy,
             final_resources,
             config_version,
@@ -1775,6 +1783,7 @@ pub(super) async fn update_release_impl(
         });
 
         Ok(Json(CreateReleaseResponse {
+            warnings: targeting_warnings(&dimensions),
             id: release_id.clone(),
             created_at,
             config: Config {
@@ -1866,4 +1875,70 @@ pub(super) async fn update_release_impl(
         }))
     })
     .await
+}
+
+fn strict_release_application(setting: &str, org: &str, app: &str) -> bool {
+    setting
+        .split(',')
+        .any(|entry| entry.trim() == format!("{org}/{app}"))
+}
+fn has_targeted_release(
+    resolved: &str,
+    default: &str,
+    snapshot: &str,
+    default_snapshot: &str,
+) -> bool {
+    !snapshot.is_empty()
+        && snapshot == default_snapshot
+        && resolved != "0.0.0"
+        && resolved != default
+}
+#[cfg(test)]
+mod release_safety_tests {
+    use super::*;
+    #[test]
+    fn strict_selection_rejects_default_and_empty_release() {
+        assert!(!has_targeted_release("old-rn", "old-rn", "1", "1"));
+        assert!(!has_targeted_release("0.0.0", "default", "1", "1"));
+        assert!(has_targeted_release("compatible", "old-rn", "1", "1"));
+        assert!(!has_targeted_release(
+            "old-fallback",
+            "new-default",
+            "1",
+            "2"
+        ));
+        assert!(!has_targeted_release("compatible", "default", "", ""));
+        assert!(strict_release_application(
+            " kharcha/scratch,org/other",
+            "kharcha",
+            "scratch"
+        ));
+        assert!(!strict_release_application(
+            "kharcha/scratch",
+            "kharcha",
+            "live"
+        ));
+        assert!(!strict_release_application("", "kharcha", "live"));
+    }
+}
+
+fn targeting_warnings(dimensions: &HashMap<String, Value>) -> Vec<String> {
+    if !dimensions.contains_key("locale") {
+        vec!["Superposition specificity: older locale-specific releases may continue to override this general rollout, even after conclusion. Preview each locale and explicitly release to those contexts when superseding them.".into()]
+    } else {
+        Vec::new()
+    }
+}
+#[cfg(test)]
+mod targeting_warning_tests {
+    use super::*;
+    #[test]
+    fn general_release_exposes_specificity_warning() {
+        assert_eq!(targeting_warnings(&HashMap::new()).len(), 1);
+        assert!(targeting_warnings(&HashMap::from([(
+            "locale".into(),
+            Value::String("kn".into())
+        )]))
+        .is_empty());
+    }
 }

@@ -1,5 +1,11 @@
 import { AirborneClient } from "./AirborneClient";
+import { AcknowledgeEmergencyRollbackCommandInput, AcknowledgeEmergencyRollbackCommandOutput } from "./commands/AcknowledgeEmergencyRollbackCommand";
+import { ApproveControlCenterDeploymentRequestCommandInput, ApproveControlCenterDeploymentRequestCommandOutput } from "./commands/ApproveControlCenterDeploymentRequestCommand";
+import { CancelControlCenterDeploymentRequestCommandInput, CancelControlCenterDeploymentRequestCommandOutput } from "./commands/CancelControlCenterDeploymentRequestCommand";
+import { ConcludeReleaseCommandInput, ConcludeReleaseCommandOutput } from "./commands/ConcludeReleaseCommand";
 import { CreateApplicationCommandInput, CreateApplicationCommandOutput } from "./commands/CreateApplicationCommand";
+import { CreateCohortRangeCommandInput, CreateCohortRangeCommandOutput } from "./commands/CreateCohortRangeCommand";
+import { CreateControlCenterDeploymentRequestCommandInput, CreateControlCenterDeploymentRequestCommandOutput } from "./commands/CreateControlCenterDeploymentRequestCommand";
 import { CreateControlCenterGroupCommandInput, CreateControlCenterGroupCommandOutput } from "./commands/CreateControlCenterGroupCommand";
 import { CreateDimensionCommandInput, CreateDimensionCommandOutput } from "./commands/CreateDimensionCommand";
 import { CreateFileCommandInput, CreateFileCommandOutput } from "./commands/CreateFileCommand";
@@ -8,11 +14,18 @@ import { CreatePackageCommandInput, CreatePackageCommandOutput } from "./command
 import { CreateReleaseCommandInput, CreateReleaseCommandOutput } from "./commands/CreateReleaseCommand";
 import { DeleteControlCenterGroupCommandInput, DeleteControlCenterGroupCommandOutput } from "./commands/DeleteControlCenterGroupCommand";
 import { DeleteDimensionCommandInput, DeleteDimensionCommandOutput } from "./commands/DeleteDimensionCommand";
+import { DiscardReleaseCommandInput, DiscardReleaseCommandOutput } from "./commands/DiscardReleaseCommand";
+import { GetControlCenterApprovalPolicyCommandInput, GetControlCenterApprovalPolicyCommandOutput } from "./commands/GetControlCenterApprovalPolicyCommand";
+import { GetControlCenterDeploymentRequestCommandInput, GetControlCenterDeploymentRequestCommandOutput } from "./commands/GetControlCenterDeploymentRequestCommand";
 import { GetControlCenterOverviewCommandInput, GetControlCenterOverviewCommandOutput } from "./commands/GetControlCenterOverviewCommand";
 import { GetControlCenterReleaseEventsCommandInput, GetControlCenterReleaseEventsCommandOutput } from "./commands/GetControlCenterReleaseEventsCommand";
 import { GetControlCenterRollbackPreviewCommandInput, GetControlCenterRollbackPreviewCommandOutput } from "./commands/GetControlCenterRollbackPreviewCommand";
 import { GetReleaseCommandInput, GetReleaseCommandOutput } from "./commands/GetReleaseCommand";
+import { GetServingPolicyCommandInput, GetServingPolicyCommandOutput } from "./commands/GetServingPolicyCommand";
+import { GetTelemetrySummaryCommandInput, GetTelemetrySummaryCommandOutput } from "./commands/GetTelemetrySummaryCommand";
 import { GetUserCommandInput, GetUserCommandOutput } from "./commands/GetUserCommand";
+import { IngestTelemetryReportsCommandInput, IngestTelemetryReportsCommandOutput } from "./commands/IngestTelemetryReportsCommand";
+import { ListControlCenterDeploymentRequestsCommandInput, ListControlCenterDeploymentRequestsCommandOutput } from "./commands/ListControlCenterDeploymentRequestsCommand";
 import { ListControlCenterGroupsCommandInput, ListControlCenterGroupsCommandOutput } from "./commands/ListControlCenterGroupsCommand";
 import { ListControlCenterOperationsCommandInput, ListControlCenterOperationsCommandOutput } from "./commands/ListControlCenterOperationsCommand";
 import { ListDimensionsCommandInput, ListDimensionsCommandOutput } from "./commands/ListDimensionsCommand";
@@ -22,11 +35,16 @@ import { ListOrganisationsCommandInput, ListOrganisationsCommandOutput } from ".
 import { ListPackagesCommandInput, ListPackagesCommandOutput } from "./commands/ListPackagesCommand";
 import { ListReleasesCommandInput, ListReleasesCommandOutput } from "./commands/ListReleasesCommand";
 import { PostLoginCommandInput, PostLoginCommandOutput } from "./commands/PostLoginCommand";
+import { PreviewServingPolicyCommandInput, PreviewServingPolicyCommandOutput } from "./commands/PreviewServingPolicyCommand";
+import { PutServingPolicyCommandInput, PutServingPolicyCommandOutput } from "./commands/PutServingPolicyCommand";
+import { RampReleaseCommandInput, RampReleaseCommandOutput } from "./commands/RampReleaseCommand";
+import { RejectControlCenterDeploymentRequestCommandInput, RejectControlCenterDeploymentRequestCommandOutput } from "./commands/RejectControlCenterDeploymentRequestCommand";
 import { RequestOrganisationCommandInput, RequestOrganisationCommandOutput } from "./commands/RequestOrganisationCommand";
 import { ResolveControlCenterOperationCommandInput, ResolveControlCenterOperationCommandOutput } from "./commands/ResolveControlCenterOperationCommand";
 import { RollbackReleaseCommandInput, RollbackReleaseCommandOutput } from "./commands/RollbackReleaseCommand";
 import { ServeReleaseCommandInput, ServeReleaseCommandOutput } from "./commands/ServeReleaseCommand";
 import { ServeReleaseV2CommandInput, ServeReleaseV2CommandOutput } from "./commands/ServeReleaseV2Command";
+import { UpdateControlCenterApprovalPolicyCommandInput, UpdateControlCenterApprovalPolicyCommandOutput } from "./commands/UpdateControlCenterApprovalPolicyCommand";
 import { UpdateControlCenterGroupCommandInput, UpdateControlCenterGroupCommandOutput } from "./commands/UpdateControlCenterGroupCommand";
 import { UpdateDimensionCommandInput, UpdateDimensionCommandOutput } from "./commands/UpdateDimensionCommand";
 import { UpdateFileCommandInput, UpdateFileCommandOutput } from "./commands/UpdateFileCommand";
@@ -34,11 +52,47 @@ import { UploadFileCommandInput, UploadFileCommandOutput } from "./commands/Uplo
 import { HttpHandlerOptions as __HttpHandlerOptions } from "@smithy/types";
 export interface Airborne {
     /**
+     * @see {@link AcknowledgeEmergencyRollbackCommand}
+     */
+    acknowledgeEmergencyRollback(args: AcknowledgeEmergencyRollbackCommandInput, options?: __HttpHandlerOptions): Promise<AcknowledgeEmergencyRollbackCommandOutput>;
+    acknowledgeEmergencyRollback(args: AcknowledgeEmergencyRollbackCommandInput, cb: (err: any, data?: AcknowledgeEmergencyRollbackCommandOutput) => void): void;
+    acknowledgeEmergencyRollback(args: AcknowledgeEmergencyRollbackCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: AcknowledgeEmergencyRollbackCommandOutput) => void): void;
+    /**
+     * @see {@link ApproveControlCenterDeploymentRequestCommand}
+     */
+    approveControlCenterDeploymentRequest(args: ApproveControlCenterDeploymentRequestCommandInput, options?: __HttpHandlerOptions): Promise<ApproveControlCenterDeploymentRequestCommandOutput>;
+    approveControlCenterDeploymentRequest(args: ApproveControlCenterDeploymentRequestCommandInput, cb: (err: any, data?: ApproveControlCenterDeploymentRequestCommandOutput) => void): void;
+    approveControlCenterDeploymentRequest(args: ApproveControlCenterDeploymentRequestCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ApproveControlCenterDeploymentRequestCommandOutput) => void): void;
+    /**
+     * @see {@link CancelControlCenterDeploymentRequestCommand}
+     */
+    cancelControlCenterDeploymentRequest(args: CancelControlCenterDeploymentRequestCommandInput, options?: __HttpHandlerOptions): Promise<CancelControlCenterDeploymentRequestCommandOutput>;
+    cancelControlCenterDeploymentRequest(args: CancelControlCenterDeploymentRequestCommandInput, cb: (err: any, data?: CancelControlCenterDeploymentRequestCommandOutput) => void): void;
+    cancelControlCenterDeploymentRequest(args: CancelControlCenterDeploymentRequestCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CancelControlCenterDeploymentRequestCommandOutput) => void): void;
+    /**
+     * @see {@link ConcludeReleaseCommand}
+     */
+    concludeRelease(args: ConcludeReleaseCommandInput, options?: __HttpHandlerOptions): Promise<ConcludeReleaseCommandOutput>;
+    concludeRelease(args: ConcludeReleaseCommandInput, cb: (err: any, data?: ConcludeReleaseCommandOutput) => void): void;
+    concludeRelease(args: ConcludeReleaseCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ConcludeReleaseCommandOutput) => void): void;
+    /**
      * @see {@link CreateApplicationCommand}
      */
     createApplication(args: CreateApplicationCommandInput, options?: __HttpHandlerOptions): Promise<CreateApplicationCommandOutput>;
     createApplication(args: CreateApplicationCommandInput, cb: (err: any, data?: CreateApplicationCommandOutput) => void): void;
     createApplication(args: CreateApplicationCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreateApplicationCommandOutput) => void): void;
+    /**
+     * @see {@link CreateCohortRangeCommand}
+     */
+    createCohortRange(args: CreateCohortRangeCommandInput, options?: __HttpHandlerOptions): Promise<CreateCohortRangeCommandOutput>;
+    createCohortRange(args: CreateCohortRangeCommandInput, cb: (err: any, data?: CreateCohortRangeCommandOutput) => void): void;
+    createCohortRange(args: CreateCohortRangeCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreateCohortRangeCommandOutput) => void): void;
+    /**
+     * @see {@link CreateControlCenterDeploymentRequestCommand}
+     */
+    createControlCenterDeploymentRequest(args: CreateControlCenterDeploymentRequestCommandInput, options?: __HttpHandlerOptions): Promise<CreateControlCenterDeploymentRequestCommandOutput>;
+    createControlCenterDeploymentRequest(args: CreateControlCenterDeploymentRequestCommandInput, cb: (err: any, data?: CreateControlCenterDeploymentRequestCommandOutput) => void): void;
+    createControlCenterDeploymentRequest(args: CreateControlCenterDeploymentRequestCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: CreateControlCenterDeploymentRequestCommandOutput) => void): void;
     /**
      * @see {@link CreateControlCenterGroupCommand}
      */
@@ -88,6 +142,24 @@ export interface Airborne {
     deleteDimension(args: DeleteDimensionCommandInput, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
     deleteDimension(args: DeleteDimensionCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: DeleteDimensionCommandOutput) => void): void;
     /**
+     * @see {@link DiscardReleaseCommand}
+     */
+    discardRelease(args: DiscardReleaseCommandInput, options?: __HttpHandlerOptions): Promise<DiscardReleaseCommandOutput>;
+    discardRelease(args: DiscardReleaseCommandInput, cb: (err: any, data?: DiscardReleaseCommandOutput) => void): void;
+    discardRelease(args: DiscardReleaseCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: DiscardReleaseCommandOutput) => void): void;
+    /**
+     * @see {@link GetControlCenterApprovalPolicyCommand}
+     */
+    getControlCenterApprovalPolicy(args: GetControlCenterApprovalPolicyCommandInput, options?: __HttpHandlerOptions): Promise<GetControlCenterApprovalPolicyCommandOutput>;
+    getControlCenterApprovalPolicy(args: GetControlCenterApprovalPolicyCommandInput, cb: (err: any, data?: GetControlCenterApprovalPolicyCommandOutput) => void): void;
+    getControlCenterApprovalPolicy(args: GetControlCenterApprovalPolicyCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetControlCenterApprovalPolicyCommandOutput) => void): void;
+    /**
+     * @see {@link GetControlCenterDeploymentRequestCommand}
+     */
+    getControlCenterDeploymentRequest(args: GetControlCenterDeploymentRequestCommandInput, options?: __HttpHandlerOptions): Promise<GetControlCenterDeploymentRequestCommandOutput>;
+    getControlCenterDeploymentRequest(args: GetControlCenterDeploymentRequestCommandInput, cb: (err: any, data?: GetControlCenterDeploymentRequestCommandOutput) => void): void;
+    getControlCenterDeploymentRequest(args: GetControlCenterDeploymentRequestCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetControlCenterDeploymentRequestCommandOutput) => void): void;
+    /**
      * @see {@link GetControlCenterOverviewCommand}
      */
     getControlCenterOverview(): Promise<GetControlCenterOverviewCommandOutput>;
@@ -113,12 +185,36 @@ export interface Airborne {
     getRelease(args: GetReleaseCommandInput, cb: (err: any, data?: GetReleaseCommandOutput) => void): void;
     getRelease(args: GetReleaseCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetReleaseCommandOutput) => void): void;
     /**
+     * @see {@link GetServingPolicyCommand}
+     */
+    getServingPolicy(args: GetServingPolicyCommandInput, options?: __HttpHandlerOptions): Promise<GetServingPolicyCommandOutput>;
+    getServingPolicy(args: GetServingPolicyCommandInput, cb: (err: any, data?: GetServingPolicyCommandOutput) => void): void;
+    getServingPolicy(args: GetServingPolicyCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetServingPolicyCommandOutput) => void): void;
+    /**
+     * @see {@link GetTelemetrySummaryCommand}
+     */
+    getTelemetrySummary(args: GetTelemetrySummaryCommandInput, options?: __HttpHandlerOptions): Promise<GetTelemetrySummaryCommandOutput>;
+    getTelemetrySummary(args: GetTelemetrySummaryCommandInput, cb: (err: any, data?: GetTelemetrySummaryCommandOutput) => void): void;
+    getTelemetrySummary(args: GetTelemetrySummaryCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetTelemetrySummaryCommandOutput) => void): void;
+    /**
      * @see {@link GetUserCommand}
      */
     getUser(): Promise<GetUserCommandOutput>;
     getUser(args: GetUserCommandInput, options?: __HttpHandlerOptions): Promise<GetUserCommandOutput>;
     getUser(args: GetUserCommandInput, cb: (err: any, data?: GetUserCommandOutput) => void): void;
     getUser(args: GetUserCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: GetUserCommandOutput) => void): void;
+    /**
+     * @see {@link IngestTelemetryReportsCommand}
+     */
+    ingestTelemetryReports(args: IngestTelemetryReportsCommandInput, options?: __HttpHandlerOptions): Promise<IngestTelemetryReportsCommandOutput>;
+    ingestTelemetryReports(args: IngestTelemetryReportsCommandInput, cb: (err: any, data?: IngestTelemetryReportsCommandOutput) => void): void;
+    ingestTelemetryReports(args: IngestTelemetryReportsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: IngestTelemetryReportsCommandOutput) => void): void;
+    /**
+     * @see {@link ListControlCenterDeploymentRequestsCommand}
+     */
+    listControlCenterDeploymentRequests(args: ListControlCenterDeploymentRequestsCommandInput, options?: __HttpHandlerOptions): Promise<ListControlCenterDeploymentRequestsCommandOutput>;
+    listControlCenterDeploymentRequests(args: ListControlCenterDeploymentRequestsCommandInput, cb: (err: any, data?: ListControlCenterDeploymentRequestsCommandOutput) => void): void;
+    listControlCenterDeploymentRequests(args: ListControlCenterDeploymentRequestsCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ListControlCenterDeploymentRequestsCommandOutput) => void): void;
     /**
      * @see {@link ListControlCenterGroupsCommand}
      */
@@ -175,6 +271,30 @@ export interface Airborne {
     postLogin(args: PostLoginCommandInput, cb: (err: any, data?: PostLoginCommandOutput) => void): void;
     postLogin(args: PostLoginCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: PostLoginCommandOutput) => void): void;
     /**
+     * @see {@link PreviewServingPolicyCommand}
+     */
+    previewServingPolicy(args: PreviewServingPolicyCommandInput, options?: __HttpHandlerOptions): Promise<PreviewServingPolicyCommandOutput>;
+    previewServingPolicy(args: PreviewServingPolicyCommandInput, cb: (err: any, data?: PreviewServingPolicyCommandOutput) => void): void;
+    previewServingPolicy(args: PreviewServingPolicyCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: PreviewServingPolicyCommandOutput) => void): void;
+    /**
+     * @see {@link PutServingPolicyCommand}
+     */
+    putServingPolicy(args: PutServingPolicyCommandInput, options?: __HttpHandlerOptions): Promise<PutServingPolicyCommandOutput>;
+    putServingPolicy(args: PutServingPolicyCommandInput, cb: (err: any, data?: PutServingPolicyCommandOutput) => void): void;
+    putServingPolicy(args: PutServingPolicyCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: PutServingPolicyCommandOutput) => void): void;
+    /**
+     * @see {@link RampReleaseCommand}
+     */
+    rampRelease(args: RampReleaseCommandInput, options?: __HttpHandlerOptions): Promise<RampReleaseCommandOutput>;
+    rampRelease(args: RampReleaseCommandInput, cb: (err: any, data?: RampReleaseCommandOutput) => void): void;
+    rampRelease(args: RampReleaseCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: RampReleaseCommandOutput) => void): void;
+    /**
+     * @see {@link RejectControlCenterDeploymentRequestCommand}
+     */
+    rejectControlCenterDeploymentRequest(args: RejectControlCenterDeploymentRequestCommandInput, options?: __HttpHandlerOptions): Promise<RejectControlCenterDeploymentRequestCommandOutput>;
+    rejectControlCenterDeploymentRequest(args: RejectControlCenterDeploymentRequestCommandInput, cb: (err: any, data?: RejectControlCenterDeploymentRequestCommandOutput) => void): void;
+    rejectControlCenterDeploymentRequest(args: RejectControlCenterDeploymentRequestCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: RejectControlCenterDeploymentRequestCommandOutput) => void): void;
+    /**
      * @see {@link RequestOrganisationCommand}
      */
     requestOrganisation(args: RequestOrganisationCommandInput, options?: __HttpHandlerOptions): Promise<RequestOrganisationCommandOutput>;
@@ -204,6 +324,12 @@ export interface Airborne {
     serveReleaseV2(args: ServeReleaseV2CommandInput, options?: __HttpHandlerOptions): Promise<ServeReleaseV2CommandOutput>;
     serveReleaseV2(args: ServeReleaseV2CommandInput, cb: (err: any, data?: ServeReleaseV2CommandOutput) => void): void;
     serveReleaseV2(args: ServeReleaseV2CommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: ServeReleaseV2CommandOutput) => void): void;
+    /**
+     * @see {@link UpdateControlCenterApprovalPolicyCommand}
+     */
+    updateControlCenterApprovalPolicy(args: UpdateControlCenterApprovalPolicyCommandInput, options?: __HttpHandlerOptions): Promise<UpdateControlCenterApprovalPolicyCommandOutput>;
+    updateControlCenterApprovalPolicy(args: UpdateControlCenterApprovalPolicyCommandInput, cb: (err: any, data?: UpdateControlCenterApprovalPolicyCommandOutput) => void): void;
+    updateControlCenterApprovalPolicy(args: UpdateControlCenterApprovalPolicyCommandInput, options: __HttpHandlerOptions, cb: (err: any, data?: UpdateControlCenterApprovalPolicyCommandOutput) => void): void;
     /**
      * @see {@link UpdateControlCenterGroupCommand}
      */

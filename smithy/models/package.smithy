@@ -100,10 +100,7 @@ structure ListPackagesResponse {
 operation CreatePackage {
     input: CreatePackageRequest
     output: Package
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// List packages for an application, with pagination and optional search by index file path. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
@@ -114,8 +111,5 @@ operation CreatePackage {
 operation ListPackages {
     input: ListPackagesRequest
     output: ListPackagesResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }

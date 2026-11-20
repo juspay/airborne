@@ -182,10 +182,7 @@ structure DeleteDimensionRequest {
 operation CreateDimension {
     input: CreateDimensionRequest
     output: CreateDimensionResponse
-    errors: [
-        BadRequestError
-        Unauthorized
-    ]
+    errors: [ApprovalRequiredError BadRequestError Unauthorized NotFoundError InternalServerError ForbiddenError]
 }
 
 /// List the targeting dimensions defined for an application, in priority order, with pagination. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
@@ -196,10 +193,7 @@ operation CreateDimension {
 operation ListDimensions {
     input: ListDimensionsRequest
     output: ListDimensionsResponse
-    errors: [
-        BadRequestError
-        Unauthorized
-    ]
+    errors: [BadRequestError Unauthorized NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Update a dimension, identified by name in the path — for example to change its priority position. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
@@ -210,11 +204,7 @@ operation ListDimensions {
 operation UpdateDimension {
     input: UpdateDimensionRequest
     output: DimensionResponse
-    errors: [
-        BadRequestError
-        Unauthorized
-        NotFoundError
-    ]
+    errors: [ApprovalRequiredError BadRequestError Unauthorized NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Delete a dimension by name. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
@@ -225,9 +215,24 @@ operation UpdateDimension {
 operation DeleteDimension {
     input: DeleteDimensionRequest
     output: Unit
-    errors: [
-        BadRequestError
-        Unauthorized
-        NotFoundError
-    ]
+    errors: [ApprovalRequiredError BadRequestError Unauthorized NotFoundError InternalServerError ForbiddenError]
 }
+
+structure CreateCohortRangeInput {
+    @required
+    @httpHeader("x-organisation")
+    organisation: String
+    @required
+    @httpHeader("x-application")
+    application: String
+    @required @httpLabel dimension: String
+    @required name: String
+    @required lower: String
+    @required upper: String
+    @required @range(min: 0) priority: Integer
+}
+structure CreateCohortRangeOutput { @required name: String, @required lower: String, @required upper: String, @required priority: Integer }
+/// Add an independent inclusive stable major.minor.patch semantic version interval. Prerelease and build metadata bounds return 400 because upstream comparators do not support their precedence. Earlier definitions are unchanged. Enum index zero wins overlaps. Does not alter checkpoint semantics. Requires cohort update permission; unavailable while maker-checker is enabled, like other targeting edits.
+@tags(["Dimensions"])
+@http(method: "POST", uri: "/api/organisations/applications/dimension/{dimension}/cohort/range", code: 200)
+operation CreateCohortRange { input: CreateCohortRangeInput, output: CreateCohortRangeOutput, errors: [ApprovalRequiredError BadRequestError, Unauthorized, ForbiddenError, ConflictError, InternalServerError] }

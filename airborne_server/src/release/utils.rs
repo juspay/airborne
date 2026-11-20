@@ -866,15 +866,12 @@ pub async fn build_overrides(
         "config.properties".to_string(),
         Document::Object(std::collections::HashMap::new()),
     );
-    let config_properties: BTreeMap<String, aws_smithy_types::Document> =
-        if let Some(ref props) = req.config.properties {
-            props
-                .iter()
-                .map(|(k, v)| (k.clone(), value_to_document(v)))
-                .collect()
-        } else {
-            opt_old_config_props_cloned.unwrap_or_default()
-        };
+    // A partial property map patches the resolved values; omitted keys must
+    // remain in both variants because Superposition requires identical key sets.
+    let config_properties = merge_config_properties(
+        opt_old_config_props_cloned.unwrap_or_default(),
+        req.config.properties.as_ref(),
+    )?;
 
     put_config_props_in_experiment(&config_properties, &mut experimental_overrides);
     experimental_overrides.insert(
@@ -920,7 +917,6 @@ pub async fn build_overrides(
     Ok(BuildOverrides {
         final_important,
         package_data,
-        is_first_release,
         final_lazy,
         final_resources,
         config_version,
@@ -1031,4 +1027,46 @@ pub async fn list_experiments_by_context(
         ABError::InternalServerError("Failed to list experiments from Superposition".to_string())
     })?;
     Ok(experiments_list)
+}
+
+fn merge_config_properties(
+    mut current: BTreeMap<String, Document>,
+    patch: Option<&BTreeMap<String, Value>>,
+) -> airborne_types::Result<BTreeMap<String, Document>> {
+    for (key, value) in patch.into_iter().flatten() {
+        if !current.contains_key(key) {
+            return Err(ABError::BadRequest(format!(
+                "Register property schema before using {key}"
+            )));
+        }
+        current.insert(key.clone(), value_to_document(value));
+    }
+    Ok(current)
+}
+#[cfg(test)]
+mod property_patch_tests {
+    use super::*;
+    #[test]
+    fn empty_and_partial_properties_preserve_registered_keys() {
+        let current = BTreeMap::from([
+            ("flag".into(), Document::Bool(true)),
+            ("other".into(), Document::Bool(false)),
+        ]);
+        assert_eq!(
+            merge_config_properties(current.clone(), Some(&BTreeMap::new())).unwrap(),
+            current
+        );
+        let patched = merge_config_properties(
+            current.clone(),
+            Some(&BTreeMap::from([("flag".into(), Value::Bool(false))])),
+        )
+        .unwrap();
+        assert_eq!(patched.len(), 2);
+        assert_eq!(patched["flag"], Document::Bool(false));
+        assert!(merge_config_properties(
+            current,
+            Some(&BTreeMap::from([("unknown".into(), Value::Bool(false))]))
+        )
+        .is_err());
+    }
 }
