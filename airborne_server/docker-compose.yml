@@ -20,13 +20,45 @@ services:
     # Resource optimization for development
     shm_size: 256mb
 
+  superposition-data-init:
+    image: ghcr.io/juspay/superposition-demo:${SUPERPOSITION_VERSION:-0.113.0}
+    user: "0:0"
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        if [ -e /seed/.airborne-seed-in-progress ]; then
+          echo 'Incomplete seed; inspect the host directory before retrying' >&2
+          exit 1
+        fi
+        if [ -f /seed/PG_VERSION ]; then
+          test -f /seed/global/pg_control
+          test "$$(cat /seed/PG_VERSION)" = 17
+          test "$$(stat -c '%u:%g %a' /seed)" = '100:102 700'
+        elif [ -z "$$(find /seed -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+          touch /seed/.airborne-seed-in-progress
+          cp -a /var/lib/postgresql/17/main/. /seed/
+          chown -R 100:102 /seed
+          chmod 0700 /seed
+          rm /seed/.airborne-seed-in-progress
+        else
+          echo 'Refusing to overwrite populated Superposition data directory' >&2
+          exit 1
+        fi
+    volumes:
+      - ${AIRBORNE_DATA_DIR:-./.airborne-data}/superposition:/seed
+    restart: "no"
+
   superposition:
-    image: ghcr.io/juspay/superposition-demo:${SUPERPOSITION_VERSION:-0.89.0}
+    image: ghcr.io/juspay/superposition-demo:${SUPERPOSITION_VERSION:-0.113.0}
     container_name: superposition
     ports:
       - "${SUPERPOSITION_PORT:-8080}:8080"
     volumes:
       - init-data:/init-data # Shared volume to pass the env file
+      - ${AIRBORNE_DATA_DIR:-./.airborne-data}/superposition:/var/lib/postgresql/17/main
+    depends_on:
+      superposition-data-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   keycloak-db:
@@ -77,26 +109,29 @@ services:
       - --health-enabled=true
       - --metrics-enabled=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/realms/master"]
+      # The upstream Keycloak image has bash, but no curl.
+      test: ["CMD", "bash", "-ec", "exec 3<>/dev/tcp/localhost/9000; printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3; cat <&3 | grep -q '200 OK'"]
       interval: 15s
       timeout: 10s
       retries: 15
       start_period: 30s
 
   localstack:
-    image: localstack/localstack:${LOCALSTACK_VERSION:-latest}
+    # Community 4.x ignores PERSISTENCE; persist S3 without a Pro token.
+    image: gresau/localstack-persist:4@sha256:02045e045f1f3868c3cadef78de2a7c048840f48ffd506babf4a36f42a4845ba
     container_name: hyper-ota-localstack
+    restart: unless-stopped
     ports:
       - "${LOCALSTACK_PORT:-4566}:4566"
-    # Add persistent volume for LocalStack data
     volumes:
-      - ./localstack-data:/var/lib/localstack
-      # - "/var/run/docker.sock:/var/run/docker.sock"
+      - ${AIRBORNE_DATA_DIR:-./.airborne-data}/localstack:/persisted-data
     environment:
       - SERVICES=${LOCALSTACK_SERVICES:-kms,s3}
       - DEBUG=${LOCALSTACK_DEBUG:-1}
-      - PERSISTENCE=1 # Enable persistence
-      - DATA_DIR=/var/lib/localstack/data
+      - PERSIST_DEFAULT=0
+      - PERSIST_S3=1
+      - PERSIST_KMS=1
+      - PERSIST_FREQUENCY=1
     healthcheck:
       # Check specific services that we need (kms and s3)
       test: >-

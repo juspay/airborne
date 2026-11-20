@@ -155,6 +155,18 @@ async fn enforce_my_permissions_batch(
                     &action,
                 );
                 decision_indexes.push(index);
+                // Endpoints accept an organisation role for application routes (an organisation `write`
+                // member can read every application's releases). Mirror that here, so the dashboard does
+                // not hide a page the server would serve.
+                let org_index = upsert_provider_check(
+                    &mut provider_checks,
+                    &mut check_index,
+                    organisation,
+                    None,
+                    &resource,
+                    &action,
+                );
+                decision_indexes.push(org_index);
             }
             PermissionScope::Auto => {
                 let organisation =
