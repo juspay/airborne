@@ -308,12 +308,6 @@ async fn issue_token(
             ABError::Unauthorized("Invalid credentials".to_string())
         })?;
 
-    log::info!(
-        "[ISSUE TOKEN] Refresh token decrypted successfully, length: {}, first 10 chars: {}",
-        decrypted_refresh_token.len(),
-        &decrypted_refresh_token.chars().take(10).collect::<String>()
-    );
-
     let token = state
         .authn_provider
         .refresh_access_token(state.get_ref(), &decrypted_refresh_token)

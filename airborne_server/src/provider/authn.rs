@@ -365,6 +365,15 @@ pub async fn verify_authn_token(
 
 #[async_trait]
 pub trait AuthNProvider: Send + Sync {
+    /// Approval rosters must resolve to real, enabled identities, not just AuthZ grants.
+    async fn approval_subject_exists(
+        &self,
+        _state: &AppState,
+        _subject: &str,
+    ) -> airborne_types::Result<bool> {
+        Err(ABError::BadRequest("Maker-checker requires an identity directory lookup supported by the configured AuthN provider".into()))
+    }
+
     fn kind(&self) -> AuthnProviderKind;
 
     fn supports_password_login(&self) -> bool;

@@ -1,0 +1,1 @@
+-- Validation has no separate schema state to undo.

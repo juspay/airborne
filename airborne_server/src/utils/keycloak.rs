@@ -120,3 +120,36 @@ pub async fn find_user_by_username(
             .unwrap_or(false)
     }))
 }
+
+/// Exact canonical email matching; a similarly named user cannot fill a roster slot.
+pub async fn approval_subject_exists(
+    admin: &KeycloakAdmin,
+    realm: &str,
+    subject: &str,
+) -> airborne_types::Result<bool> {
+    let users = admin
+        .realm_users_get(
+            realm,
+            None,
+            Some(subject.to_owned()),
+            None,
+            Some(true),
+            Some(true),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(2),
+            None,
+            None,
+            None,
+        )
+        .await
+        .map_err(|_| {
+            ABError::InternalServerError("Approval identity directory unavailable".into())
+        })?;
+    Ok(users
+        .iter()
+        .any(|u| u.enabled == Some(true) && u.email.as_deref() == Some(subject)))
+}

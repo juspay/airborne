@@ -31,6 +31,16 @@ fn required_signup_field(
 
 #[async_trait]
 impl AuthNProvider for KeycloakAuthNProvider {
+    async fn approval_subject_exists(
+        &self,
+        state: &AppState,
+        subject: &str,
+    ) -> airborne_types::Result<bool> {
+        let token = get_token(state.env.clone(), Client::new()).await?;
+        let admin = KeycloakAdmin::new(&state.env.keycloak_url, token, Client::new());
+        crate::utils::keycloak::approval_subject_exists(&admin, &state.env.realm, subject).await
+    }
+
     fn kind(&self) -> AuthnProviderKind {
         AuthnProviderKind::Keycloak
     }
