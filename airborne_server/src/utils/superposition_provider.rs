@@ -54,7 +54,7 @@ impl ProviderRegistry {
             .get_or_init(|| async move {
                 let options = SuperpositionOptions::new(
                     self.endpoint.clone(),
-                    self.api_token.clone(),
+                    superposition_provider::AuthMethod::Token(self.api_token.clone()),
                     self.organisation_id.clone(),
                     ws_owned,
                 );
