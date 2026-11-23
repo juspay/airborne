@@ -68,4 +68,18 @@ class AirborneModuleImpl(private val reactContext: ReactApplicationContext) {
             promise.reject("AIRBORNE_ERROR", "Failed to get bundle path: ${e.message}", e)
         }
     }
+
+    fun checkForUpdate(namespace: String, promise: Promise) {
+        try {
+            val airborne = Airborne.airborneObjectMap[namespace]
+            if (airborne == null) {
+                promise.reject("UNKNOWN_NAMESPACE", "Namespace not found: $namespace")
+                return
+            }
+            val result = airborne.checkForUpdate()
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.reject("AIRBORNE_ERROR", "Failed to check for update: ${e.message}", e)
+        }
+    }
 }

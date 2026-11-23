@@ -50,4 +50,8 @@ export function getBundlePath(nameSpace: string): Promise<string> {
   return Airborne.getBundlePath(nameSpace);
 }
 
+export function checkForUpdate(nameSpace: string): Promise<string> {
+  return Airborne.checkForUpdate(nameSpace);
+}
+
 export default Airborne;
