@@ -59,6 +59,25 @@ class AirborneReactHostDelegate(
     override val reactPackages: List<ReactPackage>
         get() = (reactNativeHostWrapper as? AirborneReactNativeHost)?.packages ?: emptyList()
 
+    /**
+     * Called by React Native when the instance fails (bundle load, reload or a fatal JS error)
+     * while dev support is disabled, so no RedBox is shown. Logs the error and reports it through
+     * [Airborne.trackReactInstanceException] to the [Airborne] instance whose bundle this host
+     * loaded.
+     *
+     * @param error the failure React Native reported.
+     */
     override fun handleInstanceException(error: Exception) {
+        Log.e(TAG, "React instance exception", error)
+        val bundlePath = try {
+            (reactNativeHostWrapper as? AirborneReactNativeHost)?.jsBundleFile
+        } catch (_: Exception) {
+            null
+        }
+        Airborne.trackReactInstanceException(error, bundlePath)
+    }
+
+    companion object {
+        private const val TAG = "AirborneReactHostDelegate"
     }
 }
