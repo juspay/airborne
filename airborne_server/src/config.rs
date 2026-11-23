@@ -64,7 +64,8 @@ pub struct AppConfig {
     // Superposition settings
     pub superposition_url: String,
     pub superposition_org_id: String,
-    pub superposition_token: Option<String>,
+    pub superposition_username: Option<String>,
+    pub superposition_password: Option<String>,
     pub enable_authenticated_superposition: bool,
     pub superposition_clear_unused_providers: bool,
     pub superposition_unused_provider_ttl: u64,
@@ -165,6 +166,16 @@ impl AppConfig {
                 }
             });
 
+        let enable_authenticated_superposition: bool =
+            parse_env("ENABLE_AUTHENTICATED_SUPERPOSITION", false);
+        let superposition_username = get_optional("SUPERPOSITION_USERNAME");
+        let superposition_password = get_optional_secret("SUPERPOSITION_PASSWORD")?;
+        if enable_authenticated_superposition
+            && (superposition_username.is_none() || superposition_password.is_none())
+        {
+            return Err("SUPERPOSITION_USERNAME and SUPERPOSITION_PASSWORD must be set when ENABLE_AUTHENTICATED_SUPERPOSITION=true".to_string());
+        }
+
         Ok(AppConfig {
             // Server settings
             port: parse_env("PORT", 8081),
@@ -214,11 +225,9 @@ impl AppConfig {
             // Superposition settings
             superposition_url: get_env("SUPERPOSITION_URL", None)?,
             superposition_org_id: get_env("SUPERPOSITION_ORG_ID", None)?,
-            superposition_token: get_optional_secret("SUPERPOSITION_TOKEN")?,
-            enable_authenticated_superposition: parse_env(
-                "ENABLE_AUTHENTICATED_SUPERPOSITION",
-                false,
-            ),
+            superposition_username,
+            superposition_password,
+            enable_authenticated_superposition,
             superposition_clear_unused_providers: parse_env(
                 "SUPERPOSITION_CLEAR_UNUSED_PROVIDERS",
                 false,

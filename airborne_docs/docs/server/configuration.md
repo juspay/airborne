@@ -112,16 +112,17 @@ Authorization uses Casbin, with policies persisted in Postgres. These variables 
 
 ## Superposition
 
-Airborne uses Superposition as its configuration/feature-flag engine for dimensions and release targeting. The base URL and org id are required; the token variables are only needed when Superposition is run in authenticated mode.
+Airborne uses Superposition as its configuration/feature-flag engine for dimensions and release targeting. The base URL and org id are required; the credential variables are only needed when Superposition is run in authenticated mode.
+
+Airborne authenticates to Superposition with **HTTP Basic auth**, both from the Superposition SDK client (dimensions, experiments, default configs) and from the per-workspace providers that resolve release config.
 
 | Variable | Required | Default / Example | Purpose |
 | --- | --- | --- | --- |
 | `SUPERPOSITION_URL` | **Yes** | `http://localhost:8080` | Base URL of the Superposition service. |
 | `SUPERPOSITION_ORG_ID` | **Yes** | `get-org-id-from-superposition` | Superposition organisation id. Populated by `init-superposition.sh` in dev. |
-| `ENABLE_AUTHENTICATED_SUPERPOSITION` | No | `false` | When `true`, the Superposition SDK client sends auth tokens/cookies; this makes the three token variables below mandatory. |
-| `SUPERPOSITION_TOKEN` | Conditional (secret) | _(unset)_ | Bearer token for Superposition. Used as the SDK bearer token (empty string if unset). |
-| `SUPERPOSITION_USER_TOKEN` | Conditional (secret) | _(unset)_ | User cookie token. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
-| `SUPERPOSITION_ORG_TOKEN` | Conditional (secret) | _(unset)_ | Org cookie token. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`** (panics if missing in that mode). |
+| `ENABLE_AUTHENTICATED_SUPERPOSITION` | No | `false` | When `true`, the SDK client and the workspace providers send `SUPERPOSITION_USERNAME` / `SUPERPOSITION_PASSWORD` as Basic auth credentials, and both variables become mandatory (the server fails to boot if either is missing). When `false`, empty credentials are sent and the two variables are ignored. |
+| `SUPERPOSITION_USERNAME` | Conditional | _(unset)_ | Basic auth username for Superposition. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`.** |
+| `SUPERPOSITION_PASSWORD` | Conditional (secret) | _(unset)_ | Basic auth password for Superposition. **Required when `ENABLE_AUTHENTICATED_SUPERPOSITION=true`.** |
 | `SUPERPOSITION_CLEAR_UNUSED_PROVIDERS` | No | `false` | When `true`, a background task evicts idle per-workspace Superposition providers (see below). When `false`, providers live for the process lifetime. |
 | `SUPERPOSITION_UNUSED_PROVIDER_TTL` | No | `43200` | Idle time, in seconds, after which an unused workspace provider is evicted. Only applied when eviction is enabled. Default is 12 hours. |
 | `SUPERPOSITION_UNUSED_PROVIDER_CHECK_INTERVAL` | No | `1500` | How often, in seconds, the eviction sweep runs. Only applied when eviction is enabled. Default is 25 minutes. |
@@ -199,9 +200,7 @@ The secret variables that participate in encryption are:
 - `DB_MIGRATION_PASSWORD`
 - `OIDC_CLIENT_SECRET`
 - `AUTH_ADMIN_CLIENT_SECRET`
-- `SUPERPOSITION_TOKEN`
-- `SUPERPOSITION_USER_TOKEN`
-- `SUPERPOSITION_ORG_TOKEN`
+- `SUPERPOSITION_PASSWORD`
 - `GOOGLE_SERVICE_ACCOUNT_KEY`
 
 ### The encrypt-envs flow

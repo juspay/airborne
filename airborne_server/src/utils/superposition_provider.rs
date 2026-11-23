@@ -6,7 +6,7 @@ use std::{
 use tokio::sync::OnceCell;
 
 use open_feature::{provider::FeatureProvider, EvaluationContext};
-use superposition_provider::{SuperpositionAPIProvider, SuperpositionOptions};
+use superposition_provider::{AuthMethod, SuperpositionAPIProvider, SuperpositionOptions};
 
 type WorkspaceId = String;
 
@@ -27,16 +27,16 @@ impl WorkspaceHandle {
 
 pub struct ProviderRegistry {
     organisation_id: String,
-    api_token: String,
+    auth: AuthMethod,
     endpoint: String,
     inner: DashMap<WorkspaceId, Arc<OnceCell<Arc<WorkspaceHandle>>>>,
 }
 
 impl ProviderRegistry {
-    pub fn new(organisation_id: String, api_token: String, endpoint: String) -> Self {
+    pub fn new(organisation_id: String, auth: AuthMethod, endpoint: String) -> Self {
         Self {
             organisation_id,
-            api_token,
+            auth,
             endpoint,
             inner: DashMap::new(),
         }
@@ -54,7 +54,7 @@ impl ProviderRegistry {
             .get_or_init(|| async move {
                 let options = SuperpositionOptions::new(
                     self.endpoint.clone(),
-                    self.api_token.clone(),
+                    self.auth.clone(),
                     self.organisation_id.clone(),
                     ws_owned,
                 );
