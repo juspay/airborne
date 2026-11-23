@@ -143,6 +143,8 @@ pub mod hyperotaserver {
             name -> Text,
             dimensions -> Jsonb,
             created_at -> Timestamptz,
+            view_type -> Text,
+            pending_delete_release_id -> Nullable<Text>,
         }
     }
 
