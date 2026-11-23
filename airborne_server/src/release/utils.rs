@@ -793,6 +793,11 @@ pub async fn build_overrides(
         ));
     }
 
+    // Shared by release creation and update. A release pins the checksums that
+    // devices verify against, so a file that has not finished downloading must
+    // not be pinned into one.
+    crate::file::utils::ensure_files_ready(&files)?;
+
     let config_version = uuid::Uuid::new_v4().to_string();
 
     let mut control_overrides = std::collections::HashMap::new();
