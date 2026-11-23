@@ -2090,7 +2090,7 @@
         },
         "/release/v2/{organisation}/{application}": {
             "get": {
-                "description": "Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Public — no auth token required.",
+                "description": "Version 2 of the release-resolution endpoint: resolves and returns the active release configuration for an application based on the caller's targeting dimensions. This is the endpoint newer SDKs call at boot. Pass `extended=true` to also receive the unresolved `config.properties` bundle for client-side resolution. Public — no auth token required.",
                 "operationId": "ServeReleaseV2",
                 "parameters": [
                     {
@@ -2112,6 +2112,15 @@
                             "description": "Name of the application."
                         },
                         "required": true
+                    },
+                    {
+                        "name": "extended",
+                        "in": "query",
+                        "description": "Set to `true` to additionally return the unresolved Superposition bundle in `unresolved_properties`, so the caller can resolve `config.properties` itself instead of relying on the server-resolved result.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Set to `true` to additionally return the unresolved Superposition bundle in `unresolved_properties`, so the caller can resolve `config.properties` itself instead of relying on the server-resolved result."
+                        }
                     }
                 ],
                 "responses": {
@@ -2183,7 +2192,7 @@
         },
         "/release/{organisation}/{application}": {
             "get": {
-                "description": "Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Public — no auth token required.",
+                "description": "Resolve and return the active release configuration for an application, given the caller's targeting dimensions. This is the endpoint the SDK calls at boot. Pass `extended=true` to also receive the unresolved `config.properties` bundle for client-side resolution. Public — no auth token required.",
                 "operationId": "ServeRelease",
                 "parameters": [
                     {
@@ -2205,6 +2214,15 @@
                             "description": "Name of the application."
                         },
                         "required": true
+                    },
+                    {
+                        "name": "extended",
+                        "in": "query",
+                        "description": "Set to `true` to additionally return the unresolved Superposition bundle in `unresolved_properties`, so the caller can resolve `config.properties` itself instead of relying on the server-resolved result.",
+                        "schema": {
+                            "type": "string",
+                            "description": "Set to `true` to additionally return the unresolved Superposition bundle in `unresolved_properties`, so the caller can resolve `config.properties` itself instead of relying on the server-resolved result."
+                        }
                     }
                 ],
                 "responses": {
@@ -3421,6 +3439,10 @@
                     "checksum": {
                         "type": "string",
                         "description": "Checksum used to verify the downloaded file."
+                    },
+                    "size": {
+                        "type": "number",
+                        "description": "Size of the file in bytes"
                     }
                 }
             },
@@ -3470,6 +3492,9 @@
                     },
                     "resources": {
                         "description": "Additional resources for the release, as a JSON document."
+                    },
+                    "unresolved_properties": {
+                        "$ref": "#/components/schemas/UnresolvedProperties"
                     }
                 },
                 "required": [
@@ -3490,6 +3515,9 @@
                     },
                     "resources": {
                         "description": "Additional resources for the release, as a JSON document."
+                    },
+                    "unresolved_properties": {
+                        "$ref": "#/components/schemas/UnresolvedProperties"
                     }
                 },
                 "required": [
@@ -3508,6 +3536,41 @@
                 },
                 "required": [
                     "message"
+                ]
+            },
+            "UnresolvedProperties": {
+                "type": "object",
+                "description": "The unresolved Superposition bundle for the application's workspace, narrowed to the `config.properties` key space: the same targeting data the server resolved against, handed over so the caller can run the resolution itself.",
+                "properties": {
+                    "config": {
+                        "description": "The workspace config — `contexts`, `overrides`, `default_configs` and `dimensions` — with every config key other than `config.properties*` filtered out. `dimensions` is not filtered, so cohort dimensions still carry their JsonLogic `definitions` and cohort membership is derivable from this payload."
+                    },
+                    "config_version": {
+                        "type": "string",
+                        "description": "Version identifier of the workspace config."
+                    },
+                    "config_last_modified": {
+                        "type": "string",
+                        "description": "Time the workspace config was last modified, as an RFC 3339 timestamp."
+                    },
+                    "experiments": {
+                        "description": "Active experiments, used to resolve ramped releases. Each variant's overrides are narrowed to `config.properties*`; variant selection itself is unaffected."
+                    },
+                    "experiment_groups": {
+                        "description": "Experiment groups, used to bucket a caller by its targeting key."
+                    },
+                    "experiments_last_modified": {
+                        "type": "string",
+                        "description": "Time the experiment config was last modified, as an RFC 3339 timestamp."
+                    }
+                },
+                "required": [
+                    "config",
+                    "config_last_modified",
+                    "config_version",
+                    "experiment_groups",
+                    "experiments",
+                    "experiments_last_modified"
                 ]
             },
             "UpdateDimensionRequestContent": {

@@ -240,13 +240,21 @@ async fn create_cohort_checkpoint_api(
         .superposition_client
         .update_dimension()
         .org_id(superposition_org_id)
-        .workspace_id(workspace_name)
+        .workspace_id(workspace_name.clone())
         .dimension(cohort_dimension_id.clone())
         .set_schema(Some(cohort_dimension.to_kv_str_doc()))
         .change_reason("Added cohort checkpoint via API".to_string())
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+
+    crate::release::utils::refresh_unresolved_properties(
+        &state,
+        &organisation,
+        &application,
+        &workspace_name,
+    )
+    .await;
 
     Ok(Json(types::CreateCohortDimensionCheckpointOutput {
         name: req.name.clone(),
@@ -342,13 +350,21 @@ async fn create_cohort_group_api(
         .superposition_client
         .update_dimension()
         .org_id(superposition_org_id)
-        .workspace_id(workspace_name)
+        .workspace_id(workspace_name.clone())
         .dimension(cohort_dimension_id.clone())
         .set_schema(Some(cohort_dimension.to_kv_str_doc()))
         .change_reason("Added cohort checkpoint via API".to_string())
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+
+    crate::release::utils::refresh_unresolved_properties(
+        &state,
+        &organisation,
+        &application,
+        &workspace_name,
+    )
+    .await;
 
     Ok(Json(types::CreateCohortGroupOutput {
         name: req.name.clone(),
@@ -530,13 +546,21 @@ async fn update_cohort_priority_api(
         .superposition_client
         .update_dimension()
         .org_id(superposition_org_id)
-        .workspace_id(workspace_name)
+        .workspace_id(workspace_name.clone())
         .dimension(cohort_dimension_id.clone())
         .set_schema(Some(cohort_dimension.to_kv_str_doc()))
         .change_reason("Updated cohort priority via API".to_string())
         .send()
         .await
         .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
+
+    crate::release::utils::refresh_unresolved_properties(
+        &state,
+        &organisation,
+        &application,
+        &workspace_name,
+    )
+    .await;
 
     Ok(Json(types::UpdatePriorityOutput {
         priority_map: req.priority_map.clone(),
