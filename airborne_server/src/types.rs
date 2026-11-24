@@ -43,10 +43,12 @@ pub struct AppState {
     pub authn_provider: Arc<dyn AuthNProvider>,
     pub authz_provider: Arc<dyn AuthZProvider>,
     pub db_pool: db::DbPool,
+    pub release_write_db_url: String,
     pub redis_cache: Option<RedisCache>,
     pub s3_client: aws_sdk_s3::Client,
     pub cf_client: aws_sdk_cloudfront::Client,
     pub superposition_client: Client,
+    pub release_superposition_client: Client,
     pub sheets_hub: Option<
         Sheets<hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>>,
     >,
@@ -206,6 +208,12 @@ pub enum ABError {
     #[error("{0}")]
     Conflict(String),
 
+    #[error("{body}")]
+    ReleaseOperation {
+        status: u16,
+        body: serde_json::Value,
+    },
+
     #[error("R2D2 error: {0}")]
     R2D2Error(#[from] r2d2::Error),
 }
@@ -306,6 +314,7 @@ impl AppError for ABError {
             ABError::BadRequest(_) => ABErrorCodes::BadRequest.label(),
             ABError::Forbidden(_) => ABErrorCodes::Forbidden.label(),
             ABError::Conflict(_) => ABErrorCodes::Conflict.label(),
+            ABError::ReleaseOperation { .. } => ABErrorCodes::Conflict.label(),
             ABError::R2D2Error(_) => ABErrorCodes::InternalServerError.label(),
         }
     }
@@ -318,7 +327,10 @@ impl AppError for ABError {
             ABError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ABError::Forbidden(_) => StatusCode::FORBIDDEN,
             ABError::Conflict(_) => StatusCode::CONFLICT,
-            ABError::R2D2Error(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ABError::ReleaseOperation { status, .. } => {
+                StatusCode::from_u16(*status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+            ABError::R2D2Error(_) => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
 
@@ -349,7 +361,47 @@ macro_rules! impl_response_error {
     };
 }
 
-impl_response_error!(ABError);
+impl actix_web::ResponseError for ABError {
+    fn status_code(&self) -> StatusCode {
+        AppError::status_code(self)
+    }
+    fn error_response(&self) -> actix_web::HttpResponse {
+        let status = AppError::status_code(self);
+        let code = if let Self::ReleaseOperation { body, .. } = self {
+            body["code"].as_str().unwrap_or("")
+        } else {
+            ""
+        };
+        let error_type = match code {
+            "approval_required" => "ApprovalRequiredError",
+            "unresolved" => "UnresolvedOperationError",
+            "replacement_changed" => "RollbackReplacementChangedError",
+            "superseded" => "ReleaseSupersededError",
+            _ => match status.as_u16() {
+                400 => "BadRequestError",
+                401 => "Unauthorized",
+                403 => "ForbiddenError",
+                404 => "NotFoundError",
+                409 => "ConflictError",
+                422 => "RollbackUnprocessableError",
+                429 => "TooManyRequestsError",
+                502 => "RollbackPartialFailureError",
+                503 => "ServiceUnavailableError",
+                _ => "InternalServerError",
+            },
+        };
+        let mut response = actix_web::HttpResponse::build(status);
+        response.insert_header(("x-amzn-errortype", error_type));
+        if let Self::ReleaseOperation { body, .. } = self {
+            self.message();
+            return response.json(body);
+        }
+        response.json(ErrorBody {
+            code: self.code().into(),
+            message: self.message(),
+        })
+    }
+}
 
 impl From<std::io::Error> for ABError {
     fn from(err: std::io::Error) -> ABError {

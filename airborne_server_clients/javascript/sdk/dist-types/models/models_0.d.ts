@@ -9,6 +9,11 @@ export declare class BadRequestError extends __BaseException {
     readonly name: "BadRequestError";
     readonly $fault: "client";
     /**
+     * Airborne error code (AB_005).
+     * @public
+     */
+    code: string | undefined;
+    /**
      * @internal
      */
     constructor(opts: __ExceptionOptionType<BadRequestError, __BaseException>);
@@ -57,6 +62,11 @@ export declare class ForbiddenError extends __BaseException {
     readonly name: "ForbiddenError";
     readonly $fault: "client";
     /**
+     * Airborne error code (AB_006).
+     * @public
+     */
+    code: string | undefined;
+    /**
      * @internal
      */
     constructor(opts: __ExceptionOptionType<ForbiddenError, __BaseException>);
@@ -68,6 +78,11 @@ export declare class ForbiddenError extends __BaseException {
 export declare class InternalServerError extends __BaseException {
     readonly name: "InternalServerError";
     readonly $fault: "server";
+    /**
+     * Airborne error code (AB_003).
+     * @public
+     */
+    code: string | undefined;
     /**
      * @internal
      */
@@ -81,6 +96,11 @@ export declare class NotFoundError extends __BaseException {
     readonly name: "NotFoundError";
     readonly $fault: "client";
     /**
+     * Airborne error code (AB_001).
+     * @public
+     */
+    code: string | undefined;
+    /**
      * @internal
      */
     constructor(opts: __ExceptionOptionType<NotFoundError, __BaseException>);
@@ -93,9 +113,62 @@ export declare class Unauthorized extends __BaseException {
     readonly name: "Unauthorized";
     readonly $fault: "client";
     /**
+     * Airborne error code (for example, AB_004).
+     * @public
+     */
+    code: string | undefined;
+    /**
      * @internal
      */
     constructor(opts: __ExceptionOptionType<Unauthorized, __BaseException>);
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const ControlCenterPlatform: {
+    readonly ANDROID: "android";
+    readonly IOS: "ios";
+    readonly OTHER: "other";
+    readonly WEB: "web";
+};
+/**
+ * @public
+ */
+export type ControlCenterPlatform = typeof ControlCenterPlatform[keyof typeof ControlCenterPlatform];
+/**
+ * A group member identifies an application and the platform label shown in Control Center.
+ * @public
+ */
+export interface ControlCenterGroupMember {
+    application: string | undefined;
+    /**
+     * Supported application platforms for a Control Center group member.
+     * @public
+     */
+    platform: ControlCenterPlatform | undefined;
+}
+/**
+ * A configured application group.
+ * @public
+ */
+export interface ControlCenterGroup {
+    /**
+     * UUID identifying the group.
+     * @public
+     */
+    id: string | undefined;
+    name: string | undefined;
+    members: (ControlCenterGroupMember)[] | undefined;
+}
+/**
+ * Input for creating a group.
+ * @public
+ */
+export interface CreateControlCenterGroupInput {
+    organisation: string | undefined;
+    name: string | undefined;
+    members: (ControlCenterGroupMember)[] | undefined;
 }
 /**
  * @public
@@ -364,6 +437,23 @@ export interface Package {
     files: (string)[] | undefined;
 }
 /**
+ * Conflict error returned when a release is not in a state that allows the requested change: it cannot be rolled back, has already concluded or been discarded, must be ramped before it is concluded, or another release is already ongoing for the same dimensions. Refresh the release state before retrying.
+ * @public
+ */
+export declare class ConflictError extends __BaseException {
+    readonly name: "ConflictError";
+    readonly $fault: "client";
+    /**
+     * Airborne error code (AB_007).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<ConflictError, __BaseException>);
+}
+/**
  * Create release request config
  * @public
  */
@@ -587,6 +677,11 @@ export interface ServePackage {
  */
 export interface CreateReleaseResponse {
     /**
+     * Advisory targeting warnings emitted by create, update and list.
+     * @public
+     */
+    warnings?: (string)[] | undefined;
+    /**
      * ID of the release
      * @public
      */
@@ -618,6 +713,51 @@ export interface CreateReleaseResponse {
     dimensions: Record<string, __DocumentType> | undefined;
 }
 /**
+ * A write has an unknown upstream outcome. Inspect its real state and change history before resolving it; elapsed time alone does not establish rejection. An upstream 4xx is not proof that nothing was written, because the upstream handler can return it after configuration effects. While the operation is unresolved, writes for the application stay paused. When the 409 comes from a recovery attempt it can name the config keys or contexts that changed and must be restored, or finished and resolved as applied.
+ * @public
+ */
+export declare class UnresolvedOperationError extends __BaseException {
+    readonly name: "UnresolvedOperationError";
+    readonly $fault: "client";
+    code: string | undefined;
+    operation_id: string | undefined;
+    /**
+     * The exact state expected after the upstream write.
+     * @public
+     */
+    expected: __DocumentType | undefined;
+    /**
+     * The state observed before dispatch.
+     * @public
+     */
+    before: __DocumentType | undefined;
+    upstream_workspace: __DocumentType | undefined;
+    upstream_org: __DocumentType | undefined;
+    /**
+     * True when this request itself may have changed upstream state; absent when an earlier write is blocking this request.
+     * @public
+     */
+    own_attempt?: boolean | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<UnresolvedOperationError, __BaseException>);
+}
+/**
+ * A group UUID path parameter and the organisation whose group is being changed.
+ * @public
+ */
+export interface ControlCenterGroupPath {
+    id: string | undefined;
+    organisation: string | undefined;
+}
+/**
+ * @public
+ */
+export interface DeleteControlCenterGroupResponse {
+    success: boolean | undefined;
+}
+/**
  * @public
  */
 export interface DeleteDimensionRequest {
@@ -636,6 +776,209 @@ export interface DeleteDimensionRequest {
      * @public
      */
     application: string | undefined;
+}
+/**
+ * Overview is user-scoped and does not require organisation/application scope headers.
+ * @public
+ */
+export interface GetControlCenterOverviewInput {
+}
+/**
+ * A release that is created or currently in progress.
+ * @public
+ */
+export interface ControlCenterActiveRelease {
+    release_id: string | undefined;
+    package_version: number | undefined;
+    status: string | undefined;
+    traffic_percentage: number | undefined;
+    /**
+     * Exact variant identifier of the experimental variant; conclude requires this value.
+     * @public
+     */
+    experimental_variant: string | undefined;
+    dimensions: __DocumentType | undefined;
+    created_at: Date | undefined;
+    created_by: string | undefined;
+}
+/**
+ * A release that is currently live for one dimensions context.
+ * @public
+ */
+export interface ControlCenterLiveRelease {
+    release_id: string | undefined;
+    package_version: number | undefined;
+    config_version: string | undefined;
+    dimensions: __DocumentType | undefined;
+    /**
+     * RFC 3339 timestamp for the concluded live release.
+     * @public
+     */
+    concluded_at: Date | undefined;
+}
+/**
+ * An upstream write whose outcome has not been confirmed.
+ * @public
+ */
+export interface ControlCenterUnresolvedOperation {
+    operation_id: string | undefined;
+    message: string | undefined;
+    expected: __DocumentType | undefined;
+    before: __DocumentType | undefined;
+    upstream_workspace: __DocumentType | undefined;
+}
+/**
+ * Release state for one application, including per-application lookup failures.
+ * @public
+ */
+export interface ControlCenterAppStatus {
+    application: string | undefined;
+    /**
+     * Platform label from the containing group; JSON null for an ungrouped application.
+     * @public
+     */
+    platform: __DocumentType | undefined;
+    live: (ControlCenterLiveRelease)[] | undefined;
+    active: (ControlCenterActiveRelease)[] | undefined;
+    /**
+     * Unresolved upstream writes. While any item exists, writes are paused for this application.
+     * @public
+     */
+    unresolved_operations: (ControlCenterUnresolvedOperation)[] | undefined;
+    /**
+     * RFC 3339 timestamp, or JSON null when the application has no release activity.
+     * @public
+     */
+    last_activity_at: __DocumentType | undefined;
+    /**
+     * Sanitized lookup failure message, or JSON null when lookup succeeded.
+     * @public
+     */
+    error: __DocumentType | undefined;
+}
+/**
+ * A group and its release status entries in the overview response.
+ * @public
+ */
+export interface ControlCenterOverviewGroup {
+    id: string | undefined;
+    name: string | undefined;
+    members: (ControlCenterAppStatus)[] | undefined;
+}
+/**
+ * @public
+ */
+export interface ControlCenterOrganisationOverview {
+    name: string | undefined;
+    groups: (ControlCenterOverviewGroup)[] | undefined;
+    ungrouped: (ControlCenterAppStatus)[] | undefined;
+}
+/**
+ * @public
+ */
+export interface GetControlCenterOverviewResponse {
+    generated_at: Date | undefined;
+    organisations: (ControlCenterOrganisationOverview)[] | undefined;
+}
+/**
+ * Release identifier, organisation, and application used to fetch a release timeline.
+ * @public
+ */
+export interface ControlCenterReleaseEventsInput {
+    release_id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const ControlCenterReleaseEventAction: {
+    readonly CONCLUDED: "concluded";
+    readonly CREATED: "created";
+    readonly DISCARDED: "discarded";
+    readonly OPERATION_RESOLVED: "operation_resolved";
+    readonly RAMPED: "ramped";
+    readonly ROLLED_BACK: "rolled_back";
+};
+/**
+ * @public
+ */
+export type ControlCenterReleaseEventAction = typeof ControlCenterReleaseEventAction[keyof typeof ControlCenterReleaseEventAction];
+/**
+ * @public
+ */
+export interface ControlCenterReleaseEvent {
+    /**
+     * Recorded timeline action. The timeline can also include synthetic created/concluded/discarded entries.
+     * @public
+     */
+    action: ControlCenterReleaseEventAction | undefined;
+    actor: string | undefined;
+    created_at: Date | undefined;
+    payload: __DocumentType | undefined;
+    synthetic: boolean | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const ControlCenterReleaseOutcome: {
+    /**
+     * Created or in progress.
+     */
+    readonly ACTIVE: "active";
+    /**
+     * Concluded with the control variant, so the experimental variant never went live.
+     */
+    readonly CONCLUDED_ON_CONTROL: "concluded_on_control";
+    /**
+     * Discarded before it went live.
+     */
+    readonly DISCARDED: "discarded";
+    /**
+     * Concluded on the experimental variant and still the latest live release for its dimensions.
+     */
+    readonly LIVE: "live";
+    /**
+     * Concluded on the experimental variant but replaced by a later live release.
+     */
+    readonly SUPERSEDED: "superseded";
+};
+/**
+ * @public
+ */
+export type ControlCenterReleaseOutcome = typeof ControlCenterReleaseOutcome[keyof typeof ControlCenterReleaseOutcome];
+/**
+ * @public
+ */
+export interface GetControlCenterReleaseEventsResponse {
+    events: (ControlCenterReleaseEvent)[] | undefined;
+    /**
+     * Server-computed outcome of a release. Clients must use this value rather than infer it from the events.
+     * @public
+     */
+    outcome: ControlCenterReleaseOutcome | undefined;
+}
+/**
+ * Read-authorized path and application scope for rollback preview.
+ * @public
+ */
+export interface RollbackPreviewInput {
+    release_id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+}
+/**
+ * Side-effect-free rollback decision. Action, resulting package, reconciliation details and blocked are nullable when unavailable.
+ * @public
+ */
+export interface RollbackPreviewResponse {
+    action: __DocumentType | undefined;
+    current_package_version: __DocumentType | undefined;
+    resulting_package_version: __DocumentType | undefined;
+    reconciled_keys: __DocumentType | undefined;
+    blocked: __DocumentType | undefined;
 }
 /**
  * Path and headers for fetching a single release.
@@ -663,6 +1006,11 @@ export interface GetReleaseRequest {
  * @public
  */
 export interface GetReleaseResponse {
+    /**
+     * Advisory targeting warnings.
+     * @public
+     */
+    warnings?: (string)[] | undefined;
     /**
      * ID of the release.
      * @public
@@ -750,6 +1098,46 @@ export interface User {
      * @public
      */
     user_token?: UserToken | undefined;
+}
+/**
+ * Path and organisation header for listing groups.
+ * @public
+ */
+export interface ListControlCenterGroupsInput {
+    organisation: string | undefined;
+}
+/**
+ * @public
+ */
+export interface ListControlCenterGroupsResponse {
+    groups: (ControlCenterGroup)[] | undefined;
+}
+/**
+ * List unresolved write operations for one application. `status` is currently `unresolved`.
+ * @public
+ */
+export interface ListControlCenterOperationsInput {
+    organisation: string | undefined;
+    application: string | undefined;
+    status?: string | undefined;
+}
+/**
+ * @public
+ */
+export interface ControlCenterUnresolvedOperationDetails {
+    code: string | undefined;
+    operation_id: string | undefined;
+    message: string | undefined;
+    expected: __DocumentType | undefined;
+    before: __DocumentType | undefined;
+    upstream_workspace: __DocumentType | undefined;
+    upstream_org: __DocumentType | undefined;
+}
+/**
+ * @public
+ */
+export interface ListControlCenterOperationsResponse {
+    operations: (ControlCenterUnresolvedOperationDetails)[] | undefined;
 }
 /**
  * Query parameters and headers for listing dimensions.
@@ -1240,6 +1628,239 @@ export interface RequestOrganisationResponse {
     message: string | undefined;
 }
 /**
+ * @public
+ * @enum
+ */
+export declare const OperationRecoveryFinding: {
+    readonly APPLIED: "applied";
+    readonly DID_NOT_APPLY: "did_not_apply";
+};
+/**
+ * @public
+ */
+export type OperationRecoveryFinding = typeof OperationRecoveryFinding[keyof typeof OperationRecoveryFinding];
+/**
+ * @public
+ */
+export interface ResolveControlCenterOperationInput {
+    id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+    finding: OperationRecoveryFinding | undefined;
+    /**
+     * Required and non-blank; the operator's reason is recorded in the audit event. It must not contain the reserved text `Airborne operation`; such a reason returns 400.
+     * @public
+     */
+    reason: string | undefined;
+    /**
+     * Must be true for did_not_apply. The operator confirms the original request cannot execute later.
+     * @public
+     */
+    request_terminated?: boolean | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const ResolvedOperationState: {
+    readonly CONFIRMED: "confirmed";
+    readonly REJECTED: "rejected";
+};
+/**
+ * @public
+ */
+export type ResolvedOperationState = typeof ResolvedOperationState[keyof typeof ResolvedOperationState];
+/**
+ * @public
+ */
+export interface ResolveControlCenterOperationResponse {
+    operation_id: string | undefined;
+    state: ResolvedOperationState | undefined;
+    finding: OperationRecoveryFinding | undefined;
+}
+/**
+ * Returned by rollback when the release is a concluded release that is no longer the latest live release for its dimensions. Nothing is changed.
+ * @public
+ */
+export declare class ReleaseSupersededError extends __BaseException {
+    readonly name: "ReleaseSupersededError";
+    readonly $fault: "client";
+    /**
+     * Rollback block code (`superseded`).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * Identifier of the release that is currently live for the same dimensions, or JSON null when no live release exists.
+     * @public
+     */
+    current_live_release_id: __DocumentType | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<ReleaseSupersededError, __BaseException>);
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const RollbackFailureStage: {
+    readonly CONCLUDE: "conclude";
+    /**
+     * The server is creating or recovering the replacement before recording its identifier.
+     */
+    readonly CREATE: "create";
+    readonly RAMP: "ramp";
+};
+/**
+ * @public
+ */
+export type RollbackFailureStage = typeof RollbackFailureStage[keyof typeof RollbackFailureStage];
+/**
+ * Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.
+ * @public
+ */
+export declare class RollbackPartialFailureError extends __BaseException {
+    readonly name: "RollbackPartialFailureError";
+    readonly $fault: "server";
+    /**
+     * Airborne error code (AB_003).
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * Identifier of the replacement release, or JSON null when no replacement was created.
+     * @public
+     */
+    replacement_release_id: __DocumentType | undefined;
+    /**
+     * Durable rollback operation identifier.
+     * @public
+     */
+    rollback_operation_id: string | undefined;
+    /**
+     * Step that failed.
+     * @public
+     */
+    stage: RollbackFailureStage | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<RollbackPartialFailureError, __BaseException>);
+}
+/**
+ * Path, scope headers, and reason for a release rollback request.
+ * @public
+ */
+export interface RollbackReleaseInput {
+    release_id: string | undefined;
+    organisation: string | undefined;
+    application: string | undefined;
+    /**
+     * The reason must not contain the reserved, case-sensitive text `Airborne operation`: Airborne appends a generated suffix made of `[Airborne operation `, a canonical UUID and `]` to the reason it sends upstream, and the combined text must fit Superposition's 255-byte limit, so a reason is limited to 197 bytes. A reserved or oversized reason returns 400 before anything is dispatched.
+     * @public
+     */
+    reason: string | undefined;
+}
+/**
+ * @public
+ * @enum
+ */
+export declare const RollbackReleaseAction: {
+    readonly CONCLUDED_CONTROL: "concluded_control";
+    readonly DISCARDED: "discarded";
+    readonly RERELEASED: "rereleased";
+};
+/**
+ * @public
+ */
+export type RollbackReleaseAction = typeof RollbackReleaseAction[keyof typeof RollbackReleaseAction];
+/**
+ * How the configuration of a re-released rollback was reconciled with the currently registered keys.
+ * @public
+ */
+export interface ReconciledKeys {
+    /**
+     * Keys registered after the historical release; they keep their current value.
+     * @public
+     */
+    kept_current: (string)[] | undefined;
+    /**
+     * Keys in the historical release that are no longer registered; they are dropped.
+     * @public
+     */
+    dropped: (string)[] | undefined;
+}
+/**
+ * @public
+ */
+export interface RollbackReleaseResponse {
+    action: RollbackReleaseAction | undefined;
+    release_id: string | undefined;
+    /**
+     * Control package version, historical package version, or JSON null if unavailable.
+     * @public
+     */
+    rolled_back_to_package_version: __DocumentType | undefined;
+    /**
+     * Replacement release identifier, or JSON null when rollback does not create one.
+     * @public
+     */
+    new_release_id: __DocumentType | undefined;
+    /**
+     * Config reconciliation result, sorted. Both lists are empty when the rollback discards or concludes on control.
+     * @public
+     */
+    reconciled_keys: ReconciledKeys | undefined;
+    /**
+     * Current live release in the same dimensions context, or JSON null.
+     * @public
+     */
+    current_live_release_id?: __DocumentType | undefined;
+    /**
+     * A later unrelated live release, or JSON null. Completed retries still report the recorded rollback as successful.
+     * @public
+     */
+    later_release_id?: __DocumentType | undefined;
+}
+/**
+ * The rollback replacement was changed outside the durable rollback operation. Human inspection is required; do not resume automatically.
+ * @public
+ */
+export declare class RollbackReplacementChangedError extends __BaseException {
+    readonly name: "RollbackReplacementChangedError";
+    readonly $fault: "client";
+    code: string | undefined;
+    operation_id: string | undefined;
+    replacement_release_id: string | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<RollbackReplacementChangedError, __BaseException>);
+}
+/**
+ * Returned by rollback when no earlier live release exists or the historical package and config cannot be reconciled. Nothing is created.
+ * @public
+ */
+export declare class RollbackUnprocessableError extends __BaseException {
+    readonly name: "RollbackUnprocessableError";
+    readonly $fault: "client";
+    /**
+     * Rollback block code: `no_predecessor` or `incompatible`.
+     * @public
+     */
+    code: string | undefined;
+    /**
+     * The live release for this dimensions context, or JSON null.
+     * @public
+     */
+    current_live_release_id: __DocumentType | undefined;
+    /**
+     * @internal
+     */
+    constructor(opts: __ExceptionOptionType<RollbackUnprocessableError, __BaseException>);
+}
+/**
  * Input for get release operations
  * @public
  */
@@ -1275,6 +1896,16 @@ export interface ReleaseConfig {
      * @public
      */
     resources: __DocumentType | undefined;
+}
+/**
+ * Input for replacing a group's name and members.
+ * @public
+ */
+export interface UpdateControlCenterGroupInput {
+    id: string | undefined;
+    organisation: string | undefined;
+    name: string | undefined;
+    members: (ControlCenterGroupMember)[] | undefined;
 }
 /**
  * @public

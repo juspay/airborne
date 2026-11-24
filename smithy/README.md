@@ -49,6 +49,15 @@ The Airborne service is organized into several functional domains:
 - `GetRelease` - Retrieve specific release details
 - `ServeRelease` / `ServeReleaseV2` - Serve release configurations to client applications
 
+### Control Center
+
+- `GetControlCenterOverview` - Retrieve release status across organisations and applications the user can access
+- `ListControlCenterGroups`, `CreateControlCenterGroup`, `UpdateControlCenterGroup`, `DeleteControlCenterGroup` - Manage organisation application groups
+- `GetControlCenterReleaseEvents` - Read the audit timeline for a release
+- `RollbackRelease` - Roll back a release according to its lifecycle state
+- `GetControlCenterRollbackPreview` - Preview a rollback without changing anything
+- `ListControlCenterOperations`, `ResolveControlCenterOperation` - List and resolve write operations whose upstream outcome is unknown
+
 ### Dimension Management
 
 - `CreateDimension` - Create targeting dimensions for releases
@@ -74,6 +83,7 @@ The SDK is automatically generated when building the Smithy models and provides 
 │   ├── user.smithy          # User authentication and management
 │   ├── organisation.smithy  # Organization management structures
 │   ├── release.smithy       # Release and configuration management
+│   ├── control_center.smithy # Control Center routes and response shapes
 │   ├── package.smithy       # Package management structures
 │   ├── file.smithy          # File handling structures
 │   ├── dimension.smithy     # Dimension targeting structures

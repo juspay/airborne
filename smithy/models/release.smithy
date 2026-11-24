@@ -145,8 +145,15 @@ structure CreateReleaseRequest {
     application: String
 }
 
+/// Advisory release warnings.
+list ReleaseWarnings {
+    member: String
+}
+
 /// A created release.
 structure CreateReleaseResponse {
+    /// Advisory targeting warnings emitted by create, update and list.
+    warnings: ReleaseWarnings
     /// ID of the release
     @required
     id: String
@@ -206,6 +213,9 @@ structure ListReleasesRequest {
 
 /// A release with its full details.
 structure GetReleaseResponse {
+    /// Advisory targeting warnings.
+    warnings: ReleaseWarnings
+
     /// ID of the release.
     id: String
 
@@ -294,7 +304,7 @@ structure ReleaseConfig {
     resources: Document
 }
 
-/// Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Requires a bearer token.
+/// Create a new release. A release points a package (and any resources) at a set of targeting dimensions; ramp it later to roll it out. Pass the organisation and application in the x-organisation and x-application headers. Returns the created release with its resolved config and package. Returns 409 if another release is already ongoing for the same dimensions. Requires a bearer token.
 @tags(["Releases"])
 @http(method: "POST", uri: "/api/releases")
 @requiresauth
@@ -304,6 +314,8 @@ operation CreateRelease {
     errors: [
         Unauthorized
         BadRequestError
+        ConflictError
+        UnresolvedOperationError
     ]
 }
 

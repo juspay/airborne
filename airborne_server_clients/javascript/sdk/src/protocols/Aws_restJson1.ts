@@ -4,6 +4,10 @@ import {
   CreateApplicationCommandOutput,
 } from "../commands/CreateApplicationCommand";
 import {
+  CreateControlCenterGroupCommandInput,
+  CreateControlCenterGroupCommandOutput,
+} from "../commands/CreateControlCenterGroupCommand";
+import {
   CreateDimensionCommandInput,
   CreateDimensionCommandOutput,
 } from "../commands/CreateDimensionCommand";
@@ -24,9 +28,25 @@ import {
   CreateReleaseCommandOutput,
 } from "../commands/CreateReleaseCommand";
 import {
+  DeleteControlCenterGroupCommandInput,
+  DeleteControlCenterGroupCommandOutput,
+} from "../commands/DeleteControlCenterGroupCommand";
+import {
   DeleteDimensionCommandInput,
   DeleteDimensionCommandOutput,
 } from "../commands/DeleteDimensionCommand";
+import {
+  GetControlCenterOverviewCommandInput,
+  GetControlCenterOverviewCommandOutput,
+} from "../commands/GetControlCenterOverviewCommand";
+import {
+  GetControlCenterReleaseEventsCommandInput,
+  GetControlCenterReleaseEventsCommandOutput,
+} from "../commands/GetControlCenterReleaseEventsCommand";
+import {
+  GetControlCenterRollbackPreviewCommandInput,
+  GetControlCenterRollbackPreviewCommandOutput,
+} from "../commands/GetControlCenterRollbackPreviewCommand";
 import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
@@ -35,6 +55,14 @@ import {
   GetUserCommandInput,
   GetUserCommandOutput,
 } from "../commands/GetUserCommand";
+import {
+  ListControlCenterGroupsCommandInput,
+  ListControlCenterGroupsCommandOutput,
+} from "../commands/ListControlCenterGroupsCommand";
+import {
+  ListControlCenterOperationsCommandInput,
+  ListControlCenterOperationsCommandOutput,
+} from "../commands/ListControlCenterOperationsCommand";
 import {
   ListDimensionsCommandInput,
   ListDimensionsCommandOutput,
@@ -68,6 +96,14 @@ import {
   RequestOrganisationCommandOutput,
 } from "../commands/RequestOrganisationCommand";
 import {
+  ResolveControlCenterOperationCommandInput,
+  ResolveControlCenterOperationCommandOutput,
+} from "../commands/ResolveControlCenterOperationCommand";
+import {
+  RollbackReleaseCommandInput,
+  RollbackReleaseCommandOutput,
+} from "../commands/RollbackReleaseCommand";
+import {
   ServeReleaseCommandInput,
   ServeReleaseCommandOutput,
 } from "../commands/ServeReleaseCommand";
@@ -75,6 +111,10 @@ import {
   ServeReleaseV2CommandInput,
   ServeReleaseV2CommandOutput,
 } from "../commands/ServeReleaseV2Command";
+import {
+  UpdateControlCenterGroupCommandInput,
+  UpdateControlCenterGroupCommandOutput,
+} from "../commands/UpdateControlCenterGroupCommand";
 import {
   UpdateDimensionCommandInput,
   UpdateDimensionCommandOutput,
@@ -91,6 +131,16 @@ import { AirborneServiceException as __BaseException } from "../models/AirborneS
 import {
   BadRequestError,
   ConfigProperties,
+  ConflictError,
+  ControlCenterActiveRelease,
+  ControlCenterAppStatus,
+  ControlCenterGroupMember,
+  ControlCenterLiveRelease,
+  ControlCenterOrganisationOverview,
+  ControlCenterOverviewGroup,
+  ControlCenterReleaseEvent,
+  ControlCenterUnresolvedOperation,
+  ControlCenterUnresolvedOperationDetails,
   CreateFileResponse,
   CreateReleaseRequestConfig,
   CreateReleaseRequestPackage,
@@ -100,8 +150,13 @@ import {
   GetReleaseResponse,
   InternalServerError,
   NotFoundError,
+  ReleaseSupersededError,
+  RollbackPartialFailureError,
+  RollbackReplacementChangedError,
+  RollbackUnprocessableError,
   ServePackage,
   Unauthorized,
+  UnresolvedOperationError,
 } from "../models/models_0";
 import {
   loadRestJsonErrorCode,
@@ -122,6 +177,7 @@ import {
   expectObject as __expectObject,
   expectString as __expectString,
   extendedEncodeURIComponent as __extendedEncodeURIComponent,
+  parseRfc3339DateTimeWithOffset as __parseRfc3339DateTimeWithOffset,
   resolvedPath as __resolvedPath,
   _json,
   collectBody,
@@ -153,6 +209,30 @@ export const se_CreateApplicationCommand = async(
   let body: any;
   body = JSON.stringify(take(input, {
     'application': [],
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1CreateControlCenterGroupCommand
+ */
+export const se_CreateControlCenterGroupCommand = async(
+  input: CreateControlCenterGroupCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+  });
+  b.bp("/api/control-center/groups");
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'members': _ => _json(_),
+    'name': [],
   }));
   b.m("POST")
   .h(headers)
@@ -291,6 +371,26 @@ export const se_CreateReleaseCommand = async(
 }
 
 /**
+ * serializeAws_restJson1DeleteControlCenterGroupCommand
+ */
+export const se_DeleteControlCenterGroupCommand = async(
+  input: DeleteControlCenterGroupCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+  });
+  b.bp("/api/control-center/groups/{id}");
+  b.p('id', () => input.id!, '{id}', false)
+  let body: any;
+  b.m("DELETE")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1DeleteDimensionCommand
  */
 export const se_DeleteDimensionCommand = async(
@@ -306,6 +406,66 @@ export const se_DeleteDimensionCommand = async(
   b.p('dimension', () => input.dimension!, '{dimension}', false)
   let body: any;
   b.m("DELETE")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1GetControlCenterOverviewCommand
+ */
+export const se_GetControlCenterOverviewCommand = async(
+  input: GetControlCenterOverviewCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = {
+  };
+  b.bp("/api/control-center/overview");
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1GetControlCenterReleaseEventsCommand
+ */
+export const se_GetControlCenterReleaseEventsCommand = async(
+  input: GetControlCenterReleaseEventsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/control-center/releases/{release_id}/events");
+  b.p('release_id', () => input.release_id!, '{release_id}', false)
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1GetControlCenterRollbackPreviewCommand
+ */
+export const se_GetControlCenterRollbackPreviewCommand = async(
+  input: GetControlCenterRollbackPreviewCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/control-center/releases/{release_id}/rollback-preview");
+  b.p('release_id', () => input.release_id!, '{release_id}', false)
+  let body: any;
+  b.m("GET")
   .h(headers)
   .b(body);
   return b.build();
@@ -351,6 +511,49 @@ export const se_GetUserCommand = async(
 }
 
 /**
+ * serializeAws_restJson1ListControlCenterGroupsCommand
+ */
+export const se_ListControlCenterGroupsCommand = async(
+  input: ListControlCenterGroupsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+  });
+  b.bp("/api/control-center/groups");
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1ListControlCenterOperationsCommand
+ */
+export const se_ListControlCenterOperationsCommand = async(
+  input: ListControlCenterOperationsCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/control-center/operations");
+  const query: any = map({
+    [_s]: [,input[_s]!],
+  });
+  let body: any;
+  b.m("GET")
+  .h(headers)
+  .q(query)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1ListDimensionsCommand
  */
 export const se_ListDimensionsCommand = async(
@@ -391,7 +594,7 @@ export const se_ListFileGroupsCommand = async(
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
-    [_s]: [,input[_s]!],
+    [_se]: [,input[_se]!],
     [_t]: [,input[_t]!],
   });
   let body: any;
@@ -418,7 +621,7 @@ export const se_ListFilesCommand = async(
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_pp]: [() => input.per_page !== void 0, () => (input[_pp]!.toString())],
-    [_s]: [,input[_s]!],
+    [_se]: [,input[_se]!],
     [_t]: [,input[_t]!],
   });
   let body: any;
@@ -463,7 +666,7 @@ export const se_ListPackagesCommand = async(
   const query: any = map({
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
-    [_s]: [,input[_s]!],
+    [_se]: [,input[_se]!],
     [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
   });
   let body: any;
@@ -492,7 +695,7 @@ export const se_ListReleasesCommand = async(
     [_p]: [() => input.page !== void 0, () => (input[_p]!.toString())],
     [_c]: [() => input.count !== void 0, () => (input[_c]!.toString())],
     [_al]: [() => input.all !== void 0, () => (input[_al]!.toString())],
-    [_st]: [,input[_st]!],
+    [_s]: [,input[_s]!],
   });
   let body: any;
   b.m("GET")
@@ -553,6 +756,58 @@ export const se_RequestOrganisationCommand = async(
 }
 
 /**
+ * serializeAws_restJson1ResolveControlCenterOperationCommand
+ */
+export const se_ResolveControlCenterOperationCommand = async(
+  input: ResolveControlCenterOperationCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/control-center/operations/{id}/resolve");
+  b.p('id', () => input.id!, '{id}', false)
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'finding': [],
+    'reason': [],
+    'request_terminated': [],
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1RollbackReleaseCommand
+ */
+export const se_RollbackReleaseCommand = async(
+  input: RollbackReleaseCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+    [_xa]: input[_a]!,
+  });
+  b.bp("/api/releases/{release_id}/rollback");
+  b.p('release_id', () => input.release_id!, '{release_id}', false)
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'reason': [],
+  }));
+  b.m("POST")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
  * serializeAws_restJson1ServeReleaseCommand
  */
 export const se_ServeReleaseCommand = async(
@@ -587,6 +842,31 @@ export const se_ServeReleaseV2Command = async(
   b.p('application', () => input.application!, '{application}', false)
   let body: any;
   b.m("GET")
+  .h(headers)
+  .b(body);
+  return b.build();
+}
+
+/**
+ * serializeAws_restJson1UpdateControlCenterGroupCommand
+ */
+export const se_UpdateControlCenterGroupCommand = async(
+  input: UpdateControlCenterGroupCommandInput,
+  context: __SerdeContext
+): Promise<__HttpRequest> => {
+  const b = rb(input, context);
+  const headers: any = map({}, isSerializableHeaderValue, {
+    'content-type': 'application/json',
+    [_xo]: input[_o]!,
+  });
+  b.bp("/api/control-center/groups/{id}");
+  b.p('id', () => input.id!, '{id}', false)
+  let body: any;
+  body = JSON.stringify(take(input, {
+    'members': _ => _json(_),
+    'name': [],
+  }));
+  b.m("PUT")
   .h(headers)
   .b(body);
   return b.build();
@@ -691,6 +971,29 @@ export const de_CreateApplicationCommand = async(
     'access': _json,
     'application': __expectString,
     'organisation': __expectString,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1CreateControlCenterGroupCommand
+ */
+export const de_CreateControlCenterGroupCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<CreateControlCenterGroupCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'id': __expectString,
+    'members': _json,
+    'name': __expectString,
   });
   Object.assign(contents, doc);
   return contents;
@@ -819,6 +1122,28 @@ export const de_CreateReleaseCommand = async(
     'experiment': _json,
     'id': __expectString,
     'package': _ => de_ServePackage(_, context),
+    'warnings': _json,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1DeleteControlCenterGroupCommand
+ */
+export const de_DeleteControlCenterGroupCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<DeleteControlCenterGroupCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'success': __expectBoolean,
   });
   Object.assign(contents, doc);
   return contents;
@@ -838,6 +1163,75 @@ export const de_DeleteDimensionCommand = async(
     $metadata: deserializeMetadata(output),
   });
   await collectBody(output.body, context);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetControlCenterOverviewCommand
+ */
+export const de_GetControlCenterOverviewCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetControlCenterOverviewCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'generated_at': _ => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+    'organisations': _ => de_ControlCenterOrganisationOverviewList(_, context),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetControlCenterReleaseEventsCommand
+ */
+export const de_GetControlCenterReleaseEventsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetControlCenterReleaseEventsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'events': _ => de_ControlCenterReleaseEventList(_, context),
+    'outcome': __expectString,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1GetControlCenterRollbackPreviewCommand
+ */
+export const de_GetControlCenterRollbackPreviewCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<GetControlCenterRollbackPreviewCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'action': _ => de_Document(_, context),
+    'blocked': _ => de_Document(_, context),
+    'current_package_version': _ => de_Document(_, context),
+    'reconciled_keys': _ => de_Document(_, context),
+    'resulting_package_version': _ => de_Document(_, context),
+  });
+  Object.assign(contents, doc);
   return contents;
 }
 
@@ -863,6 +1257,7 @@ export const de_GetReleaseCommand = async(
     'id': __expectString,
     'package': _ => de_ServePackage(_, context),
     'resources': _json,
+    'warnings': _json,
   });
   Object.assign(contents, doc);
   return contents;
@@ -886,6 +1281,48 @@ export const de_GetUserCommand = async(
     'organisations': _json,
     'user_id': __expectString,
     'user_token': _json,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1ListControlCenterGroupsCommand
+ */
+export const de_ListControlCenterGroupsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ListControlCenterGroupsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'groups': _json,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1ListControlCenterOperationsCommand
+ */
+export const de_ListControlCenterOperationsCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ListControlCenterOperationsCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'operations': _ => de_ControlCenterUnresolvedOperationDetailsList(_, context),
   });
   Object.assign(contents, doc);
   return contents;
@@ -1080,6 +1517,56 @@ export const de_RequestOrganisationCommand = async(
 }
 
 /**
+ * deserializeAws_restJson1ResolveControlCenterOperationCommand
+ */
+export const de_ResolveControlCenterOperationCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<ResolveControlCenterOperationCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'finding': __expectString,
+    'operation_id': __expectString,
+    'state': __expectString,
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1RollbackReleaseCommand
+ */
+export const de_RollbackReleaseCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<RollbackReleaseCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'action': __expectString,
+    'current_live_release_id': _ => de_Document(_, context),
+    'later_release_id': _ => de_Document(_, context),
+    'new_release_id': _ => de_Document(_, context),
+    'reconciled_keys': _json,
+    'release_id': __expectString,
+    'rolled_back_to_package_version': _ => de_Document(_, context),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
  * deserializeAws_restJson1ServeReleaseCommand
  */
 export const de_ServeReleaseCommand = async(
@@ -1120,6 +1607,29 @@ export const de_ServeReleaseV2Command = async(
     'config': _ => de_GetReleaseConfig(_, context),
     'package': _json,
     'resources': _ => de_Document(_, context),
+  });
+  Object.assign(contents, doc);
+  return contents;
+}
+
+/**
+ * deserializeAws_restJson1UpdateControlCenterGroupCommand
+ */
+export const de_UpdateControlCenterGroupCommand = async(
+  output: __HttpResponse,
+  context: __SerdeContext
+): Promise<UpdateControlCenterGroupCommandOutput> => {
+  if (output.statusCode !== 200 && output.statusCode >= 300) {
+    return de_CommandError(output, context);
+  }
+  const contents: any = map({
+    $metadata: deserializeMetadata(output),
+  });
+  const data: Record<string, any> = __expectNonNull((__expectObject(await parseBody(output.body, context))), "body");
+  const doc = take(data, {
+    'id': __expectString,
+    'members': _json,
+    'name': __expectString,
   });
   Object.assign(contents, doc);
   return contents;
@@ -1239,6 +1749,24 @@ const de_CommandError = async(
     case "Unauthorized":
     case "io.airborne.server#Unauthorized":
       throw await de_UnauthorizedRes(parsedOutput, context);
+    case "ConflictError":
+    case "io.airborne.server#ConflictError":
+      throw await de_ConflictErrorRes(parsedOutput, context);
+    case "UnresolvedOperationError":
+    case "io.airborne.server#UnresolvedOperationError":
+      throw await de_UnresolvedOperationErrorRes(parsedOutput, context);
+    case "ReleaseSupersededError":
+    case "io.airborne.server#ReleaseSupersededError":
+      throw await de_ReleaseSupersededErrorRes(parsedOutput, context);
+    case "RollbackPartialFailureError":
+    case "io.airborne.server#RollbackPartialFailureError":
+      throw await de_RollbackPartialFailureErrorRes(parsedOutput, context);
+    case "RollbackReplacementChangedError":
+    case "io.airborne.server#RollbackReplacementChangedError":
+      throw await de_RollbackReplacementChangedErrorRes(parsedOutput, context);
+    case "RollbackUnprocessableError":
+    case "io.airborne.server#RollbackUnprocessableError":
+      throw await de_RollbackUnprocessableErrorRes(parsedOutput, context);
     default:
       const parsedBody = parsedOutput.body;
       return throwDefaultError({
@@ -1261,10 +1789,33 @@ const de_CommandError = async(
     });
     const data: any = parsedOutput.body;
     const doc = take(data, {
+      'code': __expectString,
       'message': __expectString,
     });
     Object.assign(contents, doc);
     const exception = new BadRequestError({
+      $metadata: deserializeMetadata(parsedOutput),
+      ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+  };
+
+  /**
+   * deserializeAws_restJson1ConflictErrorRes
+   */
+  const de_ConflictErrorRes = async (
+    parsedOutput: any,
+    context: __SerdeContext
+  ): Promise<ConflictError> => {
+    const contents: any = map({
+    });
+    const data: any = parsedOutput.body;
+    const doc = take(data, {
+      'code': __expectString,
+      'message': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new ConflictError({
       $metadata: deserializeMetadata(parsedOutput),
       ...contents
     });
@@ -1282,6 +1833,7 @@ const de_CommandError = async(
     });
     const data: any = parsedOutput.body;
     const doc = take(data, {
+      'code': __expectString,
       'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -1303,6 +1855,7 @@ const de_CommandError = async(
     });
     const data: any = parsedOutput.body;
     const doc = take(data, {
+      'code': __expectString,
       'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -1324,10 +1877,106 @@ const de_CommandError = async(
     });
     const data: any = parsedOutput.body;
     const doc = take(data, {
+      'code': __expectString,
       'message': __expectString,
     });
     Object.assign(contents, doc);
     const exception = new NotFoundError({
+      $metadata: deserializeMetadata(parsedOutput),
+      ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+  };
+
+  /**
+   * deserializeAws_restJson1ReleaseSupersededErrorRes
+   */
+  const de_ReleaseSupersededErrorRes = async (
+    parsedOutput: any,
+    context: __SerdeContext
+  ): Promise<ReleaseSupersededError> => {
+    const contents: any = map({
+    });
+    const data: any = parsedOutput.body;
+    const doc = take(data, {
+      'code': __expectString,
+      'current_live_release_id': _ => de_Document(_, context),
+      'message': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new ReleaseSupersededError({
+      $metadata: deserializeMetadata(parsedOutput),
+      ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+  };
+
+  /**
+   * deserializeAws_restJson1RollbackPartialFailureErrorRes
+   */
+  const de_RollbackPartialFailureErrorRes = async (
+    parsedOutput: any,
+    context: __SerdeContext
+  ): Promise<RollbackPartialFailureError> => {
+    const contents: any = map({
+    });
+    const data: any = parsedOutput.body;
+    const doc = take(data, {
+      'code': __expectString,
+      'message': __expectString,
+      'replacement_release_id': _ => de_Document(_, context),
+      'rollback_operation_id': __expectString,
+      'stage': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new RollbackPartialFailureError({
+      $metadata: deserializeMetadata(parsedOutput),
+      ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+  };
+
+  /**
+   * deserializeAws_restJson1RollbackReplacementChangedErrorRes
+   */
+  const de_RollbackReplacementChangedErrorRes = async (
+    parsedOutput: any,
+    context: __SerdeContext
+  ): Promise<RollbackReplacementChangedError> => {
+    const contents: any = map({
+    });
+    const data: any = parsedOutput.body;
+    const doc = take(data, {
+      'code': __expectString,
+      'message': __expectString,
+      'operation_id': __expectString,
+      'replacement_release_id': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new RollbackReplacementChangedError({
+      $metadata: deserializeMetadata(parsedOutput),
+      ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+  };
+
+  /**
+   * deserializeAws_restJson1RollbackUnprocessableErrorRes
+   */
+  const de_RollbackUnprocessableErrorRes = async (
+    parsedOutput: any,
+    context: __SerdeContext
+  ): Promise<RollbackUnprocessableError> => {
+    const contents: any = map({
+    });
+    const data: any = parsedOutput.body;
+    const doc = take(data, {
+      'code': __expectString,
+      'current_live_release_id': _ => de_Document(_, context),
+      'message': __expectString,
+    });
+    Object.assign(contents, doc);
+    const exception = new RollbackUnprocessableError({
       $metadata: deserializeMetadata(parsedOutput),
       ...contents
     });
@@ -1345,6 +1994,7 @@ const de_CommandError = async(
     });
     const data: any = parsedOutput.body;
     const doc = take(data, {
+      'code': __expectString,
       'message': __expectString,
     });
     Object.assign(contents, doc);
@@ -1354,6 +2004,38 @@ const de_CommandError = async(
     });
     return __decorateServiceException(exception, parsedOutput.body);
   };
+
+  /**
+   * deserializeAws_restJson1UnresolvedOperationErrorRes
+   */
+  const de_UnresolvedOperationErrorRes = async (
+    parsedOutput: any,
+    context: __SerdeContext
+  ): Promise<UnresolvedOperationError> => {
+    const contents: any = map({
+    });
+    const data: any = parsedOutput.body;
+    const doc = take(data, {
+      'before': _ => de_Document(_, context),
+      'code': __expectString,
+      'expected': _ => de_Document(_, context),
+      'message': __expectString,
+      'operation_id': __expectString,
+      'own_attempt': __expectBoolean,
+      'upstream_org': _ => de_Document(_, context),
+      'upstream_workspace': _ => de_Document(_, context),
+    });
+    Object.assign(contents, doc);
+    const exception = new UnresolvedOperationError({
+      $metadata: deserializeMetadata(parsedOutput),
+      ...contents
+    });
+    return __decorateServiceException(exception, parsedOutput.body);
+  };
+
+  // se_ControlCenterGroupMember omitted.
+
+  // se_ControlCenterGroupMemberList omitted.
 
   /**
    * serializeAws_restJson1CreateReleaseRequestConfig
@@ -1425,6 +2107,249 @@ const de_CommandError = async(
     return take(output, {
       'tenant_info': (_: any) => de_Document(_, context),
     }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterActiveRelease
+   */
+  const de_ControlCenterActiveRelease = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterActiveRelease => {
+    return take(output, {
+      'created_at': (_: any) => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+      'created_by': __expectString,
+      'dimensions': (_: any) => de_Document(_, context),
+      'experimental_variant': __expectString,
+      'package_version': __expectLong,
+      'release_id': __expectString,
+      'status': __expectString,
+      'traffic_percentage': __expectInt32,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterActiveReleaseList
+   */
+  const de_ControlCenterActiveReleaseList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterActiveRelease)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterActiveRelease(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterAppStatus
+   */
+  const de_ControlCenterAppStatus = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterAppStatus => {
+    return take(output, {
+      'active': (_: any) => de_ControlCenterActiveReleaseList(_, context),
+      'application': __expectString,
+      'error': (_: any) => de_Document(_, context),
+      'last_activity_at': (_: any) => de_Document(_, context),
+      'live': (_: any) => de_ControlCenterLiveReleaseList(_, context),
+      'platform': (_: any) => de_Document(_, context),
+      'unresolved_operations': (_: any) => de_ControlCenterUnresolvedOperationList(_, context),
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterAppStatusList
+   */
+  const de_ControlCenterAppStatusList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterAppStatus)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterAppStatus(entry, context);
+    });
+    return retVal;
+  }
+
+  // de_ControlCenterGroup omitted.
+
+  // de_ControlCenterGroupList omitted.
+
+  // de_ControlCenterGroupMember omitted.
+
+  // de_ControlCenterGroupMemberList omitted.
+
+  /**
+   * deserializeAws_restJson1ControlCenterLiveRelease
+   */
+  const de_ControlCenterLiveRelease = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterLiveRelease => {
+    return take(output, {
+      'concluded_at': (_: any) => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+      'config_version': __expectString,
+      'dimensions': (_: any) => de_Document(_, context),
+      'package_version': __expectLong,
+      'release_id': __expectString,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterLiveReleaseList
+   */
+  const de_ControlCenterLiveReleaseList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterLiveRelease)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterLiveRelease(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterOrganisationOverview
+   */
+  const de_ControlCenterOrganisationOverview = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterOrganisationOverview => {
+    return take(output, {
+      'groups': (_: any) => de_ControlCenterOverviewGroupList(_, context),
+      'name': __expectString,
+      'ungrouped': (_: any) => de_ControlCenterAppStatusList(_, context),
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterOrganisationOverviewList
+   */
+  const de_ControlCenterOrganisationOverviewList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterOrganisationOverview)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterOrganisationOverview(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterOverviewGroup
+   */
+  const de_ControlCenterOverviewGroup = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterOverviewGroup => {
+    return take(output, {
+      'id': __expectString,
+      'members': (_: any) => de_ControlCenterAppStatusList(_, context),
+      'name': __expectString,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterOverviewGroupList
+   */
+  const de_ControlCenterOverviewGroupList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterOverviewGroup)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterOverviewGroup(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterReleaseEvent
+   */
+  const de_ControlCenterReleaseEvent = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterReleaseEvent => {
+    return take(output, {
+      'action': __expectString,
+      'actor': __expectString,
+      'created_at': (_: any) => __expectNonNull(__parseRfc3339DateTimeWithOffset(_)),
+      'payload': (_: any) => de_Document(_, context),
+      'synthetic': __expectBoolean,
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterReleaseEventList
+   */
+  const de_ControlCenterReleaseEventList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterReleaseEvent)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterReleaseEvent(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterUnresolvedOperation
+   */
+  const de_ControlCenterUnresolvedOperation = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterUnresolvedOperation => {
+    return take(output, {
+      'before': (_: any) => de_Document(_, context),
+      'expected': (_: any) => de_Document(_, context),
+      'message': __expectString,
+      'operation_id': __expectString,
+      'upstream_workspace': (_: any) => de_Document(_, context),
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterUnresolvedOperationDetails
+   */
+  const de_ControlCenterUnresolvedOperationDetails = (
+    output: any,
+    context: __SerdeContext
+  ): ControlCenterUnresolvedOperationDetails => {
+    return take(output, {
+      'before': (_: any) => de_Document(_, context),
+      'code': __expectString,
+      'expected': (_: any) => de_Document(_, context),
+      'message': __expectString,
+      'operation_id': __expectString,
+      'upstream_org': (_: any) => de_Document(_, context),
+      'upstream_workspace': (_: any) => de_Document(_, context),
+    }) as any;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterUnresolvedOperationDetailsList
+   */
+  const de_ControlCenterUnresolvedOperationDetailsList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterUnresolvedOperationDetails)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterUnresolvedOperationDetails(entry, context);
+    });
+    return retVal;
+  }
+
+  /**
+   * deserializeAws_restJson1ControlCenterUnresolvedOperationList
+   */
+  const de_ControlCenterUnresolvedOperationList = (
+    output: any,
+    context: __SerdeContext
+  ): (ControlCenterUnresolvedOperation)[] => {
+    const retVal = (output || []).filter((e: any) => e != null).map((entry: any) => {
+      return de_ControlCenterUnresolvedOperation(entry, context);
+    });
+    return retVal;
   }
 
   /**
@@ -1549,6 +2474,7 @@ const de_CommandError = async(
       'id': __expectString,
       'package': (_: any) => de_ServePackage(_, context),
       'resources': _json,
+      'warnings': _json,
     }) as any;
   }
 
@@ -1573,7 +2499,11 @@ const de_CommandError = async(
 
   // de_PackageList omitted.
 
+  // de_ReconciledKeys omitted.
+
   // de_ReleaseExperiment omitted.
+
+  // de_ReleaseWarnings omitted.
 
   // de_ServeFile omitted.
 
@@ -1629,8 +2559,8 @@ const de_CommandError = async(
   const _o = "organisation";
   const _p = "page";
   const _pp = "per_page";
-  const _s = "search";
-  const _st = "status";
+  const _s = "status";
+  const _se = "search";
   const _t = "tags";
   const _ta = "tag";
   const _xa = "x-application";

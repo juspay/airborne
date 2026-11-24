@@ -10,6 +10,10 @@ import {
   CreateApplicationCommandOutput,
 } from "./commands/CreateApplicationCommand";
 import {
+  CreateControlCenterGroupCommandInput,
+  CreateControlCenterGroupCommandOutput,
+} from "./commands/CreateControlCenterGroupCommand";
+import {
   CreateDimensionCommandInput,
   CreateDimensionCommandOutput,
 } from "./commands/CreateDimensionCommand";
@@ -30,9 +34,25 @@ import {
   CreateReleaseCommandOutput,
 } from "./commands/CreateReleaseCommand";
 import {
+  DeleteControlCenterGroupCommandInput,
+  DeleteControlCenterGroupCommandOutput,
+} from "./commands/DeleteControlCenterGroupCommand";
+import {
   DeleteDimensionCommandInput,
   DeleteDimensionCommandOutput,
 } from "./commands/DeleteDimensionCommand";
+import {
+  GetControlCenterOverviewCommandInput,
+  GetControlCenterOverviewCommandOutput,
+} from "./commands/GetControlCenterOverviewCommand";
+import {
+  GetControlCenterReleaseEventsCommandInput,
+  GetControlCenterReleaseEventsCommandOutput,
+} from "./commands/GetControlCenterReleaseEventsCommand";
+import {
+  GetControlCenterRollbackPreviewCommandInput,
+  GetControlCenterRollbackPreviewCommandOutput,
+} from "./commands/GetControlCenterRollbackPreviewCommand";
 import {
   GetReleaseCommandInput,
   GetReleaseCommandOutput,
@@ -41,6 +61,14 @@ import {
   GetUserCommandInput,
   GetUserCommandOutput,
 } from "./commands/GetUserCommand";
+import {
+  ListControlCenterGroupsCommandInput,
+  ListControlCenterGroupsCommandOutput,
+} from "./commands/ListControlCenterGroupsCommand";
+import {
+  ListControlCenterOperationsCommandInput,
+  ListControlCenterOperationsCommandOutput,
+} from "./commands/ListControlCenterOperationsCommand";
 import {
   ListDimensionsCommandInput,
   ListDimensionsCommandOutput,
@@ -74,6 +102,14 @@ import {
   RequestOrganisationCommandOutput,
 } from "./commands/RequestOrganisationCommand";
 import {
+  ResolveControlCenterOperationCommandInput,
+  ResolveControlCenterOperationCommandOutput,
+} from "./commands/ResolveControlCenterOperationCommand";
+import {
+  RollbackReleaseCommandInput,
+  RollbackReleaseCommandOutput,
+} from "./commands/RollbackReleaseCommand";
+import {
   ServeReleaseCommandInput,
   ServeReleaseCommandOutput,
 } from "./commands/ServeReleaseCommand";
@@ -81,6 +117,10 @@ import {
   ServeReleaseV2CommandInput,
   ServeReleaseV2CommandOutput,
 } from "./commands/ServeReleaseV2Command";
+import {
+  UpdateControlCenterGroupCommandInput,
+  UpdateControlCenterGroupCommandOutput,
+} from "./commands/UpdateControlCenterGroupCommand";
 import {
   UpdateDimensionCommandInput,
   UpdateDimensionCommandOutput,
@@ -160,14 +200,21 @@ export { __Client }
  */
 export type ServiceInputTypes =
   | CreateApplicationCommandInput
+  | CreateControlCenterGroupCommandInput
   | CreateDimensionCommandInput
   | CreateFileCommandInput
   | CreateOrganisationCommandInput
   | CreatePackageCommandInput
   | CreateReleaseCommandInput
+  | DeleteControlCenterGroupCommandInput
   | DeleteDimensionCommandInput
+  | GetControlCenterOverviewCommandInput
+  | GetControlCenterReleaseEventsCommandInput
+  | GetControlCenterRollbackPreviewCommandInput
   | GetReleaseCommandInput
   | GetUserCommandInput
+  | ListControlCenterGroupsCommandInput
+  | ListControlCenterOperationsCommandInput
   | ListDimensionsCommandInput
   | ListFileGroupsCommandInput
   | ListFilesCommandInput
@@ -176,8 +223,11 @@ export type ServiceInputTypes =
   | ListReleasesCommandInput
   | PostLoginCommandInput
   | RequestOrganisationCommandInput
+  | ResolveControlCenterOperationCommandInput
+  | RollbackReleaseCommandInput
   | ServeReleaseCommandInput
   | ServeReleaseV2CommandInput
+  | UpdateControlCenterGroupCommandInput
   | UpdateDimensionCommandInput
   | UpdateFileCommandInput
   | UploadFileCommandInput;
@@ -187,14 +237,21 @@ export type ServiceInputTypes =
  */
 export type ServiceOutputTypes =
   | CreateApplicationCommandOutput
+  | CreateControlCenterGroupCommandOutput
   | CreateDimensionCommandOutput
   | CreateFileCommandOutput
   | CreateOrganisationCommandOutput
   | CreatePackageCommandOutput
   | CreateReleaseCommandOutput
+  | DeleteControlCenterGroupCommandOutput
   | DeleteDimensionCommandOutput
+  | GetControlCenterOverviewCommandOutput
+  | GetControlCenterReleaseEventsCommandOutput
+  | GetControlCenterRollbackPreviewCommandOutput
   | GetReleaseCommandOutput
   | GetUserCommandOutput
+  | ListControlCenterGroupsCommandOutput
+  | ListControlCenterOperationsCommandOutput
   | ListDimensionsCommandOutput
   | ListFileGroupsCommandOutput
   | ListFilesCommandOutput
@@ -203,8 +260,11 @@ export type ServiceOutputTypes =
   | ListReleasesCommandOutput
   | PostLoginCommandOutput
   | RequestOrganisationCommandOutput
+  | ResolveControlCenterOperationCommandOutput
+  | RollbackReleaseCommandOutput
   | ServeReleaseCommandOutput
   | ServeReleaseV2CommandOutput
+  | UpdateControlCenterGroupCommandOutput
   | UpdateDimensionCommandOutput
   | UpdateFileCommandOutput
   | UploadFileCommandOutput;
