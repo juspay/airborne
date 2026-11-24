@@ -675,6 +675,10 @@ async fn build(
     dimensions: Option<&HashMap<String, Value>>,
     workspace_name: String,
 ) -> airborne_types::Result<SemVer> {
+    // Includes existing READY publication and background builds; no partial publication
+    // may race a policy enablement or an approval snapshot.
+    crate::release::maker_checker::auxiliary_write(&state.clone(),&org.clone(),&app.clone(),async {
+    crate::release::maker_checker::auxiliary(&state,&org,&app).await?;
     info!(
         "Starting build for {}/{} with release id {}",
         org, app, release_id
@@ -1012,6 +1016,7 @@ async fn build(
     }
 
     Ok(new_build_version)
+    }).await
 }
 
 async fn extract_args(
@@ -1059,6 +1064,7 @@ async fn update_superposition_build_rid(
     release_id: &str,
     dimensions: &HashMap<String, Value>,
 ) -> airborne_types::Result<()> {
+    crate::release::maker_checker::auxiliary(state, org, app).await?;
     let superposition_org = state.env.superposition_org_id.clone();
 
     if dimensions.is_empty() {
@@ -1145,8 +1151,7 @@ async fn generate(
         arguments.application.clone(),
         arguments.organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Failed to get workspace name: {}", e)))?;
+    .await?;
 
     let resolved_config_builder = arguments.dimensions.iter().fold(
         state

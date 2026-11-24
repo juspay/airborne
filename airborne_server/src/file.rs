@@ -652,78 +652,82 @@ async fn update_file(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    let pool = state.db_pool.clone();
-    let request = req.into_inner();
+        let pool = state.db_pool.clone();
+        let request = req.into_inner();
 
-    let db_organisation = organisation.clone();
-    let db_application = application.clone();
-    let db_file_tag = request.tag.clone();
-    let db_file_path = input_file_path.clone();
-    let (file, opt_old_tag) = run_blocking!({
-        let mut conn = pool.get()?;
+        let db_organisation = organisation.clone();
+        let db_application = application.clone();
+        let db_file_tag = request.tag.clone();
+        let db_file_path = input_file_path.clone();
+        let (file, opt_old_tag) = run_blocking!({
+            let mut conn = pool.get()?;
 
-        let (result, opt_old_tag) = conn
-            .transaction::<(DbFile, Option<String>), diesel::result::Error, _>(|conn| {
-                let file_in_db = if let Some(f_version) = file_version {
-                    files
-                        .filter(file_path.eq(&db_file_path))
-                        .filter(org_id.eq(&db_organisation))
-                        .filter(app_id.eq(&db_application))
-                        .filter(version.eq(f_version))
+            let (result, opt_old_tag) = conn
+                .transaction::<(DbFile, Option<String>), diesel::result::Error, _>(|conn| {
+                    let file_in_db = if let Some(f_version) = file_version {
+                        files
+                            .filter(file_path.eq(&db_file_path))
+                            .filter(org_id.eq(&db_organisation))
+                            .filter(app_id.eq(&db_application))
+                            .filter(version.eq(f_version))
+                            .select(DbFile::as_select())
+                            .first::<DbFile>(conn)?
+                    } else if let Some(f_tag) = file_tag {
+                        files
+                            .filter(file_path.eq(&db_file_path))
+                            .filter(org_id.eq(&db_organisation))
+                            .filter(app_id.eq(&db_application))
+                            .filter(tag.eq(f_tag))
+                            .select(DbFile::as_select())
+                            .first::<DbFile>(conn)?
+                    } else {
+                        return Err(diesel::result::Error::NotFound);
+                    };
+
+                    diesel::update(files.filter(id.eq(file_in_db.id)))
+                        .set(tag.eq(&db_file_tag))
+                        .execute(conn)?;
+
+                    let updated_file = files
+                        .filter(id.eq(file_in_db.id))
                         .select(DbFile::as_select())
-                        .first::<DbFile>(conn)?
-                } else if let Some(f_tag) = file_tag {
-                    files
-                        .filter(file_path.eq(&db_file_path))
-                        .filter(org_id.eq(&db_organisation))
-                        .filter(app_id.eq(&db_application))
-                        .filter(tag.eq(f_tag))
-                        .select(DbFile::as_select())
-                        .first::<DbFile>(conn)?
-                } else {
-                    return Err(diesel::result::Error::NotFound);
-                };
+                        .first::<DbFile>(conn)?;
+                    Ok((updated_file, file_in_db.tag))
+                })?;
 
-                diesel::update(files.filter(id.eq(file_in_db.id)))
-                    .set(tag.eq(&db_file_tag))
-                    .execute(conn)?;
+            Ok((result, opt_old_tag))
+        })?;
 
-                let updated_file = files
-                    .filter(id.eq(file_in_db.id))
-                    .select(DbFile::as_select())
-                    .first::<DbFile>(conn)?;
-                Ok((updated_file, file_in_db.tag))
-            })?;
-
-        Ok((result, opt_old_tag))
-    })?;
-
-    // remove both tags for file_entry (old and new) from redis cache if exists
-    if let Some(ref cache) = state.redis_cache {
-        let cache_key = cache.key(
-            &organisation,
-            &application,
-            &[
-                "file_entry",
-                &format!("{}@tag:{}", &input_file_path, &request.tag),
-            ],
-        );
-        let _ = cache.del(&cache_key).await;
-        if let Some(old_tag) = opt_old_tag {
-            let old_cache_key = cache.key(
+        // remove both tags for file_entry (old and new) from redis cache if exists
+        if let Some(ref cache) = state.redis_cache {
+            let cache_key = cache.key(
                 &organisation,
                 &application,
                 &[
                     "file_entry",
-                    &format!("{}@tag:{}", &input_file_path, &old_tag),
+                    &format!("{}@tag:{}", &input_file_path, &request.tag),
                 ],
             );
-            let _ = cache.del(&old_cache_key).await;
+            let _ = cache.del(&cache_key).await;
+            if let Some(old_tag) = opt_old_tag {
+                let old_cache_key = cache.key(
+                    &organisation,
+                    &application,
+                    &[
+                        "file_entry",
+                        &format!("{}@tag:{}", &input_file_path, &old_tag),
+                    ],
+                );
+                let _ = cache.del(&old_cache_key).await;
+            }
         }
-    }
 
-    Ok(Json(db_file_to_response(&file)))
+        Ok(Json(db_file_to_response(&file)))
+    })
+    .await
 }
 
 #[authz(

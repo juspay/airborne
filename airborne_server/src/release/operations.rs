@@ -113,6 +113,10 @@ pub async fn save(
     op: &Operation,
 ) -> airborne_types::Result<()> {
     let _ = state;
+    let mut op = op.clone();
+    if let Some(approval) = super::maker_checker::audit_context() {
+        op.data["approval"] = approval;
+    }
     let (org, app, kind, source, op) = (
         org.to_owned(),
         app.to_owned(),

@@ -81,6 +81,7 @@ pub async fn migrate_superposition(
             .get_results::<WorkspaceName>(&mut conn)?)
     })?;
 
+    let mut failures = Vec::new();
     for workspace in workspaces {
         // Try to acquire a lock for this specific workspace
         let lock_guard = match try_acquire_lock(
@@ -113,6 +114,7 @@ pub async fn migrate_superposition(
 
         match result {
             Err(e) => {
+                failures.push(format!("{}: {e}", workspace.workspace_name));
                 log::warn!(
                     "Failed to migrate workspace {}: {}",
                     workspace.workspace_name,
@@ -128,6 +130,12 @@ pub async fn migrate_superposition(
         }
     }
 
+    if !failures.is_empty() {
+        log::error!(
+            "Boot migrations skipped workspaces (server will keep serving): {}",
+            failures.join("; ")
+        );
+    }
     Ok(())
 }
 
@@ -148,124 +156,158 @@ pub async fn migrate_superposition_workspace(
     state: &web::Data<AppState>,
     migration_strategy: &SuperpositionMigrationStrategy,
 ) -> Result<(), ABError> {
-    info!(
-        "Migrating Superposition workspace: {}",
-        workspace.workspace_name
-    );
-    let default_configs: Vec<SuperpositionDefaultConfig> = state.env.default_configs.clone();
-    let local_keys: HashSet<&String> = default_configs.iter().map(|cfg| &cfg.key).collect();
+    if crate::release::maker_checker::policy(
+        state,
+        &workspace.organization_id,
+        &workspace.application_id,
+    )
+    .await?
+    .enabled
+    {
+        return Err(ABError::ReleaseOperation {
+            status: 403,
+            body: serde_json::json!({
+            "code":"system_migration_requires_maintenance","organisation":workspace.organization_id,
+            "application":workspace.application_id,"workspace":workspace.workspace_name,
+            "message":"System migration refused: approval is enabled. No config was changed. Follow the approval-enabled migration maintenance procedure in server/control-center: drain all writers, reconcile operations, save and disable the policy through the audited API, run migration, verify config, then restore policy before admitting traffic. Never edit policy tables or bypass approval."}),
+        });
+    }
+    crate::release::maker_checker::auxiliary_write(
+        state,
+        &workspace.organization_id,
+        &workspace.application_id,
+        async {
+            crate::release::maker_checker::auxiliary(
+                state,
+                &workspace.organization_id,
+                &workspace.application_id,
+            )
+            .await?;
+            info!(
+                "Migrating Superposition workspace: {}",
+                workspace.workspace_name
+            );
+            let default_configs: Vec<SuperpositionDefaultConfig> =
+                state.env.default_configs.clone();
+            let local_keys: HashSet<&String> = default_configs.iter().map(|cfg| &cfg.key).collect();
 
-    let workspace = workspace.workspace_name.clone();
-    let superposition_org = state.env.superposition_org_id.clone();
+            let workspace = workspace.workspace_name.clone();
+            let superposition_org = state.env.superposition_org_id.clone();
 
-    let all_configs = state
-        .superposition_client
-        .list_default_configs()
-        .org_id(superposition_org.clone())
-        .workspace_id(workspace.clone())
-        .all(true)
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+            let all_configs = state
+                .superposition_client
+                .list_default_configs()
+                .org_id(superposition_org.clone())
+                .workspace_id(workspace.clone())
+                .all(true)
+                .send()
+                .await
+                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
 
-    let server_configs: Vec<DefaultConfigResponse> = all_configs.data.clone();
+            let server_configs: Vec<DefaultConfigResponse> = all_configs.data.clone();
 
-    let configs_to_be_removed: Vec<DefaultConfigResponse> = server_configs
-        .clone()
-        .into_iter()
-        .filter(|srv| !local_keys.contains(&srv.key) && !srv.key.starts_with("config.properties."))
-        .collect();
+            let configs_to_be_removed: Vec<DefaultConfigResponse> = server_configs
+                .clone()
+                .into_iter()
+                .filter(|srv| {
+                    !local_keys.contains(&srv.key) && !srv.key.starts_with("config.properties.")
+                })
+                .collect();
 
-    let server_keys: HashSet<String> = server_configs
-        .clone()
-        .iter()
-        .map(|srv| srv.key.clone())
-        .collect();
+            let server_keys: HashSet<String> = server_configs
+                .clone()
+                .iter()
+                .map(|srv| srv.key.clone())
+                .collect();
 
-    let configs_to_be_added: Vec<SuperpositionDefaultConfig> = default_configs
-        .clone()
-        .into_iter()
-        .filter(|loc| !server_keys.contains(&loc.key))
-        .collect();
+            let configs_to_be_added: Vec<SuperpositionDefaultConfig> = default_configs
+                .clone()
+                .into_iter()
+                .filter(|loc| !server_keys.contains(&loc.key))
+                .collect();
 
-    debug!(
+            debug!(
         "Workspace: {}, Configs to be removed: {:?}, Configs to be added: {:?} and strategy: {:?}",
         workspace, configs_to_be_removed, configs_to_be_added, migration_strategy
     );
 
-    let mut total_additions = 0;
-    let mut total_removals = 0;
+            let mut total_additions = 0;
+            let mut total_removals = 0;
 
-    if *migration_strategy == SuperpositionMigrationStrategy::Put {
-        for config in configs_to_be_removed {
-            state
-                .superposition_client
-                .delete_default_config()
-                .org_id(superposition_org.clone())
-                .workspace_id(workspace.clone())
-                .key(config.key)
-                .send()
-                .await
-                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-            total_removals += 1;
-        }
-    }
+            if *migration_strategy == SuperpositionMigrationStrategy::Put {
+                for config in configs_to_be_removed {
+                    state
+                        .superposition_client
+                        .delete_default_config()
+                        .org_id(superposition_org.clone())
+                        .workspace_id(workspace.clone())
+                        .key(config.key)
+                        .send()
+                        .await
+                        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+                    total_removals += 1;
+                }
+            }
 
-    for config in configs_to_be_added {
-        match config.default {
-            SuperpositionDefaultConfigValue::Str(ref value) => {
-                default_config::<String>(
-                    state.superposition_client.clone(),
-                    workspace.clone(),
-                    superposition_org.clone(),
-                )(config.key, value.clone(), config.description)
-                .await
-                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+            for config in configs_to_be_added {
+                match config.default {
+                    SuperpositionDefaultConfigValue::Str(ref value) => {
+                        default_config::<String>(
+                            state.superposition_client.clone(),
+                            workspace.clone(),
+                            superposition_org.clone(),
+                        )(config.key, value.clone(), config.description)
+                        .await
+                        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+                    }
+                    SuperpositionDefaultConfigValue::Int(ref value) => {
+                        default_config::<i32>(
+                            state.superposition_client.clone(),
+                            workspace.clone(),
+                            superposition_org.clone(),
+                        )(config.key, *value, config.description)
+                        .await
+                        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+                    }
+                    SuperpositionDefaultConfigValue::Bool(ref value) => {
+                        default_config::<bool>(
+                            state.superposition_client.clone(),
+                            workspace.clone(),
+                            superposition_org.clone(),
+                        )(config.key, *value, config.description)
+                        .await
+                        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+                    }
+                    SuperpositionDefaultConfigValue::Vec(ref value) => {
+                        let default_val: Vec<Document> =
+                            value.iter().map(value_to_document).collect();
+                        default_config::<Vec<Document>>(
+                            state.superposition_client.clone(),
+                            workspace.clone(),
+                            superposition_org.clone(),
+                        )(config.key, default_val, config.description)
+                        .await
+                        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+                    }
+                    SuperpositionDefaultConfigValue::Val(ref value) => {
+                        let default_val: Document = value_to_document(value);
+                        default_config::<Document>(
+                            state.superposition_client.clone(),
+                            workspace.clone(),
+                            superposition_org.clone(),
+                        )(config.key, default_val, config.description)
+                        .await
+                        .map_err(|e| ABError::InternalServerError(e.to_string()))?;
+                    }
+                };
+                total_additions += 1;
             }
-            SuperpositionDefaultConfigValue::Int(ref value) => {
-                default_config::<i32>(
-                    state.superposition_client.clone(),
-                    workspace.clone(),
-                    superposition_org.clone(),
-                )(config.key, *value, config.description)
-                .await
-                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-            }
-            SuperpositionDefaultConfigValue::Bool(ref value) => {
-                default_config::<bool>(
-                    state.superposition_client.clone(),
-                    workspace.clone(),
-                    superposition_org.clone(),
-                )(config.key, *value, config.description)
-                .await
-                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-            }
-            SuperpositionDefaultConfigValue::Vec(ref value) => {
-                let default_val: Vec<Document> = value.iter().map(value_to_document).collect();
-                default_config::<Vec<Document>>(
-                    state.superposition_client.clone(),
-                    workspace.clone(),
-                    superposition_org.clone(),
-                )(config.key, default_val, config.description)
-                .await
-                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-            }
-            SuperpositionDefaultConfigValue::Val(ref value) => {
-                let default_val: Document = value_to_document(value);
-                default_config::<Document>(
-                    state.superposition_client.clone(),
-                    workspace.clone(),
-                    superposition_org.clone(),
-                )(config.key, default_val, config.description)
-                .await
-                .map_err(|e| ABError::InternalServerError(e.to_string()))?;
-            }
-        };
-        total_additions += 1;
-    }
-    info!(
-        "Completed migration for workspace: {}. Total additions: {}, Total removals: {}",
-        workspace, total_additions, total_removals
-    );
-    Ok(())
+            info!(
+                "Completed migration for workspace: {}. Total additions: {}, Total removals: {}",
+                workspace, total_additions, total_removals
+            );
+            Ok(())
+        },
+    )
+    .await
 }

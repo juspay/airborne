@@ -65,115 +65,122 @@ async fn create_dimension_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    // Get workspace name for this application
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+        // Get workspace name for this application
+        let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await?;
 
-    let current_dimensions = state
-        .superposition_client
-        .list_dimensions()
-        .org_id(state.env.superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to list dimensions: {}", e)))?;
-
-    // Find the highest position using nested match statements
-    let highest_position = match req.dimension_type {
-        DimensionType::Cohort => {
-            let dimensions = &current_dimensions.data;
-            dimensions
-                .iter()
-                .find(|d| d.dimension == req.depends_on.clone().unwrap_or_default())
-                .map(|d| d.position)
-                .ok_or_else(|| ABError::NotFound("Dependency dimension not found".to_string()))?
-        }
-        DimensionType::Standard => {
-            let dimensions = &current_dimensions.data;
-            dimensions.iter().map(|d| d.position).max().unwrap_or(0) + 1
-        }
-    };
-
-    let dim_schema = req.schema.to_json();
-
-    match req.dimension_type {
-        DimensionType::Cohort => {
-            let depends_on = req.depends_on.clone().ok_or_else(|| {
-                ABError::BadRequest("depends_on is required for cohort dimensions".to_string())
+        let current_dimensions = state
+            .superposition_client
+            .list_dimensions()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to list dimensions: {}", e))
             })?;
-            let schema = CohortDimensionSchema::default(depends_on.clone()).to_kv_str_doc();
-            let dimension = state
-                .superposition_client
-                .create_dimension()
-                .org_id(state.env.superposition_org_id.clone())
-                .workspace_id(workspace_name.clone())
-                .dimension(req.dimension.clone())
-                .position(highest_position)
-                .set_schema(Some(schema))
-                .dimension_type(superposition_sdk::types::DimensionType::LocalCohort(
-                    depends_on,
-                ))
-                .description(req.description.clone())
-                .change_reason("Creating new dimension".to_string())
-                .send()
-                .await
-                .map_err(|e| {
-                    ABError::InternalServerError(format!("Failed to create dimension: {}", e))
-                })?;
 
-            let _ = state
-                .superposition_client
-                .weight_recompute()
-                .org_id(state.env.superposition_org_id.clone())
-                .workspace_id(workspace_name.clone())
-                .send()
-                .await
-                .map_err(|e| {
-                    ABError::InternalServerError(format!(
-                        "Failed to trigger weight recompute: {}",
-                        e
+        // Find the highest position using nested match statements
+        let highest_position = match req.dimension_type {
+            DimensionType::Cohort => {
+                let dimensions = &current_dimensions.data;
+                dimensions
+                    .iter()
+                    .find(|d| d.dimension == req.depends_on.clone().unwrap_or_default())
+                    .map(|d| d.position)
+                    .ok_or_else(|| {
+                        ABError::NotFound("Dependency dimension not found".to_string())
+                    })?
+            }
+            DimensionType::Standard => {
+                let dimensions = &current_dimensions.data;
+                dimensions.iter().map(|d| d.position).max().unwrap_or(0) + 1
+            }
+        };
+
+        let dim_schema = req.schema.to_json();
+
+        match req.dimension_type {
+            DimensionType::Cohort => {
+                let depends_on = req.depends_on.clone().ok_or_else(|| {
+                    ABError::BadRequest("depends_on is required for cohort dimensions".to_string())
+                })?;
+                let schema = CohortDimensionSchema::default(depends_on.clone()).to_kv_str_doc();
+                let dimension = state
+                    .superposition_client
+                    .create_dimension()
+                    .org_id(state.env.superposition_org_id.clone())
+                    .workspace_id(workspace_name.clone())
+                    .dimension(req.dimension.clone())
+                    .position(highest_position)
+                    .set_schema(Some(schema))
+                    .dimension_type(superposition_sdk::types::DimensionType::LocalCohort(
+                        depends_on,
                     ))
-                })?;
-            Ok(Json(CreateDimensionResponse {
-                dimension: dimension.dimension,
-                position: dimension.position,
-                schema: hashmap_to_json_value(&dimension.schema),
-                description: dimension.description,
-                change_reason: dimension.change_reason,
-            }))
+                    .description(req.description.clone())
+                    .change_reason("Creating new dimension".to_string())
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        ABError::InternalServerError(format!("Failed to create dimension: {}", e))
+                    })?;
+
+                let _ = state
+                    .superposition_client
+                    .weight_recompute()
+                    .org_id(state.env.superposition_org_id.clone())
+                    .workspace_id(workspace_name.clone())
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        ABError::InternalServerError(format!(
+                            "Failed to trigger weight recompute: {}",
+                            e
+                        ))
+                    })?;
+                Ok(Json(CreateDimensionResponse {
+                    dimension: dimension.dimension,
+                    position: dimension.position,
+                    schema: hashmap_to_json_value(&dimension.schema),
+                    description: dimension.description,
+                    change_reason: dimension.change_reason,
+                }))
+            }
+            DimensionType::Standard => {
+                let dimension = state
+                    .superposition_client
+                    .create_dimension()
+                    .org_id(state.env.superposition_org_id.clone())
+                    .workspace_id(workspace_name.clone())
+                    .dimension(req.dimension.clone())
+                    .position(highest_position)
+                    .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&dim_schema))))
+                    .description(req.description.clone())
+                    .change_reason("Creating new dimension".to_string())
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        ABError::InternalServerError(format!("Failed to create dimension: {}", e))
+                    })?;
+                Ok(Json(CreateDimensionResponse {
+                    dimension: dimension.dimension,
+                    position: dimension.position,
+                    schema: hashmap_to_json_value(&dimension.schema),
+                    description: dimension.description,
+                    change_reason: dimension.change_reason,
+                }))
+            }
         }
-        DimensionType::Standard => {
-            let dimension = state
-                .superposition_client
-                .create_dimension()
-                .org_id(state.env.superposition_org_id.clone())
-                .workspace_id(workspace_name.clone())
-                .dimension(req.dimension.clone())
-                .position(highest_position)
-                .set_schema(Some(schema_doc_to_hashmap(&value_to_document(&dim_schema))))
-                .description(req.description.clone())
-                .change_reason("Creating new dimension".to_string())
-                .send()
-                .await
-                .map_err(|e| {
-                    ABError::InternalServerError(format!("Failed to create dimension: {}", e))
-                })?;
-            Ok(Json(CreateDimensionResponse {
-                dimension: dimension.dimension,
-                position: dimension.position,
-                schema: hashmap_to_json_value(&dimension.schema),
-                description: dimension.description,
-                change_reason: dimension.change_reason,
-            }))
-        }
-    }
+    })
+    .await
 }
 
 #[authz(
@@ -201,8 +208,7 @@ async fn list_dimensions_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
 
     let dimensionsreq = state
         .superposition_client
@@ -272,61 +278,68 @@ async fn update_dimension_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    // Get workspace name for this application
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
+        // Get workspace name for this application
+        let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await?;
+
+        let update_dimension = state
+            .superposition_client
+            .update_dimension()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .dimension(path.into_inner());
+        let update_dimension = if let Some(position) = req.position {
+            update_dimension.position(position)
+        } else {
+            update_dimension
+        };
+        let update_dimension = update_dimension
+            .change_reason(req.change_reason.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to update dimension: {}", e))
+            })?;
+
+        let _ = state
+            .superposition_client
+            .weight_recompute()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to trigger weight recompute: {}", e))
+            })?;
+
+        Ok(Json(Dimension {
+            dimension: update_dimension.dimension,
+            position: update_dimension.position,
+            schema: hashmap_to_json_value(&update_dimension.schema),
+            description: update_dimension.description,
+            change_reason: update_dimension.change_reason,
+            mandatory: Some(update_dimension.mandatory),
+            dimension_type: match update_dimension.dimension_type {
+                superposition_sdk::types::DimensionType::LocalCohort(_) => DimensionType::Cohort,
+                _ => DimensionType::Standard,
+            },
+            depends_on: match update_dimension.dimension_type {
+                superposition_sdk::types::DimensionType::LocalCohort(depends_on) => {
+                    Some(depends_on)
+                }
+                _ => None,
+            },
+        }))
+    })
     .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
-
-    let update_dimension = state
-        .superposition_client
-        .update_dimension()
-        .org_id(state.env.superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .dimension(path.into_inner());
-    let update_dimension = if let Some(position) = req.position {
-        update_dimension.position(position)
-    } else {
-        update_dimension
-    };
-    let update_dimension = update_dimension
-        .change_reason(req.change_reason.clone())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to update dimension: {}", e)))?;
-
-    let _ = state
-        .superposition_client
-        .weight_recompute()
-        .org_id(state.env.superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .send()
-        .await
-        .map_err(|e| {
-            ABError::InternalServerError(format!("Failed to trigger weight recompute: {}", e))
-        })?;
-
-    Ok(Json(Dimension {
-        dimension: update_dimension.dimension,
-        position: update_dimension.position,
-        schema: hashmap_to_json_value(&update_dimension.schema),
-        description: update_dimension.description,
-        change_reason: update_dimension.change_reason,
-        mandatory: Some(update_dimension.mandatory),
-        dimension_type: match update_dimension.dimension_type {
-            superposition_sdk::types::DimensionType::LocalCohort(_) => DimensionType::Cohort,
-            _ => DimensionType::Standard,
-        },
-        depends_on: match update_dimension.dimension_type {
-            superposition_sdk::types::DimensionType::LocalCohort(depends_on) => Some(depends_on),
-            _ => None,
-        },
-    }))
 }
 
 #[authz(
@@ -346,28 +359,33 @@ async fn delete_dimension_api(
         auth_response.organisation.clone(),
         auth_response.application.clone(),
     )?;
+    crate::release::maker_checker::auxiliary_write(&state, &organisation, &application, async {
+        crate::release::maker_checker::auxiliary(&state, &organisation, &application).await?;
 
-    // Get workspace name for this application
-    let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
-        state.db_pool.clone(),
-        &state.redis_cache,
-        application.clone(),
-        organisation.clone(),
-    )
+        // Get workspace name for this application
+        let workspace_name = crate::utils::workspace::get_workspace_name_for_application(
+            state.db_pool.clone(),
+            &state.redis_cache,
+            application.clone(),
+            organisation.clone(),
+        )
+        .await?;
+
+        state
+            .superposition_client
+            .delete_dimension()
+            .org_id(state.env.superposition_org_id.clone())
+            .workspace_id(workspace_name.clone())
+            .dimension(path.into_inner())
+            .send()
+            .await
+            .map_err(|e| {
+                ABError::InternalServerError(format!("Failed to delete dimension: {}", e))
+            })?;
+
+        Ok(Json(()))
+    })
     .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
-
-    state
-        .superposition_client
-        .delete_dimension()
-        .org_id(state.env.superposition_org_id.clone())
-        .workspace_id(workspace_name.clone())
-        .dimension(path.into_inner())
-        .send()
-        .await
-        .map_err(|e| ABError::InternalServerError(format!("Failed to delete dimension: {}", e)))?;
-
-    Ok(Json(()))
 }
 
 #[authz(
@@ -394,8 +412,7 @@ async fn create_release_view_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
 
     let existing_dimensions = state
         .superposition_client
@@ -608,8 +625,7 @@ async fn update_release_view_api(
         application.clone(),
         organisation.clone(),
     )
-    .await
-    .map_err(|e| ABError::InternalServerError(format!("Workspace error: {}", e)))?;
+    .await?;
 
     let existing_dimensions = state
         .superposition_client
