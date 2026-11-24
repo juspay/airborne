@@ -49,6 +49,10 @@ pub struct UserToken {
     pub expires_in: i64,
     pub refresh_token: String,
     pub refresh_expires_in: i64,
+    /// OIDC ID token. Returned only by the SSO (authorization code) sign-in; the dashboard
+    /// sends it as `id_token_hint` when it ends the provider session on sign-out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id_token: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

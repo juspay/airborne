@@ -13,7 +13,7 @@ const actionToEndpoint: Record<string, string> = {
 // Login/Signup response shape
 type OAuthUserResponse = {
   user_id: string;
-  user_token: { access_token: string };
+  user_token: { access_token: string; id_token?: string };
   username: string;
   is_super_admin: boolean;
   organisations: {
@@ -81,7 +81,7 @@ export default function OAuthCallback() {
         // normal login/signup flow
         const userRes = res as OAuthUserResponse;
         setToken(userRes.user_token?.access_token || "");
-        setAuthMethod("oidc");
+        setAuthMethod("oidc", userRes.user_token?.id_token);
         setUser({ user_id: userRes.user_id, name: userRes.username, is_super_admin: userRes.is_super_admin });
         const organisation = userRes.organisations?.[0]?.name || "";
         const application = userRes.organisations?.[0]?.applications?.[0]?.application || "";

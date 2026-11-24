@@ -57,20 +57,34 @@ export const LS_APP = "airborne:app";
 export const LS_USER = "airborne:user";
 /** How the current session signed in: "oidc" (SSO) or "password". */
 export const LS_AUTH_METHOD = "airborne:auth_method";
+/** ID token from the SSO sign-in, sent as `id_token_hint` when ending the provider session. */
+export const LS_ID_TOKEN = "airborne:id_token";
 
 export type AuthMethod = "oidc" | "password";
 
-export function setAuthMethod(method: AuthMethod) {
+/** Records how the session signed in, and the ID token for SSO sign-ins. */
+export function setAuthMethod(method: AuthMethod, idToken?: string | null) {
   localStorage.setItem(LS_AUTH_METHOD, method);
+  if (method === "oidc" && idToken) localStorage.setItem(LS_ID_TOKEN, idToken);
+  else localStorage.removeItem(LS_ID_TOKEN);
 }
 
-function isHttpUrl(value: string): boolean {
+/**
+ * The provider logout URL to send the browser to, with `id_token_hint` added when we have
+ * the ID token. The hint proves the request comes from this app, so the provider can end
+ * the session without asking "Do you want to log out?" (and providers such as Okta require
+ * it). Returns null if the configured URL is not an absolute http(s) URL.
+ */
+function providerLogoutUrl(configured: string, idToken: string | null): string | null {
+  let url: URL;
   try {
-    const { protocol } = new URL(value);
-    return protocol === "http:" || protocol === "https:";
+    url = new URL(configured);
   } catch {
-    return false;
+    return null;
   }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (idToken) url.searchParams.set("id_token_hint", idToken);
+  return url.toString();
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -146,6 +160,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setOrg(null);
     setApp(null);
     localStorage.removeItem(LS_AUTH_METHOD);
+    localStorage.removeItem(LS_ID_TOKEN);
     if (localStorage.getItem("org_request_data")) localStorage.removeItem("org_request_data");
   };
 
@@ -156,17 +171,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = () => {
-    // Decide before clearSession() wipes the stored sign-in method. Sessions from before
-    // the method was recorded count as SSO when password login is turned off.
+    // Read before clearSession() wipes them. Sessions from before the sign-in method was
+    // recorded count as SSO when password login is turned off.
     const signedInWithOidc =
       localStorage.getItem(LS_AUTH_METHOD) === "oidc" || config?.password_login_enabled === false;
-    const providerLogoutUrl = config?.oidc_logout_url;
+    const logoutUrl = config?.oidc_logout_url
+      ? providerLogoutUrl(config.oidc_logout_url, localStorage.getItem(LS_ID_TOKEN))
+      : null;
     clearSession();
     if (typeof window === "undefined") return;
-    if (signedInWithOidc && providerLogoutUrl && isHttpUrl(providerLogoutUrl)) {
+    if (signedInWithOidc && logoutUrl) {
       // A top-level navigation (not fetch) so the provider can read and clear its own
       // session cookie; it then redirects back via the URL's post-logout redirect.
-      window.location.href = providerLogoutUrl;
+      window.location.href = logoutUrl;
       return;
     }
     window.location.href = "/login";

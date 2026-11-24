@@ -269,6 +269,7 @@ async fn oauth_login(
         expires_in: token_response.expires_in,
         refresh_token: token_response.refresh_token.unwrap_or_default(),
         refresh_expires_in: token_response.refresh_expires_in.unwrap_or(0),
+        id_token: token_response.id_token,
     });
 
     Ok(user_resp)
@@ -313,6 +314,7 @@ async fn oauth_signup(
         expires_in: token_response.expires_in,
         refresh_token: token_response.refresh_token.unwrap_or_default(),
         refresh_expires_in: token_response.refresh_expires_in.unwrap_or(0),
+        id_token: token_response.id_token,
     });
 
     info!(
