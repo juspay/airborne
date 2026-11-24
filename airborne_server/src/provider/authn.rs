@@ -534,9 +534,6 @@ fn to_user_token(token_response: &CoreTokenResponse) -> airborne_types::Result<U
         refresh_token,
         // refresh_expires_in is provider-specific and not part of core OAuth2/OIDC token response.
         refresh_expires_in: 0,
-        // Password and refresh-token logins never end the provider session from the
-        // dashboard, so they don't need the ID token.
-        id_token: None,
     })
 }
 
