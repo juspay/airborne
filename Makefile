@@ -48,7 +48,7 @@ define read-container-name
 endef
 
 define check-container
-	$(DOCKER) ps | grep $(1) 2>&1 > /dev/null; echo $$?
+	if [ -n "$(1)" ] && $(DOCKER) ps --format '{{.Names}}' | grep -Fqx -- "$(1)"; then echo 0; else echo 1; fi
 endef
 
 DB_CONTAINER_NAME = $(shell $(call read-container-name,airborne_server,postgres))
@@ -716,6 +716,7 @@ smithy-clients: smithy-clean-build
 # 	git restore airborne_server_clients/javascript/sdk/README.md
 	cp -r $(SMITHY_BUILD_SRC)/typescript-client-codegen/*\
 				airborne_server_clients/javascript/sdk
+	@node smithy/scripts/normalize-sdk-package.cjs airborne_server_clients/javascript/sdk/package.json
 	git restore airborne_server_clients/javascript/sdk/LICENSE
 	cp -f $(SMITHY_BUILD_SRC)/model/*\
 				airborne_server_clients/model
@@ -744,11 +745,16 @@ generate-cli: smithy-clients
 		--service Airborne \
 		--smithyModelJSONPath airborne_server_clients/model/model.json \
 		--plugin typescript-client-codegen
+	node smithy/scripts/normalize-core-cli.cjs airborne-core-cli
 	@echo "$(YELLOW)Adding repository field to airborne-core-cli/package.json...$(NC)"
-	@sed -i.bak '/"dependencies": {/i\
-\  "repository": {\
-\    "type": "git",\
-\    "url": "git+https://github.com/juspay/airborne.git"\
-\  },' airborne-core-cli/package.json && rm -f airborne-core-cli/package.json.bak
+	@node -e 'const fs = require("node:fs"); const file = "airborne-core-cli/package.json"; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); pkg.repository = { type: "git", url: "git+https://github.com/juspay/airborne.git" }; fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");'
+	@echo "$(YELLOW)Validating generated core CLI...$(NC)"
+	chmod +x airborne-core-cli/bin.js
+	node --check airborne-core-cli/index.js
+	node --check airborne-core-cli/action.js
 	cd airborne-core-cli && npm install
   
+
+.PHONY: quickstart
+quickstart:
+	python3 scripts/quickstart.py

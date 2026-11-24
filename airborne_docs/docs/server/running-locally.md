@@ -141,3 +141,44 @@ make cleanup   # stop + remove volumes and delete airborne_server/.env
 
 - [Configuration](/docs/server/configuration) — every environment variable explained.
 - [Deploy on AWS ECS](/docs/server/deploy-ecs) and [Deploy on AWS EKS](/docs/server/deploy-eks) — taking the same dependency model to production.
+
+## Isolated first-run sandbox
+
+Run `make quickstart` from the repository root after installing Docker Compose, the pinned Rust toolchain, Node/npm, Python 3, curl and jq. The script creates a unique Compose project with loopback-only random ports and a private `.quickstart/` state directory. It retains Keycloak authentication, seeds `quickstart / first-app` and an exact `1.0.0` version cohort, starts the API/dashboard, and prints credentials and the next release steps. It skips Redis (REDIS_URL is unset), RedisInsight, analytics and docs. Superposition is pinned to SDK-compatible `0.113.0`. No auth bypass is installed.
+
+Ctrl-C stops its own processes and removes only project-labelled containers, volumes and network. Logs and credentials remain locally for inspection. Run `python3 scripts/quickstart.py --smoke` to time startup and seed, then clean up automatically. The script binds its server to `127.0.0.1` and stops when disk space falls below 5 GB. This local plaintext setup is not production configuration.
+
+Native SDK wiring, a native rebuild, bundling/uploading a package and validating the running app remain manual. Follow [React Native integration](/docs/guides/integrate-react-native). The seeded cohort targets only `app_version=1.0.0`; first releases require an explicit ramp and conclusion. Ten minutes is a walkthrough budget with prerequisites and build caches ready, not a cold-install promise.
+
+## Persistent local data
+
+Set `AIRBORNE_DATA_DIR` in `airborne_server/.env` to an absolute host directory.
+Compose stores Superposition PostgreSQL under `superposition/` and LocalStack
+S3/KMS snapshots under `localstack/` there (default: gitignored `.airborne-data/`).
+A helper seeds a fresh Superposition cluster with its required permissions.
+Existing deployments must import their stopped containers **before** Compose
+recreates them; follow [backup and migration](/docs/server/superposition-backup/).
+
+Container restart, recreation and `docker compose down` retain these host files.
+Avoid `down -v`: Airborne Postgres and Keycloak still use named volumes, which that
+command deletes. LocalStack saves periodically, so abrupt power loss can lose its
+latest unsaved writes. Keep independent backups. The quickstart uses its own
+`.quickstart/<project>/data` directory, isolated from your normal stack.
+
+## Upgrading an existing local stack
+
+The local setup now uses Superposition 0.113.0 (previously 0.89.0) and host bind mounts for LocalStack, replacing its earlier relative bind mount. Back up and migrate existing data using [the backup and persistence guide](./superposition-backup.md) before starting the new configuration; otherwise the new mount appears empty.
+
+Quickstart retains logs, credentials and database files in `.quickstart/<project>`. On Linux, PostgreSQL data is owned by container UID 100 with mode 0700. After verifying that this quickstart's containers are stopped, an administrator must remove that specific project's directory with elevated permissions. Do not delete the shared data directory or other projects.
+
+For a pre-persistence `localstack/localstack` source, export objects through S3
+**before stopping it**. The old `/var/lib/localstack` bind mount is not a
+`gresau/localstack-persist` snapshot, and a stopped ephemeral API may have lost
+its objects. Use `aws --endpoint-url <old-endpoint> s3 sync s3://<bucket>
+<export>/<bucket>/` for every bucket. Then stop the old services and set
+`LOCALSTACK_S3_EXPORT=<absolute-export>` when running `seed-local-data.sh`.
+The script imports objects into a disposable, network-isolated LocalStack with
+no published ports, stops it to flush the new snapshot format, and promotes
+both staged directories only after successful validation. It never copies an
+old `/persisted-data` path that did not exist. If the old process was already
+stopped without persistence or export, recover the objects from backup first.

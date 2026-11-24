@@ -22,18 +22,21 @@ import {
 } from "./utils/release.js";
 import { createFiles, uploadFiles } from "./utils/file.js";
 import { createPackageFromLocalRelease } from "./utils/package.js";
-import { PostLoginAction } from "airborne-core-cli/action";
-import { getBaseUrl, setBaseUrl } from "airborne-core-cli";
+import {
+  ConcludeReleaseAction,
+  DiscardReleaseAction,
+  GetReleaseAction,
+  PostLoginAction,
+  RampReleaseAction,
+  RollbackReleaseAction,
+} from "airborne-core-cli/action";
+import {
+  MAX_RAMP_PERCENTAGE,
+  describeFailure,
+  parseRampPercentage,
+  runLifecycle,
+} from "./utils/lifecycle.js";
 const program = new Command();
-
-try{
-  const baseUrl = await getBaseUrl();
-  if(!baseUrl){
-    await setBaseUrl("https://airborne.juspay.in");
-  }
-}catch(err){
-   await setBaseUrl("https://airborne.juspay.in");
-}
 
 program
   .name("airborne-devkit")
@@ -833,6 +836,185 @@ Troubleshooting:
       process.exit(1);
     }
   });
+
+// Release lifecycle: ramp, conclude, discard and roll back a release by id.
+const lifecycleActions = {
+  ConcludeReleaseAction,
+  DiscardReleaseAction,
+  GetReleaseAction,
+  RampReleaseAction,
+  RollbackReleaseAction,
+};
+
+function platformOption(value) {
+  const lower = value.toLowerCase();
+  if (!["android", "ios", "web"].includes(lower)) {
+    throw new InvalidOptionArgumentError(
+      `Invalid platform: "${value}". Allowed values: android | ios | web`
+    );
+  }
+  return lower;
+}
+
+// Organisation and application come from --organisation/--application, or from the
+// airborne-config.json section of --platform, like the other release commands.
+async function lifecycleScope(directoryPath, options) {
+  const directory = directoryPath || process.cwd();
+  const token = loadToken(directory)?.access_token;
+  if (!token) {
+    throw new Error("Not logged in. Run 'airborne-devkit login' first.");
+  }
+  let { organisation, application } = options;
+  if (!organisation || !application) {
+    if (!options.platform) {
+      throw new Error(
+        "Pass --platform, or both --organisation and --application"
+      );
+    }
+    const config = await readAndResolveAirborneConfig(
+      directory,
+      options.platform
+    );
+    organisation = organisation || config.organisation;
+    application = application || config.namespace;
+  }
+  return { organisation, application, token };
+}
+
+function addLifecycleCommand(kind, name, description, configure, examples) {
+  const command = program
+    .command(`${name} <releaseId> [directoryPath]`)
+    .description(description)
+    .option("-p, --platform <platform>", "android | ios | web", platformOption)
+    .option("--organisation <organisation>", "Organisation (skips airborne-config.json)")
+    .option("--application <application>", "Application (skips airborne-config.json)");
+  configure(command);
+  command
+    .addHelpText("after", `\nExamples:\n${examples}\n\nExits with a nonzero status when the server refuses the request.`)
+    .action(async (releaseId, directoryPath, options) => {
+      try {
+        const scope = await lifecycleScope(directoryPath, options);
+        const result = await runLifecycle(
+          kind,
+          { ...options, ...scope, releaseId },
+          lifecycleActions
+        );
+        const { $metadata, ...body } = result;
+        console.log(JSON.stringify(body, null, 2));
+        process.exit(0);
+      } catch (err) {
+        console.error(`❌ Failed to ${name.replace("-release", "")} release:`, describeFailure(err));
+        process.exit(1);
+      }
+    });
+}
+
+addLifecycleCommand(
+  "ramp",
+  "ramp-release",
+  `
+  Set the share of traffic that receives a release:
+
+  A new release serves no traffic until it is ramped. Ramping a created release
+  starts it; ramp again to raise or lower the share, or set 0 to pause it. The
+  most a release can be ramped to is ${MAX_RAMP_PERCENTAGE}; conclude the release to send everyone to it.
+  When the application requires approvals, raising the share is refused with
+  "approval_required"; raise a deployment request instead.
+
+  Parameters:
+      <releaseId> (required) : Id of the release
+      [directoryPath] (optional) : Directory with airborne-config.json and login (defaults to current directory)
+      --percentage <0-${MAX_RAMP_PERCENTAGE}> (required) : Traffic percentage
+      --reason <string> (optional) : Reason recorded upstream
+`,
+  (command) =>
+    command
+      .requiredOption("--percentage <percentage>", `Traffic percentage, 0 to ${MAX_RAMP_PERCENTAGE}`, (value) => {
+        try {
+          return parseRampPercentage(value);
+        } catch (err) {
+          throw new InvalidOptionArgumentError(err.message);
+        }
+      })
+      .option("-r, --reason <reason>", "Reason recorded upstream"),
+  `1. Start a release at 10%:
+   $ airborne-devkit ramp-release 7522252134449025024 -p android --percentage 10
+
+2. Pause it:
+   $ airborne-devkit ramp-release 7522252134449025024 -p android --percentage 0`
+);
+
+addLifecycleCommand(
+  "conclude",
+  "conclude-release",
+  `
+  Make one outcome of a ramped release permanent:
+
+  "--variant release" promotes the release to everyone; "--variant control" ends it
+  and keeps the previous release live. The release must be ramped first. When the
+  application requires approvals, every conclude is refused with "approval_required".
+
+  Parameters:
+      <releaseId> (required) : Id of the release
+      [directoryPath] (optional) : Directory with airborne-config.json and login (defaults to current directory)
+      --variant <release|control|id> (required) : Outcome, or an exact variant id
+      --reason <string> (optional) : Reason recorded upstream
+`,
+  (command) =>
+    command
+      .requiredOption("--variant <variant>", "release | control | exact variant id")
+      .option("-r, --reason <reason>", "Reason recorded upstream"),
+  `1. Promote a release:
+   $ airborne-devkit conclude-release 7522252134449025024 -p android --variant release
+
+2. End it and keep the previous release:
+   $ airborne-devkit conclude-release 7522252134449025024 -p android --variant control`
+);
+
+addLifecycleCommand(
+  "discard",
+  "discard-release",
+  `
+  Discard a release that has not been ramped:
+
+  Only a created release can be discarded. A ramped release must be concluded on
+  control or rolled back instead. Discarding never needs approval.
+
+  Parameters:
+      <releaseId> (required) : Id of the release
+      [directoryPath] (optional) : Directory with airborne-config.json and login (defaults to current directory)
+      --reason <string> (optional) : Reason recorded upstream
+`,
+  (command) => command.option("-r, --reason <reason>", "Reason recorded upstream"),
+  `1. Discard a release:
+   $ airborne-devkit discard-release 7522252134449025024 -p android`
+);
+
+addLifecycleCommand(
+  "rollback",
+  "rollback-release",
+  `
+  Roll a release back according to its state:
+
+  A created release is discarded, a ramped release is concluded on control, and a
+  live release is replaced by a re-release of the previous live one. Check the
+  result first with the GetControlCenterRollbackPreview command.
+
+  Parameters:
+      <releaseId> (required) : Id of the release
+      [directoryPath] (optional) : Directory with airborne-config.json and login (defaults to current directory)
+      --reason <string> (required) : Why the release is rolled back
+      --emergency (optional) : Use the constrained emergency path (current checkers only)
+      --confirm-sensitive-risk (optional) : Required when the release is marked rollback-sensitive
+`,
+  (command) =>
+    command
+      .requiredOption("-r, --reason <reason>", "Why the release is rolled back")
+      .option("--emergency", "Use the emergency rollback path")
+      .option("--confirm-sensitive-risk", "Confirm a rollback-sensitive release"),
+  `1. Roll back a live release:
+   $ airborne-devkit rollback-release 7522252134449025024 -p android --reason "crash on launch"`
+);
 
 // Parse command line arguments
 program.parse(process.argv);

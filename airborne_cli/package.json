@@ -9,8 +9,8 @@
   },
   "scripts": {
     "cli": "node src/index.js",
-    "release": "release-it --only-version",
-    "test": "node --test test/*.test.js"
+    "test": "node --experimental-vm-modules --test test/*.test.js test/*.test.mjs",
+    "release": "release-it --only-version"
   },
   "keywords": [
     "cli",
