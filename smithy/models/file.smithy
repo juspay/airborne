@@ -32,10 +32,7 @@ structure UpdateFileRequest {
 operation UpdateFile {
     input: UpdateFileRequest,
     output: CreateFileResponse,
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [ApprovalRequiredError Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Create file request
@@ -212,10 +209,7 @@ structure UploadFileRequest {
 operation CreateFile {
     input: CreateFileRequest
     output: CreateFileResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [ApprovalRequiredError Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// List files for an application, with pagination and optional search and tag filters. Pass the organisation and application in the x-organisation and x-application headers. Requires a bearer token.
@@ -226,10 +220,7 @@ operation CreateFile {
 operation ListFiles {
     input: ListFilesRequest
     output: ListFilesResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Upload a file's bytes directly as the request body and register it in one step. Send the raw file as the payload, with its Base64-encoded SHA-256 digest in the x-checksum header and the organisation and application in the x-organisation and x-application headers. Returns the created file. Requires a bearer token.
@@ -239,10 +230,7 @@ operation ListFiles {
 operation UploadFile {
     input: UploadFileRequest
     output: CreateFileResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [ApprovalRequiredError Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// List file tags request
@@ -313,10 +301,7 @@ structure ListFileTagsResponse {
 operation ListFileTags {
     input: ListFileTagsRequest
     output: ListFileTagsResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }
 
 /// Represents a version within a file group
@@ -446,8 +431,5 @@ structure ListFileGroupsResponse {
 operation ListFileGroups {
     input: ListFileGroupsRequest
     output: ListFileGroupsResponse
-    errors: [
-        Unauthorized
-        BadRequestError
-    ]
+    errors: [Unauthorized BadRequestError NotFoundError InternalServerError ForbiddenError]
 }

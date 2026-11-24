@@ -51,6 +51,9 @@ declare const DeleteDimensionCommand_base: {
  * @see {@link DeleteDimensionCommandOutput} for command's `response` shape.
  * @see {@link AirborneClientResolvedConfig | config} for AirborneClient's `config` shape.
  *
+ * @throws {@link ApprovalRequiredError} (client fault)
+ *  A direct release write was refused because this application requires an approved deployment request.
+ *
  * @throws {@link BadRequestError} (client fault)
  *  Bad request error
  *

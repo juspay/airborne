@@ -64,6 +64,7 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  *   resources: [
  *     "STRING_VALUE",
  *   ],
+ *   rollback_sensitive: "security" || "one_way_migration",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
@@ -112,6 +113,12 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  * //   },
  * //   experiment: { // ReleaseExperiment
  * //     experiment_id: "STRING_VALUE",
+ * //     experiment_variants: { // ExperimentVariants
+ * //       control: "STRING_VALUE",
+ * //       experimentals: [ // StringList
+ * //         "STRING_VALUE",
+ * //       ],
+ * //     },
  * //     package_version: Number("int"),
  * //     config_version: "STRING_VALUE",
  * //     created_at: "STRING_VALUE",
@@ -150,6 +157,9 @@ export interface CreateReleaseCommandOutput extends CreateReleaseResponse, __Met
  *  Internal server error
  *
  * @throws {@link ForbiddenError} (client fault)
+ *
+ * @throws {@link ApprovalRequiredError} (client fault)
+ *  A direct release write was refused because this application requires an approved deployment request.
  *
  * @throws {@link AirborneServiceException}
  * <p>Base exception class for all service exceptions from Airborne service.</p>

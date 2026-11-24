@@ -39,6 +39,8 @@ declare const RollbackReleaseCommand_base: {
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  *   reason: "STRING_VALUE", // required
+ *   emergency: true || false,
+ *   confirm_sensitive_risk: true || false,
  * };
  * const command = new RollbackReleaseCommand(input);
  * const response = await client.send(command);
@@ -98,6 +100,9 @@ declare const RollbackReleaseCommand_base: {
  *
  * @throws {@link RollbackPartialFailureError} (server fault)
  *  Returned when the durable replacement create, ramp, or conclude step needs recovery. Repeat the same rollback after reviewing upstream state.
+ *
+ * @throws {@link ApprovalRequiredError} (client fault)
+ *  A direct release write was refused because this application requires an approved deployment request.
  *
  * @throws {@link AirborneServiceException}
  * <p>Base exception class for all service exceptions from Airborne service.</p>

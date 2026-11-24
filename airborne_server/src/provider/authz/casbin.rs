@@ -243,6 +243,28 @@ impl CasbinAuthzProvider {
             .await
     }
 
+    async fn app_exists(
+        &self,
+        organisation: &str,
+        application: &str,
+    ) -> airborne_types::Result<bool> {
+        let (org, app, pool) = (
+            organisation.to_owned(),
+            application.to_owned(),
+            self.db_pool.clone(),
+        );
+        run_blocking!({
+            let mut conn = pool.get()?;
+            Ok(diesel::select(diesel::dsl::exists(
+                authz_memberships::table
+                    .filter(authz_memberships::scope.eq(POLICY_SCOPE_APP))
+                    .filter(authz_memberships::organisation.eq(org))
+                    .filter(authz_memberships::application.eq(app)),
+            ))
+            .get_result::<bool>(&mut conn)?)
+        })
+    }
+
     async fn list_org_apps(&self, organisation: &str) -> Vec<String> {
         let policies = self
             .list_memberships(POLICY_SCOPE_APP, organisation, None)
@@ -1233,6 +1255,24 @@ impl AuthZProvider for CasbinAuthzProvider {
             }
         }
 
+        // Built-in organisation membership includes read access to existing apps.
+        // Preserve stronger explicit app grants; never invent access to another org.
+        if let (Some(org), Some(app_name)) = (org_access.as_ref(), application) {
+            if app_access.is_none()
+                && org.level >= READ.access
+                && self.app_exists(&org.name, app_name).await?
+            {
+                app_access = Some(AccessLevel {
+                    name: app_name.to_owned(),
+                    level: app_access
+                        .as_ref()
+                        .map(|a| a.level)
+                        .unwrap_or(READ.access)
+                        .max(READ.access),
+                });
+            }
+        }
+
         Ok(AuthzAccessContext {
             organisation: org_access,
             application: app_access,
@@ -1297,6 +1337,17 @@ impl AuthZProvider for CasbinAuthzProvider {
                         access: app_access,
                     });
                 }
+            }
+            if highest_role_from_set(&roles).is_some_and(|role| {
+                org_role_display_expansion(&role)
+                    .iter()
+                    .any(|r| r == ROLE_READ)
+            }) {
+                add_org_read_apps(
+                    &mut applications,
+                    &org_name,
+                    self.list_org_apps(&org_name).await,
+                );
             }
             applications.sort_by(|left, right| left.application.cmp(&right.application));
 
@@ -2441,6 +2492,25 @@ fn is_reserved_role_management_permission(resource: &str) -> bool {
     matches!(resource, "organisation_role" | "application_role")
 }
 
+fn add_org_read_apps(
+    applications: &mut Vec<ApplicationAccessSummary>,
+    org: &str,
+    apps: Vec<String>,
+) {
+    for app in apps {
+        if !applications
+            .iter()
+            .any(|a| a.organisation == org && a.application == app)
+        {
+            applications.push(ApplicationAccessSummary {
+                organisation: org.to_owned(),
+                application: app,
+                access: vec![ROLE_READ.to_owned()],
+            });
+        }
+    }
+}
+
 fn org_role_display_expansion(role: &str) -> Vec<String> {
     let canonical = canonical_system_role(role);
     let mut roles = match canonical.as_deref().unwrap_or(role) {
@@ -2492,4 +2562,22 @@ fn role_sort_key(role: &str) -> u8 {
 
 fn sort_roles(roles: &mut [String]) {
     roles.sort_by_key(|left| role_sort_key(left));
+}
+
+#[cfg(test)]
+mod org_read_tests {
+    use super::*;
+    #[test]
+    fn org_reader_sees_apps_without_overwriting_explicit_grants() {
+        let mut apps = vec![ApplicationAccessSummary {
+            organisation: "org".into(),
+            application: "existing".into(),
+            access: vec!["admin".into()],
+        }];
+        add_org_read_apps(&mut apps, "org", vec!["existing".into(), "new".into()]);
+        assert_eq!(apps.len(), 2);
+        assert_eq!(apps[0].access, vec!["admin"]);
+        assert_eq!(apps[1].access, vec!["read"]);
+        assert_eq!(apps[1].organisation, "org");
+    }
 }

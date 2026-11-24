@@ -43,12 +43,18 @@ export interface ServeReleaseV2CommandOutput extends ReleaseConfig, __MetadataBe
  * // const { AirborneClient, ServeReleaseV2Command } = require("airborne-server-sdk"); // CommonJS import
  * const client = new AirborneClient(config);
  * const input = { // GetServeReleaseInput
+ *   telemetry_platform: "STRING_VALUE",
+ *   native_version: "STRING_VALUE",
  *   organisation: "STRING_VALUE", // required
  *   application: "STRING_VALUE", // required
  * };
  * const command = new ServeReleaseV2Command(input);
  * const response = await client.send(command);
  * // { // ReleaseConfig
+ * //   blocked_package_versions: [ // StringList
+ * //     "STRING_VALUE",
+ * //   ],
+ * //   telemetry: "DOCUMENT_VALUE",
  * //   config: { // GetReleaseConfig
  * //     version: "STRING_VALUE", // required
  * //     release_config_timeout: Number("int"), // required
@@ -61,7 +67,7 @@ export interface ServeReleaseV2CommandOutput extends ReleaseConfig, __MetadataBe
  * //     tag: "STRING_VALUE",
  * //     version: Number("int"), // required
  * //     index: "STRING_VALUE", // required
- * //     files: [ // StringList // required
+ * //     files: [ // required
  * //       "STRING_VALUE",
  * //     ],
  * //   },
