@@ -13,7 +13,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { GENERIC_OIDC_PROVIDER, resolveOidcProviders } from "@/lib/oidc-providers";
-import { useAppContext } from "@/providers/app-context";
+import { setAuthMethod, useAppContext } from "@/providers/app-context";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -52,6 +52,7 @@ export default function LoginPage() {
       });
       const token = res?.user_token?.access_token || "";
       setToken(token);
+      setAuthMethod("password");
       setUser({ user_id: res?.user_id, name, is_super_admin: res?.is_super_admin || false });
       // default org/app selection from response if present
       const org = res?.organisations?.[0]?.name || "";

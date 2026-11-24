@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { useApp } from "@/providers/app-context";
+import { setAuthMethod, useApp } from "@/providers/app-context";
 
 const actionToEndpoint: Record<string, string> = {
   signup: "/users/oauth/signup",
@@ -81,6 +81,7 @@ export default function OAuthCallback() {
         // normal login/signup flow
         const userRes = res as OAuthUserResponse;
         setToken(userRes.user_token?.access_token || "");
+        setAuthMethod("oidc");
         setUser({ user_id: userRes.user_id, name: userRes.username, is_super_admin: userRes.is_super_admin });
         const organisation = userRes.organisations?.[0]?.name || "";
         const application = userRes.organisations?.[0]?.applications?.[0]?.application || "";

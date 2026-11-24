@@ -35,6 +35,9 @@ struct Configuration {
     oidc_login_enabled: bool,
     password_login_enabled: bool,
     registration_enabled: bool,
+    /// Identity provider logout URL (`OIDC_LOGOUT_URL`). When set, the dashboard sends
+    /// users who signed in with SSO here on sign-out, so the provider session ends too.
+    oidc_logout_url: Option<String>,
 }
 
 #[get("")]
@@ -55,6 +58,7 @@ async fn get_global_configurations(
         oidc_login_enabled: state.authn_provider.is_oidc_login_enabled(state.get_ref()),
         password_login_enabled: state.authn_provider.supports_password_login(),
         registration_enabled: state.authn_provider.supports_signup(),
+        oidc_logout_url: state.env.oidc_logout_url.clone(),
     };
 
     Ok(Json(config))

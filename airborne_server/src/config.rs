@@ -52,6 +52,7 @@ pub struct AppConfig {
     pub oidc_client_id: Option<String>,
     pub oidc_client_secret: Option<String>,
     pub oidc_clock_skew_secs: u64,
+    pub oidc_logout_url: Option<String>,
     pub authz_bootstrap_super_admins: Option<String>,
     pub authz_casbin_auto_load_secs: Option<u64>,
     pub auth_admin_client_id: Option<String>,
@@ -200,6 +201,7 @@ impl AppConfig {
             oidc_client_id: get_optional("OIDC_CLIENT_ID"),
             oidc_client_secret: get_optional_secret("OIDC_CLIENT_SECRET")?,
             oidc_clock_skew_secs: parse_env("OIDC_CLOCK_SKEW_SECS", 60),
+            oidc_logout_url: parse_oidc_logout_url(get_optional("OIDC_LOGOUT_URL"))?,
             authz_bootstrap_super_admins: get_optional("AUTHZ_BOOTSTRAP_SUPER_ADMINS"),
             authz_casbin_auto_load_secs: env::var("AUTHZ_CASBIN_AUTOLOAD_SECS")
                 .ok()
@@ -272,6 +274,26 @@ fn parse_csv_env_list(raw: &str) -> Vec<String> {
         .map(|value| value.to_ascii_lowercase())
         .filter(|value| seen.insert(value.clone()))
         .collect()
+}
+
+/// Parses `OIDC_LOGOUT_URL`, the identity provider's logout (end-session) URL that
+/// the dashboard sends the browser to on sign-out. It must be an absolute http(s)
+/// URL, so a typo fails at startup instead of breaking sign-out for every user.
+pub fn parse_oidc_logout_url(raw: Option<String>) -> Result<Option<String>, String> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let value = raw.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let invalid =
+        |reason: &str| format!("OIDC_LOGOUT_URL: '{value}' is not a valid URL ({reason})");
+    let url = url::Url::parse(value).map_err(|e| invalid(&e.to_string()))?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err(invalid("expected an absolute http(s) URL"));
+    }
+    Ok(Some(url.into()))
 }
 
 /// Browser origins allowed to read the public `/release` routes cross-origin.
@@ -370,6 +392,42 @@ mod release_cors_origin_tests {
             "not a url",
         ] {
             assert!(parse_release_cors_origins(raw).is_err(), "{raw}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod oidc_logout_url_tests {
+    use super::parse_oidc_logout_url;
+
+    #[test]
+    fn unset_or_blank_disables_provider_logout() {
+        assert_eq!(parse_oidc_logout_url(None), Ok(None));
+        assert_eq!(parse_oidc_logout_url(Some("  ".to_string())), Ok(None));
+    }
+
+    #[test]
+    fn keeps_the_query_string() {
+        let url = "https://sso.example.com/realms/airborne/protocol/openid-connect/logout\
+                   ?client_id=airborne&post_logout_redirect_uri=https%3A%2F%2Fairborne.example.com%2Flogin";
+        assert_eq!(
+            parse_oidc_logout_url(Some(format!(" {url} "))),
+            Ok(Some(url.to_string()))
+        );
+    }
+
+    #[test]
+    fn rejects_non_http_urls() {
+        for raw in [
+            "sso.example.com/logout",
+            "/logout",
+            "javascript:alert(1)",
+            "ftp://sso.example.com/logout",
+        ] {
+            assert!(
+                parse_oidc_logout_url(Some(raw.to_string())).is_err(),
+                "{raw}"
+            );
         }
     }
 }

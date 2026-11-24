@@ -25,8 +25,10 @@ type AppContextType = {
   setApp: (a: string | null) => void;
   user: User;
   setUser: (u: User) => void;
+  /** Clears the local session and returns to /login (used when the API rejects the token). */
   logout: () => void;
-  signOut: () => void; // add alias for compatibility
+  /** User-initiated sign-out: also ends the identity provider session for SSO users. */
+  signOut: () => void;
   config: Configuration | null;
   organisations: Organisations[];
   getOrgAccess: (orgName: string | null) => string[];
@@ -43,6 +45,8 @@ interface Configuration {
   oidc_login_enabled?: boolean;
   password_login_enabled?: boolean;
   registration_enabled?: boolean;
+  /** Identity provider logout URL (server env `OIDC_LOGOUT_URL`). */
+  oidc_logout_url?: string | null;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -51,6 +55,23 @@ export const LS_TOKEN = "airborne:token";
 export const LS_ORG = "airborne:org";
 export const LS_APP = "airborne:app";
 export const LS_USER = "airborne:user";
+/** How the current session signed in: "oidc" (SSO) or "password". */
+export const LS_AUTH_METHOD = "airborne:auth_method";
+
+export type AuthMethod = "oidc" | "password";
+
+export function setAuthMethod(method: AuthMethod) {
+  localStorage.setItem(LS_AUTH_METHOD, method);
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [token, setTokenState] = useState<string | null>(null);
@@ -119,14 +140,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     else localStorage.removeItem(LS_USER);
   };
 
-  const logout = () => {
+  const clearSession = () => {
     setToken(null);
     setUser(null);
     setOrg(null);
     setApp(null);
+    localStorage.removeItem(LS_AUTH_METHOD);
     if (localStorage.getItem("org_request_data")) localStorage.removeItem("org_request_data");
+  };
+
+  const logout = () => {
+    clearSession();
     // redirect to login after clearing state
     if (typeof window !== "undefined") window.location.href = "/login";
+  };
+
+  const signOut = () => {
+    // Decide before clearSession() wipes the stored sign-in method. Sessions from before
+    // the method was recorded count as SSO when password login is turned off.
+    const signedInWithOidc =
+      localStorage.getItem(LS_AUTH_METHOD) === "oidc" || config?.password_login_enabled === false;
+    const providerLogoutUrl = config?.oidc_logout_url;
+    clearSession();
+    if (typeof window === "undefined") return;
+    if (signedInWithOidc && providerLogoutUrl && isHttpUrl(providerLogoutUrl)) {
+      // A top-level navigation (not fetch) so the provider can read and clear its own
+      // session cookie; it then redirects back via the URL's post-logout redirect.
+      window.location.href = providerLogoutUrl;
+      return;
+    }
+    window.location.href = "/login";
   };
 
   const getOrgAccess = (orgName: string | null) => {
@@ -155,7 +198,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       user,
       setUser,
       logout,
-      signOut: logout, // add alias for compatibility
+      signOut,
       config,
       organisations,
       getOrgAccess,

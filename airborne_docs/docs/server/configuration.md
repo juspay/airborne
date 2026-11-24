@@ -89,6 +89,7 @@ Authentication is OIDC-based. `AUTHN_PROVIDER` selects the flavour; the shared `
 | `OIDC_CLIENT_ID` | **Yes** | `hyperota` | OIDC client id. Required at boot. |
 | `OIDC_CLIENT_SECRET` | **Yes** (secret) | `get-secret-from-keycloak` | OIDC client secret. Required at boot; decrypted when secrets are encrypted. |
 | `OIDC_CLOCK_SKEW_SECS` | No | `60` | Allowed JWT clock skew (leeway) in seconds for `exp`/`nbf` validation. |
+| `OIDC_LOGOUT_URL` | No | _(empty)_, e.g. `http://localhost:8180/realms/hyperOTA/protocol/openid-connect/logout?client_id=hyperota&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Flogin` | Identity provider logout (end-session) URL, returned to the dashboard by `GET /api/dashboard/configuration` as `oidc_logout_url`. When set, **Sign out** in the dashboard also ends the provider session for users who signed in with SSO. Must be an absolute `http(s)` URL; a malformed value fails startup. Empty keeps the old behaviour (sign-out only clears the dashboard session). See [Signing out of the identity provider](#signing-out-of-the-identity-provider). |
 | `AUTH_ADMIN_CLIENT_ID` | Conditional | `hyperota` | Admin API client id. **Required when `AUTHN_PROVIDER=keycloak`** (otherwise optional). |
 | `AUTH_ADMIN_CLIENT_SECRET` | Conditional (secret) | `get-admin-secret-from-keycloak` | Admin API client secret. **Required when `AUTHN_PROVIDER=keycloak`**; decrypted when secrets are encrypted. |
 | `AUTH_ADMIN_TOKEN_URL` | Conditional | `http://localhost:8180/realms/hyperOTA/protocol/openid-connect/token` | Token endpoint for the admin client. **Required when `AUTHN_PROVIDER=keycloak`**. |
@@ -98,6 +99,24 @@ Authentication is OIDC-based. `AUTHN_PROVIDER` selects the flavour; the shared `
 
 :::caution
 When `AUTHN_PROVIDER=keycloak`, the server **panics on boot** if any of `AUTH_ADMIN_CLIENT_ID`, `AUTH_ADMIN_CLIENT_SECRET`, `AUTH_ADMIN_TOKEN_URL`, or a parseable `AUTH_ADMIN_ISSUER` is missing. For non-Keycloak providers these are optional. `AUTH_ADMIN_ISSUER` must be a realm URL containing `/realms/<realm>`.
+:::
+
+### Signing out of the identity provider
+
+By default, **Sign out** in the dashboard only clears the dashboard's own session. The identity provider (for example Keycloak) keeps its session, so the next **Continue with SSO** in the same browser signs the user straight back in, without asking for a password or a second factor, until that provider session expires.
+
+To end the provider session as well, set `OIDC_LOGOUT_URL` to the provider's logout endpoint, including the parameters it needs to send the browser back to the dashboard afterwards. On **Sign out**, the dashboard clears its session and then navigates the browser to that URL. It does this only for users who signed in with SSO (or for everyone when password login is turned off); users who signed in with a password go straight back to the sign-in page.
+
+For Keycloak:
+
+```bash
+OIDC_LOGOUT_URL="https://<keycloak-host>/realms/<realm>/protocol/openid-connect/logout?client_id=<OIDC_CLIENT_ID>&post_logout_redirect_uri=<url-encoded dashboard sign-in URL>"
+```
+
+Keycloak only redirects to a `post_logout_redirect_uri` that the client allows, under **Valid post logout redirect URIs** (**Clients → `<client>` → Settings → Access settings**). Its default value, `+`, accepts anything allowed by **Valid redirect URIs**, so the dashboard sign-in URL (for example `https://airborne.example.com/login`) usually works already. If you replaced `+` with explicit entries, add the sign-in URL there.
+
+:::note
+The dashboard does not send an `id_token_hint`, so Keycloak shows a **Do you want to log out?** confirmation before ending the session. Providers that require `id_token_hint` on logout (such as Okta) are not supported by this setting yet.
 :::
 
 ## Authorization / Casbin
