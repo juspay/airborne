@@ -681,6 +681,22 @@
     {
       "id": "f8c7ea4e-23f8-4b51-b3da-088d72439a84",
       "clientId": "hyperota",
+      "protocolMappers": [
+        {
+          "name": "airborne-email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ],
       "name": "",
       "description": "",
       "rootUrl": "http://localhost:9000",
