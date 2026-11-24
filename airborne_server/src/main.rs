@@ -319,6 +319,7 @@ async fn main() -> std::io::Result<()> {
         authn_client_id: authn_client_id.clone(),
         authn_client_secret: authn_client_secret.clone(),
         authn_clock_skew_secs,
+        oidc_logout_url: app_config.oidc_logout_url.clone(),
         auth_admin_client_id,
         auth_admin_client_secret,
         auth_admin_token_url,

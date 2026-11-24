@@ -61,6 +61,7 @@ pub struct Environment {
     pub authn_client_id: String,
     pub authn_client_secret: String,
     pub authn_clock_skew_secs: u64,
+    pub oidc_logout_url: Option<String>,
     pub auth_admin_client_id: String,
     pub auth_admin_client_secret: String,
     pub auth_admin_token_url: String,

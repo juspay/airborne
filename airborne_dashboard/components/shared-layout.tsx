@@ -56,7 +56,7 @@ const LAYOUT_AUTHZ = definePagePermissions({
 });
 
 export default function SharedLayout({ children }: SharedLayoutProps) {
-  const { org, app, user, token, logout, config } = useAppContext();
+  const { org, app, user, token, logout, signOut, config } = useAppContext();
   const permissions = usePagePermissions(LAYOUT_AUTHZ);
   const [isOrgCreateModelOpen, setIsOrgCreateModelOpen] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
@@ -343,7 +343,7 @@ export default function SharedLayout({ children }: SharedLayoutProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={logout} className="text-red-600">
+                <DropdownMenuItem onClick={signOut} className="text-red-600">
                   <LogOut className="h-4 w-4 mr-2" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>

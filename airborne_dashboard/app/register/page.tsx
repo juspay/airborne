@@ -14,7 +14,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { apiFetch } from "@/lib/api";
 import { GENERIC_OIDC_PROVIDER, resolveOidcProviders } from "@/lib/oidc-providers";
-import { useAppContext } from "@/providers/app-context";
+import { setAuthMethod, useAppContext } from "@/providers/app-context";
 import { toastWarning } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
@@ -67,6 +67,7 @@ export default function RegisterPage() {
       });
       const token = res?.user_token?.access_token || "";
       setToken(token);
+      setAuthMethod("password");
       setUser({ user_id: res?.user_id, name: formData.email, is_super_admin: res?.is_super_admin || false });
       window.location.href = "/dashboard";
     } catch (e: any) {
