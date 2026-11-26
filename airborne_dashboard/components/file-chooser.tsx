@@ -11,6 +11,7 @@ import { useAppContext } from "@/providers/app-context";
 import { apiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { cn } from "@/lib/utils";
+import { toastError } from "@/hooks/use-toast";
 
 import type {
   FileGroup,
@@ -32,6 +33,8 @@ export interface FileChooserProps {
   className?: string;
   disabled?: boolean;
   excludeFiles?: string[]; // File paths to exclude from selection
+  /** Why a path can't be picked right now (e.g. a file set already provides it), or undefined. */
+  fileLockedReason?: (filePath: string) => string | undefined;
 }
 
 const GROUPS_PER_PAGE = 15;
@@ -45,6 +48,7 @@ export function FileChooser({
   className,
   disabled = false,
   excludeFiles = [],
+  fileLockedReason,
 }: FileChooserProps) {
   const { token, org, app } = useAppContext();
 
@@ -316,6 +320,11 @@ export function FileChooser({
       if (mode === "single") {
         onChange([selectedFile]);
       } else {
+        const lockedReason = fileLockedReason?.(group.file_path);
+        if (lockedReason) {
+          toastError("This file can't be selected", lockedReason);
+          return;
+        }
         const isSelected = isVersionSelected(group.file_path, version.version);
         if (isSelected) {
           onChange(selected.filter((s) => !(s.file_path === group.file_path && s.version === version.version)));
@@ -325,7 +334,7 @@ export function FileChooser({
         }
       }
     },
-    [mode, selected, onChange, isVersionSelected, getVersionTag]
+    [mode, selected, onChange, isVersionSelected, getVersionTag, fileLockedReason]
   );
 
   const handleTagFilterToggle = useCallback((tag: string) => {
@@ -473,7 +482,7 @@ export function FileChooser({
                     const existing = selected.find((s) => s.file_path === g.file_path);
                     if (existing) return;
                     const v = g.versions[0];
-                    if (v) {
+                    if (v && !fileLockedReason?.(g.file_path)) {
                       newFiles.push({
                         file_path: g.file_path,
                         version: v.version,

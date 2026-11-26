@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Info } from "lucide-react";
 import { useReleaseForm } from "../ReleaseFormContext";
 import { FileChooser, SelectedFile } from "@/components/file-chooser";
+import { FileSetPicker } from "@/components/file-set-picker";
 import { parseFileRef } from "@/lib/utils";
+import { toastError } from "@/hooks/use-toast";
+import type { FileSet, FileSetMember } from "@/types/files";
 
 export function ResourcesStep() {
   const { mode, files, selectedPackage, selectedResources, setSelectedResources } = useReleaseForm();
@@ -47,6 +50,74 @@ export function ResourcesStep() {
     setSelectedResources(filteredIds);
   };
 
+  // File sets: ticking one copies its latest version's files into the
+  // resources (the release doesn't remember the set); ticking it again
+  // removes exactly those file versions. Files already in the package are
+  // skipped.
+  const isChosen = useCallback(
+    (f: FileSetMember) => selectedResources.has(`${f.file_path}@version:${f.version}`),
+    [selectedResources]
+  );
+  const selectableOf = useCallback(
+    (setFiles: FileSetMember[]) => setFiles.filter((f) => !packageFilePaths.has(f.file_path)),
+    [packageFilePaths]
+  );
+  const isSetSelected = useCallback(
+    (_fileSet: FileSet, setFiles: FileSetMember[] | undefined) => {
+      const candidates = setFiles ? selectableOf(setFiles) : [];
+      return candidates.length > 0 && candidates.every(isChosen);
+    },
+    [selectableOf, isChosen]
+  );
+  const describeSet = useCallback(
+    (_fileSet: FileSet, setFiles: FileSetMember[] | undefined) => {
+      if (!setFiles) return undefined;
+      const candidates = selectableOf(setFiles);
+      if (candidates.length === 0) {
+        return {
+          badge: "all in package",
+          disabled: true,
+          title: "All files of this set are already in the package",
+        };
+      }
+      const chosen = candidates.filter(isChosen).length;
+      return {
+        badge: chosen > 0 && chosen < candidates.length ? "partial" : undefined,
+        note:
+          candidates.length < setFiles.length
+            ? `${candidates.length} of ${setFiles.length} selectable`
+            : `${setFiles.length} file${setFiles.length === 1 ? "" : "s"}`,
+      };
+    },
+    [selectableOf, isChosen]
+  );
+  const handleSetToggle = (fileSet: FileSet, setFiles: FileSetMember[]) => {
+    const candidates = selectableOf(setFiles);
+    if (candidates.length === 0) {
+      toastError(`Cannot add file set "${fileSet.name}"`, "All of its files are already in the package.");
+      return;
+    }
+    const keys = candidates.map((f) => `${f.file_path}@version:${f.version}`);
+    if (candidates.every(isChosen)) {
+      const next = new Set(selectedResources);
+      keys.forEach((k) => next.delete(k));
+      setSelectedResources(next);
+      return;
+    }
+    // The exact same file version can't be selected twice, e.g. from two
+    // overlapping sets. The same path at a different version is allowed.
+    const duplicates = candidates.filter(isChosen);
+    if (duplicates.length > 0) {
+      const sample = `${duplicates[0].file_path}@v${duplicates[0].version}`;
+      toastError(
+        `Cannot add file set "${fileSet.name}"`,
+        `${duplicates.length} of its file${duplicates.length === 1 ? " is" : "s are"} already selected (e.g. ${sample}). The same file version cannot be included twice.`
+      );
+      return;
+    }
+    setSelectedResources(new Set([...selectedResources, ...keys]));
+  };
+
   // Remove package files from selection - only runs when package changes, not when selection changes
   useEffect(() => {
     if (packageFilePaths.size === 0) return;
@@ -85,6 +156,12 @@ export function ResourcesStep() {
           )}
         </CardHeader>
         <CardContent>
+          <FileSetPicker
+            className="mb-4"
+            isSelected={isSetSelected}
+            onToggle={handleSetToggle}
+            describe={describeSet}
+          />
           <FileChooser
             mode="multi"
             selected={selectedFiles}

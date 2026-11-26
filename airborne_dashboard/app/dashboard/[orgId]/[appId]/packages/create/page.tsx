@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,12 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { useAppContext } from "@/providers/app-context";
 import { useRouter } from "next/navigation";
-import { toastWarning } from "@/hooks/use-toast";
+import { toastError, toastWarning } from "@/hooks/use-toast";
 import { notFound } from "next/navigation";
 import { FileChooser, SelectedFile } from "@/components/file-chooser";
+import { FileSetPicker } from "@/components/file-set-picker";
+import type { FileSet, FileSetMember, SelectedFileSet } from "@/types/files";
+import { coveredBySets, lockedBySetReason, setConflict } from "@/lib/package-rules";
 import { definePagePermissions, permission } from "@/lib/page-permissions";
 import { usePagePermissions } from "@/hooks/use-page-permissions";
 
@@ -34,6 +37,7 @@ export default function CreatePackagePage() {
 
   // Step 2: Package Files
   const [selectedPackageFiles, setSelectedPackageFiles] = useState<SelectedFile[]>([]);
+  const [selectedFileSets, setSelectedFileSets] = useState<SelectedFileSet[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -52,6 +56,38 @@ export default function CreatePackagePage() {
   const handlePackageFilesChange = useCallback((files: SelectedFile[]) => {
     setSelectedPackageFiles(files);
   }, []);
+
+  // A package references the sets it is built from (pinned to their latest
+  // version) instead of copying their files into the individual selection.
+  const coveredPaths = useMemo(() => coveredBySets(selectedFileSets), [selectedFileSets]);
+  const isSetChosen = useCallback(
+    (fileSet: FileSet) => selectedFileSets.some((s) => s.name === fileSet.name),
+    [selectedFileSets]
+  );
+  const handleSetToggle = useCallback(
+    (fileSet: FileSet, files: FileSetMember[]) => {
+      if (selectedFileSets.some((s) => s.name === fileSet.name)) {
+        setSelectedFileSets(selectedFileSets.filter((s) => s.name !== fileSet.name));
+        return;
+      }
+      const conflict = setConflict(fileSet, files, {
+        indexPath: selectedIndexFile?.file_path,
+        sets: selectedFileSets,
+        individual: selectedPackageFiles,
+      });
+      if (conflict) {
+        toastError(`Cannot add file set "${fileSet.name}"`, conflict);
+        return;
+      }
+      setSelectedFileSets([...selectedFileSets, { name: fileSet.name, version: fileSet.latest_version, files }]);
+    },
+    [selectedFileSets, selectedIndexFile, selectedPackageFiles]
+  );
+  const describeSet = useCallback(
+    (_fileSet: FileSet, files: FileSetMember[] | undefined) =>
+      files ? { note: `${files.length} file${files.length === 1 ? "" : "s"}` } : undefined,
+    []
+  );
 
   const canProceedToStep = (step: number) => {
     switch (step) {
@@ -94,6 +130,7 @@ export default function CreatePackagePage() {
             tag: tag || undefined,
             properties,
             files: filteredFileIds,
+            file_sets: selectedFileSets.map((g) => ({ name: g.name, version: g.version })),
           },
         },
         { token, org, app }
@@ -211,12 +248,27 @@ export default function CreatePackagePage() {
                 <CardDescription>Choose additional files to include in this package</CardDescription>
               </CardHeader>
               <CardContent>
+                <FileSetPicker
+                  className="mb-4"
+                  isSelected={isSetChosen}
+                  onToggle={handleSetToggle}
+                  describe={describeSet}
+                />
                 <FileChooser
                   mode="multi"
                   selected={selectedPackageFiles}
                   onChange={handlePackageFilesChange}
                   excludeFiles={selectedIndexFile ? [selectedIndexFile.file_path] : []}
+                  fileLockedReason={(path) => lockedBySetReason(path, coveredPaths)}
                 />
+                {selectedFileSets.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {selectedFileSets.length} file set{selectedFileSets.length === 1 ? "" : "s"} selected —{" "}
+                    {selectedFileSets.map((g) => `${g.name} (v${g.version})`).join(", ")} — contributing{" "}
+                    {selectedFileSets.reduce((n, g) => n + g.files.length, 0)} files. The package will remember these
+                    sets.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

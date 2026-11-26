@@ -1,3 +1,4 @@
+pub mod file_sets;
 pub mod groups;
 pub mod types;
 pub mod utils;

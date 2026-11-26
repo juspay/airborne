@@ -92,6 +92,19 @@ pub mod hyperotaserver {
     }
 
     diesel::table! {
+        hyperotaserver.file_sets (id) {
+            id -> Uuid,
+            org_id -> Text,
+            app_id -> Text,
+            name -> Text,
+            version -> Int4,
+            metadata -> Jsonb,
+            file_keys -> Array<Text>,
+            created_at -> Timestamptz,
+        }
+    }
+
+    diesel::table! {
         use diesel::sql_types::*;
         use super::sql_types::InviteRole;
         use super::sql_types::InviteStatus;
@@ -119,6 +132,13 @@ pub mod hyperotaserver {
             lazy -> Jsonb,
             properties -> Jsonb,
             resources -> Jsonb,
+        }
+    }
+
+    diesel::table! {
+        hyperotaserver.package_file_sets (package_id, file_set_id) {
+            package_id -> Uuid,
+            file_set_id -> Uuid,
         }
     }
 
@@ -179,14 +199,19 @@ pub mod hyperotaserver {
         }
     }
 
+    diesel::joinable!(package_file_sets -> file_sets (file_set_id));
+    diesel::joinable!(package_file_sets -> packages_v2 (package_id));
+
     diesel::allow_tables_to_appear_in_same_query!(
         authz_memberships,
         authz_role_bindings,
         cleanup_outbox,
         builds,
         configs,
+        file_sets,
         files,
         organisation_invites,
+        package_file_sets,
         packages,
         packages_v2,
         release_views,
